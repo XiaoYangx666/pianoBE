@@ -1,0 +1,7 @@
+{
+    "texture_data": {
+        "piano:piano_item": {
+            "textures": "textures/items/piano_item"
+        }
+    }
+}

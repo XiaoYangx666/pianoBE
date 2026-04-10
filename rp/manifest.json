@@ -1,0 +1,20 @@
+{
+    "format_version": 3,
+    "header": {
+        "name": "钢琴资源包",
+        "description": "钢琴资源包",
+        "uuid": "efbe8777-707f-42de-a238-97b05684685e",
+        "version": "1.0.0",
+        "min_engine_version": "1.26.10"
+    },
+    "modules": [
+        {
+            "type": "resources",
+            "uuid": "36d4f042-edf0-4be3-8d48-8165de3057ad",
+            "version": "1.0.0"
+        }
+    ],
+    "dependencies": [
+        { "uuid": "04f4bc5e-60a2-49f6-840c-5a22dbb19bf7", "version": "1.0.0" }
+    ]
+}

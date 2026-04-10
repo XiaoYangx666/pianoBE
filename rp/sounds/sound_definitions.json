@@ -1,0 +1,305 @@
+{
+    "format_version": "1.26.0",
+    "sound_definitions": {
+        "piano.A0": {
+            "category": "block",
+            "sounds": ["sounds/piano/A0"],
+            "max_distance": 20
+        },
+        "piano.A0_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A0_long"],
+            "max_distance": 20
+        },
+        "piano.A1": {
+            "category": "block",
+            "sounds": ["sounds/piano/A1"],
+            "max_distance": 20
+        },
+        "piano.A1_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A1_long"],
+            "max_distance": 20
+        },
+        "piano.A2": {
+            "category": "block",
+            "sounds": ["sounds/piano/A2"],
+            "max_distance": 20
+        },
+        "piano.A2_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A2_long"],
+            "max_distance": 20
+        },
+        "piano.A3": {
+            "category": "block",
+            "sounds": ["sounds/piano/A3"],
+            "max_distance": 20
+        },
+        "piano.A3_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A3_long"],
+            "max_distance": 20
+        },
+        "piano.A4": {
+            "category": "block",
+            "sounds": ["sounds/piano/A4"],
+            "max_distance": 20
+        },
+        "piano.A4_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A4_long"],
+            "max_distance": 20
+        },
+        "piano.A5": {
+            "category": "block",
+            "sounds": ["sounds/piano/A5"],
+            "max_distance": 20
+        },
+        "piano.A5_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A5_long"],
+            "max_distance": 20
+        },
+        "piano.A6": {
+            "category": "block",
+            "sounds": ["sounds/piano/A6"],
+            "max_distance": 20
+        },
+        "piano.A6_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A6_long"],
+            "max_distance": 20
+        },
+        "piano.A7": {
+            "category": "block",
+            "sounds": ["sounds/piano/A7"],
+            "max_distance": 20
+        },
+        "piano.A7_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/A7_long"],
+            "max_distance": 20
+        },
+        "piano.C1": {
+            "category": "block",
+            "sounds": ["sounds/piano/C1"],
+            "max_distance": 20
+        },
+        "piano.C1_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C1_long"],
+            "max_distance": 20
+        },
+        "piano.C2": {
+            "category": "block",
+            "sounds": ["sounds/piano/C2"],
+            "max_distance": 20
+        },
+        "piano.C2_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C2_long"],
+            "max_distance": 20
+        },
+        "piano.C3": {
+            "category": "block",
+            "sounds": ["sounds/piano/C3"],
+            "max_distance": 20
+        },
+        "piano.C3_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C3_long"],
+            "max_distance": 20
+        },
+        "piano.C4": {
+            "category": "block",
+            "sounds": ["sounds/piano/C4"],
+            "max_distance": 20
+        },
+        "piano.C4_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C4_long"],
+            "max_distance": 20
+        },
+        "piano.C5": {
+            "category": "block",
+            "sounds": ["sounds/piano/C5"],
+            "max_distance": 20
+        },
+        "piano.C5_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C5_long"],
+            "max_distance": 20
+        },
+        "piano.C6": {
+            "category": "block",
+            "sounds": ["sounds/piano/C6"],
+            "max_distance": 20
+        },
+        "piano.C6_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C6_long"],
+            "max_distance": 20
+        },
+        "piano.C7": {
+            "category": "block",
+            "sounds": ["sounds/piano/C7"],
+            "max_distance": 20
+        },
+        "piano.C7_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C7_long"],
+            "max_distance": 20
+        },
+        "piano.C8": {
+            "category": "block",
+            "sounds": ["sounds/piano/C8"],
+            "max_distance": 20
+        },
+        "piano.C8_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/C8_long"],
+            "max_distance": 20
+        },
+        "piano.D#1": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#1"],
+            "max_distance": 20
+        },
+        "piano.D#1_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#1_long"],
+            "max_distance": 20
+        },
+        "piano.D#2": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#2"],
+            "max_distance": 20
+        },
+        "piano.D#2_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#2_long"],
+            "max_distance": 20
+        },
+        "piano.D#3": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#3"],
+            "max_distance": 20
+        },
+        "piano.D#3_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#3_long"],
+            "max_distance": 20
+        },
+        "piano.D#4": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#4"],
+            "max_distance": 20
+        },
+        "piano.D#4_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#4_long"],
+            "max_distance": 20
+        },
+        "piano.D#5": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#5"],
+            "max_distance": 20
+        },
+        "piano.D#5_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#5_long"],
+            "max_distance": 20
+        },
+        "piano.D#6": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#6"],
+            "max_distance": 20
+        },
+        "piano.D#6_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#6_long"],
+            "max_distance": 20
+        },
+        "piano.D#7": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#7"],
+            "max_distance": 20
+        },
+        "piano.D#7_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/D#7_long"],
+            "max_distance": 20
+        },
+        "piano.F#1": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#1"],
+            "max_distance": 20
+        },
+        "piano.F#1_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#1_long"],
+            "max_distance": 20
+        },
+        "piano.F#2": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#2"],
+            "max_distance": 20
+        },
+        "piano.F#2_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#2_long"],
+            "max_distance": 20
+        },
+        "piano.F#3": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#3"],
+            "max_distance": 20
+        },
+        "piano.F#3_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#3_long"],
+            "max_distance": 20
+        },
+        "piano.F#4": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#4"],
+            "max_distance": 20
+        },
+        "piano.F#4_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#4_long"],
+            "max_distance": 20
+        },
+        "piano.F#5": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#5"],
+            "max_distance": 20
+        },
+        "piano.F#5_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#5_long"],
+            "max_distance": 20
+        },
+        "piano.F#6": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#6"],
+            "max_distance": 20
+        },
+        "piano.F#6_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#6_long"],
+            "max_distance": 20
+        },
+        "piano.F#7": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#7"],
+            "max_distance": 20
+        },
+        "piano.F#7_long": {
+            "category": "block",
+            "sounds": ["sounds/piano/F#7_long"],
+            "max_distance": 20
+        }
+    }
+}
