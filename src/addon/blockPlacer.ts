@@ -11,7 +11,8 @@ import {
     Vector3,
     world,
 } from "@minecraft/server";
-import { Cardinal_Direction, RightOffsets } from "./func";
+import { Cardinal_Direction } from "@types";
+import { getRightBlock } from "@utils/block";
 
 const FaceOffsets: Record<Direction, Vector3> = {
     Up: { x: 0, y: 1, z: 0 },
@@ -32,12 +33,11 @@ export const blockPlacerComponent: ItemCustomComponent = {
             return;
         }
 
-        // world.sendMessage(JSON.stringify(leftBlock.location));
         //获取角度
         const rot = t.source.getRotation();
         const direction = getDirectionByRot(rot.y);
         //获取右侧方块
-        const rightBlock = leftBlock.offset(RightOffsets[direction]);
+        const rightBlock = getRightBlock(leftBlock, direction);
         // world.sendMessage(JSON.stringify(rightBlock));
         if (!rightBlock || !canPlace(rightBlock)) {
             return;

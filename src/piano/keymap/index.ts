@@ -1,4 +1,4 @@
-import { KeyMapInfo } from "@piano/types";
+import { KeyMapInfo } from "@types";
 import { defaultKeyMap } from "./default";
 import { noBlack } from "./noBlack";
 

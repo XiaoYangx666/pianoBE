@@ -1,4 +1,4 @@
-import { KeyMap } from "@piano/types";
+import { KeyMap } from "@types";
 
 export const noBlack: KeyMap = {
     /* -------- 第4排：z -> / （C2 起） -------- */

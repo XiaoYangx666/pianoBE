@@ -1,9 +1,10 @@
-import { Dimension, Player, system, Vector3 } from "@minecraft/server";
+import { Block, Dimension, Player, system, Vector3 } from "@minecraft/server";
 import { CustomForm, Observable } from "@minecraft/server-ui";
-import { processNote } from "@piano/func";
-import { NoteInfo } from "@piano/types";
+import { NoteInfo } from "@types";
+import { processNote } from "@utils/note";
 import { Vector3Utils } from "@utils/vector";
 import { keyMaps } from "./keymap";
+import { openMidiPlayer } from "@midiPlayer/ui/playerUI";
 
 const PIANO_LAYOUT = [
     ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
@@ -56,10 +57,10 @@ function switchKeyMap(ctx: PianoContext, p: Player, label: Observable<string>) {
 /**为玩家打开钢琴表单
  * @throws 当玩家掉线时
  */
-export function openPiano(p: Player, pos: Vector3, dim: Dimension) {
+export async function openPiano(p: Player, block: Block) {
     const keyMapIdx = (p.getDynamicProperty("piano:keyMap") as number) ?? 0;
 
-    const context: PianoContext = {
+    const ctx: PianoContext = {
         status: Observable.create<string>("§b🎹 钢琴已就绪"),
         rows: [
             Observable.create<string>(""),
@@ -73,24 +74,28 @@ export function openPiano(p: Player, pos: Vector3, dim: Dimension) {
         }),
         input: Observable.create<string>("", { clientWritable: true }),
         isHandling: false,
-        pos,
-        dim,
+        pos: block.location,
+        dim: block.dimension,
     };
 
     const keyMapLabel = createKeyMapLabel(keyMapIdx);
 
     const form = CustomForm.create(p, "文本钢琴")
-        .label(context.status)
+        .label(ctx.status)
         .label("   ");
 
-    context.rows.forEach((row) => form.label(row));
+    ctx.rows.forEach((row) => form.label(row));
 
     form.label("   ")
         .button(keyMapLabel, () => {
-            switchKeyMap(context, p, keyMapLabel);
+            switchKeyMap(ctx, p, keyMapLabel);
         })
-        .toggle("升8度 (高音模式)", context.octave)
-        .textField("在此处快速打字...", context.input);
+        .button("MIDI播放", () => {
+            close();
+            system.runTimeout(() => openMidiPlayer(p, block), 20);
+        })
+        .toggle("升8度 (高音模式)", ctx.octave)
+        .textField("在此处快速打字...", ctx.input);
 
     let closed = false;
 
@@ -98,44 +103,49 @@ export function openPiano(p: Player, pos: Vector3, dim: Dimension) {
         if (closed) return;
         closed = true;
 
-        context.input.unsubscribe(inputSub);
-        context.octave.unsubscribe(octaveSub);
+        ctx.input.unsubscribe(inputSub);
+        ctx.octave.unsubscribe(octaveSub);
 
         if (form.isShowing()) {
             form.close();
         }
     }
 
-    try {
-        const result = form.show();
-        if (!result) return;
-    } catch {
-        return;
-    }
-
     // 初始化 UI
-    updateUI(context, []);
+    updateUI(ctx, []);
 
     // 监听升8度
-    const octaveSub = context.octave.subscribe(() => {
-        updateUI(context, []);
+    const octaveSub = ctx.octave.subscribe(() => {
+        updateUI(ctx, []);
     });
 
     // 监听输入
-    const inputSub = context.input.subscribe((val) => {
+    const inputSub = ctx.input.subscribe((val) => {
         // 玩家无效 / 距离超出
-        if (!p.isValid || Vector3Utils.squaredDistance(p.location, pos) > 16) {
+        if (
+            !p.isValid ||
+            Vector3Utils.squaredDistance(p.location, block.location) > 16
+        ) {
             return close();
         }
 
         // 方块失效
-        const block = dim.getBlock(pos);
         if (!block?.isValid || !block.typeId.startsWith("xypiano:piano")) {
             return close();
         }
 
-        handleInput(val, context);
+        handleInput(val, ctx);
     });
+
+    try {
+        const result = await form.show();
+        if (!result) {
+            close();
+        }
+    } catch {
+        close();
+        return;
+    }
 }
 
 const emptyInfo: NoteInfo = {
@@ -225,7 +235,7 @@ function handleInput(val: string, ctx: PianoContext) {
 function playNote(pos: Vector3, dim: Dimension, info: NoteInfo) {
     if (info.sample === "none") return;
 
-    dim.playSound(`piano.${info.sample}_long`, pos, {
+    dim.playSound(`piano_long.${info.sample}`, pos, {
         pitch: info.pitch,
         volume: 1.0,
     });

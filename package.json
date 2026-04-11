@@ -3,7 +3,8 @@
         "@minecraft/server": "2.7.0-beta.1.26.12-stable",
         "@minecraft/server-ui": "2.1.0-beta.1.26.12-stable",
         "@tonejs/midi": "^2.0.28",
-        "axios": "^1.14.0"
+        "axios": "^1.14.0",
+        "sapi-pro": "^0.4.0"
     },
     "scripts": {
         "update": "npx sapi-kit update",

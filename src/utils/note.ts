@@ -1,4 +1,4 @@
-import { NoteInfo } from "@piano/types";
+import { NoteInfo } from "@types";
 
 const NOTE_ORDER = [
     "C",

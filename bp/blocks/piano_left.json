@@ -21,7 +21,7 @@
                     "texture": "piano:texture"
                 }
             },
-            "xypiano:block": {},
+            "xypiano:piano_block": {},
             "minecraft:destructible_by_mining": {
                 "seconds_to_destroy": 1.6,
                 "item_specific_speeds": [

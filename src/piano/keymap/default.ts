@@ -1,4 +1,4 @@
-import { KeyMap } from "@piano/types";
+import { KeyMap } from "@types";
 
 export const defaultKeyMap: KeyMap = {
     /* -------- C3（低八度） -------- */

@@ -1,7 +1,8 @@
-import { BlockCustomComponent } from "@minecraft/server";
-import { Vector3Utils } from "@utils/vector";
-import { Cardinal_Direction, RightOffsets } from "./func";
+import { BlockCustomComponent, system } from "@minecraft/server";
 import { openPiano } from "@piano/piano";
+import { RightOffsets } from "@utils/block";
+import { Vector3Utils } from "@utils/vector";
+import { Cardinal_Direction } from "@types";
 
 export const PianoBlockComponent: BlockCustomComponent = {
     onBreak(e) {
@@ -37,6 +38,6 @@ export const PianoBlockComponent: BlockCustomComponent = {
             e.player.onScreenDisplay.setActionBar("距离钢琴过远");
             return;
         }
-        openPiano(e.player, e.block.location, e.dimension);
+        openPiano(e.player, e.block);
     },
 };

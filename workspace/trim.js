@@ -3,10 +3,17 @@ const fs = require("fs");
 const path = require("path");
 
 // 设置目标文件夹 (当前目录)
-const directoryPath = "./";
-const duration = 2; // 裁剪为 2 秒
+const source = "./piano_source";
+const outDir = "./piano_long";
+const duration = 4;
+const fadeDuration = 1;
+const fadeStart = duration - fadeDuration;
 
-fs.readdir(directoryPath, (err, files) => {
+if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir);
+}
+
+fs.readdir(source, (err, files) => {
     if (err) {
         return console.log("无法读取目录: " + err);
     }
@@ -16,27 +23,18 @@ fs.readdir(directoryPath, (err, files) => {
         if (path.extname(file) === ".ogg") {
             console.log(`正在处理: ${file}`);
 
-            const tempFile = `temp_${file}`;
+            const outFile = path.join(outDir, file);
 
             try {
-                // 执行 ffmpeg 裁剪命令
-                // -i: 输入
-                // -t 2: 时长 2 秒
-                // -c copy: 不重新编码 (速度最快)
-                // -y: 覆盖输出
                 execSync(
-                    `ffmpeg -i "${file}" -t ${duration} -c copy -y "${tempFile}"`
+                    `ffmpeg -loglevel error -i "${path.join(source, file)}" -t ${duration} -af "afade=t=out:st=${fadeStart}:d=${fadeDuration}" -y "${outFile}"`
                 );
-
-                // 替换原文件
-                fs.unlinkSync(file);
-                fs.renameSync(tempFile, file);
 
                 console.log(`成功: ${file} 已裁剪至 ${duration} 秒`);
             } catch (error) {
                 console.error(`处理失败 ${file}:`, error.message);
                 // 如果失败则清理临时文件
-                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
             }
         }
     });

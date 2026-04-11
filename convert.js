@@ -6,6 +6,11 @@ const { Midi } = pkg;
 const inputDir = path.resolve("./midis");
 const outputDir = path.resolve("./src/midis");
 
+function toFixed(num, digits) {
+    if (typeof num !== "number") return NaN;
+    return Number(num.toFixed(digits));
+}
+
 if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
 }
@@ -29,37 +34,19 @@ for (const file of files) {
     const data = {
         name: file.replace(/\.midi?$/i, ""),
         duration: midi.duration,
-        durationTicks: midi.durationTicks,
-
-        header: {
-            name: midi.header.name,
-            tempos: midi.header.tempos,
-            timeSignatures: midi.header.timeSignatures,
-            keySignatures: midi.header.keySignatures,
-            ppq: midi.header.ppq,
-        },
-
         tracks: midi.tracks.map((track) => ({
-            name: track.name,
-            channel: track.channel,
             instrument: track.instrument,
-            controlChanges: track.controlChanges,
-            pitchBends: track.pitchBends,
-
-            notes: track.notes.map((n) => ({
-                midi: n.midi,
-                name: n.name,
-                time: n.time,
-                ticks: n.ticks,
-                duration: n.duration,
-                durationTicks: n.durationTicks,
-                velocity: n.velocity,
-            })),
+            notes: track.notes.map((n) => [
+                n.midi,
+                toFixed(n.time, 2),
+                toFixed(n.duration, 1),
+                toFixed(n.velocity, 1),
+            ]),
         })),
     };
 
     // 写入单文件
-    const content = `export const ${varName} = ${JSON.stringify(data, null, 2)};\n`;
+    const content = `export const ${varName} = ${JSON.stringify(data)};\n`;
 
     fs.writeFileSync(path.join(outputDir, outFile), content, "utf-8");
 
