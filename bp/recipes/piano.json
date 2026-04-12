@@ -1,0 +1,21 @@
+{
+    "format_version": "1.17",
+    "minecraft:recipe_shaped": {
+        "description": {
+            "identifier": "xypiano:piano_recipe"
+        },
+        "tags": ["crafting_table"],
+        "pattern": ["XXX", "BAB", "IRI"],
+        "key": {
+            "X": { "item": "minecraft:planks" },
+            "A": { "item": "minecraft:noteblock" },
+            "B": { "item": "minecraft:jukebox" },
+            "I": { "item": "minecraft:iron_ingot" },
+            "R": { "item": "minecraft:redstone" }
+        },
+        "result": {
+            "item": "xypiano:piano_item",
+            "count": 1
+        }
+    }
+}

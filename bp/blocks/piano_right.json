@@ -4,7 +4,7 @@
         "description": {
             "identifier": "xypiano:piano_right",
             "menu_category": {
-                "category": "items",
+                "category": "none",
                 "is_hidden_in_commands": false
             },
             "traits": {
