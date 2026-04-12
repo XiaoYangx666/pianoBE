@@ -1,6 +1,8 @@
+import { getPlayModeName, PlayMode, PlayQueue } from "@midiPlayer/queue";
 import { Block, Player, system } from "@minecraft/server";
 import { CustomForm, Observable } from "@minecraft/server-ui";
-import { getAdjacentPianoBlock } from "@utils/block";
+import { Cardinal_Direction } from "@types";
+import { getLeftPianoBlock } from "@utils/block";
 import { formManager } from "sapi-pro";
 import { midiPlayerManager } from "../manager";
 import { MidiPlayer } from "../player";
@@ -20,14 +22,28 @@ interface MidiPlayerContext {
     buttonText: Observable<string>;
 }
 
+const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
+function switchPlayMode(queue: PlayQueue, label: Observable<string>) {
+    const curIdx = playModes.indexOf(queue.getMode());
+    const mode = playModes[(curIdx + 1) % playModes.length];
+    queue.setMode(mode);
+    label.setData(getPlayModeName(mode));
+}
+
 export async function openMidiPlayer(p: Player, block: Block) {
     const leftBlock = getLeftPianoBlock(block);
     if (!leftBlock) return;
+    const dir = leftBlock.permutation.getState(
+        "minecraft:cardinal_direction"
+    ) as Cardinal_Direction | undefined;
+    if (!dir) return;
 
     // 获取或创建 player
     let player =
         midiPlayerManager.get(leftBlock.dimension, leftBlock.location) ??
-        midiPlayerManager.add(new MidiPlayer(block.dimension, block.location));
+        midiPlayerManager.add(
+            new MidiPlayer(leftBlock.dimension, leftBlock.location, dir)
+        );
 
     const ctx: MidiPlayerContext = {
         state: Observable.create<string>("§7加载中..."),
@@ -39,6 +55,9 @@ export async function openMidiPlayer(p: Player, block: Block) {
 
         buttonText: Observable.create<string>("▶ 播放"),
     };
+
+    const mode = player.queue.getMode();
+    const playModeLabel = Observable.create<string>(getPlayModeName(mode));
 
     const form = CustomForm.create(p, "§bMIDI播放")
         // ===== 顶部信息 =====
@@ -86,6 +105,9 @@ export async function openMidiPlayer(p: Player, block: Block) {
         .button("⏭ 下一首", () => {
             player.next();
             updateUI(ctx, player);
+        })
+        .button(playModeLabel, () => {
+            switchPlayMode(player.queue, playModeLabel);
         });
 
     let closed = false;
@@ -163,19 +185,4 @@ function updateUI(ctx: MidiPlayerContext, player: MidiPlayer) {
 
     // ===== 按钮 =====
     ctx.buttonText.setData(info.state === "playing" ? "⏸ 暂停" : "▶ 播放");
-}
-
-function getLeftPianoBlock(block: Block) {
-    if (!block?.isValid) return;
-
-    const leftBlock =
-        block.typeId == "xypiano:piano_left"
-            ? block
-            : getAdjacentPianoBlock(block);
-
-    if (leftBlock?.typeId !== "xypiano:piano_left") {
-        return;
-    }
-
-    return leftBlock;
 }

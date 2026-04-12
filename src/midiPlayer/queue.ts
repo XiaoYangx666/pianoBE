@@ -1,6 +1,17 @@
 import { MidiJson } from "@types";
 
-type PlayMode = "sequence" | "loop" | "single" | "shuffle";
+export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
+
+const modeName: Record<PlayMode, string> = {
+    sequence: "顺序播放",
+    loop: "循环播放",
+    single: "单曲循环",
+    shuffle: "随机播放",
+};
+
+export function getPlayModeName(mode: PlayMode) {
+    return modeName[mode] ?? "未知播放模式";
+}
 
 export class PlayQueue {
     private list: MidiJson[] = [];

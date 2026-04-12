@@ -1,3 +1,5 @@
+import { Dimension, Vector3 } from "@minecraft/server";
+
 export type Cardinal_Direction = "east" | "west" | "north" | "south";
 
 export interface NoteInfo {
@@ -5,6 +7,12 @@ export interface NoteInfo {
     sample: string;
     pitch: number;
     midi: number;
+}
+/**钢琴信息 */
+export interface PianoEnv {
+    pos: Vector3;
+    dim: Dimension;
+    dir: Cardinal_Direction;
 }
 //键盘映射
 export interface KeyMapInfo {

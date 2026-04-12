@@ -1,13 +1,15 @@
 import { Dimension, Vector3 } from "@minecraft/server";
 import { processNote } from "@utils/note";
+import { summonParticle } from "@utils/particle";
 import { Signal } from "@utils/signal";
-import { MidiJson, MidiNote, NoteInfo } from "../types";
+import { Cardinal_Direction, MidiJson, MidiNote, NoteInfo } from "../types";
 import { PlayQueue } from "./queue";
 
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
 
 export class MidiPlayer {
     pos: Vector3;
+    dir: Cardinal_Direction;
     dimension: Dimension;
 
     private notes: MidiNote[] = [];
@@ -31,9 +33,10 @@ export class MidiPlayer {
 
     private readonly MAX_DELTA = 0.1;
 
-    constructor(dimension: Dimension, pos: Vector3) {
+    constructor(dimension: Dimension, pos: Vector3, dir: Cardinal_Direction) {
         this.dimension = dimension;
         this.pos = pos;
+        this.dir = dir;
         this.signal = new Signal();
     }
 
@@ -200,7 +203,7 @@ export class MidiPlayer {
             const note = this.notes[this.noteIdx];
             const info = processNote(note[0], false);
 
-            this.playNote(info, note[3], note[2]);
+            this.playNote(info, note[2]);
 
             this.noteIdx++;
         }
@@ -263,15 +266,17 @@ export class MidiPlayer {
         return all.sort((a, b) => a[1] - b[1]);
     }
 
-    private playNote(info: NoteInfo, velocity: number, duration: number) {
+    private playNote(info: NoteInfo, duration: number) {
         if (info.sample === "none") return;
 
         const id = getIdByDuration(duration);
 
         this.dimension.playSound(`${id}.${info.sample}`, this.pos, {
             pitch: info.pitch,
-            volume: Math.min(velocity, 1),
+            volume: 2,
         });
+        //生成粒子
+        summonParticle(this.dimension, this.pos, this.dir, info.midi);
     }
 
     /* ================== 状态判断 ================== */
