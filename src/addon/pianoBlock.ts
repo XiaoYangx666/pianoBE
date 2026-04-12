@@ -1,23 +1,34 @@
-import { BlockCustomComponent, system } from "@minecraft/server";
+import {
+    Block,
+    BlockCustomComponent,
+    BlockPermutation,
+    GameMode,
+    ItemStack,
+    system,
+    world,
+} from "@minecraft/server";
 import { openPiano } from "@piano/piano";
-import { RightOffsets } from "@utils/block";
-import { Vector3Utils } from "@utils/vector";
 import { Cardinal_Direction } from "@types";
+import { PairOffsets } from "@utils/block";
+import { Vector3Utils } from "sapi-pro";
+
+function getPairedBlockOffset(block: BlockPermutation) {
+    const dir = block.getState(
+        "minecraft:cardinal_direction"
+    ) as Cardinal_Direction;
+    if (!dir) return;
+
+    return block.type.id === "xypiano:piano_left"
+        ? PairOffsets[dir].left
+        : PairOffsets[dir].right;
+}
 
 export const PianoBlockComponent: BlockCustomComponent = {
     onBreak(e) {
         const block = e.brokenBlockPermutation;
-        const cardinal_direction = block.getState(
-            "minecraft:cardinal_direction"
-        );
-        if (!cardinal_direction) return;
-        //获取配对的方块
-        const offsetRight =
-            RightOffsets[cardinal_direction as Cardinal_Direction];
-        const offset =
-            block.type.id == "xypiano:piano_left"
-                ? offsetRight
-                : Vector3Utils.scale(offsetRight, -1);
+        const offset = getPairedBlockOffset(block);
+        if (!offset) return;
+
         const nearByBlock = e.block.offset(offset);
         //同时破坏旁边的
         if (
@@ -41,3 +52,50 @@ export const PianoBlockComponent: BlockCustomComponent = {
         openPiano(e.player, e.block);
     },
 };
+
+export function regEvents() {
+    world.beforeEvents.playerBreakBlock.subscribe((t) => {
+        if (!t.block.typeId.startsWith("xypiano:piano")) return;
+
+        t.cancel = true;
+
+        system.run(() => {
+            t.block.setType("air");
+            //手动生成掉落物
+            if (t.player?.getGameMode() !== GameMode.Creative) {
+                const loot = new ItemStack("xypiano:piano_item");
+                t.block.dimension.spawnItem(loot, t.block.center());
+            }
+        });
+    });
+
+    world.beforeEvents.explosion.subscribe((t) => {
+        const blocks = t.getImpactedBlocks();
+        if (blocks.length === 0) return;
+
+        const visited = new Set<string>();
+        const result: Block[] = [];
+
+        for (const block of blocks) {
+            if (!block.typeId.startsWith("xypiano")) continue;
+
+            const key = `${block.location.x},${block.location.y},${block.location.z}`;
+            if (visited.has(key)) continue;
+
+            const offset = getPairedBlockOffset(block.permutation);
+            if (offset) {
+                const pairX = block.location.x + offset.x;
+                const pairY = block.location.y + offset.y;
+                const pairZ = block.location.z + offset.z;
+
+                const pairKey = `${pairX},${pairY},${pairZ}`;
+                visited.add(pairKey);
+            }
+
+            visited.add(key);
+            result.push(block);
+        }
+
+        t.setImpactedBlocks(result);
+    });
+}

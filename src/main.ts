@@ -1,7 +1,7 @@
 import { blockPlacerComponent } from "@addon/blockPlacer";
-import { PianoBlockComponent } from "@addon/pianoBlock";
-import { system, world } from "@minecraft/server";
+import { PianoBlockComponent, regEvents } from "@addon/pianoBlock";
 import { midiPlayerManager } from "@midiPlayer/manager";
+import { system } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
 
 //注册模组组件
@@ -16,6 +16,7 @@ system.beforeEvents.startup.subscribe((e) => {
     );
 });
 
+regEvents();
 midiPlayerManager.init();
 
 initSAPIPro({
