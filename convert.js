@@ -67,7 +67,7 @@ for (const item of metaList) {
 }
 
 // 导出数组
-indexContent += `\nexport const midis = [\n`;
+indexContent += `\nexport const midis:{name:string,duration:number,value:any}[] = [\n`;
 
 for (const item of metaList) {
     indexContent += `  {\n`;
@@ -79,6 +79,6 @@ for (const item of metaList) {
 
 indexContent += `];\n`;
 
-fs.writeFileSync(path.join(outputDir, "index.js"), indexContent, "utf-8");
+fs.writeFileSync(path.join(outputDir, "index.ts"), indexContent, "utf-8");
 
 console.log(`✅ 已转换 ${files.length} 个 MIDI 文件`);

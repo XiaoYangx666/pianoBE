@@ -5,7 +5,7 @@ import { CommonForm } from "sapi-pro";
 import { openMidiPlayer } from "./playerUI";
 import { Block, Player } from "@minecraft/server";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
 export const QueueListForm = CommonForm.ButtonForm<{
     midiPlayer: MidiPlayer;
