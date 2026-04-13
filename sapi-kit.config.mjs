@@ -44,7 +44,7 @@ export default {
      * 自定义打包名，若未定义，则从manifest.json读取
      * 如果有两个包，打包mcaddon，必须指定名字
      */
-    packageName: undefined,
+    packageName: "PianoBE",
     /**
      * 自定义名字构造函数
      * @param {string} name 自定义名字或manifest.json中读取的名字
