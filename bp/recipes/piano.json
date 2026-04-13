@@ -8,8 +8,8 @@
         "pattern": ["XXX", "BAB", "IRI"],
         "key": {
             "X": { "item": "minecraft:planks" },
-            "A": { "item": "minecraft:noteblock" },
-            "B": { "item": "minecraft:jukebox" },
+            "B": { "item": "minecraft:noteblock" },
+            "A": { "item": "minecraft:jukebox" },
             "I": { "item": "minecraft:iron_ingot" },
             "R": { "item": "minecraft:redstone" }
         },
