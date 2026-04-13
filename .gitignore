@@ -6,5 +6,6 @@ tools
 package-lock.json
 output.zip
 bp/scripts
-midis/*
+midis/files/*
+midis/js/*
 *.ogg

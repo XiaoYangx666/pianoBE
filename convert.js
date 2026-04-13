@@ -3,8 +3,8 @@ import path from "path";
 import pkg from "@tonejs/midi";
 const { Midi } = pkg;
 
-const inputDir = path.resolve("./midis");
-const outputDir = path.resolve("./src/midis");
+const inputDir = path.resolve("./midis/files");
+const outputDir = path.resolve("./midis/js");
 
 function toFixed(num, digits) {
     if (typeof num !== "number") return NaN;
@@ -61,24 +61,19 @@ for (const file of files) {
 // ===== 生成 index.js =====
 let indexContent = "";
 
-// import
-for (const item of metaList) {
-    indexContent += `import { ${item.varName} } from "./${item.fileId}.js";\n`;
-}
-
 // 导出数组
-indexContent += `\nexport const midis:{name:string,duration:number,value:any}[] = [\n`;
+indexContent += `export const midis = [\n`;
 
 for (const item of metaList) {
     indexContent += `  {\n`;
     indexContent += `    name: "${item.name}",\n`;
     indexContent += `    duration: ${item.duration},\n`;
-    indexContent += `    value: ${item.varName}\n`;
+    indexContent += `    value:()=>{return import("./${item.fileId}.js")}\n`;
     indexContent += `  },\n`;
 }
 
 indexContent += `];\n`;
 
-fs.writeFileSync(path.join(outputDir, "index.ts"), indexContent, "utf-8");
+fs.writeFileSync(path.join(outputDir, "index.js"), indexContent, "utf-8");
 
 console.log(`✅ 已转换 ${files.length} 个 MIDI 文件`);

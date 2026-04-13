@@ -1,3 +1,7 @@
+import os from "os";
+import { cp, mkdir } from "fs/promises";
+import { join } from "path";
+
 export default {
     // === 全局配置 ===
 
@@ -23,12 +27,12 @@ export default {
     /** 构建完成后是否自动复制行为包到游戏目录 */
     shouldCopyToGame: true,
     /** 游戏路径类型："win" 表示默认 Windows 路径，"custom" 表示自定义路径 */
-    gamePathMode: "win",
+    gamePathMode: os.platform() == "linux" ? "custom" : "win",
     /**
      * 自定义游戏根目录(本机为com.mojang目录;服务器为服务器根目录)
      * 仅当 gamePathMode 为 "custom" 时有效
      */
-    customGameRoot: undefined,
+    customGameRoot: "/server/server1",
     /** 行为包在 development_behavior_packs 中的文件夹名称 */
     behaviorPackFolderName: "pianoBP",
     /** 资源包在 development_resource_packs 中的文件夹名称 */
@@ -59,4 +63,13 @@ export default {
 
     /** 是否使用逗号格式的版本号如 v1,x,x 以兼容某些玩家导入问题 */
     useCommaStyleVersion: true,
+
+    hooks: {
+        afterBundle: (ctx) => {
+            return cp("./midis/js/", join(ctx.outputDir, "midis"), {
+                recursive: true,
+                force: true,
+            });
+        },
+    },
 };
