@@ -27,52 +27,52 @@ for (const file of files) {
 
     const midi = new Midi(buffer);
 
-    const fileId = index++; // 1,2,3...
-    const varName = `midi${fileId}`; // midi1, midi2...
-    const outFile = `${fileId}.js`; // 1.js, 2.js...
+    const fileId = index++;
+    const varName = `midi${fileId}`;
+    const outFile = `${fileId}.js`;
 
-    const data = {
-        name: file.replace(/\.midi?$/i, ""),
-        duration: midi.duration,
-        tracks: midi.tracks.map((track) => ({
-            instrument: track.instrument,
-            notes: track.notes.map((n) => [
-                n.midi,
-                toFixed(n.time, 2),
-                toFixed(n.duration, 1),
-                toFixed(n.velocity, 1),
-            ]),
-        })),
-    };
+    const tracksCode = midi.tracks
+        .map((track) => {
+            const flat = [];
 
-    // 写入单文件
-    const content = `export const ${varName} = ${JSON.stringify(data)};\n`;
+            for (const n of track.notes) {
+                flat.push(
+                    n.midi,
+                    toFixed(n.time, 2),
+                    toFixed(n.duration, 1),
+                    toFixed(n.velocity, 1)
+                );
+            }
+
+            return `{instrument:${JSON.stringify(track.instrument)},notes:new Float32Array([${flat.join(",")}])}`;
+        })
+        .join(",");
+
+    const content =
+        `export const ${varName}={` +
+        `name:${JSON.stringify(file.replace(/\.midi?$/i, ""))},` +
+        `duration:${midi.duration},` +
+        `tracks:[${tracksCode}]` +
+        `};`;
 
     fs.writeFileSync(path.join(outputDir, outFile), content, "utf-8");
 
     metaList.push({
         varName,
         fileId,
-        name: data.name,
-        duration: data.duration,
+        name: file.replace(/\.midi?$/i, ""),
+        duration: midi.duration,
     });
 }
 
-// ===== 生成 index.js =====
-let indexContent = "";
-
-// 导出数组
-indexContent += `export const midis = [\n`;
+// index.js
+let indexContent = "export const midis=[";
 
 for (const item of metaList) {
-    indexContent += `  {\n`;
-    indexContent += `    name: "${item.name}",\n`;
-    indexContent += `    duration: ${item.duration},\n`;
-    indexContent += `    value:async () => (await import("./${item.fileId}.js")).${item.varName}\n`;
-    indexContent += `  },\n`;
+    indexContent += `{name:${JSON.stringify(item.name)},duration:${item.duration},value:async()=> (await import("./${item.fileId}.js")).${item.varName}},`;
 }
 
-indexContent += `];\n`;
+indexContent += "];";
 
 fs.writeFileSync(path.join(outputDir, "index.js"), indexContent, "utf-8");
 

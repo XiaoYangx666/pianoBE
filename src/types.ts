@@ -31,13 +31,10 @@ export interface MidiJson {
             number: number;
             name: string;
         };
-        /**midi,time,duration,velocity */
-        notes: MidiNote[];
+        /**midi,time,duration,velocity(4个一组) */
+        notes: Float32Array;
     }[];
 }
-
-/**midi,time,duration,velocity */
-export type MidiNote = [number, number, number, number];
 
 export type MidiListType = MidiInfo[];
 
