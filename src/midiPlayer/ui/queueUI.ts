@@ -3,7 +3,7 @@ import { PlayQueue } from "@midiPlayer/queue";
 import { midis } from "@midis/index";
 import { Block, Player } from "@minecraft/server";
 import { CommonForm, FuncButton, TextField } from "sapi-pro";
-import { openMidiPlayer } from "./playerUI";
+import { openMidiPlayer } from "./playerUIManager";
 
 const PAGE_SIZE = 10;
 
@@ -249,8 +249,7 @@ const MidiListForm = CommonForm.ButtonForm<{
                     label: `${realIndex}. ${midi.name}`,
                 };
             });
-        const queue = args.queue;
-        if (args.p * PAGE_SIZE < queue.getLength()) {
+        if (args.p * PAGE_SIZE < filteredList.length) {
             buttons.push({
                 label: "下一页",
                 func(ctx) {

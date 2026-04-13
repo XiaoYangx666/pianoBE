@@ -2,126 +2,207 @@ import { Block, Player, system } from "@minecraft/server";
 import { Observable } from "@minecraft/server-ui";
 import { Cardinal_Direction, PianoEnv } from "@types";
 import { getLeftPianoBlock } from "@utils/block";
-import { Vector3Utils } from "sapi-pro/utils";
+import { DDUIManager } from "@utils/ddui";
+import { Vector3Utils } from "sapi-pro";
 import { handleInput } from "./input";
 import { createPianoUI, PianoState, PianoUIRefs, updatePianoUI } from "./ui";
 
-function createContext(p: Player, leftBlock: Block) {
-    const keyMapIdx = (p.getDynamicProperty("piano:keyMap") as number) ?? 0;
-    const mode = (p.getDynamicProperty("piano:comMode") as boolean) ?? true;
-    const state: PianoState = {
-        keyMap: Observable.create<number>(keyMapIdx),
-        mode: Observable.create<boolean>(mode),
-        octave: Observable.create<boolean>(false, {
-            clientWritable: true,
-        }),
-        fullUI: Observable.create<boolean>(true, { clientWritable: true }),
-        input: Observable.create<string>("", { clientWritable: true }),
-    };
-    const ui: PianoUIRefs = {
-        status: Observable.create<string>("§b🎹 钢琴已就绪"),
-        rows: [
-            Observable.create<string>(""),
-            Observable.create<string>(""),
-            Observable.create<string>(""),
-            Observable.create<string>(""),
-        ],
-    };
-    const env: PianoEnv = {
-        pos: leftBlock.location,
-        dim: leftBlock.dimension,
-        dir: leftBlock.permutation.getState(
-            "minecraft:cardinal_direction"
-        ) as Cardinal_Direction,
-    };
-    return {
-        state,
-        ui,
-        env,
-    };
+/** 单个玩家的 Piano 实例 */
+class PianoInstance {
+    private form: any;
+    private state!: PianoState;
+    private ui!: PianoUIRefs;
+    private env!: PianoEnv;
+
+    private leftBlock: Block | null = null;
+    private inited = false;
+    private lastLength = 0;
+
+    constructor(private player: Player) {}
+
+    /** 设置当前钢琴方块 */
+    setPianoBlock(block: Block) {
+        const left = getLeftPianoBlock(block);
+        if (!left) return;
+
+        this.leftBlock = left;
+
+        // 已初始化 → 更新 env
+        if (this.inited && this.env) {
+            this.env.pos = left.location;
+            this.env.dim = left.dimension;
+            this.env.dir = left.permutation.getState(
+                "minecraft:cardinal_direction"
+            ) as Cardinal_Direction;
+        }
+    }
+
+    /** 初始化（只执行一次） */
+    private init() {
+        if (this.inited || !this.leftBlock) return;
+        this.inited = true;
+
+        const left = getLeftPianoBlock(this.leftBlock);
+        if (!left) return;
+
+        // === state ===
+        const keyMapIdx =
+            (this.player.getDynamicProperty("piano:keyMap") as number) ?? 0;
+        const mode =
+            (this.player.getDynamicProperty("piano:comMode") as boolean) ??
+            true;
+
+        this.state = {
+            keyMap: Observable.create<number>(keyMapIdx),
+            mode: Observable.create<boolean>(mode),
+            octave: Observable.create<boolean>(false, {
+                clientWritable: true,
+            }),
+            fullUI: Observable.create<boolean>(true, {
+                clientWritable: true,
+            }),
+            input: Observable.create<string>("", {
+                clientWritable: true,
+            }),
+        };
+
+        // === UI ===
+        this.ui = {
+            status: Observable.create<string>("§b🎹 钢琴已就绪"),
+            rows: [
+                Observable.create<string>(""),
+                Observable.create<string>(""),
+                Observable.create<string>(""),
+                Observable.create<string>(""),
+            ],
+            keyMapLabel: Observable.create<string>(""),
+            modeLabel: Observable.create<string>(""),
+        };
+
+        // === env ===
+        this.env = {
+            pos: left.location,
+            dim: left.dimension,
+            dir: left.permutation.getState(
+                "minecraft:cardinal_direction"
+            ) as Cardinal_Direction,
+        };
+
+        // === form（只创建一次）===
+        this.form = createPianoUI(
+            this.player,
+            this.state,
+            this.ui,
+            () => this.leftBlock
+        );
+
+        // === 订阅（只注册一次）===
+
+        // 输入
+        this.state.input.subscribe((val) => {
+            // ❗玩家 / 方块校验（必须保留）
+            if (this.shouldClose()) {
+                this.close();
+                return;
+            }
+
+            // ❗长度控制（必须保留）
+            if (val.length <= this.lastLength) {
+                this.lastLength = val.length;
+                return;
+            }
+
+            this.lastLength = val.length;
+
+            // 处理输入
+            const result = handleInput(val, this.state, this.env);
+
+            // 更新 UI
+            updatePianoUI(this.state, this.ui, result.keys, result.last);
+
+            // 清空输入
+            if (result.shouldClear) {
+                system.runTimeout(() => {
+                    this.state.input.setData("");
+                }, 2);
+            }
+        });
+        // 升8度
+        this.state.octave.subscribe(() => {
+            updatePianoUI(this.state, this.ui, []);
+        });
+
+        // UI开关
+        this.state.fullUI.subscribe(() => {
+            updatePianoUI(this.state, this.ui, []);
+        });
+    }
+
+    /** 打开 UI */
+    async show() {
+        this.init();
+        if (!this.form) return;
+
+        // 重置输入状态
+        this.lastLength = 0;
+        this.state.input.setData("");
+
+        // 刷新 UI
+        updatePianoUI(this.state, this.ui, []);
+
+        await this.form.show();
+    }
+
+    close() {
+        // 1. 关闭 UI
+        if (this.form?.isShowing?.()) {
+            this.form.close();
+        }
+    }
+
+    private shouldClose(): boolean {
+        const p = this.player;
+        const block = this.leftBlock;
+
+        //玩家失效
+        if (!p.isValid) return true;
+        // 方块失效
+        if (!block?.isValid || !block.typeId.startsWith("xypiano:piano")) {
+            return true;
+        }
+        //距离太远
+        if (Vector3Utils.squaredDistance(p.location, block.location) > 25) {
+            return true;
+        }
+        return false;
+    }
+
+    isShowing() {
+        return this.form?.isShowing?.() ?? false;
+    }
 }
 
-/**为玩家打开钢琴表单*/
+/** Piano 管理器 */
+class PianoManager extends DDUIManager<PianoInstance> {
+    protected create(player: Player): PianoInstance {
+        return new PianoInstance(player);
+    }
+
+    async open(player: Player, block: Block) {
+        const inst = this.get(player);
+
+        inst.setPianoBlock(block);
+
+        if (inst.isShowing()) return;
+
+        await inst.show();
+    }
+}
+
+// 单例导出
+export const pianoManager = new PianoManager();
+
+/** 对外入口 */
 export async function openPiano(p: Player, block: Block) {
-    const leftBlock = getLeftPianoBlock(block);
-    if (!leftBlock) return;
-
-    const { state, ui, env } = createContext(p, leftBlock);
-
-    const form = createPianoUI(p, state, ui, block);
-    //初始化
-    updatePianoUI(state, ui, []);
-
-    let closed = false;
-
-    function close() {
-        if (closed) return;
-        closed = true;
-
-        state.input.unsubscribe(inputSub);
-        state.octave.unsubscribe(octaveSub);
-        state.fullUI.unsubscribe(hideUISub);
-
-        if (form.isShowing()) {
-            form.close();
-        }
-    }
-
-    // 监听升8度
-    const octaveSub = state.octave.subscribe(() => {
-        updatePianoUI(state, ui, []);
-    });
-    const hideUISub = state.fullUI.subscribe(() => {
-        updatePianoUI(state, ui, []);
-    });
-
-    let lastLength = 0;
-    // 监听输入
-    const inputSub = state.input.subscribe((val) => {
-        // 玩家无效 / 距离超出
-        if (shouldClose(p, block)) {
-            return close();
-        }
-        //字符变短时不触发
-        if (val.length <= lastLength) {
-            lastLength = val.length;
-            return;
-        }
-        lastLength = val.length;
-        //处理输入
-        const result = handleInput(val, state, env);
-        //更新UI
-        updatePianoUI(state, ui, result.keys, result.last);
-        //清空输入
-        if (result.shouldClear) {
-            system.runTimeout(() => {
-                state.input.setData("");
-            }, 2);
-        }
-    });
-
-    try {
-        const result = await form.show();
-        if (!result) {
-            close();
-        }
-    } catch {
-        close();
-        return;
-    }
-}
-
-function shouldClose(p: Player, block: Block) {
-    //距离过远
-    if (
-        !p.isValid ||
-        Vector3Utils.squaredDistance(p.location, block.location) > 16
-    ) {
-        return true;
-    }
-    // 方块失效
-    if (!block?.isValid || !block.typeId.startsWith("xypiano:piano")) {
-        return true;
-    }
-    return false;
+    await pianoManager.open(p, block);
 }
