@@ -68,7 +68,7 @@ for (const item of metaList) {
     indexContent += `  {\n`;
     indexContent += `    name: "${item.name}",\n`;
     indexContent += `    duration: ${item.duration},\n`;
-    indexContent += `    value:()=>{return import("./${item.fileId}.js")}\n`;
+    indexContent += `    value:async () => (await import("./${item.fileId}.js")).${item.varName}\n`;
     indexContent += `  },\n`;
 }
 
