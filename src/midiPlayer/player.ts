@@ -1,8 +1,14 @@
 import { Dimension, Vector3 } from "@minecraft/server";
-import { processNote } from "@utils/note";
+import { getSoundIdByDuration, processNote } from "@utils/note";
 import { summonParticle } from "@utils/particle";
 import { Signal } from "@utils/signal";
-import { Cardinal_Direction, MidiJson, MidiNote, NoteInfo } from "../types";
+import {
+    Cardinal_Direction,
+    MidiInfo,
+    MidiJson,
+    MidiNote,
+    NoteInfo,
+} from "../types";
 import { PlayQueue } from "./queue";
 
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
@@ -19,12 +25,9 @@ export class MidiPlayer {
 
     private state: PlayerState = "idle";
 
-    /** 当前 MIDI */
-    private currentMidi?: MidiJson;
+    private isLoading = false;
 
-    /** 使用 PlayQueue */
-    queue = new PlayQueue();
-
+    readonly queue = new PlayQueue();
     /** 订阅信号 */
     readonly signal: Signal<void>;
 
@@ -48,62 +51,19 @@ export class MidiPlayer {
 
     /* ================== 控制接口 ================== */
 
-    /** 立即播放（替换当前） */
-    play(midi: MidiJson) {
-        const m = this.queue.play(midi);
-
-        this.loadMidi(m);
-
-        if (!this.hasContent()) {
-            this.playNext();
-            return;
-        }
-
-        this.state = "playing";
-    }
-
-    playAt(index: number) {
-        if (this.state === "stopped") return;
-
-        const midi = this.queue.jump(index);
-        if (!midi) return;
-
-        this.loadMidi(midi);
-
-        if (!this.hasContent()) {
-            this.playNext();
-            return;
-        }
-
-        this.state = "playing";
-    }
-
-    /** 加入队列（连播） */
-    enqueue(midi: MidiJson) {
-        const m = this.queue.enqueue(midi);
-
-        if (this.state === "idle" && m) {
-            this.loadMidi(m);
-            this.state = "playing";
-        }
-    }
-
-    pause() {
-        if (this.state !== "playing") return;
-
-        if (!this.hasContent()) {
+    /** 加载队列当前指针的曲子并播放 */
+    async play() {
+        const info = this.queue.current();
+        if (!info) {
             this.state = "idle";
             return;
         }
 
-        this.state = "paused";
-    }
-
-    resume() {
-        if (this.state !== "paused") return;
+        await this.loadMidi(info);
 
         if (!this.hasContent()) {
-            this.playNext();
+            // 当前没内容，尝试自动找下一首
+            this.prepareNext();
             return;
         }
 
@@ -111,49 +71,49 @@ export class MidiPlayer {
         this.lastTime = Date.now();
     }
 
-    restart() {
-        if (!this.currentMidi) return;
-
-        this.loadMidi(this.currentMidi);
-        this.state = "playing";
+    pause() {
+        if (this.state !== "playing") return;
+        this.state = "paused";
     }
 
-    stop() {
-        this.state = "stopped";
-        this.queue.clear();
-    }
-
-    idle() {
-        this.state = "idle";
-    }
-
-    /** 下一首 */
-    next() {
-        if (this.state === "stopped") return;
-        this.playNext();
-    }
-
-    /** 上一首 */
-    prev() {
-        if (this.state === "stopped") return;
-
-        const prev = this.queue.prev();
-        if (!prev) return;
-
-        this.loadMidi(prev);
+    resume() {
+        if (this.state !== "paused") return;
 
         if (!this.hasContent()) {
-            this.playNext();
+            this.prepareNext();
             return;
         }
 
         this.state = "playing";
+        this.lastTime = Date.now();
+    }
+
+    /** 重新加载当前队列指针的曲子并从头播放 */
+    async restart() {
+        const info = this.queue.current();
+        if (!info) return;
+
+        await this.loadMidi(info);
+        this.state = "playing";
+        this.lastTime = Date.now();
+    }
+
+    /** 停止播放（仅停止状态，不干预队列内容） */
+    stop() {
+        this.state = "stopped";
+        this.notes = [];
+        this.noteIdx = 0;
+        this.currentTime = 0;
+        this.isLoading = false;
     }
 
     /* ================== 调度 ================== */
 
-    update(now: number) {
-        if (this.state === "stopped") return;
+    tick(now: number) {
+        if (this.state === "stopped" || this.state === "idle") {
+            this.lastTime = now;
+            return;
+        }
 
         const block = this.dimension.getBlock(this.pos);
 
@@ -165,22 +125,17 @@ export class MidiPlayer {
 
         // 方块没了 → 彻底失效
         if (block.typeId !== "xypiano:piano_left") {
-            this.state = "stopped";
+            this.stop();
             return;
         }
 
-        // 空内容兜底
-        if (!this.hasContent()) {
+        if (this.state === "paused") {
             this.lastTime = now;
-
-            if (this.state === "playing") {
-                this.playNext();
-            }
-
             return;
         }
 
-        if (this.state === "paused" || this.state === "idle") {
+        // 正在异步加载中，跳过本次 tick
+        if (this.isLoading) {
             this.lastTime = now;
             return;
         }
@@ -204,55 +159,69 @@ export class MidiPlayer {
             const info = processNote(note[0], false);
 
             this.playNote(info, note[2]);
-
             this.noteIdx++;
         }
 
         // 发布事件
         this.signal.publish();
 
-        // 当前曲子结束
+        // 当前曲子播完 → 自动请求下一首
         if (this.noteIdx >= this.notes.length) {
-            this.playNext();
+            this.prepareNext();
         }
     }
 
-    /* ================== 内部 ================== */
+    /* ================== 内部逻辑 ================== */
 
-    private playNext() {
+    /**
+     * 内部自动连播核心：
+     * 循环请求 queue.next()，直到有可播放的内容或队列结束
+     */
+    private async prepareNext() {
+        if (this.isLoading) return;
+
+        // 上锁并清空当前音符，防止 tick 再次触发
+        this.isLoading = true;
+        this.notes = [];
+
         while (true) {
-            const next = this.queue.next();
+            const nextInfo = this.queue.next();
 
-            if (!next) {
+            if (!nextInfo) {
+                // 队列真的到底了
                 this.state = "idle";
+                this.isLoading = false;
                 return;
             }
 
-            this.loadMidi(next);
+            await this.loadMidi(nextInfo);
 
             if (this.hasContent()) {
+                // 找到能播的了，继续播放
                 this.state = "playing";
+                this.lastTime = Date.now();
+                this.isLoading = false;
                 return;
             }
+            // 如果加载出来没音符（空曲子），while 循环继续请求下一个
         }
     }
 
-    private loadMidi(midi: MidiJson) {
-        this.currentMidi = midi;
+    private async loadMidi(info: MidiInfo) {
+        try {
+            const midi = await info.value(); // 调用 MidiInfo 自身的加载方法获取 Json
+            this.notes = this.extractNotes(midi);
+        } catch (e) {
+            console.error(`加载 MIDI 失败: ${info.name}`, e);
+            this.notes = [];
+        }
 
-        this.notes = this.extractNotes(midi);
         this.noteIdx = 0;
         this.currentTime = 0;
-        this.lastTime = Date.now();
-
-        if (this.notes.length === 0) {
-            this.playNext();
-        }
     }
 
     private extractNotes(midi: MidiJson): MidiNote[] {
         const all: MidiNote[] = [];
-
         if (midi.tracks.length === 1) {
             return midi.tracks[0].notes ?? [];
         }
@@ -269,13 +238,13 @@ export class MidiPlayer {
     private playNote(info: NoteInfo, duration: number) {
         if (info.sample === "none") return;
 
-        const id = getIdByDuration(duration);
+        const id = getSoundIdByDuration(duration);
 
         this.dimension.playSound(`${id}.${info.sample}`, this.pos, {
             pitch: info.pitch,
             volume: 2,
         });
-        //生成粒子
+        // 生成粒子
         summonParticle(this.dimension, this.pos, this.dir, info.midi);
     }
 
@@ -295,58 +264,20 @@ export class MidiPlayer {
         return this.state;
     }
 
-    getCurrentMidi() {
-        return {
-            name: this.currentMidi?.name ?? "unknown",
-            totalNotes: this.notes.length,
-            currentNoteIndex: this.noteIdx,
-            progress:
-                this.notes.length === 0 ? 0 : this.noteIdx / this.notes.length,
-        };
-    }
-
-    getQueue() {
-        return this.queue.getQueue();
-    }
-
-    getTime() {
-        return {
-            currentTime: this.currentTime,
-        };
-    }
-
     getInfo() {
         return {
             pos: this.pos,
             dimension: this.dimension,
-
             state: this.state,
-
-            midiName: this.currentMidi?.name ?? "unknown",
-
+            midiName: this.queue.current()?.name ?? "unknown",
             totalNotes: this.notes.length,
             currentNoteIndex: this.noteIdx,
             progress:
                 this.notes.length === 0 ? 0 : this.noteIdx / this.notes.length,
-
             currentTime: this.currentTime,
-
             queueIndex: this.queue.getIndex(),
             queueLength: this.queue.getLength(),
-            queue: this.queue.getQueue(),
-
             lastActiveTime: this.lastActiveTime,
         };
-    }
-}
-
-/** 根据note时长获取音效id */
-function getIdByDuration(duration: number) {
-    if (duration < 1) {
-        return "piano_short";
-    } else if (duration > 4) {
-        return "piano_long";
-    } else {
-        return "piano";
     }
 }

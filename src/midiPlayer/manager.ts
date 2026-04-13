@@ -35,7 +35,7 @@ class MidiPlayerManager {
         for (let i = this.players.length - 1; i >= 0; i--) {
             const p = this.players[i];
 
-            p.update(now);
+            p.tick(now);
 
             if (!p.isAlive()) {
                 this.removeAt(i);

@@ -38,3 +38,12 @@ export interface MidiJson {
 
 /**midi,time,duration,velocity */
 export type MidiNote = [number, number, number, number];
+
+export type MidiListType = MidiInfo[];
+
+/**Midi的信息 */
+export interface MidiInfo {
+    name: string;
+    duration: number;
+    value: () => Promise<MidiJson>;
+}

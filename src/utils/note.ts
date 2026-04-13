@@ -63,3 +63,14 @@ export function processNote(midi: number, shift: boolean): NoteInfo {
         midi,
     };
 }
+
+/** 根据note时长获取音效id */
+export function getSoundIdByDuration(duration: number) {
+    if (duration < 1) {
+        return "piano_short";
+    } else if (duration > 4) {
+        return "piano_long";
+    } else {
+        return "piano";
+    }
+}

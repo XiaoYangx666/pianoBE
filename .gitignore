@@ -7,5 +7,4 @@ package-lock.json
 output.zip
 bp/scripts
 midis/*
-src/midis/*
 *.ogg

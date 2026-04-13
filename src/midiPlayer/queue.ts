@@ -1,4 +1,4 @@
-import { MidiJson } from "@types";
+import { MidiInfo } from "@types";
 
 export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
 
@@ -14,9 +14,8 @@ export function getPlayModeName(mode: PlayMode) {
 }
 
 export class PlayQueue {
-    private list: MidiJson[] = [];
+    private list: MidiInfo[] = [];
     private index = -1;
-
     private mode: PlayMode = "sequence";
 
     /* ================== 基础 ================== */
@@ -26,13 +25,9 @@ export class PlayQueue {
         this.index = -1;
     }
 
-    current(): MidiJson | undefined {
+    current(): MidiInfo | undefined {
         if (this.index < 0 || this.index >= this.list.length) return;
         return this.list[this.index];
-    }
-
-    hasCurrent() {
-        return this.current() !== undefined;
     }
 
     /* ================== 播放模式 ================== */
@@ -48,21 +43,17 @@ export class PlayQueue {
     /* ================== 核心行为 ================== */
 
     /**
-     * 播放（插入当前后面并立即播放）
+     * 插入当前后面并立即跳转
      */
-    play(midi: MidiJson): MidiJson {
+    insertBack(midi: MidiInfo): MidiInfo {
         if (this.index === -1) {
-            // 没有当前 → 直接放入
             this.list.push(midi);
             this.index = 0;
             return midi;
         }
 
-        // 插入到当前后面
         const insertIndex = this.index + 1;
         this.list.splice(insertIndex, 0, midi);
-
-        // 跳到它
         this.index = insertIndex;
         return midi;
     }
@@ -70,7 +61,7 @@ export class PlayQueue {
     /**
      * 普通加入队列（尾部）
      */
-    enqueue(midi: MidiJson) {
+    enqueue(midi: MidiInfo): MidiInfo | undefined {
         this.list.push(midi);
 
         if (this.index === -1) {
@@ -79,56 +70,45 @@ export class PlayQueue {
         }
     }
 
-    remove(index: number): MidiJson | undefined {
+    remove(index: number): MidiInfo | undefined {
         if (index < 0 || index >= this.list.length) return;
 
         const removed = this.list[index];
-
-        // 删除元素
         this.list.splice(index, 1);
 
-        // ⭐ 情况1：删除的是当前
+        // 删除的是当前 → index 不变（指向"下一首"）
         if (index === this.index) {
-            // 当前被删 → index 不变（指向“下一首”）
             if (this.index >= this.list.length) {
-                // 删的是最后一个
                 this.index = this.list.length; // 越界（表示结束）
             }
-
             return removed;
         }
 
-        // ⭐ 情况2：删除的是当前前面的
+        // 删除的是当前前面的
         if (index < this.index) {
             this.index--;
         }
 
-        // ⭐ 情况3：删除的是后面的 → 不用动
-
         return removed;
     }
 
-    jump(index: number): MidiJson | undefined {
+    jump(index: number): MidiInfo | undefined {
         if (index < 0 || index >= this.list.length) return;
-
         this.index = index;
         return this.list[index];
     }
 
     /* ================== 跳转 ================== */
 
-    next(): MidiJson | undefined {
+    next(): MidiInfo | undefined {
         if (this.list.length === 0) return;
 
-        // 单曲循环
         if (this.mode === "single") {
             return this.current();
         }
 
-        // 随机
         if (this.mode === "shuffle") {
-            const nextIndex = Math.floor(Math.random() * this.list.length);
-            this.index = nextIndex;
+            this.index = Math.floor(Math.random() * this.list.length);
             return this.list[this.index];
         }
 
@@ -145,22 +125,19 @@ export class PlayQueue {
         }
 
         // sequence 模式 → 结束
-        this.index = this.list.length; // 越界
+        this.index = this.list.length;
         return;
     }
 
-    prev(): MidiJson | undefined {
+    prev(): MidiInfo | undefined {
         if (this.list.length === 0) return;
 
-        // 单曲循环
         if (this.mode === "single") {
             return this.current();
         }
 
-        // 随机（简单实现：再随机一个）
         if (this.mode === "shuffle") {
-            const prevIndex = Math.floor(Math.random() * this.list.length);
-            this.index = prevIndex;
+            this.index = Math.floor(Math.random() * this.list.length);
             return this.list[this.index];
         }
 
@@ -181,6 +158,11 @@ export class PlayQueue {
 
     isEmpty() {
         return this.list.length === 0;
+    }
+
+    /** 队列是否已播完（无下一首） */
+    isEnd() {
+        return this.index >= this.list.length;
     }
 
     getQueue() {

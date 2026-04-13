@@ -75,14 +75,13 @@ export async function openMidiPlayer(p: Player, block: Block) {
 
         // ===== 控制区 =====
         .button(ctx.buttonText, () => {
-            const state = player.getInfo().state;
+            const state = player.getState();
             if (state === "playing") {
                 player.pause();
             } else if (state === "paused") {
                 player.resume();
             } else if (state === "idle") {
-                const idx = player.queue.getIndex();
-                player.playAt(idx);
+                player.play();
             } else {
                 close();
             }
@@ -99,11 +98,13 @@ export async function openMidiPlayer(p: Player, block: Block) {
             }, 20);
         })
         .button("⏮ 上一首", () => {
-            player.prev();
+            player.queue.prev();
+            player.play();
             updateUI(ctx, player);
         })
         .button("⏭ 下一首", () => {
-            player.next();
+            player.queue.next();
+            player.play();
             updateUI(ctx, player);
         })
         .button(playModeLabel, () => {
