@@ -1,10 +1,13 @@
 {
+    "type": "module",
     "dependencies": {
         "@minecraft/server": "2.7.0-beta.1.26.12-stable",
         "@minecraft/server-ui": "2.1.0-beta.1.26.12-stable",
         "@tonejs/midi": "^2.0.28",
-        "axios": "^1.14.0",
         "sapi-pro": "^0.4.0"
+    },
+    "devDependencies": {
+        "sapi-kit": "^0.2.3"
     },
     "scripts": {
         "update": "npx sapi-kit update",
@@ -12,6 +15,10 @@
         "dev": "npx sapi-kit dev",
         "build": "npx sapi-kit build",
         "copy": "npx sapi-kit copy",
-        "check": "npx sapi-kit check"
+        "check": "npx sapi-kit check",
+        "build:template": "npx sapi-kit build --skip-copy --skip-hook && npx sapi-kit pack",
+        "cp:template": "node -e \"const fs = require('fs'); fs.cpSync('./build/', './html', { recursive: true })\"",
+        "build:html": "npm run build:template && npm run cp:template",
+        "convert": "node tools/convert.js"
     }
 }

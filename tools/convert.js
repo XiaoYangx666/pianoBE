@@ -3,14 +3,17 @@ import path from "path";
 import pkg from "@tonejs/midi";
 const { Midi } = pkg;
 
-const inputDir = path.resolve("./midis/files");
-const outputDir = path.resolve("./midis/js");
+// ===== 1. 读取命令行参数 =====
+const inputDir = path.resolve(process.argv[2] || "./midis/files");
+const outputDir = path.resolve(process.argv[3] || "./midis/js");
 
 function toFixed(num, digits) {
     if (typeof num !== "number") return NaN;
     return Number(num.toFixed(digits));
 }
 
+fs.rmSync(outputDir, { recursive: true });
+// ===== 2. 创建输出目录 =====
 if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
 }
@@ -18,9 +21,9 @@ if (!fs.existsSync(outputDir)) {
 const files = fs.readdirSync(inputDir).filter((f) => /\.midi?$/i.test(f));
 
 const metaList = [];
-
 let index = 1;
 
+// ===== 3. 主转换逻辑 =====
 for (const file of files) {
     const filePath = path.join(inputDir, file);
     const buffer = fs.readFileSync(filePath);
@@ -65,7 +68,7 @@ for (const file of files) {
     });
 }
 
-// index.js
+// ===== 4. 生成 index.js =====
 let indexContent = "export const midis=[";
 
 for (const item of metaList) {
@@ -76,4 +79,7 @@ indexContent += "];";
 
 fs.writeFileSync(path.join(outputDir, "index.js"), indexContent, "utf-8");
 
+// ===== 5. 输出日志 =====
 console.log(`✅ 已转换 ${files.length} 个 MIDI 文件`);
+console.log(`📥 输入目录: ${inputDir}`);
+console.log(`📤 输出目录: ${outputDir}`);

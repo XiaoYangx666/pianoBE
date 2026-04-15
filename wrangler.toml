@@ -1,0 +1,4 @@
+name = "MIDI Piano Factory"
+
+[assets]
+directory = "./html"

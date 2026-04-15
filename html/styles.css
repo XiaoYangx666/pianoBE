@@ -1,0 +1,71 @@
+/* 电脑端锁定高度 */
+@media (min-width: 1024px) {
+    html,
+    body {
+        height: 100vh;
+        overflow: hidden;
+    }
+}
+
+/* 手机端流式布局 */
+@media (max-width: 1023px) {
+    html,
+    body {
+        height: auto;
+        overflow: auto;
+    }
+    .main-grid {
+        overflow: visible !important;
+    }
+}
+
+/* 自定义滚动条 */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+}
+
+/* 加载动画 */
+.loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.loader {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* 列表条目动画 */
+.midi-item {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.midi-item:hover {
+    background-color: #f8fafc;
+    padding-left: 1.25rem;
+}

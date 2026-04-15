@@ -1,5 +1,5 @@
+import { cp } from "fs/promises";
 import os from "os";
-import { cp, mkdir } from "fs/promises";
 import { join } from "path";
 
 export default {
@@ -44,7 +44,7 @@ export default {
      * 自定义打包名，若未定义，则从manifest.json读取
      * 如果有两个包，打包mcaddon，必须指定名字
      */
-    packageName: "PianoBE",
+    packageName: "template",
     /**
      * 自定义名字构造函数
      * @param {string} name 自定义名字或manifest.json中读取的名字
@@ -56,7 +56,7 @@ export default {
     // },
 
     /** 是否启用二次 zip 压缩(用于上传蓝奏云等平台) */
-    enableExtraZip: true,
+    enableExtraZip: false,
 
     /** 打包文件名中是否包含版本号（版本号从 manifest.json 中读取） */
     includeVersionInName: true,

@@ -2,10 +2,11 @@ build
 cache
 node_modules
 scripts
-tools
 package-lock.json
 output.zip
 bp/scripts
 midis/files/*
 midis/js/*
 *.ogg
+*.mid
+*.mcaddon
