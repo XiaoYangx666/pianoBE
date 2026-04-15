@@ -73,11 +73,26 @@ export function regEvents() {
         const blocks = t.getImpactedBlocks();
         if (blocks.length === 0) return;
 
+        // 先快速检测：有没有钢琴方块
+        let hasPiano = false;
+        for (const block of blocks) {
+            if (block.typeId.startsWith("xypiano")) {
+                hasPiano = true;
+                break;
+            }
+        }
+
+        // 没有就直接退出
+        if (!hasPiano) return;
+
         const visited = new Set<string>();
         const result: Block[] = [];
 
         for (const block of blocks) {
-            if (!block.typeId.startsWith("xypiano")) continue;
+            if (!block.typeId.startsWith("xypiano")) {
+                result.push(block);
+                continue;
+            }
 
             const key = `${block.location.x},${block.location.y},${block.location.z}`;
             if (visited.has(key)) continue;
