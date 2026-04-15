@@ -1,4 +1,5 @@
-name = "MIDI Piano Factory"
+name = "pianobe"
+compatibility_date = "2026-04-15"
 
 [assets]
 directory = "./html"
