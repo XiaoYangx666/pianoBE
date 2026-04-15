@@ -1,5 +1,6 @@
 {
     "type": "module",
+    "license": "GPL-3.0-only",
     "dependencies": {
         "@minecraft/server": "2.7.0-beta.1.26.12-stable",
         "@minecraft/server-ui": "2.1.0-beta.1.26.12-stable",
