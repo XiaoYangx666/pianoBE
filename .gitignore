@@ -7,6 +7,6 @@ output.zip
 bp/scripts
 midis/files/*
 midis/js/*
-*.ogg
+tools/piano_source/*
 *.mid
 *.mcaddon
