@@ -18,7 +18,7 @@ export default {
     /** 构建时清空scripts目录 */
     shouldClearOutput: true,
     /** 是否通过 npx 调用 tsc。建议在 tsc 无法直接调用（例如未全局安装）时启用，注意可能会降低启动速度。 */
-    useNpx: false,
+    useNpx: true,
     /**是否使用tsgo进行编译 */
     useTsGo: true,
 

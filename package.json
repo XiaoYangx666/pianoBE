@@ -7,6 +7,7 @@
         "sapi-pro": "^0.4.0"
     },
     "devDependencies": {
+        "@typescript/native-preview": "^7.0.0-dev.20260415.1",
         "sapi-kit": "^0.2.3"
     },
     "scripts": {
