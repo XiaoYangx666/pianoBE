@@ -314,6 +314,7 @@ export class MidiPlayer {
             queueIndex: this.queue.getIndex(),
             queueLength: this.queue.getLength(),
             lastActiveTime: this.lastActiveTime,
+            listenerCount: this.signal.listenerCount(),
         };
     }
 }

@@ -202,7 +202,8 @@ class MidiPlayerManager {
                     `(${(info.progress * 100).toFixed(1)}%) | ` +
                     `time=${info.currentTime.toFixed(2)}s | ` +
                     `queue=${info.queueLength} | ` +
-                    `idle=${Math.floor(idleTime / 1000)}s`
+                    `idle=${Math.floor(idleTime / 1000)}s | ` +
+                    `listenerCnt=${info.listenerCount}`
             );
         }
 

@@ -6,7 +6,6 @@ import { DDUIManager } from "@utils/ddui";
 import { midiPlayerManager } from "../manager";
 import { MidiPlayer } from "../player";
 import { createMidiPlayerUI, MidiPlayerUIContext, updateUI } from "./playerUI";
-import { Vector3Utils } from "sapi-pro";
 
 class MidiPlayerInstance {
     private form: any;
@@ -20,9 +19,9 @@ class MidiPlayerInstance {
 
     constructor(private player: Player) {}
 
-    setBlock(block: Block) {
+    setBlock(block: Block): boolean {
         const left = getLeftPianoBlock(block);
-        if (!left) return;
+        if (!left) return false;
 
         this.leftBlock = left;
 
@@ -36,28 +35,26 @@ class MidiPlayerInstance {
                 new MidiPlayer(left.dimension, left.location, dir)
             );
 
-        if (this.playerInst !== newPlayer) {
-            if (this.unsub) {
-                try {
-                    this.unsub();
-                } catch {}
-                this.unsub = undefined;
-            }
-
-            this.playerInst = newPlayer;
-
-            this.unsub = this.playerInst.signal.subscribe(() => {
-                if (!this.form?.isShowing?.()) {
-                    return this.close();
-                }
-                updateUI(this.ctx, this.playerInst);
-            });
+        if (this.unsub) {
+            try {
+                this.unsub();
+            } catch {}
+            this.unsub = undefined;
         }
+        this.playerInst = newPlayer;
+
+        this.unsub = this.playerInst.signal.subscribe(() => {
+            if (!this.form?.isShowing?.()) {
+                return this.close();
+            }
+            updateUI(this.ctx, this.playerInst);
+        });
 
         // 同步上下文
         if (this.ctx) {
             this.ctx.block = left;
         }
+        return true;
     }
 
     private init() {
@@ -107,6 +104,7 @@ class MidiPlayerInstance {
         if (this.form?.isShowing()) {
             this.form.close();
         }
+        this.unsub?.();
     }
 
     isShowing() {
@@ -122,7 +120,8 @@ class MidiPlayerUIManager extends DDUIManager<MidiPlayerInstance> {
     async open(player: Player, block: Block) {
         const inst = this.get(player);
 
-        inst.setBlock(block);
+        const result = inst.setBlock(block);
+        if (!result) return;
 
         if (inst.isShowing()) return;
 

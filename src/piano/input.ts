@@ -4,13 +4,21 @@ import { summonParticle } from "@utils/particle";
 import { keyMaps } from "./keymap";
 import { PianoState } from "./ui";
 
+export const soundTypes = [
+    { name: "长音(4s)", id: "piano_long" },
+    { name: "标准音(2s)", id: "piano" },
+    { name: "短音(0.5s)", id: "piano_short" },
+];
+
 export function handleInput(val: string, state: PianoState, env: PianoEnv) {
     if (!val) return { keys: [], last: undefined, shouldClear: false };
     const comMode = state.mode.getData();
     const keyMap = keyMaps[state.keyMap.getData()].value;
     const octave = state.octave.getData();
     const { keys, notes } = parseInput(val, comMode, keyMap, octave);
-    playNotes(env, notes, "piano_long");
+
+    const sound = soundTypes[state.sound.getData()]?.id ?? "piano_long";
+    playNotes(env, notes, sound);
 
     return { keys, last: notes.at(-1), shouldClear: !comMode };
 }

@@ -51,6 +51,8 @@ class PianoInstance {
         const mode =
             (this.player.getDynamicProperty("piano:comMode") as boolean) ??
             true;
+        const sound =
+            (this.player.getDynamicProperty("piano:sound") as number) ?? 0;
 
         this.state = {
             keyMap: Observable.create<number>(keyMapIdx),
@@ -64,6 +66,7 @@ class PianoInstance {
             input: Observable.create<string>("", {
                 clientWritable: true,
             }),
+            sound: Observable.create<number>(sound),
         };
 
         // === UI ===
@@ -77,6 +80,7 @@ class PianoInstance {
             ],
             keyMapLabel: Observable.create<string>(""),
             modeLabel: Observable.create<string>(""),
+            soundLabel: Observable.create<string>(""),
         };
 
         // === env ===
@@ -100,13 +104,13 @@ class PianoInstance {
 
         // 输入
         this.state.input.subscribe((val) => {
-            // ❗玩家 / 方块校验（必须保留）
+            // ❗玩家 / 方块校验
             if (this.shouldClose()) {
                 this.close();
                 return;
             }
 
-            // ❗长度控制（必须保留）
+            // ❗长度控制
             if (val.length <= this.lastLength) {
                 this.lastLength = val.length;
                 return;
@@ -124,7 +128,7 @@ class PianoInstance {
             if (result.shouldClear) {
                 system.runTimeout(() => {
                     this.state.input.setData("");
-                }, 2);
+                }, 1);
             }
         });
         // 升8度

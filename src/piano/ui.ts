@@ -2,6 +2,7 @@ import { openMidiPlayer } from "@midiPlayer/ui/playerUIManager";
 import { Block, Player, system } from "@minecraft/server";
 import { CustomForm, Observable } from "@minecraft/server-ui";
 import { NoteInfo } from "@types";
+import { soundTypes } from "./input";
 import { keyMaps } from "./keymap";
 import { PIANO_LAYOUT } from "./layout";
 
@@ -11,6 +12,7 @@ export interface PianoState {
     input: Observable<string>;
     keyMap: Observable<number>;
     mode: Observable<boolean>;
+    sound: Observable<number>;
 }
 
 export interface PianoUIRefs {
@@ -18,6 +20,7 @@ export interface PianoUIRefs {
     rows: Observable<string>[];
     keyMapLabel: Observable<string>;
     modeLabel: Observable<string>;
+    soundLabel: Observable<string>;
 }
 
 function switchKeyMap(state: PianoState, p: Player) {
@@ -31,6 +34,13 @@ function switchComMode(state: PianoState, p: Player) {
     const newMode = !state.mode.getData();
     state.mode.setData(newMode);
     p.setDynamicProperty("piano:comMode", newMode);
+}
+
+function switchSoundType(state: PianoState, p: Player) {
+    let idx = state.sound.getData();
+    idx = (idx + 1) % soundTypes.length;
+    state.sound.setData(idx);
+    p.setDynamicProperty("piano:sound", idx);
 }
 
 export function createPianoUI(
@@ -76,6 +86,14 @@ export function createPianoUI(
             },
             options
         )
+        .button(
+            ui.soundLabel,
+            () => {
+                switchSoundType(state, p);
+                updatePianoUI(state, ui, []);
+            },
+            options
+        )
         .toggle("详细信息", state.fullUI);
 
     return form;
@@ -101,14 +119,17 @@ export function updatePianoUI(
 
     const info = last ?? emptyInfo;
 
-    ui.status.setData(
-        `§l§f音符: §a${info.name}\n§7音高: §e${info.pitch.toFixed(3)}`
-    );
-
     ui.keyMapLabel.setData(`当前方案: ${keyMaps[state.keyMap.getData()].name}`);
-
+    //更新模式
     ui.modeLabel.setData(
         state.mode.getData() ? "模式: 单音模式" : "模式: 连音模式"
+    );
+    //更新sound类型
+    const sound = state.sound.getData() ?? 0;
+    ui.soundLabel.setData(soundTypes[sound].name);
+
+    ui.status.setData(
+        `§l§f音符: §a${info.name}\n§7音高: §e${info.pitch.toFixed(3)} §7采样: ${info.sample}`
     );
 
     PIANO_LAYOUT.forEach((row, i) => {
