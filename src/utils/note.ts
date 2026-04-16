@@ -33,26 +33,35 @@ export function noteNameToMidi(note: string): number {
     return (octavePart + 1) * 12 + index;
 }
 
+function getShortestDiff(a: number, b: number): number {
+    let diff = a - b;
+    if (diff > 6) diff -= 12;
+    if (diff < -6) diff += 12;
+    return diff;
+}
+
 export function processNote(midi: number, shift: boolean): NoteInfo {
     // 升八度
     if (shift) midi += 12;
 
     const name = midiToNoteName(midi);
 
-    const noteIndex = midi % 12;
+    // ✅ 防止负数（更健壮）
+    const noteIndex = ((midi % 12) + 12) % 12;
 
     let bestBaseIndex = 0;
     let bestDiff = Infinity;
 
     for (const baseIndex of baseIndexes) {
-        const diff = noteIndex - baseIndex;
+        const diff = getShortestDiff(noteIndex, baseIndex);
+
         if (Math.abs(diff) < Math.abs(bestDiff)) {
             bestDiff = diff;
             bestBaseIndex = baseIndex;
         }
     }
 
-    // sample 对应的 octave（关键点！）
+    // sample 对应的 octave
     const sampleMidi = midi - bestDiff;
     const sampleName = midiToNoteName(sampleMidi);
 
