@@ -1,9 +1,11 @@
 import fs from "fs";
 import path from "path";
 import pkg from "@tonejs/midi";
+import { crc32 } from "crc";
+
 const { Midi } = pkg;
 
-// ===== 1. 读取命令行参数 =====
+// ===== 1. 读取路径 =====
 const inputDir = path.resolve(process.argv[2] || "./midis/files");
 const outputDir = path.resolve(process.argv[3] || "./midis/js");
 
@@ -12,26 +14,23 @@ function toFixed(num, digits) {
     return Number(num.toFixed(digits));
 }
 
-fs.rmSync(outputDir, { recursive: true });
-// ===== 2. 创建输出目录 =====
-if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-}
+// 清空输出
+fs.rmSync(outputDir, { recursive: true, force: true });
+fs.mkdirSync(outputDir, { recursive: true });
 
 const files = fs.readdirSync(inputDir).filter((f) => /\.midi?$/i.test(f));
 
 const metaList = [];
-let index = 1;
 
-// ===== 3. 主转换逻辑 =====
+// ===== 2. 转换 MIDI =====
 for (const file of files) {
     const filePath = path.join(inputDir, file);
     const buffer = fs.readFileSync(filePath);
 
     const midi = new Midi(buffer);
 
-    const fileId = index++;
-    const varName = `midi${fileId}`;
+    // ===== CRC32 作为唯一 ID =====
+    const fileId = (crc32(buffer) >>> 0).toString(16);
     const outFile = `${fileId}.js`;
 
     const tracksCode = midi.tracks
@@ -51,8 +50,10 @@ for (const file of files) {
         })
         .join(",");
 
+    // ===== export default =====
     const content =
-        `export const ${varName}={` +
+        `export default {` +
+        `id:${JSON.stringify(fileId)},` +
         `name:${JSON.stringify(file.replace(/\.midi?$/i, ""))},` +
         `duration:${midi.duration},` +
         `tracks:[${tracksCode}]` +
@@ -61,25 +62,30 @@ for (const file of files) {
     fs.writeFileSync(path.join(outputDir, outFile), content, "utf-8");
 
     metaList.push({
-        varName,
-        fileId,
+        id: fileId,
         name: file.replace(/\.midi?$/i, ""),
         duration: midi.duration,
     });
 }
 
-// ===== 4. 生成 index.js =====
+// ===== 3. 生成 index.js =====
 let indexContent = "export const midis=[";
 
 for (const item of metaList) {
-    indexContent += `{name:${JSON.stringify(item.name)},duration:${item.duration},value:async()=> (await import("./${item.fileId}.js")).${item.varName}},`;
+    indexContent +=
+        `{` +
+        `id:${JSON.stringify(item.id)},` +
+        `name:${JSON.stringify(item.name)},` +
+        `duration:${toFixed(item.duration, 2)},` +
+        `value:async()=> (await import("./${item.id}.js")).default` +
+        `},`;
 }
 
 indexContent += "];";
 
 fs.writeFileSync(path.join(outputDir, "index.js"), indexContent, "utf-8");
 
-// ===== 5. 输出日志 =====
+// ===== 4. 日志 =====
 console.log(`✅ 已转换 ${files.length} 个 MIDI 文件`);
-console.log(`📥 输入目录: ${inputDir}`);
-console.log(`📤 输出目录: ${outputDir}`);
+console.log(`📥 输入: ${inputDir}`);
+console.log(`📤 输出: ${outputDir}`);

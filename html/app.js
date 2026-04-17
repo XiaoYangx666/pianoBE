@@ -1,18 +1,25 @@
 /**
- * MC MIDI Addon Factory - v2.2.5
+ * MC MIDI Addon Factory - 修改版 (适配 CRC32 和新脚本格式)
  */
 
 let templateZip = null;
 let musicData = [];
 let paths = { bp: "bp/", rp: "rp/" };
 let manifestData = { bp: null, rp: null };
-let templateChangelog = ""; // 用于存储从包里读出来的日志
+let templateChangelog = "";
 
 const generateUUID = () =>
     "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
         return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
     });
+
+const formatDuration = (seconds) => {
+    if (isNaN(seconds)) return "0s";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+};
 
 const toFixed = (num, digits) =>
     typeof num === "number" ? Number(num.toFixed(digits)) : NaN;
@@ -24,17 +31,18 @@ const showLoading = (text) => {
 const hideLoading = () =>
     (document.getElementById("loading").style.display = "none");
 
-// --- 更新日志逻辑 ---
 window.openLog = async (tab = "web") => {
     const logModal = document.getElementById("logModal");
     const logBody = document.getElementById("logBody");
+    if (!logModal || !logBody) return;
+
     logModal.classList.add("active");
 
     // 渲染选项卡头部
     const tabHtml = `
         <div class="flex gap-4 border-b border-gray-100 mb-6">
-            <button onclick="renderLogContent('web')" id="tab-web" class="pb-2 px-1 text-xs font-bold transition-all border-b-2 ${tab === "web" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400"}">网页更新</button>
-            <button onclick="renderLogContent('tpl')" id="tab-tpl" class="pb-2 px-1 text-xs font-bold transition-all border-b-2 ${tab === "tpl" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400"}">底包更新</button>
+            <button onclick="renderLogContent('web')" id="tab-web" class="pb-2 px-1 text-xs font-bold transition-all border-b-2">网页更新</button>
+            <button onclick="renderLogContent('tpl')" id="tab-tpl" class="pb-2 px-1 text-xs font-bold transition-all border-b-2">底包更新</button>
         </div>
         <div id="logList" class="space-y-6">加载中...</div>
     `;
@@ -44,14 +52,19 @@ window.openLog = async (tab = "web") => {
 
 window.renderLogContent = async (type) => {
     const listContainer = document.getElementById("logList");
+    if (!listContainer) return;
+
     // 切换按钮样式
     document.querySelectorAll('[id^="tab-"]').forEach((btn) => {
         btn.classList.remove("border-blue-600", "text-blue-600");
         btn.classList.add("border-transparent", "text-gray-400");
     });
-    document
-        .getElementById("tab-" + type)
-        .classList.add("border-blue-600", "text-blue-600");
+
+    const activeBtn = document.getElementById("tab-" + type);
+    if (activeBtn) {
+        activeBtn.classList.add("border-blue-600", "text-blue-600");
+        activeBtn.classList.remove("border-transparent", "text-gray-400");
+    }
 
     if (type === "web") {
         try {
@@ -86,8 +99,10 @@ window.renderLogContent = async (type) => {
     }
 };
 
-window.closeLog = () =>
-    document.getElementById("logModal").classList.remove("active");
+window.closeLog = () => {
+    const logModal = document.getElementById("logModal");
+    if (logModal) logModal.classList.remove("active");
+};
 
 // --- 核心：加载模板 ---
 async function loadTemplate(fileOrBlob) {
@@ -120,22 +135,18 @@ async function loadTemplate(fileOrBlob) {
             await templateZip.file(rpM).async("string")
         );
 
-        // 尝试读取底包内的日志文件 (如 changelog.txt)
         const logFile = files.find((f) =>
             f.toLowerCase().includes("changelog.txt")
         );
-        if (logFile) {
+        if (logFile)
             templateChangelog = await templateZip.file(logFile).async("string");
-        }
 
         document.getElementById("addonName").value =
             manifestData.bp.header.name || "";
         document.getElementById("addonDesc").value =
             manifestData.bp.header.description || "";
 
-        // --- 修复点：版本号 Join 报错 ---
         const ver = manifestData.bp.header.version;
-        // 如果 ver 是数组则 join，如果已经是字符串则直接用，如果都不是则显示 0.0.1
         document.getElementById("tplVersion").innerText = Array.isArray(ver)
             ? ver.join(".")
             : typeof ver === "string"
@@ -153,7 +164,7 @@ async function loadTemplate(fileOrBlob) {
     hideLoading();
 }
 
-// 解析已有音乐
+// 解析已有音乐 (适配新格式 export default)
 async function parseExistingMidis() {
     const midisDir = `${paths.bp}scripts/midis/`.replace(/\/+/g, "/");
     const indexFile = templateZip.file(midisDir + "index.js");
@@ -162,24 +173,42 @@ async function parseExistingMidis() {
     try {
         const content = await indexFile.async("string");
         const regex =
-            /\{name:("(?:[^"\\]|\\.)*"),duration:([\d.]+),value:async\(\)=>\s*\(await\s*import\("\.\/(\d+)\.js"\)\)\.midi\d+\}/g;
+            /\{id:("(?:[^"\\]|\\.)*"),name:("(?:[^"\\]|\\.)*"),duration:([\d.]+),value:async\(\)=>\s*\(await\s*import\("\.\/([^"]+)\.js"\)\)\.default\}/g;
         let match;
         const items = [];
         while ((match = regex.exec(content)) !== null) {
-            const name = JSON.parse(match[1]);
-            const duration = parseFloat(match[2]);
-            const fileId = match[3];
+            const id = JSON.parse(match[1]);
+            const name = JSON.parse(match[2]);
+            const duration = parseFloat(match[3]);
+            const fileId = match[4];
+
             const jsFile = templateZip.file(`${midisDir}${fileId}.js`);
             if (jsFile) {
                 const jsContent = await jsFile.async("string");
                 const tracksMatch = jsContent.match(/tracks:(\[.*\])\};/);
-                if (tracksMatch)
+                if (tracksMatch) {
+                    // 估算音符数（通过计算 "notes:" 出现的次数或 Float32Array 内容）
+                    // 简单方法：统计 new Float32Array 里的数字个数除以 4
+                    const noteMatches = jsContent.match(
+                        /Float32Array\(\[(.*?)\]\)/g
+                    );
+                    let noteCount = 0;
+                    if (noteMatches) {
+                        noteMatches.forEach((m) => {
+                            const nums = m.match(/[\d.]+/g);
+                            if (nums) noteCount += nums.length / 4;
+                        });
+                    }
+
                     items.push({
+                        id,
                         name,
                         duration,
+                        noteCount: Math.floor(noteCount),
                         tracksCode: tracksMatch[1],
                         isOriginal: true,
                     });
+                }
             }
         }
         musicData = items;
@@ -188,80 +217,62 @@ async function parseExistingMidis() {
     }
 }
 
-// 转换 MIDI
+// 转换 MIDI (逻辑同步脚本)
 async function handleMidiUpload(files) {
     if (!templateZip) return alert("请先等待模板加载完成！");
     showLoading("正在转换 MIDI...");
+
+    let skipCount = 0;
     for (const file of Array.from(files)) {
         try {
             const buffer = await file.arrayBuffer();
+            const fileId = (CRC32.buf(new Uint8Array(buffer)) >>> 0).toString(
+                16
+            );
+
+            // 1. 去重检查
+            if (musicData.some((m) => m.id === fileId)) {
+                skipCount++;
+                continue;
+            }
+
             const midi = new Midi(buffer);
-            const tracksCode =
-                "[" +
-                midi.tracks
-                    .map((track) => {
-                        const flat = [];
-                        for (const n of track.notes) {
-                            flat.push(
-                                n.midi,
-                                toFixed(n.time, 2),
-                                toFixed(n.duration, 1),
-                                toFixed(n.velocity, 1)
-                            );
-                        }
-                        return `{instrument:${JSON.stringify(track.instrument)},notes:new Float32Array([${flat.join(",")}])}`;
-                    })
-                    .join(",") +
-                "]";
+            let totalNotes = 0;
+
+            const tracksCode = midi.tracks
+                .map((track) => {
+                    totalNotes += track.notes.length; // 2. 统计音符
+                    const flat = [];
+                    for (const n of track.notes) {
+                        flat.push(
+                            n.midi,
+                            toFixed(n.time, 2),
+                            toFixed(n.duration, 1),
+                            toFixed(n.velocity, 1)
+                        );
+                    }
+                    return `{instrument:${JSON.stringify(track.instrument)},notes:new Float32Array([${flat.join(",")}])}`;
+                })
+                .join(",");
+
             musicData.push({
+                id: fileId,
                 name: file.name.replace(/\.midi?$/i, ""),
-                duration: midi.duration,
-                tracksCode,
+                duration: midi.duration, // 3. 存储原始秒数
+                noteCount: totalNotes,
+                tracksCode: `[${tracksCode}]`,
                 isOriginal: false,
             });
         } catch (e) {
             console.error(e);
         }
     }
+    if (skipCount > 0) alert(`${skipCount} 个重复文件已被跳过`);
     renderList();
     hideLoading();
-    document.getElementById("midiInput").value = "";
 }
 
-function renderList() {
-    const listDiv = document.getElementById("midiList");
-    document.getElementById("count").innerText = musicData.length;
-    document.getElementById("generateBtn").disabled = !templateZip;
-
-    if (musicData.length === 0) {
-        listDiv.innerHTML = `<div class="py-20 text-center text-gray-300 text-[10px] font-black uppercase italic tracking-widest leading-none">未添加音乐，将生成空包</div>`;
-        return;
-    }
-
-    listDiv.innerHTML = musicData
-        .map(
-            (item, i) => `
-        <div class="midi-item p-4 flex justify-between items-center group bg-white border-b border-gray-50 transition-all">
-            <div class="flex items-center gap-4 min-w-0">
-                <div class="w-7 h-7 flex-shrink-0 bg-gray-100 text-gray-400 rounded-lg flex items-center justify-center text-[10px] font-black group-hover:bg-blue-600 group-hover:text-white transition-colors">${i + 1}</div>
-                <div class="min-w-0">
-                    <div class="text-[13px] font-bold text-gray-700 truncate">${item.name}</div>
-                    <div class="text-[9px] text-gray-400 font-mono mt-1 flex items-center gap-2">
-                        <span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">${Math.floor(item.duration)}S</span>
-                        ${item.isOriginal ? '<span class="text-blue-400 font-bold uppercase tracking-tighter">#Templated</span>' : '<span class="text-green-500 font-bold uppercase tracking-tighter">#New</span>'}
-                    </div>
-                </div>
-            </div>
-            <button onclick="removeMusic(${i})" class="text-gray-200 hover:text-red-500 p-2 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            </button>
-        </div>
-    `
-        )
-        .join("");
-}
-
-// 导出
+// 导出 (逻辑同步脚本)
 async function generateAddon() {
     showLoading("导出打包中...");
     try {
@@ -311,17 +322,20 @@ async function generateAddon() {
             if (f.startsWith(midisDir)) templateZip.remove(f);
         });
 
-        // 生成脚本
+        // 生成脚本 (格式: export default)
         let indexContent = "export const midis=[";
-        if (musicData.length > 0) {
-            musicData.forEach((item, i) => {
-                const id = i + 1;
-                templateZip.file(
-                    `${midisDir}${id}.js`,
-                    `export const midi${id}={name:${JSON.stringify(item.name)},duration:${item.duration},tracks:${item.tracksCode}};`
-                );
-                indexContent += `{name:${JSON.stringify(item.name)},duration:${item.duration},value:async()=> (await import("./${id}.js")).midi${id}},`;
-            });
+        for (const item of musicData) {
+            const content = `export default {id:${JSON.stringify(item.id)},name:${JSON.stringify(item.name)},duration:${item.duration},tracks:${item.tracksCode}};`;
+
+            templateZip.file(`${midisDir}${item.id}.js`, content);
+
+            indexContent +=
+                `{` +
+                `id:${JSON.stringify(item.id)},` +
+                `name:${JSON.stringify(item.name)},` +
+                `duration:${toFixed(item.duration, 2)},` +
+                `value:async()=> (await import("./${item.id}.js")).default` +
+                `},`;
         }
         templateZip.file(`${midisDir}index.js`, indexContent + "];");
 
@@ -336,6 +350,42 @@ async function generateAddon() {
     hideLoading();
 }
 
+function renderList() {
+    const listDiv = document.getElementById("midiList");
+    document.getElementById("count").innerText = musicData.length;
+    document.getElementById("generateBtn").disabled = !templateZip;
+
+    if (musicData.length === 0) {
+        listDiv.innerHTML = `<div class="py-20 text-center text-gray-300 text-[10px] font-black uppercase italic tracking-widest leading-none">未添加音乐，将生成空包</div>`;
+        return;
+    }
+
+    listDiv.innerHTML = musicData
+        .map(
+            (item, i) => `
+        <div class="midi-item p-4 flex justify-between items-center group bg-white border-b border-gray-50 transition-all">
+            <div class="flex items-center gap-4 min-w-0">
+                <div class="w-7 h-7 flex-shrink-0 bg-gray-100 text-gray-400 rounded-lg flex items-center justify-center text-[10px] font-black group-hover:bg-blue-600 group-hover:text-white transition-colors">${i + 1}</div>
+                <div class="min-w-0">
+                    <div class="text-[13px] font-bold text-gray-700 truncate">${item.name}</div>
+                    <div class="text-[9px] text-gray-400 font-mono mt-1 flex flex-wrap items-center gap-2">
+                        <span class="bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded font-bold">${item.noteCount || 0} NOTES</span>
+                        <!-- 这里修改了时长显示格式 -->
+                        <span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">${formatDuration(item.duration)}</span>
+                        <span class="text-gray-300 hidden sm:inline">ID: ${item.id}</span>
+                        ${item.isOriginal ? '<span class="text-blue-400 font-bold uppercase tracking-tighter">#Templated</span>' : '<span class="text-green-500 font-bold uppercase tracking-tighter">#New</span>'}
+                    </div>
+                </div>
+            </div>
+            <button onclick="removeMusic(${i})" class="text-gray-200 hover:text-red-500 p-2 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+        </div>`
+        )
+        .join("");
+}
+
+// 其余 UI 事件保持不变 ...
 window.removeMusic = (index) => {
     musicData.splice(index, 1);
     renderList();
@@ -359,6 +409,5 @@ window.addEventListener("DOMContentLoaded", async () => {
         else document.getElementById("tplVersion").innerText = "未加载默认底包";
     } catch (e) {
         document.getElementById("tplVersion").innerText = "底包加载失败";
-        console.warn("未找到默认底包 template.mcaddon");
     }
 });

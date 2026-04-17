@@ -5,6 +5,7 @@
         "@minecraft/server": "2.7.0-beta.1.26.12-stable",
         "@minecraft/server-ui": "2.1.0-beta.1.26.12-stable",
         "@tonejs/midi": "^2.0.28",
+        "crc": "^4.3.2",
         "sapi-pro": "^0.4.0"
     },
     "devDependencies": {
