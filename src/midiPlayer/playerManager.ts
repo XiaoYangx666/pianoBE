@@ -1,7 +1,7 @@
 import { Dimension, system, Vector3 } from "@minecraft/server";
 import { MidiPlayer } from "./player";
 
-class MidiPlayerManager {
+export class MidiPlayerManager {
     private players: MidiPlayer[] = [];
     private playerMap: Map<string, MidiPlayer> = new Map();
     private intervalId?: number;
@@ -32,7 +32,7 @@ class MidiPlayerManager {
     private tick() {
         const now = Date.now();
 
-        for (let i = this.players.length - 1; i >= 0; i--) {
+        for (let i = 0; i < this.players.length; i++) {
             const p = this.players[i];
 
             p.tick(now);
@@ -119,7 +119,7 @@ class MidiPlayerManager {
             const p = this.players[i];
 
             if (!p.isPlaying()) {
-                p.stop();
+                p.end();
                 this.removeAt(i);
                 i--;
                 removeCount--;
@@ -130,7 +130,7 @@ class MidiPlayerManager {
         for (let i = 0; i < this.players.length && removeCount > 0; i++) {
             const p = this.players[i];
 
-            p.stop();
+            p.end();
             this.removeAt(i);
             i--;
             removeCount--;
@@ -144,7 +144,7 @@ class MidiPlayerManager {
             const p = this.players[i];
 
             if (now - p.lastActiveTime > this.MAX_IDLE_TIME) {
-                p.stop();
+                p.end();
                 this.removeAt(i);
             }
         }
@@ -210,5 +210,3 @@ class MidiPlayerManager {
         return lines.join("\n");
     }
 }
-
-export const midiPlayerManager = new MidiPlayerManager();

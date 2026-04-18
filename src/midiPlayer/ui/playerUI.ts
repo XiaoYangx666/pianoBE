@@ -1,9 +1,10 @@
-import { CustomForm, Observable } from "@minecraft/server-ui";
-import { Block, system } from "@minecraft/server";
-import { MidiPlayer } from "../player";
 import { getPlayModeName, PlayMode } from "@midiPlayer/queue";
-import { QueueListForm } from "./queueUI";
+import { Block, system } from "@minecraft/server";
+import { CustomForm, Observable } from "@minecraft/server-ui";
 import { formManager } from "sapi-pro";
+import { MidiPlayer } from "../player";
+import { PlayListMainForm } from "./playListUI";
+import { QueueListForm } from "./queueUI";
 
 export interface MidiPlayerUIContext {
     state: Observable<string>;
@@ -50,41 +51,65 @@ export function createMidiPlayerUI(
         .label("   ")
 
         .button(ctx.buttonText, () => {
-            const state = getPlayer().getState();
+            const player = getPlayer();
+            const state = player.getState();
 
-            if (state === "playing") getPlayer().pause();
-            else if (state === "paused") getPlayer().resume();
-            else if (state === "idle") getPlayer().play();
+            if (state === "playing") player.pause();
+            else if (state === "paused") player.resume();
+            else if (state === "idle") player.play();
             else close();
 
-            updateUI(ctx, getPlayer());
+            updateUI(ctx, player);
         })
 
         .button("队列管理", () => {
             close();
+            if (!getPlayer().isAlive()) {
+                return;
+            }
             system.runTimeout(() => {
                 formManager.open(p, QueueListForm, {
                     midiPlayer: getPlayer(),
                     p: 1,
-                    ui: { player: p, block: ctx.block },
+                    block: ctx.block,
                 });
             }, 20);
         })
 
         .button("⏮ 上一首", () => {
+            if (!getPlayer().isAlive()) {
+                return close();
+            }
             getPlayer().queue.prev();
             getPlayer().play();
             updateUI(ctx, getPlayer());
         })
 
         .button("⏭ 下一首", () => {
+            if (!getPlayer().isAlive()) {
+                return close();
+            }
             getPlayer().queue.next();
             getPlayer().play();
             updateUI(ctx, getPlayer());
         })
 
         .button(ctx.playMode, () => {
+            if (!getPlayer().isAlive()) {
+                return close();
+            }
             switchPlayMode(getPlayer(), ctx.playMode);
+        })
+        .button("播放列表管理", () => {
+            close();
+            if (!getPlayer().isAlive()) {
+                return;
+            }
+            system.runTimeout(() => {
+                formManager.open(p, PlayListMainForm, {
+                    midiPlayer: getPlayer(),
+                });
+            }, 20);
         });
 
     return form;

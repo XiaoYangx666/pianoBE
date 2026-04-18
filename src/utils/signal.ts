@@ -1,6 +1,7 @@
 export type EventCallback<T = any> = (data: T) => void;
 
 export class Signal<T = any> {
+    private isActive: boolean = true;
     private callbacks: Set<EventCallback<T>> = new Set();
 
     /**
@@ -9,6 +10,7 @@ export class Signal<T = any> {
      * @returns 取消订阅的函数
      */
     subscribe(callback: EventCallback<T>): () => void {
+        if (!this.isActive) return () => {};
         this.callbacks.add(callback);
 
         // 返回取消订阅函数
@@ -28,6 +30,7 @@ export class Signal<T = any> {
      * @param data 传递的数据
      */
     publish(data?: T): void {
+        if (!this.isActive) return;
         // 遍历时使用副本，避免回调中修改 callbacks 导致问题
         const callbacks = Array.from(this.callbacks);
         callbacks.forEach((callback) => {
@@ -44,6 +47,11 @@ export class Signal<T = any> {
      */
     clear(): void {
         this.callbacks.clear();
+    }
+
+    dispose(): void {
+        this.callbacks.clear();
+        this.isActive = false;
     }
 
     /**

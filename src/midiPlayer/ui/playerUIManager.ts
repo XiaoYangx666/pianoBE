@@ -3,7 +3,7 @@ import { Observable } from "@minecraft/server-ui";
 import { Cardinal_Direction } from "@types";
 import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
-import { midiPlayerManager } from "../manager";
+import { midiPlayerManager } from "../index";
 import { MidiPlayer } from "../player";
 import { createMidiPlayerUI, MidiPlayerUIContext, updateUI } from "./playerUI";
 
@@ -11,7 +11,7 @@ class MidiPlayerInstance {
     private form: any;
     private ctx!: MidiPlayerUIContext;
 
-    private playerInst!: MidiPlayer;
+    private playerInst?: MidiPlayer;
     private leftBlock: Block | null = null;
 
     private inited = false;
@@ -44,7 +44,7 @@ class MidiPlayerInstance {
         this.playerInst = newPlayer;
 
         this.unsub = this.playerInst.signal.subscribe(() => {
-            if (!this.form?.isShowing?.()) {
+            if (!this.form?.isShowing?.() || !this.playerInst?.isAlive()) {
                 return this.close();
             }
             updateUI(this.ctx, this.playerInst);
@@ -80,14 +80,14 @@ class MidiPlayerInstance {
         this.form = createMidiPlayerUI(
             this.player,
             this.ctx,
-            () => this.playerInst,
+            () => this.playerInst!,
             () => this.close()
         );
     }
 
     async show() {
         this.init();
-        if (!this.form) return;
+        if (!this.form || !this.playerInst) return;
 
         // 每次打开刷新 UI
         updateUI(this.ctx, this.playerInst);

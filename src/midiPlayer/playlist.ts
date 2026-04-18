@@ -1,35 +1,48 @@
 import { DPDataBase } from "sapi-pro";
 
-export interface PlayList {
+export interface PlayListMeta {
     id: number;
     owner: string;
     name: string;
-    items: string[];
     public: boolean;
     playCount: number;
     createdAt: number;
     updatedAt: number;
 }
 
-class PlayListStore {
+export interface PlayListContent {
+    id: number;
+    items: string[];
+}
+
+export class PlayListStore {
     private readonly db = new DPDataBase("playlist");
 
     private readonly KEY_ID = "id";
     private readonly KEY_PUBLIC = "public";
 
     // ---------------------------
-    // key helpers
+    // 内存记录：用于播放计数限制
     // ---------------------------
-    private keyItem(id: number) {
-        return `item:${id}`;
-    }
-
-    private keyPlayer(playerId: string) {
-        return `player:${playerId}`;
-    }
+    // 存储格式: "playerId:listId"
+    private playRecords = new Set<string>();
+    private lastRecordDate = "";
 
     // ---------------------------
-    // id 生成
+    // Keys
+    // ---------------------------
+    private keyMeta(id: number) {
+        return `meta:${id}`;
+    }
+    private keyContent(id: number) {
+        return `content:${id}`;
+    }
+    private keyOwnerIndex(owner: string) {
+        return `owner_lists:${owner}`;
+    }
+
+    // ---------------------------
+    // ID Generator
     // ---------------------------
     private nextId(): number {
         const id = this.db.getJSON<number>(this.KEY_ID) ?? 0;
@@ -39,27 +52,7 @@ class PlayListStore {
     }
 
     // ---------------------------
-    // item 操作
-    // ---------------------------
-    private getItem(id: number): PlayList | undefined {
-        return this.db.getJSON<PlayList>(
-            this.keyItem(id),
-            (v: any): v is PlayList => {
-                return v && typeof v.id === "number";
-            }
-        );
-    }
-
-    private saveItem(item: PlayList) {
-        this.db.setJSON(this.keyItem(item.id), item);
-    }
-
-    private deleteItem(id: number) {
-        this.db.rm(this.keyItem(id));
-    }
-
-    // ---------------------------
-    // index 操作
+    // Private Helpers
     // ---------------------------
     private getIndex(key: string): number[] {
         return this.db.getJSON<number[]>(key, Array.isArray) ?? [];
@@ -69,177 +62,168 @@ class PlayListStore {
         this.db.setJSON(key, ids);
     }
 
-    private addToIndex(key: string, id: number) {
-        const arr = this.getIndex(key);
-        if (!arr.includes(id)) {
-            arr.push(id);
-            this.saveIndex(key, arr);
+    /**
+     * 内部方法：检查并清理跨天记录
+     */
+    private checkDateAndClear() {
+        const today = new Date().toDateString();
+        if (this.lastRecordDate !== today) {
+            this.playRecords.clear(); // 跨天了，清空内存记录
+            this.lastRecordDate = today;
         }
     }
 
-    private removeFromIndex(key: string, id: number) {
-        const arr = this.getIndex(key).filter((x) => x !== id);
-        this.saveIndex(key, arr);
-    }
-
     // ---------------------------
-    // 清理脏指针
+    // Public API - CRUD
     // ---------------------------
-    private cleanIndex(key: string): number[] {
-        const ids = this.getIndex(key);
-        const valid: number[] = [];
 
-        for (const id of ids) {
-            const item = this.getItem(id);
-            if (item) valid.push(id);
-        }
-
-        if (valid.length !== ids.length) {
-            this.saveIndex(key, valid);
-        }
-
-        return valid;
-    }
-
-    // ---------------------------
-    // 创建列表
-    // ---------------------------
-    createList(playerId: string, name: string): PlayList {
+    create(owner: string, name: string): PlayListMeta {
         const id = this.nextId();
+        const now = Date.now();
 
-        const item: PlayList = {
+        const meta: PlayListMeta = {
             id,
-            owner: playerId,
+            owner,
             name,
-            items: [],
             public: false,
             playCount: 0,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+            createdAt: now,
+            updatedAt: now,
         };
 
-        this.saveItem(item);
-        this.addToIndex(this.keyPlayer(playerId), id);
+        this.db.setJSON(this.keyMeta(id), meta);
+        this.db.setJSON(this.keyContent(id), { id, items: [] });
 
-        return item;
+        const ownerIdx = this.getIndex(this.keyOwnerIndex(owner));
+        ownerIdx.push(id);
+        this.saveIndex(this.keyOwnerIndex(owner), ownerIdx);
+
+        return meta;
     }
 
-    // ---------------------------
-    // 删除列表
-    // ---------------------------
-    deleteList(playerId: string, listId: number) {
-        const item = this.getItem(listId);
-        if (!item) return;
-
-        if (item.owner !== playerId) {
-            throw new Error("permission denied");
-        }
-
-        this.removeFromIndex(this.keyPlayer(playerId), listId);
-
-        if (item.public) {
-            this.removeFromIndex(this.KEY_PUBLIC, listId);
-        }
-
-        this.deleteItem(listId);
+    getMeta(id: number): PlayListMeta | undefined {
+        return this.db.getJSON<PlayListMeta>(this.keyMeta(id));
     }
 
-    // ---------------------------
-    // 设置 items
-    // ---------------------------
-    setListItems(playerId: string, listId: number, items: string[]) {
-        const item = this.getItem(listId);
-        if (!item) throw new Error("list not found");
-
-        if (item.owner !== playerId) {
-            throw new Error("permission denied");
-        }
-
-        item.items = items;
-        item.updatedAt = Date.now();
-
-        this.saveItem(item);
+    getContent(id: number): string[] {
+        const data = this.db.getJSON<PlayListContent>(this.keyContent(id));
+        return data ? data.items : [];
     }
 
-    // ---------------------------
-    // 设置 public
-    // ---------------------------
-    setPublic(playerId: string, listId: number, isPublic: boolean) {
-        const item = this.getItem(listId);
-        if (!item) throw new Error("list not found");
+    updateMeta(id: number, patch: Partial<Omit<PlayListMeta, "id" | "owner">>) {
+        const meta = this.getMeta(id);
+        if (!meta) return;
 
-        if (item.owner !== playerId) {
-            throw new Error("permission denied");
-        }
+        const updated = { ...meta, ...patch, updatedAt: Date.now() };
+        this.db.setJSON(this.keyMeta(id), updated);
 
-        if (item.public === isPublic) return;
-
-        item.public = isPublic;
-        item.updatedAt = Date.now();
-
-        this.saveItem(item);
-
-        if (isPublic) {
-            this.addToIndex(this.KEY_PUBLIC, listId);
-        } else {
-            this.removeFromIndex(this.KEY_PUBLIC, listId);
+        if (patch.public !== undefined) {
+            const pubIdx = this.getIndex(this.KEY_PUBLIC);
+            if (patch.public) {
+                if (!pubIdx.includes(id)) pubIdx.push(id);
+            } else {
+                const i = pubIdx.indexOf(id);
+                if (i > -1) pubIdx.splice(i, 1);
+            }
+            this.saveIndex(this.KEY_PUBLIC, pubIdx);
         }
     }
 
-    // ---------------------------
-    // 播放计数 +1
-    // ---------------------------
-    incPlayCount(listId: number) {
-        const item = this.getItem(listId);
-        if (!item) return;
+    setContent(id: number, items: string[]) {
+        this.db.setJSON(this.keyContent(id), { id, items });
+        this.updateMeta(id, {});
+    }
 
-        item.playCount++;
-        this.saveItem(item);
+    delete(id: number) {
+        const meta = this.getMeta(id);
+        if (!meta) return;
+
+        this.db.rm(this.keyMeta(id));
+        this.db.rm(this.keyContent(id));
+
+        const ownerIdx = this.getIndex(this.keyOwnerIndex(meta.owner)).filter(
+            (i) => i !== id
+        );
+        this.saveIndex(this.keyOwnerIndex(meta.owner), ownerIdx);
+
+        if (meta.public) {
+            const pubIdx = this.getIndex(this.KEY_PUBLIC).filter(
+                (i) => i !== id
+            );
+            this.saveIndex(this.KEY_PUBLIC, pubIdx);
+        }
+    }
+
+    /**
+     * 增加播放次数（带频率限制）
+     * @param id 播放列表ID
+     * @param playerId 操作者ID
+     */
+    incPlayCount(id: number, playerId: string) {
+        this.checkDateAndClear();
+
+        const recordKey = `${playerId}:${id}`;
+        if (this.playRecords.has(recordKey)) {
+            // 该玩家今天已经为该列表贡献过播放量了
+            return;
+        }
+
+        const meta = this.getMeta(id);
+        if (!meta) return;
+
+        // 1. 更新数据库
+        meta.playCount++;
+        this.db.setJSON(this.keyMeta(id), meta);
+
+        // 2. 写入内存记录
+        this.playRecords.add(recordKey);
     }
 
     // ---------------------------
-    // 获取玩家列表
+    // Query APIs
     // ---------------------------
-    getPlayerLists(playerId: string): PlayList[] {
-        const ids = this.cleanIndex(this.keyPlayer(playerId));
-        const result: PlayList[] = [];
+
+    getMetasByOwner(owner: string): PlayListMeta[] {
+        const ids = this.getIndex(this.keyOwnerIndex(owner));
+        const result: PlayListMeta[] = [];
+        let changed = false;
 
         for (const id of ids) {
-            const item = this.getItem(id);
-            if (item) result.push(item);
+            const m = this.getMeta(id);
+            if (m) result.push(m);
+            else changed = true;
         }
 
+        if (changed) {
+            this.saveIndex(
+                this.keyOwnerIndex(owner),
+                result.map((r) => r.id)
+            );
+        }
         return result;
     }
 
-    // ---------------------------
-    // 获取 public（按播放量排序）
-    // ---------------------------
-    getPublicLists(order?: "play"): PlayList[] {
-        const ids = this.cleanIndex(this.KEY_PUBLIC);
-        const result: PlayList[] = [];
+    getPublicMetas(sortByPlayCount: boolean = false): PlayListMeta[] {
+        const ids = this.getIndex(this.KEY_PUBLIC);
+        const result: PlayListMeta[] = [];
+        let changed = false;
 
         for (const id of ids) {
-            const item = this.getItem(id);
-            if (item && item.public) {
-                result.push(item);
-            }
+            const m = this.getMeta(id);
+            if (m && m.public) result.push(m);
+            else changed = true;
         }
 
-        if (order == "play") {
-            // 🔥 按播放量排序
+        if (changed) {
+            this.saveIndex(
+                this.KEY_PUBLIC,
+                result.map((r) => r.id)
+            );
+        }
+
+        if (sortByPlayCount) {
             result.sort((a, b) => b.playCount - a.playCount);
         }
-
         return result;
     }
-
-    // ---------------------------
-    // 获取单个
-    // ---------------------------
-    getList(listId: number): PlayList | undefined {
-        return this.getItem(listId);
-    }
 }
-
-export const playListStore = new PlayListStore();

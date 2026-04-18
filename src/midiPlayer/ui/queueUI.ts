@@ -1,18 +1,17 @@
 import { MidiPlayer } from "@midiPlayer/player";
-import { PlayQueue } from "@midiPlayer/queue";
-import { midis } from "@midis/index";
-import { Block, Player } from "@minecraft/server";
-import { CommonForm, FuncButton, TextField } from "sapi-pro";
+import { Block } from "@minecraft/server";
+import { CommonForm } from "sapi-pro";
+import { MidiListForm, MidiSearchForm } from "./midiList";
 import { openMidiPlayer } from "./playerUIManager";
 
 const PAGE_SIZE = 10;
 
 export const QueueListForm = CommonForm.ButtonForm<{
     midiPlayer: MidiPlayer;
-    ui: { player: Player; block: Block };
+    block: Block;
     p: number;
 }>({
-    title: "midi播放器列表",
+    title: "播放器序列",
     generator(form, player, args) {
         const queue = args.midiPlayer.queue;
         const total = queue.getLength();
@@ -31,7 +30,10 @@ export const QueueListForm = CommonForm.ButtonForm<{
                     queue: ctx.args.midiPlayer.queue,
                     p: 1,
                     filter: undefined,
-                });
+                } as any);
+            },
+            shouldShow(player, args) {
+                return args.p == 1; //仅第一页显示
             },
         },
         {
@@ -39,7 +41,22 @@ export const QueueListForm = CommonForm.ButtonForm<{
             func(ctx) {
                 ctx.push(MidiSearchForm, {
                     queue: ctx.args.midiPlayer.queue,
+                } as any);
+            },
+            shouldShow(player, args) {
+                return args.p == 1; //仅第一页显示
+            },
+        },
+        {
+            label: "返回首页",
+            func(ctx) {
+                ctx.replace(QueueListForm, {
+                    ...ctx.args,
+                    p: 1,
                 });
+            },
+            shouldShow(player, args) {
+                return args.p != 1;
             },
         },
         {
@@ -103,7 +120,7 @@ export const QueueListForm = CommonForm.ButtonForm<{
         });
     },
     oncancel(res, ctx) {
-        openMidiPlayer(ctx.args.ui.player, ctx.args.ui.block);
+        openMidiPlayer(ctx.player, ctx.args.block);
     },
 });
 
@@ -157,133 +174,4 @@ const QueueItemForm = CommonForm.ButtonForm<{
             },
         },
     ],
-});
-
-const MidiSearchForm = CommonForm.InputForm<
-    { keywords: string },
-    { queue: PlayQueue }
->({
-    title: "搜索歌曲",
-    fields: [new TextField("歌曲名字", "请输入歌曲名字", "").key("keywords")],
-    submitButton: "搜索",
-    onSubmit(data, ctx) {
-        const keywords = data.keywords?.trim() || "";
-        ctx.push(MidiListForm, {
-            queue: ctx.args.queue,
-            p: 1,
-            filter: keywords || undefined,
-        });
-    },
-    onCancel(res, ctx) {
-        ctx.back();
-    },
-});
-
-/** 获取筛选后的列表 */
-function getFilteredList(filter?: string) {
-    if (!filter) return midis;
-    const lowerFilter = filter.toLowerCase();
-    return midis.filter((m) => m.name.toLowerCase().includes(lowerFilter));
-}
-
-const MidiListForm = CommonForm.ButtonForm<{
-    queue: PlayQueue;
-    p: number;
-    filter: any;
-}>({
-    title: "添加到播放列表",
-
-    generator(form, ctx, args) {
-        const filteredList = getFilteredList(args.filter);
-        const maxPage = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
-
-        if (args.p > maxPage) args.p = maxPage;
-        if (args.p < 1) args.p = 1;
-
-        const filterInfo = args.filter ? `搜索: "${args.filter}"\n` : "";
-        form.body(
-            `${filterInfo}共 ${filteredList.length} 首\n第 ${args.p} / ${maxPage} 页`
-        );
-    },
-
-    buttons: [
-        {
-            label: "上一页",
-            func(ctx) {
-                ctx.replace(MidiListForm as any, {
-                    queue: ctx.args.queue,
-                    p: ctx.args.p - 1,
-                    filter: ctx.args.filter,
-                });
-            },
-            shouldShow(player, args) {
-                return args.p > 1;
-            },
-        },
-        {
-            label: "清除搜索",
-            func(ctx) {
-                ctx.replace(MidiListForm, {
-                    queue: ctx.args.queue,
-                    p: 1,
-                    filter: undefined,
-                });
-            },
-            shouldShow(player, args) {
-                return !!args.filter;
-            },
-        },
-    ],
-
-    buttonGenerator(player, args) {
-        const filteredList = getFilteredList(args.filter);
-
-        const start = (args.p - 1) * PAGE_SIZE;
-        const end = start + PAGE_SIZE;
-
-        const buttons: FuncButton<any, any>[] = filteredList
-            .slice(start, end)
-            .map((midi, i) => {
-                const realIndex = start + i;
-                return {
-                    label: `${realIndex}. ${midi.name}`,
-                };
-            });
-        if (args.p * PAGE_SIZE < filteredList.length) {
-            buttons.push({
-                label: "下一页",
-                func(ctx) {
-                    ctx.replace(MidiListForm, {
-                        queue: ctx.args.queue,
-                        p: ctx.args.p + 1,
-                        filter: ctx.args.filter,
-                    });
-                },
-            });
-        }
-
-        return buttons;
-    },
-
-    handler(ctx, button) {
-        const { queue, p, filter } = ctx.args;
-        const filteredList = getFilteredList(filter);
-
-        const start = (p - 1) * PAGE_SIZE;
-        const realIndex = start + button.btnIndex;
-
-        const midi = filteredList[realIndex];
-        if (!midi) return;
-
-        queue.enqueue(midi);
-
-        ctx.replace(MidiListForm, {
-            queue,
-            p,
-            filter,
-        });
-    },
-    oncancel(res, ctx) {
-        ctx.back();
-    },
 });

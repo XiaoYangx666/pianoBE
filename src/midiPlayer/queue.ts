@@ -177,12 +177,16 @@ export class PlayQueue {
         return this.list.length;
     }
 
-    /* ================== 状态 ================== */
+    /* ================== 导入与导出 ================== */
 
-    import(list: MidiInfo[]) {
+    /**导入播放列表，覆盖当前 */
+    import(list: MidiInfo[]): void {
         this.list = list;
-        this.index = 0;
+        this.index = list.length == 0 ? -1 : 0;
     }
 
-    export() {}
+    /**导出midi的id列表 */
+    export(): string[] {
+        return this.list.map((t) => t.id);
+    }
 }

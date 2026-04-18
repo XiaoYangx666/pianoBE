@@ -1,3 +1,4 @@
+import { midiManager } from "@midiPlayer";
 import { Dimension, Vector3 } from "@minecraft/server";
 import { getSoundIdByDuration, processNote } from "@utils/note";
 import { summonParticle } from "@utils/particle";
@@ -89,31 +90,31 @@ export class MidiPlayer {
         this.lastTime = Date.now();
     }
 
-    stop() {
+    end() {
         this.state = "stopped";
         this.tracks = [];
         this.indices = [];
         this.currentTime = 0;
         this.isLoading = false;
+        this.signal.dispose();
     }
 
     /* ================== 调度 ================== */
 
     tick(now: number) {
-        if (this.state === "stopped" || this.state === "idle") {
-            this.lastTime = now;
+        if (this.state === "stopped") {
             return;
         }
 
         const block = this.dimension.getBlock(this.pos);
 
-        if (!block) {
+        if (!block || this.state == "idle") {
             this.lastTime = now;
             return;
         }
 
         if (block.typeId !== "xypiano:piano_left") {
-            this.stop();
+            this.end();
             return;
         }
 
@@ -229,7 +230,7 @@ export class MidiPlayer {
 
     private async loadMidi(info: MidiInfo) {
         try {
-            const midi = await info.value();
+            const midi = await midiManager.load(info);
 
             this.tracks = this.extractTracks(midi);
 
