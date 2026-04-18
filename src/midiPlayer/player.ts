@@ -190,12 +190,12 @@ export class MidiPlayer {
     private processPlayback() {
         const tracks = this.tracks;
         const indices = this.indices;
+        const currentTime = this.currentTime * 40;
 
         while (true) {
             let minTime = Infinity;
             let minTrack = -1;
 
-            // 找最早的 note
             for (let t = 0; t < tracks.length; t++) {
                 const idx = indices[t];
                 const arr = tracks[t];
@@ -210,15 +210,17 @@ export class MidiPlayer {
                 }
             }
 
-            if (minTrack === -1) break; // 全播完
+            if (minTrack === -1) break;
 
-            if (minTime > this.currentTime) break;
+            if (minTime > currentTime) break;
 
             const arr = tracks[minTrack];
             const i = indices[minTrack];
 
             const midi = arr[i];
-            const duration = arr[i + 2];
+
+            // duration 只在用的时候除
+            const duration = arr[i + 2] / 100;
 
             const info = processNote(midi, false);
 

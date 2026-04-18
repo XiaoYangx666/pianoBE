@@ -73,7 +73,6 @@ export function regEvents() {
         if (t.source?.typeId == "minecraft:wind_charge_projectile") return;
 
         const blocks = t.getImpactedBlocks();
-        world.sendMessage(blocks.length.toString());
         if (blocks.length === 0) return;
 
         // 先快速检测：有没有钢琴方块

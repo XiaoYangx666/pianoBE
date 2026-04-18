@@ -9,9 +9,16 @@ const { Midi } = pkg;
 const inputDir = path.resolve(process.argv[2] || "./midis/files");
 const outputDir = path.resolve(process.argv[3] || "./midis/js");
 
-function toFixed(num, digits) {
-    if (typeof num !== "number") return NaN;
-    return Number(num.toFixed(digits));
+// ===== scale 定义 =====
+const TIME_SCALE = 40;
+const OTHER_SCALE = 100;
+
+// ===== encode 函数 =====
+function encTime(v) {
+    return Math.floor(v * TIME_SCALE);
+}
+function enc(v) {
+    return Math.round(v * OTHER_SCALE);
 }
 
 // 清空输出
@@ -39,14 +46,14 @@ for (const file of files) {
 
             for (const n of track.notes) {
                 flat.push(
-                    n.midi,
-                    toFixed(n.time, 2),
-                    toFixed(n.duration, 1),
-                    toFixed(n.velocity, 1)
+                    n.midi, // 0~127 不变
+                    encTime(n.time), // /20
+                    enc(n.duration), // /100
+                    enc(n.velocity) // /100
                 );
             }
 
-            return `{instrument:${JSON.stringify(track.instrument)},notes:new Float32Array([${flat.join(",")}])}`;
+            return `{instrument:${JSON.stringify(track.instrument)},notes:new Uint16Array([${flat.join(",")}])}`;
         })
         .join(",");
 
@@ -55,7 +62,7 @@ for (const file of files) {
         `export default {` +
         `id:${JSON.stringify(fileId)},` +
         `name:${JSON.stringify(file.replace(/\.midi?$/i, ""))},` +
-        `duration:${midi.duration},` +
+        `duration:${Math.round(midi.duration * TIME_SCALE)},` + // 统一 /20
         `tracks:[${tracksCode}]` +
         `};`;
 
@@ -64,7 +71,7 @@ for (const file of files) {
     metaList.push({
         id: fileId,
         name: file.replace(/\.midi?$/i, ""),
-        duration: midi.duration,
+        duration: Math.round(midi.duration * TIME_SCALE),
     });
 }
 
@@ -76,7 +83,7 @@ for (const item of metaList) {
         `{` +
         `id:${JSON.stringify(item.id)},` +
         `name:${JSON.stringify(item.name)},` +
-        `duration:${toFixed(item.duration, 2)},` +
+        `duration:${item.duration},` +
         `value:async()=> (await import("./${item.id}.js")).default` +
         `},`;
 }
