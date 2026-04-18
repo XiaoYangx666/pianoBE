@@ -176,4 +176,13 @@ export class PlayQueue {
     getLength() {
         return this.list.length;
     }
+
+    /* ================== 状态 ================== */
+
+    import(list: MidiInfo[]) {
+        this.list = list;
+        this.index = 0;
+    }
+
+    export() {}
 }

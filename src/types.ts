@@ -40,6 +40,7 @@ export type MidiListType = MidiInfo[];
 
 /**Midi的信息 */
 export interface MidiInfo {
+    id: string;
     name: string;
     duration: number;
     value: () => Promise<MidiJson>;
