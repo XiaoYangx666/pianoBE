@@ -45,7 +45,7 @@ export class PlayListStore {
     // ID Generator
     // ---------------------------
     private nextId(): number {
-        const id = this.db.getJSON<number>(this.KEY_ID) ?? 0;
+        const id = this.db.get<number>(this.KEY_ID) ?? 0;
         const next = id + 1;
         this.db.set(this.KEY_ID, next);
         return next;
