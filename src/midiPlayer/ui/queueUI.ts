@@ -1,10 +1,9 @@
 import { MidiPlayer } from "@midiPlayer/player";
 import { Block } from "@minecraft/server";
-import { CommonForm } from "sapi-pro";
+import { CommonForm, FuncButton } from "sapi-pro";
 import { MidiListForm, MidiSearchForm } from "./midiList";
 import { openMidiPlayer } from "./playerUIManager";
-
-const PAGE_SIZE = 10;
+import { PAGE_SIZE } from "./static";
 
 export const QueueListForm = CommonForm.ButtonForm<{
     midiPlayer: MidiPlayer;
@@ -16,6 +15,16 @@ export const QueueListForm = CommonForm.ButtonForm<{
         const queue = args.midiPlayer.queue;
         const total = queue.getLength();
         const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+        // p = -1 时跳转到当前播放页
+        if (args.p === -1) {
+            const current = queue.getIndex();
+            if (current >= 0) {
+                args.p = Math.floor(current / PAGE_SIZE) + 1;
+            } else {
+                args.p = 1;
+            }
+        }
 
         if (args.p > maxPage) args.p = maxPage;
         if (args.p < 1) args.p = 1;
@@ -95,21 +104,31 @@ export const QueueListForm = CommonForm.ButtonForm<{
 
         const current = queue.getIndex();
 
-        return list.slice(start, end).map((name, i) => {
-            const realIndex = start + i;
+        const buttons: FuncButton<typeof args, any>[] = list
+            .slice(start, end)
+            .map((name, i) => {
+                const realIndex = start + i;
 
-            return {
-                label:
-                    realIndex === current
-                        ? `▶ ${name}`
-                        : `${realIndex}. ${name}`,
-            };
+                return {
+                    label:
+                        realIndex === current
+                            ? `§q▶ ${name}`
+                            : `${realIndex}. ${name}`,
+                };
+            });
+        buttons.push({
+            label: "§c§l清空列表",
+            shouldShow: () => args.p == 1,
+            func(ctx) {
+                ctx.args.midiPlayer.queue.clear();
+                ctx.back();
+            },
         });
+        return buttons;
     },
 
     handler(ctx, button) {
         const { midiPlayer: player, p } = ctx.args;
-        const queue = player.queue;
 
         const start = (p - 1) * PAGE_SIZE;
         const realIndex = start + button.btnIndex;

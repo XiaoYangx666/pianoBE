@@ -1,7 +1,14 @@
 import { midiManager } from "@midiPlayer";
 import { PlayQueue } from "@midiPlayer/queue";
 import { MidiInfo } from "@types";
-import { CommonForm, TextField } from "sapi-pro";
+import {
+    CommonForm,
+    formManager,
+    FuncButton,
+    NumberField,
+    TextField,
+    Validators,
+} from "sapi-pro";
 import { PlayListStore } from "../playlist"; // 导入你的存储类
 
 const playListStore = new PlayListStore();
@@ -52,7 +59,6 @@ export const MidiListForm = CommonForm.ButtonForm<{
             `${mode}\n结果: ${filteredList.length} 首\n页码: ${args.p} / ${maxPage}`
         );
     },
-
     buttons: [
         {
             label: "上一页",
@@ -74,10 +80,59 @@ export const MidiListForm = CommonForm.ButtonForm<{
     buttonGenerator(player, args) {
         const filteredList = getFilteredList(args.filter);
         const start = (args.p - 1) * PAGE_SIZE;
-        return filteredList.slice(start, start + PAGE_SIZE).map((midi) => ({
-            label: `${midi.name}`,
-            data: midi,
-        }));
+        const list: FuncButton<any>[] = filteredList
+            .slice(start, start + PAGE_SIZE)
+            .map((midi) => ({
+                label: `${midi.name}`,
+                data: midi,
+            }));
+        list.push(
+            {
+                label: "§q一键添加",
+                shouldShow: (player, args) => args.p === 1,
+                func(ctx) {
+                    const { queue, targetPlayListId, filter } = ctx.args;
+                    const filteredList = getFilteredList(filter);
+
+                    if (targetPlayListId !== undefined) {
+                        // 模式 A：批量加入播放列表
+                        const items =
+                            playListStore.getContent(targetPlayListId);
+                        let added = 0;
+
+                        for (const midi of filteredList) {
+                            if (!items.includes(midi.id)) {
+                                items.push(midi.id);
+                                added++;
+                            }
+                        }
+
+                        playListStore.setContent(targetPlayListId, items);
+                        ctx.player.sendMessage(
+                            `§a已添加 ${added} 首歌曲到列表`
+                        );
+                    } else if (queue) {
+                        // 模式 B：批量加入队列
+                        for (const midi of filteredList) {
+                            queue.enqueue(midi);
+                        }
+                        ctx.player.sendMessage(
+                            `§a已加入 ${filteredList.length} 首到播放队列`
+                        );
+                    }
+
+                    // 刷新当前页
+                    ctx.replace(MidiListForm, ctx.args);
+                },
+            },
+            {
+                label: "跳页",
+                func(ctx) {
+                    ctx.push(jumpPageForm, { len: filteredList.length });
+                },
+            }
+        );
+        return list;
     },
 
     handler(ctx, button) {
@@ -105,5 +160,31 @@ export const MidiListForm = CommonForm.ButtonForm<{
     },
     oncancel(res, ctx) {
         ctx.back();
+    },
+});
+
+const jumpPageForm = CommonForm.InputForm<{ p: number }, { len: number }>({
+    title: "跳页",
+    fieldsGenerator(player, args) {
+        return [
+            new NumberField("页码", "请输入页码")
+                .key("p")
+                .validator(
+                    Validators.numberRange(
+                        1,
+                        Math.ceil(args.len / PAGE_SIZE),
+                        "页码超出范围"
+                    )
+                ),
+        ];
+    },
+    onCancel(res, ctx) {
+        ctx.back();
+    },
+    onSubmit(data, ctx) {
+        (ctx as any).stack.pop();
+        const lastCtx = (ctx as any).stack.pop() as any;
+        (ctx as any).stack.push({ ...lastCtx.args, p: data.p }, MidiListForm);
+        formManager._show(ctx.player);
     },
 });

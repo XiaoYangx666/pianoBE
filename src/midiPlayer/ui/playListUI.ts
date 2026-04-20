@@ -5,8 +5,7 @@ import { PlayListMeta } from "@midiPlayer/playlist";
 import { Player } from "@minecraft/server";
 import { CommonForm, TextField, Validators } from "sapi-pro";
 import { MidiListForm, MidiSearchForm } from "./midiList";
-
-const PAGE_SIZE = 8;
+import { PAGE_SIZE } from "./static";
 
 function canManage(player: Player, meta: PlayListMeta) {
     return (player as any).isOp?.() || player.id === meta.owner;
@@ -222,9 +221,10 @@ const PlayListItemsManager = CommonForm.ButtonForm<any>({
         const items = playListStore.getContent(ctx.args.meta.id);
 
         if (realIndex >= 0 && realIndex < items.length) {
-            const removed = items.splice(realIndex, 1);
+            const removed = items.splice(realIndex, 1)[0];
+            const name = midiManager.getInfo(removed)?.name ?? removed;
             playListStore.setContent(ctx.args.meta.id, items);
-            ctx.player.sendMessage(`§e已移除: ${removed}`);
+            ctx.player.sendMessage(`§e已移除: ${name}`);
         }
 
         // 刷新当前页

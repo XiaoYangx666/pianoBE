@@ -1,5 +1,5 @@
 import { getPlayModeName, PlayMode } from "@midiPlayer/queue";
-import { Block, system } from "@minecraft/server";
+import { Block, Player, system } from "@minecraft/server";
 import { CustomForm, Observable } from "@minecraft/server-ui";
 import { formManager } from "sapi-pro";
 import { MidiPlayer } from "../player";
@@ -31,7 +31,7 @@ function switchPlayMode(player: MidiPlayer, label: Observable<string>) {
 }
 
 export function createMidiPlayerUI(
-    p: any,
+    p: Player,
     ctx: MidiPlayerUIContext,
     getPlayer: () => MidiPlayer,
     close: () => void
@@ -70,7 +70,7 @@ export function createMidiPlayerUI(
             system.runTimeout(() => {
                 formManager.open(p, QueueListForm, {
                     midiPlayer: getPlayer(),
-                    p: 1,
+                    p: -1,
                     block: ctx.block,
                 });
             }, 20);
