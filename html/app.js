@@ -298,10 +298,16 @@ async function generateAddon() {
             bp.header.uuid = newB;
             rp.header.uuid = newR;
             bp.dependencies.forEach((d) => {
-                if (d.uuid === oldR) d.uuid = newR;
+                if (d.uuid === oldR) {
+                    d.uuid = newR;
+                    d.version = rp.header.version;
+                }
             });
             rp.dependencies.forEach((d) => {
-                if (d.uuid === oldB) d.uuid = newB;
+                if (d.uuid === oldB) {
+                    d.uuid = newB;
+                    d.version = bp.header.version;
+                }
             });
             bp.modules.forEach((m) => (m.uuid = generateUUID()));
             rp.modules.forEach((m) => (m.uuid = generateUUID()));
