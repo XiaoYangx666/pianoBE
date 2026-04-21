@@ -4,7 +4,7 @@
         "description": "钢琴附加包",
         "name": "钢琴",
         "uuid": "04f4bc5e-60a2-49f6-840c-5a22dbb19bf7",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "min_engine_version": "1.26.10"
     },
     "modules": [

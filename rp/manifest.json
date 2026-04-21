@@ -4,7 +4,7 @@
         "name": "钢琴资源包",
         "description": "钢琴资源包",
         "uuid": "efbe8777-707f-42de-a238-97b05684685e",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "min_engine_version": "1.26.10"
     },
     "modules": [
