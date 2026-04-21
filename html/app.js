@@ -8,14 +8,21 @@ let paths = { bp: "bp/", rp: "rp/" };
 let manifestData = { bp: null, rp: null };
 let templateChangelog = "";
 
+const TIME_SCALE = 40;
+const OTHER_SCALE = 100;
+
+const encTime = (v) => Math.floor(v * TIME_SCALE);
+const enc = (v) => Math.round(v * OTHER_SCALE);
+
 const generateUUID = () =>
     "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
         return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
     });
 
-const formatDuration = (seconds) => {
-    if (isNaN(seconds)) return "0s";
+const formatDuration = (scaled) => {
+    if (isNaN(scaled)) return "0s";
+    const seconds = scaled / TIME_SCALE;
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
@@ -187,10 +194,10 @@ async function parseExistingMidis() {
                 const jsContent = await jsFile.async("string");
                 const tracksMatch = jsContent.match(/tracks:(\[.*\])\};/);
                 if (tracksMatch) {
-                    // 估算音符数（通过计算 "notes:" 出现的次数或 Float32Array 内容）
-                    // 简单方法：统计 new Float32Array 里的数字个数除以 4
+                    // 估算音符数（通过计算 "notes:" 出现的次数或 Float32Array/Uint16Array 内容）
+                    // 简单方法：统计 new Float32Array/Uint16Array 里的数字个数除以 4
                     const noteMatches = jsContent.match(
-                        /Float32Array\(\[(.*?)\]\)/g
+                        /(Float32Array|Uint16Array)\(\[(.*?)\]\)/g
                     );
                     let noteCount = 0;
                     if (noteMatches) {
@@ -246,19 +253,19 @@ async function handleMidiUpload(files) {
                     for (const n of track.notes) {
                         flat.push(
                             n.midi,
-                            toFixed(n.time, 2),
-                            toFixed(n.duration, 1),
-                            toFixed(n.velocity, 1)
+                            encTime(n.time),
+                            enc(n.duration),
+                            enc(n.velocity)
                         );
                     }
-                    return `{instrument:${JSON.stringify(track.instrument)},notes:new Float32Array([${flat.join(",")}])}`;
+                    return `{instrument:${JSON.stringify(track.instrument)},notes:new Uint16Array([${flat.join(",")}])}`;
                 })
                 .join(",");
 
             musicData.push({
                 id: fileId,
                 name: file.name.replace(/\.midi?$/i, ""),
-                duration: midi.duration, // 3. 存储原始秒数
+                duration: Math.round(midi.duration * TIME_SCALE),
                 noteCount: totalNotes,
                 tracksCode: `[${tracksCode}]`,
                 isOriginal: false,
@@ -339,7 +346,7 @@ async function generateAddon() {
                 `{` +
                 `id:${JSON.stringify(item.id)},` +
                 `name:${JSON.stringify(item.name)},` +
-                `duration:${toFixed(item.duration, 2)},` +
+                `duration:${item.duration},` +
                 `value:async()=> (await import("./${item.id}.js")).default` +
                 `},`;
         }
