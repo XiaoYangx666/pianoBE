@@ -6,14 +6,18 @@ import { Player } from "@minecraft/server";
 import { CommonForm, TextField, Validators } from "sapi-pro";
 import { MidiListForm, MidiSearchForm } from "./midiList";
 import { PAGE_SIZE } from "./static";
+import { isAdmin } from "sapi-pro/func";
 
 function canManage(player: Player, meta: PlayListMeta) {
-    return (player as any).isOp?.() || player.id === meta.owner;
+    return isAdmin(player) || player.id === meta.owner;
 }
 // --- 入口 ---
-export const PlayListMainForm = CommonForm.ButtonForm<{
-    midiPlayer: MidiPlayer;
-}>({
+export const PlayListMainForm = CommonForm.ButtonForm<
+    {
+        midiPlayer: MidiPlayer;
+    },
+    PlayListMeta
+>({
     title: "播放列表管理",
     buttons: [
         {
@@ -37,14 +41,17 @@ export const PlayListMainForm = CommonForm.ButtonForm<{
     handler(ctx, button) {
         if (button.data)
             ctx.push(PlayListDetailForm, {
-                meta: button.data as PlayListMeta,
+                meta: button.data,
                 midiPlayer: ctx.args.midiPlayer,
             });
     },
 });
 
 // --- 公开广场 ---
-const PublicPlayListForm = CommonForm.ButtonForm<any>({
+const PublicPlayListForm = CommonForm.ButtonForm<
+    { midiPlayer: MidiPlayer },
+    PlayListMeta
+>({
     title: "公开播放列表",
     buttonGenerator: () =>
         playListStore.getPublicMetas(true).map((meta) => ({
@@ -54,7 +61,7 @@ const PublicPlayListForm = CommonForm.ButtonForm<any>({
     handler(ctx, button) {
         if (button.data)
             ctx.push(PlayListDetailForm, {
-                meta: button.data as PlayListMeta,
+                meta: button.data,
                 midiPlayer: ctx.args.midiPlayer,
             });
     },
@@ -64,7 +71,10 @@ const PublicPlayListForm = CommonForm.ButtonForm<any>({
 });
 
 // --- 详情页 ---
-const PlayListDetailForm = CommonForm.ButtonForm<any>({
+const PlayListDetailForm = CommonForm.ButtonForm<{
+    meta: PlayListMeta;
+    midiPlayer: MidiPlayer;
+}>({
     title: "列表详情",
     generator(form, player, args) {
         const m = args.meta;
@@ -150,7 +160,13 @@ const PlayListDetailForm = CommonForm.ButtonForm<any>({
 });
 
 // --- 歌曲管理页 (分页版) ---
-const PlayListItemsManager = CommonForm.ButtonForm<any>({
+const PlayListItemsManager = CommonForm.ButtonForm<
+    {
+        meta: PlayListMeta;
+        p: number;
+    },
+    number
+>({
     title: "管理列表歌曲",
     generator(form, player, args) {
         const items = playListStore.getContent(args.meta.id);
@@ -169,7 +185,7 @@ const PlayListItemsManager = CommonForm.ButtonForm<any>({
                 ctx.push(MidiListForm, {
                     targetPlayListId: ctx.args.meta.id,
                     p: 1,
-                } as any),
+                }),
         },
         {
             label: "搜索添加",
@@ -177,7 +193,7 @@ const PlayListItemsManager = CommonForm.ButtonForm<any>({
             func: (ctx) =>
                 ctx.push(MidiSearchForm, {
                     targetPlayListId: ctx.args.meta.id,
-                } as any),
+                }),
         },
         {
             label: "上一页",
@@ -217,7 +233,7 @@ const PlayListItemsManager = CommonForm.ButtonForm<any>({
     handler(ctx, button) {
         if (!canManage(ctx.player, ctx.args.meta)) return;
 
-        const realIndex = button.data as number;
+        const realIndex = button.data;
         const items = playListStore.getContent(ctx.args.meta.id);
 
         if (realIndex >= 0 && realIndex < items.length) {

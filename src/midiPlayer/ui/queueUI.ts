@@ -39,7 +39,7 @@ export const QueueListForm = CommonForm.ButtonForm<{
                     queue: ctx.args.midiPlayer.queue,
                     p: 1,
                     filter: undefined,
-                } as any);
+                });
             },
             shouldShow(player, args) {
                 return args.p == 1; //仅第一页显示
@@ -50,7 +50,7 @@ export const QueueListForm = CommonForm.ButtonForm<{
             func(ctx) {
                 ctx.push(MidiSearchForm, {
                     queue: ctx.args.midiPlayer.queue,
-                } as any);
+                });
             },
             shouldShow(player, args) {
                 return args.p == 1; //仅第一页显示
