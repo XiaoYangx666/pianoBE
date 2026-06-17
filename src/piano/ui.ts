@@ -1,26 +1,31 @@
 import { openMidiPlayer } from "@midiPlayer/ui/playerUIManager";
 import { Block, Player, system } from "@minecraft/server";
-import { CustomForm, Observable } from "@minecraft/server-ui";
+import {
+    CustomForm,
+    ObservableBoolean,
+    ObservableNumber,
+    ObservableString,
+} from "@minecraft/server-ui";
 import { NoteInfo } from "@types";
 import { soundTypes } from "./input";
 import { keyMaps } from "./keymap";
 import { PIANO_LAYOUT } from "./layout";
 
 export interface PianoState {
-    octave: Observable<boolean>;
-    fullUI: Observable<boolean>;
-    input: Observable<string>;
-    keyMap: Observable<number>;
-    mode: Observable<boolean>;
-    sound: Observable<number>;
+    octave: ObservableBoolean;
+    fullUI: ObservableBoolean;
+    input: ObservableString;
+    keyMap: ObservableNumber;
+    mode: ObservableBoolean;
+    sound: ObservableNumber;
 }
 
 export interface PianoUIRefs {
-    status: Observable<string>;
-    rows: Observable<string>[];
-    keyMapLabel: Observable<string>;
-    modeLabel: Observable<string>;
-    soundLabel: Observable<string>;
+    status: ObservableString;
+    rows: ObservableString[];
+    keyMapLabel: ObservableString;
+    modeLabel: ObservableString;
+    soundLabel: ObservableString;
 }
 
 function switchKeyMap(state: PianoState, p: Player) {
@@ -51,7 +56,7 @@ export function createPianoUI(
 ) {
     const options = { visible: state.fullUI };
 
-    const form = CustomForm.create(p, "文本钢琴")
+    const form = new CustomForm(p, "文本钢琴")
         .label(ui.status, options)
         .label("   ", options);
 

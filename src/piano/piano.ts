@@ -1,11 +1,15 @@
 import { Block, Player, system } from "@minecraft/server";
-import { Observable } from "@minecraft/server-ui";
 import { Cardinal_Direction, PianoEnv } from "@types";
 import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
 import { Vector3Utils } from "sapi-pro";
 import { handleInput } from "./input";
 import { createPianoUI, PianoState, PianoUIRefs, updatePianoUI } from "./ui";
+import {
+    ObservableBoolean,
+    ObservableNumber,
+    ObservableString,
+} from "@minecraft/server-ui";
 
 /** 单个玩家的 Piano 实例 */
 class PianoInstance {
@@ -55,32 +59,32 @@ class PianoInstance {
             (this.player.getDynamicProperty("piano:sound") as number) ?? 0;
 
         this.state = {
-            keyMap: Observable.create<number>(keyMapIdx),
-            mode: Observable.create<boolean>(mode),
-            octave: Observable.create<boolean>(false, {
+            keyMap: new ObservableNumber(keyMapIdx),
+            mode: new ObservableBoolean(mode),
+            octave: new ObservableBoolean(false, {
                 clientWritable: true,
             }),
-            fullUI: Observable.create<boolean>(true, {
+            fullUI: new ObservableBoolean(true, {
                 clientWritable: true,
             }),
-            input: Observable.create<string>("", {
+            input: new ObservableString("", {
                 clientWritable: true,
             }),
-            sound: Observable.create<number>(sound),
+            sound: new ObservableNumber(sound),
         };
 
         // === UI ===
         this.ui = {
-            status: Observable.create<string>("§b🎹 钢琴已就绪"),
+            status: new ObservableString("§b🎹 钢琴已就绪"),
             rows: [
-                Observable.create<string>(""),
-                Observable.create<string>(""),
-                Observable.create<string>(""),
-                Observable.create<string>(""),
+                new ObservableString(""),
+                new ObservableString(""),
+                new ObservableString(""),
+                new ObservableString(""),
             ],
-            keyMapLabel: Observable.create<string>(""),
-            modeLabel: Observable.create<string>(""),
-            soundLabel: Observable.create<string>(""),
+            keyMapLabel: new ObservableString(""),
+            modeLabel: new ObservableString(""),
+            soundLabel: new ObservableString(""),
         };
 
         // === env ===

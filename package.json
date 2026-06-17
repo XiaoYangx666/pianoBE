@@ -2,8 +2,8 @@
     "type": "module",
     "license": "GPL-3.0-only",
     "dependencies": {
-        "@minecraft/server": "2.7.0-beta.1.26.12-stable",
-        "@minecraft/server-ui": "2.1.0-beta.1.26.12-stable",
+        "@minecraft/server": "2.9.0-beta.1.26.30-stable",
+        "@minecraft/server-ui": "2.2.0-beta.1.26.30-stable",
         "@tonejs/midi": "^2.0.28",
         "crc": "^4.3.2",
         "sapi-pro": "^0.4.0"

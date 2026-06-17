@@ -1,5 +1,5 @@
 import { Block, Player } from "@minecraft/server";
-import { Observable } from "@minecraft/server-ui";
+import { CustomForm, ObservableString } from "@minecraft/server-ui";
 import { Cardinal_Direction } from "@types";
 import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
@@ -8,7 +8,7 @@ import { MidiPlayer } from "../player";
 import { createMidiPlayerUI, MidiPlayerUIContext, updateUI } from "./playerUI";
 
 class MidiPlayerInstance {
-    private form: any;
+    private form: CustomForm | undefined;
     private ctx!: MidiPlayerUIContext;
 
     private playerInst?: MidiPlayer;
@@ -63,15 +63,15 @@ class MidiPlayerInstance {
 
         // === Observable（只创建一次）===
         this.ctx = {
-            state: Observable.create<string>("§7加载中..."),
-            midiName: Observable.create<string>(""),
-            queue: Observable.create<string>(""),
+            state: new ObservableString("§7加载中..."),
+            midiName: new ObservableString(""),
+            queue: new ObservableString(""),
 
-            progressBar: Observable.create<string>(""),
-            progressText: Observable.create<string>(""),
+            progressBar: new ObservableString(""),
+            progressText: new ObservableString(""),
 
-            buttonText: Observable.create<string>("▶ 播放"),
-            playMode: Observable.create<string>(""),
+            buttonText: new ObservableString("▶ 播放"),
+            playMode: new ObservableString(""),
 
             block: this.leftBlock!,
         };

@@ -1,28 +1,28 @@
 import { getPlayModeName, PlayMode } from "@midiPlayer/queue";
 import { Block, Player, system } from "@minecraft/server";
-import { CustomForm, Observable } from "@minecraft/server-ui";
+import { CustomForm, ObservableString } from "@minecraft/server-ui";
 import { formManager } from "sapi-pro";
 import { MidiPlayer } from "../player";
 import { PlayListMainForm } from "./playListUI";
 import { QueueListForm } from "./queueUI";
 
 export interface MidiPlayerUIContext {
-    state: Observable<string>;
-    midiName: Observable<string>;
-    queue: Observable<string>;
+    state: ObservableString;
+    midiName: ObservableString;
+    queue: ObservableString;
 
-    progressBar: Observable<string>;
-    progressText: Observable<string>;
+    progressBar: ObservableString;
+    progressText: ObservableString;
 
-    buttonText: Observable<string>;
-    playMode: Observable<string>;
+    buttonText: ObservableString;
+    playMode: ObservableString;
 
     block: Block;
 }
 
 const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
 
-function switchPlayMode(player: MidiPlayer, label: Observable<string>) {
+function switchPlayMode(player: MidiPlayer, label: ObservableString) {
     const queue = player.queue;
     const curIdx = playModes.indexOf(queue.getMode());
     const mode = playModes[(curIdx + 1) % playModes.length];
@@ -38,7 +38,7 @@ export function createMidiPlayerUI(
 ) {
     ctx.playMode.setData(getPlayModeName(getPlayer().queue.getMode()));
 
-    const form = CustomForm.create(p, "§bMIDI播放")
+    const form = new CustomForm(p, "§bMIDI播放")
         .label(ctx.state)
         .label(ctx.midiName)
         .label(ctx.queue)
