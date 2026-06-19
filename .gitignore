@@ -2,7 +2,6 @@ build
 cache
 node_modules
 scripts
-package-lock.json
 output.zip
 bp/scripts
 midis/files/*

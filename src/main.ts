@@ -21,7 +21,7 @@ initPlayer();
 
 initSAPIPro({
     name: "小阳钢琴",
-    version: "1.0.0",
+    version: "1.2.0",
     description: "小阳牌钢琴",
     author: "XiaoYangx666",
     nameSpace: "xypiano",

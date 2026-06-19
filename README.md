@@ -1,6 +1,6 @@
 # PianoBE
 
-[![Requires](https://img.shields.io/badge/基于-SAPI_Pro_v0.4.0_beta-blue?style=flat-square)](https://github.com/XiaoYangx666/SAPI-Pro) ![Requires](https://img.shields.io/badge/依赖-SAPI%202.6.0%20Beta-red?style=flat-square) ![Support](https://img.shields.io/badge/支持版本-MCBE%2026.10+-green?style=flat-square) [![QQ群](https://img.shields.io/badge/QQ群-1004513100-orange?style=flat-square)](https://qm.qq.com/q/KUgqkHM5uS)
+[![Requires](https://img.shields.io/badge/基于-SAPI_Pro_v0.4.1_beta-blue?style=flat-square)](https://github.com/XiaoYangx666/SAPI-Pro) ![Requires](https://img.shields.io/badge/依赖-SAPI%202.9.0%20Beta-red?style=flat-square) ![Support](https://img.shields.io/badge/支持版本-MCBE%2026.30+-green?style=flat-square) [![QQ群](https://img.shields.io/badge/QQ群-1004513100-orange?style=flat-square)](https://qm.qq.com/q/KUgqkHM5uS)
 
 ![painoBE](./screenshot.png)
 
