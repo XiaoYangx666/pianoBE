@@ -9,7 +9,6 @@
     },
     "modules": [
         {
-            "description": "scripts",
             "type": "script",
             "language": "javascript",
             "uuid": "f2c4ed57-79a9-4e3c-b876-f7bf697417d0",

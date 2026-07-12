@@ -1,28 +1,17 @@
 {
     "compilerOptions": {
-        "target": "esnext",
+        "target": "es2023",
         "moduleResolution": "bundler",
-        "module": "esnext",
-        "lib": ["ESNext", "DOM"],
-        "types": [],
-        "declaration": false,
-        "noLib": false,
-        "sourceMap": false,
-        "pretty": true,
-        "forceConsistentCasingInFileNames": true,
-        "preserveConstEnums": true,
+        "module": "es2022",
+        "skipLibCheck": true,
         "strict": true,
         "noImplicitAny": true,
         "outDir": "cache",
         "rootDir": "src",
-        "allowJs": true,
-        "incremental": true,
-        "tsBuildInfoFile": "cache/tsbuildinfo.json",
         "paths": {
             "@*": ["./src/*"]
         }
     },
     "include": ["./src"],
-    "exclude": ["./src/midis"],
-    "compileOnSave": false
+    "exclude": ["./src/midis"]
 }
