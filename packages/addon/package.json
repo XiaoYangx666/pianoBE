@@ -6,11 +6,15 @@
     "license": "GPL-3.0-only",
     "private": true,
     "scripts": {
+        "prepack": "node scripts/clean-manifest.mjs",
         "pack": "bepack pack",
         "dev": "bepack dev",
+        "prebuild": "node scripts/clean-manifest.mjs",
         "build": "bepack build",
         "copy": "bepack copy",
+        "prebuild:template": "node scripts/clean-manifest.mjs",
         "build:template": "bepack build --skip-copy --pack --mode template",
+        "prebuild:server": "node scripts/clean-manifest.mjs",
         "build:server": "bepack build --config bepack.server.config.ts --skip-copy --pack",
         "test": "bun test"
     },

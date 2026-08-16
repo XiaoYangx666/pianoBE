@@ -11,20 +11,11 @@
     "modules": [
         {
             "type": "resources",
-            "uuid": "a51c41cc-6b76-4364-a372-381b4bdf0ee7",
-            "version": "1.0.0"
-        },
-        {
-            "type": "resources",
             "uuid": "36d4f042-edf0-4be3-8d48-8165de3057ad",
             "version": "1.0.0"
         }
     ],
     "dependencies": [
-        {
-            "uuid": "32559cdb-d3be-49cf-9f05-2a9a774fe17f",
-            "version": "1.2.0"
-        },
         {
             "uuid": "04f4bc5e-60a2-49f6-840c-5a22dbb19bf7",
             "version": "1.2.0"
