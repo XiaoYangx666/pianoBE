@@ -25,6 +25,9 @@ BOOTSTRAP_TOKEN=你的管理员令牌 docker compose up -d --build
 # 数据落在 ./data/piano.db（挂载卷），忘记令牌改 .env 重启即可重置
 ```
 
+> 镜像只包含后端依赖树（core / server / web）：addon 是预构建产物，不进入
+> 镜像，sapi-pro、@minecraft/* 等 addon 依赖也不会被安装。
+
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
