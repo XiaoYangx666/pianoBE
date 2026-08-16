@@ -7,5 +7,7 @@ bp/scripts
 midis/files/*
 midis/js/*
 tools/piano_source/*
+packages/*/dist
+apps/*/dist
 *.mid
 *.mcaddon

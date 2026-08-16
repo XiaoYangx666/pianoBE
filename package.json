@@ -1,9 +1,13 @@
 {
+    "name": "pianobe",
     "type": "module",
     "license": "GPL-3.0-only",
+    "private": true,
+    "workspaces": [
+        "packages/*",
+        "apps/*"
+    ],
     "dependencies": {
-        "@tonejs/midi": "^2.0.28",
-        "crc": "^4.3.2",
         "@minecraft/server": "2.10.0-beta.1.26.44-stable",
         "@minecraft/server-ui": "2.2.0-beta.1.26.44-stable",
         "sapi-pro": "file:../SAPI-Pro/sapi-pro-0.4.2.tgz",
@@ -11,7 +15,8 @@
     },
     "devDependencies": {
         "@bepack/cli": "^0.1.0-beta.0",
-        "sapi-kit": "^0.2.3"
+        "sapi-kit": "^0.2.3",
+        "typescript": "^5.5.0"
     },
     "scripts": {
         "pack": "bepack pack",
@@ -21,6 +26,7 @@
         "build:template": "bepack build --skip-copy --pack --mode template",
         "cp:template": "node -e \"const fs = require('fs'); fs.cpSync('./dist/', './html', { recursive: true })\"",
         "build:html": "npm run build:template && npm run cp:template",
-        "convert": "node tools/convert.js"
+        "convert": "node tools/convert.js",
+        "build:core": "npm run build -w @piano/core"
     }
 }
