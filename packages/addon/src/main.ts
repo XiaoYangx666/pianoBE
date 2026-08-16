@@ -33,3 +33,14 @@ pcommand.registerCommand(
         player.sendMessage(midiPlayerManager.debugDump());
     })
 );
+
+// 动态导入 serveradmin（BDS 专属：读 secrets.json 配置后端 URL/token，
+// 经 server-net 启用远程曲库）。客户端环境/未配置时静默降级内嵌曲库。
+system.runTimeout(async () => {
+    try {
+        const { initServerAdmin } = await import("./serverAdmin/index.js");
+        await initServerAdmin();
+    } catch (e) {
+        console.warn("[serverAdmin] 初始化失败，使用内嵌曲库", e);
+    }
+}, 20);

@@ -8,8 +8,14 @@ export class MidiManager {
     private metas: MidiSongMeta[] = [];
     private readonly metaMap = new Map<string, MidiSongMeta>();
 
-    constructor(private readonly source: MidiSource) {
+    constructor(private source: MidiSource) {
         this.refreshSync();
+    }
+
+    /** 切换曲库来源（如内嵌 → 远程），并异步刷新元信息；失败保持现有列表 */
+    setSource(source: MidiSource): void {
+        this.source = source;
+        void this.refresh();
     }
 
     /** 同步填充（内嵌源直接返回；远程源在 refresh 前为空列表） */

@@ -18,6 +18,9 @@ export default defineConfig({
             moduleUuid: "f2c4ed57-79a9-4e3c-b876-f7bf697417d0",
             compile: {
                 entry: "src/main.ts",
+                // server-admin / server-net 为 BDS 运行时模块：不安装 npm 包，
+                // 打包时保留为运行时动态 import（客户端环境 import 失败由 try/catch 兜底）
+                external: [/^@minecraft\/server-admin$/, /^@minecraft\/server-net$/],
             },
             name: "钢琴",
             description: "钢琴行为包",

@@ -10,7 +10,8 @@
         "dev": "bepack dev",
         "build": "bepack build",
         "copy": "bepack copy",
-        "build:template": "bepack build --skip-copy --pack --mode template"
+        "build:template": "bepack build --skip-copy --pack --mode template",
+        "test": "bun test"
     },
     "dependencies": {
         "@minecraft/server": "2.10.0-beta.1.26.44-stable",
@@ -21,6 +22,8 @@
     },
     "devDependencies": {
         "@bepack/cli": "^0.1.0-beta.0",
+        "@minecraft/server-admin": "^1.0.0-beta.11940b24",
+        "@minecraft/server-net": "^1.0.0-beta.11940b24",
         "sapi-kit": "^0.2.3"
     }
 }
