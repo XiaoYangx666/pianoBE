@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>基岩版钢琴模组生成器</title>
+    </head>
+    <body>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">处理中...</p>
+        </div>
+
+        <header>
+            <h1>🎹 钢琴模组生成器</h1>
+            <button id="generateBtn" disabled>导出包</button>
+        </header>
+
+        <main>
+            <aside class="panel">
+                <h3>导出配置</h3>
+                <label>Pack Name</label>
+                <input type="text" id="addonName" placeholder="钢琴附加包" />
+                <label>Description</label>
+                <textarea id="addonDesc" rows="2"></textarea>
+                <label class="check">
+                    <input type="checkbox" id="randomUuid" checked />
+                    随机化 UUID
+                </label>
+
+                <h3>模板底包状态</h3>
+                <div class="tpl-box">
+                    <div>
+                        <span>底包版本</span>
+                        <b id="tplVersion">未加载</b>
+                    </div>
+                    <div>
+                        <span>原始描述</span>
+                        <i id="tplDesc">等待解析...</i>
+                    </div>
+                </div>
+                <label class="file-btn">
+                    更换底包模板 (.mcaddon)
+                    <input type="file" id="templateInput" accept=".mcaddon,.zip" hidden />
+                </label>
+            </aside>
+
+            <section class="panel main-panel">
+                <div class="import-row">
+                    <div>
+                        <h3>MIDI 音乐导入</h3>
+                        <p>批量导入 MIDI，自动内嵌为 addon 脚本</p>
+                    </div>
+                    <label class="file-btn primary">
+                        选择 MIDI 文件
+                        <input type="file" id="midiInput" multiple accept=".mid,.midi" hidden />
+                    </label>
+                </div>
+
+                <div class="list-head">
+                    <span>曲目列表 (<span id="count">0</span>)</span>
+                    <button id="clearBtn" class="text-danger">清空列表</button>
+                </div>
+                <div id="midiList" class="midi-list"></div>
+            </section>
+        </main>
+
+        <footer>© PianoBE · 转换与打包逻辑由 @piano/core 提供</footer>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

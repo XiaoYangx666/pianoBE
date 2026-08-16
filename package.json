@@ -13,8 +13,6 @@
         "build": "npm run build -w @piano/addon",
         "copy": "npm run copy -w @piano/addon",
         "build:template": "npm run build:template -w @piano/addon",
-        "cp:template": "node -e \"const fs = require('fs'); fs.cpSync('./packages/addon/dist/', './html', { recursive: true })\"",
-        "build:html": "npm run build:template && npm run cp:template",
         "convert": "node tools/convert.js",
         "build:core": "npm run build -w @piano/core",
         "test": "npm run test -w @piano/core",
@@ -22,7 +20,9 @@
         "start:server": "npm run start -w @piano/server",
         "test:server": "npm run test -w @piano/server",
         "dev:web": "npm run dev -w @piano/web",
-        "build:web": "npm run build -w @piano/web"
+        "build:web": "npm run build -w @piano/web",
+        "dev:generator": "npm run dev -w @piano/generator",
+        "build:generator": "npm run build -w @piano/generator"
     },
     "devDependencies": {
         "typescript": "^5.5.0"
