@@ -1,4 +1,6 @@
-name = "pianobe-generator"
+# 保持与历史部署同名，旧地址 pianobe.2408807389.workers.dev 不变；
+# 如需新域名改这里即可
+name = "pianobe"
 compatibility_date = "2026-04-15"
 
 [assets]
