@@ -1,10 +1,7 @@
-import { midiManager } from "@midiPlayer";
+import { midiManager, playListStore } from "@midiPlayer";
 import { PlayQueue } from "@midiPlayer/queue";
-import { MidiInfo } from "@types";
+import type { MidiSongMeta } from "@piano/core";
 import { CommonForm, NumberField, TextField, Validators } from "sapi-pro";
-import { PlayListStore } from "../playlist"; // 导入你的存储类
-
-const playListStore = new PlayListStore();
 const PAGE_SIZE = 8;
 
 /** 获取筛选后的列表 */
@@ -43,9 +40,9 @@ export const MidiListForm = CommonForm.ButtonForm<
         targetPlayListId?: number;
         p: number;
         filter?: string;
-        filteredList?: MidiInfo[];
+        filteredList?: MidiSongMeta[];
     },
-    MidiInfo
+    MidiSongMeta
 >({
     title: "选择歌曲",
     async generator(form, ctx, args) {

@@ -1,4 +1,7 @@
 import { Dimension, Vector3 } from "@minecraft/server";
+import type { MidiSong, MidiSongMeta } from "@piano/core";
+
+export type { MidiSong, MidiSongMeta, MidiTrack, MidiTrackInstrument, PlaylistMeta } from "@piano/core";
 
 export type Cardinal_Direction = "east" | "west" | "north" | "south";
 
@@ -21,27 +24,9 @@ export interface KeyMapInfo {
 }
 export type KeyMap = Record<string, number>;
 
-//MIDI部分
-export interface MidiJson {
-    name: string;
-    duration: number;
-    tracks: {
-        instrument: {
-            family: string;
-            number: number;
-            name: string;
-        };
-        /**midi,time,duration,velocity(4个一组) */
-        notes: Float32Array;
-    }[];
+/**内嵌曲目条目：元信息 + 懒加载器（构建期由 midis/js/index.js 生成） */
+export interface MidiInfo extends MidiSongMeta {
+    value: () => Promise<MidiSong>;
 }
 
 export type MidiListType = MidiInfo[];
-
-/**Midi的信息 */
-export interface MidiInfo {
-    id: string;
-    name: string;
-    duration: number;
-    value: () => Promise<MidiJson>;
-}

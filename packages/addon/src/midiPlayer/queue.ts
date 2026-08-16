@@ -1,4 +1,4 @@
-import { MidiInfo } from "@types";
+import type { MidiSongMeta } from "@piano/core";
 
 export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
 
@@ -14,7 +14,7 @@ export function getPlayModeName(mode: PlayMode) {
 }
 
 export class PlayQueue {
-    private list: MidiInfo[] = [];
+    private list: MidiSongMeta[] = [];
     private index = -1;
     private mode: PlayMode = "sequence";
 
@@ -25,7 +25,7 @@ export class PlayQueue {
         this.index = -1;
     }
 
-    current(): MidiInfo | undefined {
+    current(): MidiSongMeta | undefined {
         if (this.index < 0 || this.index >= this.list.length) return;
         return this.list[this.index];
     }
@@ -45,7 +45,7 @@ export class PlayQueue {
     /**
      * 插入当前后面并立即跳转
      */
-    insertBack(midi: MidiInfo): MidiInfo {
+    insertBack(midi: MidiSongMeta): MidiSongMeta {
         if (this.index === -1) {
             this.list.push(midi);
             this.index = 0;
@@ -61,7 +61,7 @@ export class PlayQueue {
     /**
      * 普通加入队列（尾部）
      */
-    enqueue(midi: MidiInfo): MidiInfo | undefined {
+    enqueue(midi: MidiSongMeta): MidiSongMeta | undefined {
         this.list.push(midi);
 
         if (this.index === -1) {
@@ -70,7 +70,7 @@ export class PlayQueue {
         }
     }
 
-    remove(index: number): MidiInfo | undefined {
+    remove(index: number): MidiSongMeta | undefined {
         if (index < 0 || index >= this.list.length) return;
 
         const removed = this.list[index];
@@ -92,7 +92,7 @@ export class PlayQueue {
         return removed;
     }
 
-    jump(index: number): MidiInfo | undefined {
+    jump(index: number): MidiSongMeta | undefined {
         if (index < 0 || index >= this.list.length) return;
         this.index = index;
         return this.list[index];
@@ -100,7 +100,7 @@ export class PlayQueue {
 
     /* ================== 跳转 ================== */
 
-    next(): MidiInfo | undefined {
+    next(): MidiSongMeta | undefined {
         if (this.list.length === 0) return;
 
         if (this.mode === "single") {
@@ -129,7 +129,7 @@ export class PlayQueue {
         return;
     }
 
-    prev(): MidiInfo | undefined {
+    prev(): MidiSongMeta | undefined {
         if (this.list.length === 0) return;
 
         if (this.mode === "single") {
@@ -180,7 +180,7 @@ export class PlayQueue {
     /* ================== 导入与导出 ================== */
 
     /**导入播放列表，覆盖当前 */
-    import(list: MidiInfo[]): void {
+    import(list: MidiSongMeta[]): void {
         this.list = list;
         this.index = list.length == 0 ? -1 : 0;
     }

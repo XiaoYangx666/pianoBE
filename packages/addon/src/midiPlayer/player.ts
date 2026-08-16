@@ -3,7 +3,9 @@ import { Dimension, Vector3 } from "@minecraft/server";
 import { getSoundIdByDuration, processNote } from "@utils/note";
 import { summonParticle } from "@utils/particle";
 import { Signal } from "@utils/signal";
-import { Cardinal_Direction, MidiInfo, MidiJson, NoteInfo } from "../types";
+import { packNotes } from "@piano/core";
+import type { MidiSong, MidiSongMeta } from "@piano/core";
+import { Cardinal_Direction, NoteInfo } from "../types";
 import { PlayQueue } from "./queue";
 
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
@@ -13,7 +15,7 @@ export class MidiPlayer {
     dir: Cardinal_Direction;
     dimension: Dimension;
 
-    private tracks: Float32Array[] = [];
+    private tracks: Uint16Array[] = [];
     private indices: number[] = [];
     private totalNotes = 0;
     private currentTime = 0;
@@ -230,9 +232,10 @@ export class MidiPlayer {
         }
     }
 
-    private async loadMidi(info: MidiInfo) {
+    private async loadMidi(info: MidiSongMeta) {
         try {
             const midi = await midiManager.load(info);
+            if (!midi) throw new Error(`曲目内容不存在: ${info.id}`);
 
             this.tracks = this.extractTracks(midi);
 
@@ -254,12 +257,12 @@ export class MidiPlayer {
         this.currentTime = 0;
     }
 
-    private extractTracks(midi: MidiJson): Float32Array[] {
-        const result: Float32Array[] = [];
+    private extractTracks(midi: MidiSong): Uint16Array[] {
+        const result: Uint16Array[] = [];
 
         for (const track of midi.tracks) {
             if (track.notes && track.notes.length > 0) {
-                result.push(track.notes);
+                result.push(packNotes(track.notes));
             }
         }
 

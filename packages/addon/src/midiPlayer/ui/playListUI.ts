@@ -1,14 +1,14 @@
 import { nameDb } from "@ext";
 import { midiManager, playListStore } from "@midiPlayer";
 import { MidiPlayer } from "@midiPlayer/player";
-import { PlayListMeta } from "@midiPlayer/playlist";
+import type { PlaylistMeta } from "@piano/core";
 import { Player } from "@minecraft/server";
 import { CommonForm, TextField, Validators } from "sapi-pro";
 import { MidiListForm, MidiSearchForm } from "./midiList";
 import { PAGE_SIZE } from "./static";
 import { isAdmin } from "sapi-pro/func";
 
-function canManage(player: Player, meta: PlayListMeta) {
+function canManage(player: Player, meta: PlaylistMeta) {
     return isAdmin(player) || player.id === meta.owner;
 }
 // --- 入口 ---
@@ -16,7 +16,7 @@ export const PlayListMainForm = CommonForm.ButtonForm<
     {
         midiPlayer: MidiPlayer;
     },
-    PlayListMeta
+    PlaylistMeta
 >({
     title: "播放列表管理",
     buttons: [
@@ -50,7 +50,7 @@ export const PlayListMainForm = CommonForm.ButtonForm<
 // --- 公开广场 ---
 const PublicPlayListForm = CommonForm.ButtonForm<
     { midiPlayer: MidiPlayer },
-    PlayListMeta
+    PlaylistMeta
 >({
     title: "公开播放列表",
     buttonGenerator: () =>
@@ -72,7 +72,7 @@ const PublicPlayListForm = CommonForm.ButtonForm<
 
 // --- 详情页 ---
 const PlayListDetailForm = CommonForm.ButtonForm<{
-    meta: PlayListMeta;
+    meta: PlaylistMeta;
     midiPlayer: MidiPlayer;
 }>({
     title: "列表详情",
@@ -162,7 +162,7 @@ const PlayListDetailForm = CommonForm.ButtonForm<{
 // --- 歌曲管理页 (分页版) ---
 const PlayListItemsManager = CommonForm.ButtonForm<
     {
-        meta: PlayListMeta;
+        meta: PlaylistMeta;
         p: number;
     },
     number
