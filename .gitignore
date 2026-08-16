@@ -4,6 +4,7 @@ node_modules
 scripts
 output.zip
 bp/scripts
+packages/*/bp/scripts
 midis/files/*
 midis/js/*
 tools/piano_source/*

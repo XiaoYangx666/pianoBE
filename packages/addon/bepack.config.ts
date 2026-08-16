@@ -65,7 +65,7 @@ export default defineConfig({
                 ctx.logger.error("scripts目录不存在");
                 return;
             }
-            await cp("./midis/js/", join(ctx.paths.scriptOutDir, "midis"), {
+            await cp("../../midis/js/", join(ctx.paths.scriptOutDir, "midis"), {
                 recursive: true,
                 force: true,
             });

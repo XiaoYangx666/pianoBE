@@ -1,0 +1,26 @@
+{
+    "name": "@piano/addon",
+    "version": "0.1.0",
+    "description": "钢琴附加包（游戏内显示与播放）",
+    "type": "module",
+    "license": "GPL-3.0-only",
+    "private": true,
+    "scripts": {
+        "pack": "bepack pack",
+        "dev": "bepack dev",
+        "build": "bepack build",
+        "copy": "bepack copy",
+        "build:template": "bepack build --skip-copy --pack --mode template"
+    },
+    "dependencies": {
+        "@minecraft/server": "2.10.0-beta.1.26.44-stable",
+        "@minecraft/server-ui": "2.2.0-beta.1.26.44-stable",
+        "@minecraft/vanilla-data": "1.26.44",
+        "@piano/core": "file:../core",
+        "sapi-pro": "file:../../../SAPI-Pro/sapi-pro-0.4.2.tgz"
+    },
+    "devDependencies": {
+        "@bepack/cli": "^0.1.0-beta.0",
+        "sapi-kit": "^0.2.3"
+    }
+}
