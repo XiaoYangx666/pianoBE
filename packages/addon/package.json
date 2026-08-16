@@ -17,7 +17,7 @@
         "@minecraft/server-ui": "2.2.0-beta.1.26.44-stable",
         "@minecraft/vanilla-data": "1.26.44",
         "@piano/core": "file:../core",
-        "sapi-pro": "file:../../../SAPI-Pro/sapi-pro-0.4.2.tgz"
+        "sapi-pro": "file:../../vendor/sapi-pro-0.4.2.tgz"
     },
     "devDependencies": {
         "@bepack/cli": "^0.1.0-beta.0",

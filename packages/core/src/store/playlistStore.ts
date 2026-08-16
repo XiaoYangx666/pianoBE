@@ -80,6 +80,11 @@ export class PlaylistStore {
 
     /* ================== 派生视图 ================== */
 
+    /** 全量列表（管理/对账用，保持存储顺序） */
+    listAll(): PlaylistMeta[] {
+        return this.port.listAllMetas();
+    }
+
     getMetasByOwner(owner: string): PlaylistMeta[] {
         return this.port.listAllMetas().filter((m) => m.owner === owner);
     }

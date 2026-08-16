@@ -17,7 +17,12 @@
         "build:html": "npm run build:template && npm run cp:template",
         "convert": "node tools/convert.js",
         "build:core": "npm run build -w @piano/core",
-        "test": "npm run test -w @piano/core"
+        "test": "npm run test -w @piano/core",
+        "dev:server": "npm run dev -w @piano/server",
+        "start:server": "npm run start -w @piano/server",
+        "test:server": "npm run test -w @piano/server",
+        "dev:web": "npm run dev -w @piano/web",
+        "build:web": "npm run build -w @piano/web"
     },
     "devDependencies": {
         "typescript": "^5.5.0"

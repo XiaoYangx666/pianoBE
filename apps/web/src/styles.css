@@ -1,0 +1,226 @@
+:root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e3e6ea;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --danger: #dc2626;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+header h1 {
+    font-size: 20px;
+    margin: 0;
+}
+
+nav {
+    display: flex;
+    gap: 6px;
+}
+
+button,
+label.btn {
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+}
+
+button:hover,
+label.btn:hover {
+    background: #eef1f5;
+}
+
+button.primary,
+label.btn.primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+button.primary:hover,
+label.btn.primary:hover {
+    background: #1d4ed8;
+}
+
+button.danger {
+    color: var(--danger);
+}
+
+button.logout {
+    color: var(--muted);
+}
+
+button.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.page {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+input,
+select,
+textarea {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 13px;
+    background: #fbfcfd;
+    color: var(--text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid #93c5fd;
+    border-color: var(--primary);
+}
+
+input[type="text"],
+input:not([type]) {
+    min-width: 200px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 12px;
+    margin: 4px 0 10px;
+}
+
+.error {
+    color: var(--danger);
+    font-size: 13px;
+}
+
+.empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 24px 0;
+}
+
+.items {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+}
+
+.items li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13px;
+}
+
+.items li span:first-child {
+    flex: 1;
+}
+
+.add-picker {
+    margin-top: 12px;
+    border: 1px dashed var(--border);
+}
+
+.card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    background: var(--card);
+    margin-bottom: 12px;
+}
+
+.token-once textarea {
+    width: 100%;
+    font-family: ui-monospace, monospace;
+}
+
+.login {
+    max-width: 420px;
+    margin: 15vh auto 0;
+    padding: 0 16px;
+}
+
+.login .card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.login input {
+    width: 100%;
+    padding: 10px 12px;
+}

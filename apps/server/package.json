@@ -1,0 +1,22 @@
+{
+    "name": "@piano/server",
+    "version": "0.1.0",
+    "description": "PianoBE 后端曲库管理服务（Hono + bun:sqlite）",
+    "type": "module",
+    "license": "GPL-3.0-only",
+    "private": true,
+    "scripts": {
+        "start": "bun src/index.ts",
+        "dev": "bun --watch src/index.ts",
+        "test": "bun test",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@piano/core": "file:../../packages/core",
+        "hono": "^4.6.0"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.1.0",
+        "typescript": "^5.5.0"
+    }
+}

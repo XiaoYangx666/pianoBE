@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { MemorySongPort, SongStore } from "../src/index.js";
-import { runSongPortSuite } from "./conformance.js";
+import { songPortCases } from "./conformance.js";
 
-/** 契约测试：内存驱动必须全部通过（后续 SQLite 驱动复用同一套） */
-runSongPortSuite("MemorySongPort", () => new MemorySongPort());
+describe("SongPort 契约（MemorySongPort）", () => {
+    for (const c of songPortCases(() => new MemorySongPort())) {
+        it(c.name, c.fn);
+    }
+});
 
 describe("SongStore 业务层", () => {
     it("add/getMeta/getSong/has/remove", () => {

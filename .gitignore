@@ -10,5 +10,6 @@ midis/js/*
 tools/piano_source/*
 packages/*/dist
 apps/*/dist
+apps/*/data
 *.mid
 *.mcaddon

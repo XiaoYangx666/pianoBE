@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlaylistPort, PlaylistStore } from "../src/index.js";
-import { runPlaylistPortSuite } from "./conformance.js";
+import { playlistPortCases } from "./conformance.js";
 
-/** 契约测试：内存驱动必须全部通过（后续 SQLite 驱动复用同一套） */
-runPlaylistPortSuite("MemoryPlaylistPort", () => new MemoryPlaylistPort());
+/** 契约测试：内存驱动必须全部通过（SQLite 驱动复用同一套） */
+describe("PlaylistPort 契约（MemoryPlaylistPort）", () => {
+    for (const c of playlistPortCases(() => new MemoryPlaylistPort())) {
+        it(c.name, c.fn);
+    }
+});
 
 describe("PlaylistStore 业务层", () => {
     function setup(now?: () => number) {
