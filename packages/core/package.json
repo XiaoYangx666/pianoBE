@@ -22,9 +22,13 @@
         "dist"
     ],
     "scripts": {
-        "build": "tsc -p tsconfig.json"
+        "build": "tsc -p tsconfig.json",
+        "test": "vitest run"
     },
     "dependencies": {
         "@tonejs/midi": "^2.0.28"
+    },
+    "devDependencies": {
+        "vitest": "^4.1.10"
     }
 }

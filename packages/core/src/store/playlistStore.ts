@@ -1,6 +1,11 @@
 import type { PlaylistMeta } from "../types.js";
 import type { PlaylistPort } from "./ports.js";
 
+export interface PlaylistStoreOptions {
+    /** 时钟注入（测试用）；默认 Date.now */
+    now?: () => number;
+}
+
 /**
  * 播放列表业务层：在 PlaylistPort 之上实现 CRUD、派生视图与播放计数。
  * 一致性策略：
@@ -12,14 +17,20 @@ export class PlaylistStore {
     /** 播放计数去重：`playerId:listId`，跨天清空 */
     private playRecords = new Set<string>();
     private lastRecordDate = "";
+    private readonly now: () => number;
 
-    constructor(private readonly port: PlaylistPort) {}
+    constructor(
+        private readonly port: PlaylistPort,
+        options: PlaylistStoreOptions = {}
+    ) {
+        this.now = options.now ?? Date.now;
+    }
 
     /* ================== CRUD ================== */
 
     create(owner: string, name: string): PlaylistMeta {
         const id = this.port.nextId();
-        const now = Date.now();
+        const now = this.now();
         const meta: PlaylistMeta = {
             id,
             owner,
@@ -49,7 +60,9 @@ export class PlaylistStore {
     ): PlaylistMeta | undefined {
         const meta = this.port.getMeta(id);
         if (!meta) return;
-        const updated = { ...meta, ...patch, updatedAt: Date.now() };
+        // 运行时防御：id/owner 不可被 patch 篡改
+        const { id: _id, owner: _owner, ...safePatch } = patch as Record<string, unknown>;
+        const updated = { ...meta, ...safePatch, updatedAt: this.now() } as PlaylistMeta;
         this.port.setMeta(updated);
         return updated;
     }
@@ -58,7 +71,7 @@ export class PlaylistStore {
     setContent(id: number, items: string[]): void {
         this.port.setContent(id, items);
         const meta = this.port.getMeta(id);
-        if (meta) this.port.setMeta({ ...meta, updatedAt: Date.now() });
+        if (meta) this.port.setMeta({ ...meta, updatedAt: this.now() });
     }
 
     delete(id: number): void {
@@ -96,7 +109,7 @@ export class PlaylistStore {
     }
 
     private checkDateAndClear() {
-        const today = new Date().toDateString();
+        const today = new Date(this.now()).toDateString();
         if (this.lastRecordDate !== today) {
             this.playRecords.clear();
             this.lastRecordDate = today;

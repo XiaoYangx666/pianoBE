@@ -1,5 +1,6 @@
 export * from "./constants.js";
 export * from "./types.js";
+export * from "./source.js";
 export * from "./midi/crc32.js";
 export * from "./midi/encoding.js";
 export * from "./midi/addonModule.js";
