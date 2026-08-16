@@ -34,13 +34,16 @@ pcommand.registerCommand(
     })
 );
 
-// 动态导入 serveradmin（BDS 专属：读 secrets.json 配置后端 URL/token，
-// 经 server-net 启用远程曲库）。客户端环境/未配置时静默降级内嵌曲库。
-system.runTimeout(async () => {
-    try {
-        const { initServerAdmin } = await import("./serverAdmin/index.js");
-        await initServerAdmin();
-    } catch (e) {
-        console.warn("[serverAdmin] 初始化失败，使用内嵌曲库", e);
-    }
-}, 20);
+// 远程曲库（BDS 专用：server-admin 读 secrets.json 配置后端 URL/token，
+// 经 server-net 拉取）。client 构建时此分支被注入常量折叠 + 死代码消除
+// 整体裁剪（产物不含 serverAdmin/serverNet 代码，不依赖 BDS 模块）。
+if (__PIANO_TARGET__ === "server") {
+    system.runTimeout(async () => {
+        try {
+            const { initServerAdmin } = await import("./serverAdmin/index.js");
+            await initServerAdmin();
+        } catch (e) {
+            console.warn("[serverAdmin] 初始化失败，使用内嵌曲库", e);
+        }
+    }, 20);
+}

@@ -18,8 +18,8 @@ export default defineConfig({
             moduleUuid: "f2c4ed57-79a9-4e3c-b876-f7bf697417d0",
             compile: {
                 entry: "src/main.ts",
-                // server-admin / server-net 为 BDS 运行时模块：不安装 npm 包，
-                // 打包时保留为运行时动态 import（客户端环境 import 失败由 try/catch 兜底）
+                // BDS 运行时模块：仅安装类型（devDeps），打包时保留为运行时动态
+                // import；client 构建中对应分支会被注入常量 + 死代码消除裁剪
                 external: [/^@minecraft\/server-admin$/, /^@minecraft\/server-net$/],
             },
             name: "钢琴",
@@ -77,6 +77,10 @@ export default defineConfig({
     },
     plugins: [sapiPro()],
     replace: {
+        // client 构建：远程曲库分支注入为 false 常量，由 rolldown 死代码消除裁剪
+        values: {
+            __PIANO_TARGET__: '"client"',
+        },
         builtins: {
             NAME: true,
             DESCRIPTION: true,

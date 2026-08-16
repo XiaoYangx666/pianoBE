@@ -13,6 +13,7 @@
         "build": "npm run build -w @piano/addon",
         "copy": "npm run copy -w @piano/addon",
         "build:template": "npm run build:template -w @piano/addon",
+        "build:server": "npm run build:server -w @piano/addon",
         "convert": "node tools/convert.js",
         "build:core": "npm run build -w @piano/core",
         "test": "npm run test -w @piano/core",
