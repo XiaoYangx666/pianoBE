@@ -1,0 +1,24 @@
+# 开发配置：直接挂载本地代码与构建产物，改代码即生效（无需重建镜像）。
+# 用法：docker compose -f docker-compose.dev.yml up
+# 前置：本地构建 core/web（npm run build:core && npm run build:web），改 core/web 后需重新 build
+services:
+    server:
+        image: pianobe-server:latest
+        ports:
+            - "35050:3000"
+        environment:
+            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-change-me-admin-token}
+            DB_PATH: /app/data/piano.db
+            MIDIS_DIR: /app/data/midis
+            WEB_ROOT: /app/packages/web/dist
+            ALLOW_PUBLIC_READ: ${ALLOW_PUBLIC_READ:-false}
+        volumes:
+            # 本地源码热重载（bun --watch）
+            - ./packages/server/src:/app/packages/server/src
+            # 本地构建产物（改 core/web 后 npm run build:* 生效）
+            - ./packages/core/dist:/app/packages/core/dist
+            - ./packages/web/dist:/app/packages/web/dist
+            # 数据持久化
+            - ./packages/server/data:/app/data
+        command: ["bun", "--watch", "src/index.ts"]
+        restart: unless-stopped
