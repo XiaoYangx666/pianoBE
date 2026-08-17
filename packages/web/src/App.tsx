@@ -4,6 +4,7 @@ import { Login } from "./Login";
 import { SongsPage } from "./SongsPage";
 import { PlaylistsPage } from "./PlaylistsPage";
 import { TokensPage } from "./TokensPage";
+import { PlayerBar } from "./PlayerBar";
 
 type Tab = "songs" | "playlists" | "tokens";
 
@@ -24,7 +25,7 @@ export default function App() {
     return (
         <div className="app">
             <header>
-                <h1>🎹 PianoBE 曲库管理</h1>
+                <h1>PianoBE 曲库管理</h1>
                 <nav>
                     <button className={tab === "songs" ? "active" : ""} onClick={() => setTab("songs")}>
                         曲库
@@ -51,6 +52,7 @@ export default function App() {
                 {tab === "playlists" && <PlaylistsPage />}
                 {tab === "tokens" && <TokensPage />}
             </main>
+            <PlayerBar />
         </div>
     );
 }

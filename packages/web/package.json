@@ -11,6 +11,8 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@piano/core": "*",
+        "@tonejs/midi": "^2.0.28",
         "react": "^19.0.0",
         "react-dom": "^19.0.0"
     },

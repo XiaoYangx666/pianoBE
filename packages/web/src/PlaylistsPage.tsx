@@ -191,7 +191,14 @@ function PlaylistTable({
             <tbody>
                 {lists.map((m) => (
                     <tr key={m.id}>
-                        <td>{m.public ? "🌐 " : ""}{m.name}</td>
+                        <td>
+                            {m.public && (
+                                <span className="public-badge" title="公开列表">
+                                    <GlobeIcon /> 公开
+                                </span>
+                            )}
+                            {m.name}
+                        </td>
                         <td className="mono">{m.owner}</td>
                         <td>{m.playCount}</td>
                         <td>
@@ -258,5 +265,14 @@ function AddSongPicker({
             </ul>
             {Object.keys(songNames).length > 0 && null}
         </div>
+    );
+}
+
+function GlobeIcon() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
     );
 }

@@ -2,6 +2,8 @@ export interface MidiSongMeta {
     id: string;
     name: string;
     duration: number;
+    noteCount?: number;
+    dataSize?: number;
 }
 
 export interface PlaylistMeta {
@@ -62,7 +64,8 @@ function authHeaders(extra: Record<string, string> = {}): Headers {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    return handle<T>(await fetch(path, init));
+    const headers = init.headers ? new Headers(init.headers) : authHeaders();
+    return handle<T>(await fetch(path, { ...init, headers }));
 }
 
 export const api = {
@@ -73,9 +76,24 @@ export const api = {
             `/api/songs?q=${encodeURIComponent(q)}&page=${page}&pageSize=50`
         ),
 
-    uploadSong: (file: File) =>
+    /** 原始 .mid 字节（前端直接解析播放，无需 server 转 JSON） */
+    getSongRaw: async (id: string): Promise<ArrayBuffer> => {
+        const res = await fetch(`/api/songs/${encodeURIComponent(id)}/raw`, {
+            headers: authHeaders(),
+        });
+        if (res.status === 401) {
+            setToken(null);
+            throw new ApiError(401, "令牌无效或已过期，请重新登录");
+        }
+        if (!res.ok) {
+            throw new ApiError(res.status, `拉取曲目失败 (${res.status})`);
+        }
+        return res.arrayBuffer();
+    },
+
+    uploadSong: async (file: File) =>
         handle<MidiSongMeta>(
-            fetch("/api/songs", {
+            await fetch("/api/songs", {
                 method: "POST",
                 headers: authHeaders({
                     "X-File-Name": encodeURIComponent(file.name),
@@ -83,6 +101,13 @@ export const api = {
                 body: file,
             })
         ),
+
+    renameSong: (id: string, name: string) =>
+        request<MidiSongMeta>(`/api/songs/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: authHeaders({ "content-type": "application/json" }),
+            body: JSON.stringify({ name }),
+        }),
 
     deleteSong: (id: string) =>
         request<void>(`/api/songs/${id}`, {
