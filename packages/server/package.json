@@ -8,11 +8,12 @@
     "scripts": {
         "start": "bun src/index.ts",
         "dev": "bun --watch src/index.ts",
+        "debug": "bun --inspect src/index.ts",
         "test": "bun test",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@piano/core": "file:../../packages/core",
+        "@piano/core": "file:../core",
         "hono": "^4.6.0"
     },
     "devDependencies": {

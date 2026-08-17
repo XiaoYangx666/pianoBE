@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openDb } from "../src/db";
 import { createApp, type AppDeps } from "../src/app";
 import { createToken, ensureBootstrapToken, getTokenInfo } from "../src/auth";
 import { SqlitePlaylistPort, SqliteSongPort } from "../src/drivers/sqlitePorts";
 import { loadConfig } from "../src/config";
-import { PlaylistStore, SongStore } from "@piano/core";
+import { PlaylistStore } from "@piano/core";
 
 /** 最小 SMF：format 0、1 轨道、division 96 */
 function minimalMidi(note = 0x3c): Uint8Array {
@@ -23,6 +26,7 @@ let writerToken = "";
 let writer2Token = "";
 let readerToken = "";
 let songId = "";
+let midisDir = "";
 
 /** 类型化 json 解析 */
 async function j<T>(res: Response): Promise<T> {
@@ -39,9 +43,11 @@ function req(path: string, init: RequestInit & { token?: string } = {}) {
 beforeAll(() => {
     const db = openDb(":memory:");
     ensureBootstrapToken(db, ADMIN);
+    midisDir = mkdtempSync(join(tmpdir(), "piano-api-midis-"));
+    const songPort = new SqliteSongPort(db, midisDir);
     deps = {
         db,
-        songStore: new SongStore(new SqliteSongPort(db)),
+        songPort,
         playlistStore: new PlaylistStore(new SqlitePlaylistPort(db)),
         config: loadConfig({}),
     };
@@ -53,6 +59,7 @@ beforeAll(() => {
 
 afterAll(() => {
     deps.db.close();
+    rmSync(midisDir, { recursive: true, force: true });
 });
 
 describe("健康检查与鉴权", () => {
@@ -148,6 +155,43 @@ describe("曲库 API", () => {
         expect((await req(`/api/songs/${songId}`, { token: readerToken, method: "DELETE" })).status).toBe(403);
         expect((await req(`/api/songs/${songId}`, { token: writerToken, method: "DELETE" })).status).toBe(204);
         expect((await req(`/api/songs/${songId}`, { token: readerToken })).status).toBe(404);
+    });
+
+    test("PATCH 改名 → meta 更新；空名/不存在 → 400/404", async () => {
+        const up = await req("/api/songs", {
+            token: writerToken,
+            method: "POST",
+            headers: { "X-File-Name": encodeURIComponent("rename-me.mid") },
+            body: minimalMidi(0x40),
+        });
+        const { id } = await j<{ id: string }>(up);
+
+        const patched = await req(`/api/songs/${id}`, {
+            token: writerToken,
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: "  新名字  " }),
+        });
+        expect(patched.status).toBe(200);
+        expect((await j<{ name: string }>(patched)).name).toBe("新名字");
+
+        const empty = await req(`/api/songs/${id}`, {
+            token: writerToken,
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: "   " }),
+        });
+        expect(empty.status).toBe(400);
+
+        const missing = await req("/api/songs/nope", {
+            token: writerToken,
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: "x" }),
+        });
+        expect(missing.status).toBe(404);
+
+        await req(`/api/songs/${id}`, { token: writerToken, method: "DELETE" });
     });
 });
 

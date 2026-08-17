@@ -3,7 +3,8 @@ import { logger } from "hono/logger";
 import { existsSync } from "node:fs";
 import { serveStatic } from "hono/bun";
 import type { Database } from "bun:sqlite";
-import type { PlaylistStore, SongStore } from "@piano/core";
+import type { PlaylistStore } from "@piano/core";
+import type { SqliteSongPort } from "./drivers/sqlitePorts.js";
 import type { ServerConfig } from "./config.js";
 import { authMiddleware, type AppVariables } from "./auth.js";
 import { songsRoutes } from "./routes/songs.js";
@@ -12,7 +13,7 @@ import { tokensRoutes } from "./routes/tokens.js";
 
 export interface AppDeps {
     db: Database;
-    songStore: SongStore;
+    songPort: SqliteSongPort;
     playlistStore: PlaylistStore;
     config: ServerConfig;
 }
@@ -36,7 +37,14 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
     // 静态托管 web 构建产物（SPA fallback 到 index.html）
     if (deps.config.webRoot && existsSync(deps.config.webRoot)) {
-        app.use("*", serveStatic({ root: deps.config.webRoot }));
+        app.use(
+            "*",
+            serveStatic({
+                root: deps.config.webRoot,
+                // 采样 OGG 显式声明 MIME，避免被误判为 octet-stream 触发下载
+                mimes: { ogg: "audio/ogg" },
+            })
+        );
         app.get("*", async (c) => {
             const file = Bun.file(`${deps.config.webRoot}/index.html`);
             if (await file.exists()) {

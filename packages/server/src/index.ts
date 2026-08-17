@@ -3,7 +3,7 @@ import { loadConfig } from "./config.js";
 import { ensureBootstrapToken } from "./auth.js";
 import { SqlitePlaylistPort, SqliteSongPort } from "./drivers/sqlitePorts.js";
 import { createApp } from "./app.js";
-import { PlaylistStore, SongStore } from "@piano/core";
+import { PlaylistStore } from "@piano/core";
 
 const config = loadConfig();
 const db = openDb(config.dbPath);
@@ -18,10 +18,10 @@ if (generated) {
     console.log(`bootstrap 管理员令牌已就绪 (${token.slice(0, 8)}…)`);
 }
 
-const songStore = new SongStore(new SqliteSongPort(db));
+const songPort = new SqliteSongPort(db, config.midisDir);
 const playlistStore = new PlaylistStore(new SqlitePlaylistPort(db));
 
-const app = createApp({ db, songStore, playlistStore, config });
+const app = createApp({ db, songPort, playlistStore, config });
 
 console.log(`PianoBE server: http://0.0.0.0:${config.port} (db=${config.dbPath})`);
 Bun.serve({
