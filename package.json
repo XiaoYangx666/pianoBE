@@ -4,8 +4,7 @@
     "license": "GPL-3.0-only",
     "private": true,
     "workspaces": [
-        "packages/*",
-        "apps/*"
+        "packages/*"
     ],
     "scripts": {
         "pack": "npm run pack -w @piano/addon",
@@ -21,8 +20,10 @@
         "test": "npm run test -w @piano/core",
         "dev:server": "npm run dev -w @piano/server",
         "start:server": "npm run start -w @piano/server",
+        "debug:server": "npm run debug -w @piano/server",
         "test:server": "npm run test -w @piano/server",
         "dev:web": "npm run dev -w @piano/web",
+        "start:web": "npm run preview -w @piano/web",
         "build:web": "npm run build -w @piano/web",
         "dev:generator": "npm run dev -w @piano/generator",
         "build:generator": "npm run build -w @piano/generator"

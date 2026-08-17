@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs";
 import JSZip from "jszip";
 import { midiBufferToSong } from "@piano/core/convert";
 import { metasToAddonIndex, songToAddonModule } from "@piano/core";
-import { loadTemplate, parseExistingMidis } from "../apps/generator/src/template.ts";
-import { generateAddonZip } from "../apps/generator/src/export.ts";
+import { loadTemplate, parseExistingMidis } from "../packages/generator/src/template.ts";
+import { generateAddonZip } from "../packages/generator/src/export.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const MIDI_A = "midis/files/Beyond - 海阔天空.mid";

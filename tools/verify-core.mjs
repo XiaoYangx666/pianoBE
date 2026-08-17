@@ -6,7 +6,6 @@ import {
     unpackNotes,
     songToAddonModule,
     metasToAddonIndex,
-    SongStore,
     PlaylistStore,
     MemorySongPort,
     MemoryPlaylistPort,
@@ -34,14 +33,19 @@ import { midiBufferToSong } from "@piano/core/convert";
     assert.equal(songToAddonModule(song), existing);
 }
 
-// 4. 曲库：内容寻址幂等 + fromIds 过滤缺失
+// 4. 曲库：内容寻址幂等 + 过滤缺失
 const songPort = new MemorySongPort();
-const songStore = new SongStore(songPort);
-songStore.add({ id: "aaa", name: "A", duration: 100, tracks: [] });
-songStore.add({ id: "aaa", name: "A2", duration: 200, tracks: [] }); // 同 id 覆盖（幂等语义：内容寻址下同 id 应同内容）
-assert.equal(songStore.getMeta("aaa")?.duration, 200);
-assert.equal(songStore.has("bbb"), false);
-assert.deepEqual(songStore.fromIds(["aaa", "missing"]).map((m) => m.id), ["aaa"]);
+songPort.add({ id: "aaa", name: "A", duration: 100, tracks: [] });
+songPort.add({ id: "aaa", name: "A2", duration: 200, tracks: [] }); // 同 id 覆盖（幂等语义：内容寻址下同 id 应同内容）
+assert.equal(songPort.getMeta("aaa")?.duration, 200);
+assert.equal(songPort.has("bbb"), false);
+assert.deepEqual(
+    ["aaa", "missing"]
+        .map((id) => songPort.getMeta(id))
+        .filter(Boolean)
+        .map((m) => m.id),
+    ["aaa"]
+);
 
 // 5. 播放列表：创建/视图/删除/播放计数
 const plPort = new MemoryPlaylistPort();

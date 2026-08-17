@@ -1,8 +1,8 @@
 {
     "format_version": 3,
     "header": {
-        "description": "钢琴行为包",
         "name": "钢琴",
+        "description": "钢琴行为包",
         "uuid": "04f4bc5e-60a2-49f6-840c-5a22dbb19bf7",
         "version": "1.2.0",
         "min_engine_version": "1.26.30"

@@ -18,9 +18,17 @@ export default defineConfig({
             moduleUuid: "f2c4ed57-79a9-4e3c-b876-f7bf697417d0",
             compile: {
                 entry: "src/main.ts",
-                // BDS 运行时模块：仅安装类型（devDeps），打包时保留为运行时动态
-                // import；client 构建中对应分支会被注入常量 + 死代码消除裁剪
-                external: [/^@minecraft\/server-admin$/, /^@minecraft\/server-net$/],
+                // 条件编译注入：标识符引用级替换（rolldown transform.define），
+                // 优于 replace.values（不触碰对象键/字符串字面量/注释）
+                // @minecraft/server-admin/server-net 等 catalog 依赖自动 external
+                define: {
+                    __PIANO_TARGET__: JSON.stringify("client"),
+                },
+            },
+            // clean 模式：manifest 从配置全量重建，双配置交替构建互不污染
+            manifest: {
+                merge: "clean",
+                minEngineVersion: "1.26.30",
             },
             name: "钢琴",
             description: "钢琴行为包",
@@ -35,6 +43,10 @@ export default defineConfig({
             root: "rp",
             uuid: "efbe8777-707f-42de-a238-97b05684685e",
             moduleUuid: "36d4f042-edf0-4be3-8d48-8165de3057ad",
+            manifest: {
+                merge: "clean",
+                minEngineVersion: "1.26.30",
+            },
             name: "钢琴资源包",
             description: "钢琴资源包",
             pbr: true,
@@ -77,10 +89,8 @@ export default defineConfig({
     },
     plugins: [sapiPro()],
     replace: {
-        // client 构建：远程曲库分支注入为 false 常量，由 rolldown 死代码消除裁剪
-        values: {
-            __PIANO_TARGET__: '"client"',
-        },
+        // **NAME**/**VERSION**/**DESCRIPTION**/**UUID** 模板占位符仍用 replace；
+        // 条件编译标识符 __PIANO_TARGET__ 已改用 compile.define（见上）
         builtins: {
             NAME: true,
             DESCRIPTION: true,

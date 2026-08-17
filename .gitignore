@@ -9,7 +9,7 @@ midis/files/*
 midis/js/*
 tools/piano_source/*
 packages/*/dist
-apps/*/dist
-apps/*/data
+packages/*/data
+.env
 *.mid
 *.mcaddon

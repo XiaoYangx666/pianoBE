@@ -16,6 +16,10 @@
         "./convert": {
             "types": "./dist/convert.d.ts",
             "import": "./dist/convert.js"
+        },
+        "./note": {
+            "types": "./dist/midi/note.d.ts",
+            "import": "./dist/midi/note.js"
         }
     },
     "files": [

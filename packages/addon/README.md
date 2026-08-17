@@ -18,7 +18,7 @@
 ### BDS 配置（配置文件示例）
 
 ```
-config/default/variables.json    → { "pianoBackendUrl": "http://192.168.1.10:3000" }
+config/default/variables.json    → { "pianoBackendUrl": "http://192.168.1.10:35050" }
 config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
 ```
 
@@ -31,7 +31,7 @@ config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
 
 - 曲目列表：启动后从 `GET /api/songs` 拉取，内存缓存 5 分钟 + 世界动态属性持久缓存（断网可读）
 - 单曲：播放时按 id 拉取 `GET /api/songs/:id` 并缓存，之后离线可播
-- 后端 API 鉴权与部署见 `apps/server/README.md`（Hono + bun:sqlite + Docker）
+- 后端 API 鉴权与部署见 `packages/server/README.md`（Hono + bun:sqlite + Docker）
 
 ## 开发
 

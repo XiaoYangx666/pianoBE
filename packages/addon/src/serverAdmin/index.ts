@@ -2,14 +2,7 @@ import { midiManager } from "@midiPlayer";
 import { getNetFetch } from "@serverNet";
 import { CachedRemoteSource } from "./netSource";
 import { DPDataBase } from "sapi-pro";
-
-/** @minecraft/server-admin 模块的最小形状（BDS 专属，客户端缺失） */
-interface ServerAdminModule {
-    /** 非敏感配置（config/default/variables.json），可读字符串 */
-    variables: { get(name: string): unknown };
-    /** 敏感配置（config/default/secrets.json），返回 SecretString（脚本不可读） */
-    secrets: { get(name: string): { value?: never } | undefined };
-}
+import { secrets, variables } from "@minecraft/server-admin";
 
 /** variables.json 键名：后端地址（可读） */
 export const KEY_BACKEND_URL = "pianoBackendUrl";
@@ -20,7 +13,9 @@ let initialized = false;
 
 /**
  * 初始化远程曲库（server-admin 读配置 → server-net 拉取）。
- * 任一环节不可用（客户端环境 / 未配置 / 网络模块缺失）→ 保持内嵌曲库，返回 false。
+ * 任一环节不可用（未配置）→ 保持内嵌曲库，返回 false。
+ * 本模块整体仅在 server 构建中被引用（client 构建被 compile.define 常量
+ * 折叠 + 死代码消除裁剪，故静态导入 @minecraft/server-admin 无副作用）。
  *
  * BDS 配置文件示例：
  *   config/default/variables.json  → { "pianoBackendUrl": "http://192.168.1.10:3000" }
@@ -31,15 +26,7 @@ let initialized = false;
 export async function initServerAdmin(): Promise<boolean> {
     if (initialized) return true;
 
-    let mod: ServerAdminModule;
-    try {
-        mod = (await import("@minecraft/server-admin")) as ServerAdminModule;
-    } catch (e) {
-        console.warn("[serverAdmin] @minecraft/server-admin 不可用，使用内嵌曲库", e);
-        return false;
-    }
-
-    const url = mod.variables.get(KEY_BACKEND_URL);
+    const url = variables.get(KEY_BACKEND_URL);
     if (typeof url !== "string" || !url) {
         console.warn(
             `[serverAdmin] 未配置 ${KEY_BACKEND_URL}（BDS config/default/variables.json），使用内嵌曲库`
@@ -51,7 +38,7 @@ export async function initServerAdmin(): Promise<boolean> {
     if (!fetch) return false;
 
     // SecretString 仅透传（作为 HttpHeader 值执行时解析），绝不读取/打印
-    const token = mod.secrets.get(KEY_BACKEND_TOKEN);
+    const token = secrets.get(KEY_BACKEND_TOKEN);
     const extraHeaders = token ? () => ({ Authorization: token }) : undefined;
 
     midiManager.setSource(

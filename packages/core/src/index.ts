@@ -4,7 +4,7 @@ export * from "./source.js";
 export * from "./midi/crc32.js";
 export * from "./midi/encoding.js";
 export * from "./midi/addonModule.js";
+export * from "./midi/note.js";
 export * from "./store/ports.js";
-export * from "./store/songStore.js";
 export * from "./store/playlistStore.js";
 export * from "./store/memory.js";

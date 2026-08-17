@@ -24,8 +24,16 @@ export default defineConfig({
             moduleUuid: "544d1620-bdcb-4c71-a0a7-8c32fb059a44",
             compile: {
                 entry: "src/main.ts",
-                // BDS 运行时模块：保留为动态 import，不打包（catalog 亦自动 external，此处显式双保险）
-                external: [/^@minecraft\/server-admin$/, /^@minecraft\/server-net$/],
+                // @minecraft/server-admin/server-net 等 catalog 依赖自动 external
+                //（catalog 自动 external，无需显式配置）
+                // 条件编译注入：保留 server 分支（clean 模式同下）
+                define: {
+                    __PIANO_TARGET__: JSON.stringify("server"),
+                },
+            },
+            manifest: {
+                merge: "clean",
+                minEngineVersion: "1.26.30",
             },
             name: "钢琴(服务器版)",
             description: "钢琴行为包（服务器专用）",
@@ -42,6 +50,10 @@ export default defineConfig({
             root: "rp",
             uuid: "d891a694-3ffd-4773-b629-21698dcb6884",
             moduleUuid: "a51c41cc-6b76-4364-a372-381b4bdf0ee7",
+            manifest: {
+                merge: "clean",
+                minEngineVersion: "1.26.30",
+            },
             name: "钢琴资源包(服务器版)",
             description: "钢琴资源包",
             pbr: true,
@@ -76,10 +88,8 @@ export default defineConfig({
     },
     plugins: [sapiPro()],
     replace: {
-        // server 构建：远程曲库分支注入为 true 常量（保留）
-        values: {
-            __PIANO_TARGET__: '"server"',
-        },
+        // **NAME**/**VERSION**/**DESCRIPTION**/**UUID** 模板占位符仍用 replace；
+        // 条件编译标识符 __PIANO_TARGET__ 已改用 compile.define（见上）
         builtins: {
             NAME: true,
             DESCRIPTION: true,
