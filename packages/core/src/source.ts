@@ -10,4 +10,12 @@ export interface MidiSource {
     list(): MidiSongMeta[] | Promise<MidiSongMeta[]>;
     /** 按 id 获取完整曲目（异步；未找到返回 undefined） */
     get(id: string): Promise<MidiSong | undefined>;
+    /** 服务端分页查询（远程源实现；返回该页 items + 总数；q 为服务端名称搜索） */
+    page?(
+        page: number,
+        pageSize: number,
+        q?: string
+    ): Promise<{ items: MidiSongMeta[]; total: number }>;
+    /** 按 q 取全部元信息（批量操作专用，如"一键添加"；未实现时调用方回退本地过滤） */
+    metaAll?(q?: string): Promise<MidiSongMeta[]>;
 }

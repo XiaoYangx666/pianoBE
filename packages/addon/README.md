@@ -29,9 +29,35 @@ config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
 
 ### 远程模式行为
 
-- 曲目列表：启动后从 `GET /api/songs` 拉取，内存缓存 5 分钟 + 世界动态属性持久缓存（断网可读）
-- 单曲：播放时按 id 拉取 `GET /api/songs/:id` 并缓存，之后离线可播
+- 曲目列表：每次打开**现拉**（`GET /api/songs` 分页取全），游戏内不持久化完整列表，后端新上传的曲目即时可见
+- 单曲：播放时按 id 拉取 `GET /api/songs/:id`，**仅内存 LRU 缓存最近 10 首**（不落动态属性/存档，重启即空），已缓存歌曲断网可播
 - 后端 API 鉴权与部署见 `packages/server/README.md`（Hono + bun:sqlite + Docker）
+
+### 故障排查（BDS 控制台日志）
+
+server 构建会在控制台输出逐步诊断（不打印令牌）：
+
+```
+[piano] 主脚本已加载，构建目标: server          ← 确认装的是服务器专用包
+[piano] server 构建：20 tick 后尝试初始化远程曲库
+[serverAdmin] step1 读取配置 pianoBackendUrl = "http://...:35050"
+[serverAdmin] step2 获取 @minecraft/server-net 适配器
+[serverAdmin] step3 已读取 secrets 令牌 / 未读取到 secrets 令牌
+[serverAdmin] step4 切换到远程曲库: http://...:35050
+[netSource] 拉取曲目列表: GET http://.../api/songs?pageSize=100
+[netSource] 曲目列表响应状态: 200
+[netSource] 曲目列表拉取成功: N 首
+```
+
+对照判断：
+
+| 日志表现 | 含义 |
+|---|---|
+| 完全没有 `[piano] 主脚本已加载` | 装的是模板包（client）或脚本未运行 |
+| `step1 ... (未配置)` | `variables.json` 路径/格式不对（应为 `config/default/variables.json`） |
+| `step3 未读取到 secrets 令牌` | `secrets.json` 缺失或键名不对（`pianoBackendToken` 需含完整 `Bearer ` 前缀） |
+| `[netSource] ... 拉取失败: ... 网络/超时/连接被拒` | 后端不可达：确认 URL 端口、BDS 与后端网络互通（容器内 BDS 需用宿主 IP） |
+| `响应状态: 401/403` | 令牌错误或后端 `ALLOW_PUBLIC_READ=false` 下未带有效令牌 |
 
 ## 开发
 

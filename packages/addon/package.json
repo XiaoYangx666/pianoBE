@@ -15,16 +15,16 @@
         "test": "bun test"
     },
     "dependencies": {
+        "@piano/core": "file:../core",
         "@minecraft/server": "2.10.0-beta.1.26.44-stable",
         "@minecraft/server-ui": "2.2.0-beta.1.26.44-stable",
+        "sapi-pro": "file:../../vendor/sapi-pro-0.4.2.tgz",
         "@minecraft/vanilla-data": "1.26.44",
-        "@piano/core": "file:../core",
-        "sapi-pro": "file:../../vendor/sapi-pro-0.4.2.tgz"
+        "@minecraft/server-net": "1.0.0-beta.1.26.44-stable",
+        "@minecraft/server-admin": "1.0.0-beta.1.26.44-stable"
     },
     "devDependencies": {
         "@bepack/cli": "file:/server/mcdev/BEPack",
-        "@minecraft/server-admin": "^1.0.0-beta.11940b24",
-        "@minecraft/server-net": "^1.0.0-beta.11940b24",
         "sapi-kit": "^0.2.3"
     }
 }

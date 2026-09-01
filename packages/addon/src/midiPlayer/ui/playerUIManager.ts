@@ -1,5 +1,5 @@
 import { Block, Player } from "@minecraft/server";
-import { CustomForm, ObservableString } from "@minecraft/server-ui";
+import { CustomForm, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import { Cardinal_Direction } from "@types";
 import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
@@ -13,6 +13,11 @@ class MidiPlayerInstance {
 
     private playerInst?: MidiPlayer;
     private leftBlock: Block | null = null;
+
+    /** 进度滑块：每 tick 同步播放进度；玩家拖动（值明显偏离）→ seek */
+    private sliderObs?: ObservableNumber;
+    /** 服务器最后一次写入滑块的值（用于区分"自己回写"与"玩家拖动"） */
+    private lastSyncedSlider = -1;
 
     private inited = false;
     private unsub?: () => void;
@@ -48,6 +53,7 @@ class MidiPlayerInstance {
                 return this.close();
             }
             updateUI(this.ctx, this.playerInst);
+            this.syncSlider();
         });
 
         // 同步上下文
@@ -55,6 +61,41 @@ class MidiPlayerInstance {
             this.ctx.block = left;
         }
         return true;
+    }
+
+    /** 进度滑块同步：把滑块设为当前播放进度（0~100，时间制） */
+    private syncSlider() {
+        if (
+            !this.sliderObs ||
+            !this.form?.isShowing?.() ||
+            !this.playerInst?.isAlive()
+        ) {
+            return;
+        }
+        const info = this.playerInst.getInfo();
+        const pct = Math.round(info.progress * 100);
+        if (pct === this.lastSyncedSlider) return;
+        this.lastSyncedSlider = pct;
+        this.sliderObs.setData(pct);
+    }
+
+    /**
+     * 监听滑块变化，按"写入者身份"判断：
+     * - 值为 lastSyncedSlider（服务器刚写的）→ 忽略
+     * - 其它值（clientWritable 下玩家拖动写入）→ seek
+     * 这样慢速拖动（±1%）也不会被服务器回写拽回。
+     */
+    private wireSlider(obs: ObservableNumber) {
+        obs.subscribe((v: number) => {
+            if (v === this.lastSyncedSlider) return; // 服务器回写
+            this.lastSyncedSlider = v;
+
+            const inst = this.playerInst;
+            if (!inst?.isAlive()) return;
+            const info = inst.getInfo();
+            const durSec = (info.durationMs ?? 0) / 1000;
+            if (durSec > 0) inst.seek((v / 100) * durSec);
+        });
     }
 
     private init() {
@@ -67,14 +108,19 @@ class MidiPlayerInstance {
             midiName: new ObservableString(""),
             queue: new ObservableString(""),
 
-            progressBar: new ObservableString(""),
             progressText: new ObservableString(""),
+
+            // clientWritable：允许玩家拖动写值（双向绑定）
+            progressSlider: new ObservableNumber(0, { clientWritable: true }),
 
             buttonText: new ObservableString("▶ 播放"),
             playMode: new ObservableString(""),
 
             block: this.leftBlock!,
         };
+
+        this.sliderObs = this.ctx.progressSlider;
+        this.wireSlider(this.sliderObs);
 
         // === form（只创建一次）===
         this.form = createMidiPlayerUI(

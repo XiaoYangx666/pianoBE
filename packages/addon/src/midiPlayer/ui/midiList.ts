@@ -1,16 +1,8 @@
-import { midiManager, playListStore } from "@midiPlayer";
+import { midiManager, playlist } from "@midiPlayer";
 import { PlayQueue } from "@midiPlayer/queue";
 import type { MidiSongMeta } from "@piano/core";
 import { CommonForm, NumberField, TextField, Validators } from "sapi-pro";
 const PAGE_SIZE = 8;
-
-/** 获取筛选后的列表 */
-function getFilteredList(filter?: string) {
-    const midis = midiManager.list();
-    if (!filter) return midis;
-    const lowerFilter = filter.toLowerCase();
-    return midis.filter((m) => m.name.toLowerCase().includes(lowerFilter));
-}
 
 // --- 搜索表单 ---
 export const MidiSearchForm = CommonForm.InputForm<
@@ -40,19 +32,25 @@ export const MidiListForm = CommonForm.ButtonForm<
         targetPlayListId?: number;
         p: number;
         filter?: string;
-        filteredList?: MidiSongMeta[];
+        /** 当前页歌曲（服务端分页返回） */
+        pageItems?: MidiSongMeta[];
+        /** 匹配总数量（服务端 total） */
+        total?: number;
+        maxPage?: number;
     },
     MidiSongMeta
 >({
     title: "选择歌曲",
+    // 服务端分页：每页向后端请求对应页（搜索时 filter 作为 q 走服务端过滤），
+    // 不下载全量列表、不缓存
     async generator(form, ctx, args) {
-        const filteredList = getFilteredList(args.filter);
-        const maxPage = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+        const { items, total } = await midiManager.page(args.p, PAGE_SIZE, args.filter);
+        const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        args.pageItems = items;
+        args.total = total;
+        args.maxPage = maxPage;
         const mode = args.targetPlayListId ? "§e[添加至列表]§r" : "§b[点歌]§r";
-        form.body(
-            `${mode}\n结果: ${filteredList.length} 首\n页码: ${args.p} / ${maxPage}`
-        );
-        args.filteredList = filteredList;
+        form.body(`${mode}\n结果: ${total} 首\n页码: ${args.p} / ${maxPage}`);
     },
     buttons: [
         {
@@ -67,34 +65,29 @@ export const MidiListForm = CommonForm.ButtonForm<
             func: (ctx) =>
                 ctx.replace(MidiListForm, { ...ctx.args, p: ctx.args.p + 1 }),
             shouldShow(player, args) {
-                return args.p * PAGE_SIZE < getFilteredList(args.filter).length;
+                return (args.maxPage ?? 1) > args.p;
             },
         },
     ],
 
     buttonGenerator(player, args) {
-        const start = (args.p - 1) * PAGE_SIZE;
-        const list = args
-            .filteredList!.slice(start, start + PAGE_SIZE)
-            .map((midi) => ({
-                label: `${midi.name}`,
-                data: midi,
-            }));
-
-        return list;
+        return (args.pageItems ?? []).map((midi) => ({
+            label: `${midi.name}`,
+            data: midi,
+        }));
     },
 
     footerButtons: [
         {
             label: "§q一键添加",
             shouldShow: (player, args) => args.p === 1,
-            func(ctx) {
+            async func(ctx) {
                 const { queue, targetPlayListId, filter } = ctx.args;
-                const filteredList = getFilteredList(filter);
-
+                // 批量操作需要匹配全集：metaAll 分页取全（远程源后端过滤）
+                const filteredList = await midiManager.metaAll(filter);
                 if (targetPlayListId !== undefined) {
                     // 模式 A：批量加入播放列表
-                    const items = playListStore.getContent(targetPlayListId);
+                    const items = await playlist.getContent(targetPlayListId);
                     let added = 0;
 
                     for (const midi of filteredList) {
@@ -104,7 +97,7 @@ export const MidiListForm = CommonForm.ButtonForm<
                         }
                     }
 
-                    playListStore.setContent(targetPlayListId, items);
+                    await playlist.setContent(targetPlayListId, items);
                     ctx.player.sendMessage(`§a已添加 ${added} 首歌曲到列表`);
                 } else if (queue) {
                     // 模式 B：批量加入队列
@@ -115,44 +108,42 @@ export const MidiListForm = CommonForm.ButtonForm<
                         `§a已加入 ${filteredList.length} 首到播放队列`
                     );
                 }
-
-                // 刷新当前页
-                ctx.replace(MidiListForm, ctx.args);
             },
         },
         {
             label: "跳页",
             func(ctx) {
                 ctx.push(jumpPageForm, {
-                    len: ctx.args.filteredList!.length,
+                    len: ctx.args.total ?? 0,
                     args: ctx.args,
                 });
             },
         },
     ],
 
-    handler(ctx, button) {
+    async handler(ctx, button) {
         const midi = button.data;
         const { queue, targetPlayListId } = ctx.args;
 
         if (targetPlayListId !== undefined) {
-            // 模式 A: 存入数据库播放列表
-            const items = playListStore.getContent(targetPlayListId);
+            // 模式 A: 存入后端/本地播放列表（异步读写）
+            const items = await playlist.getContent(targetPlayListId);
             if (!items.includes(midi.id)) {
                 items.push(midi.id);
-                playListStore.setContent(targetPlayListId, items);
+                await playlist.setContent(targetPlayListId, items);
                 ctx.player.sendMessage(`§a已添加: ${midi.name}`);
             } else {
                 ctx.player.sendMessage(`§e歌曲已存在`);
             }
+            // 停留在当前页，方便继续添加下一首（generator 重新请求该页）
+            ctx.replace(MidiListForm, ctx.args);
         } else if (queue) {
             // 模式 B: 直接加入当前队列
             queue.enqueue(midi);
             ctx.player.sendMessage(`§a已加入当前播放队列`);
+            // 停留在当前页，方便继续添加下一首（generator 重新请求该页）
+            ctx.replace(MidiListForm, ctx.args);
         }
-
-        // 停留在当前页，方便继续添加下一首
-        ctx.replace(MidiListForm, ctx.args);
     },
     oncancel(res, ctx) {
         ctx.back();

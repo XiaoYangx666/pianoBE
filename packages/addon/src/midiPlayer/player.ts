@@ -92,6 +92,38 @@ export class MidiPlayer {
         this.lastTime = Date.now();
     }
 
+    /**
+     * 快进/回退：跳转到指定秒数（0 ≤ t ≤ 曲目时长），从该位置继续。
+     * 不改变播放/暂停状态；idle/stopped 时恢复为播放。
+     * 打包音符时间单位 = 1/40 秒（processPlayback 中 currentTime*40 对照）。
+     */
+    seek(positionSec: number) {
+        if (!this.hasContent()) return;
+
+        const meta = this.queue.current();
+        // duration 为内部 tick 单位（TIME_SCALE=40，40 tick = 1 秒）
+        const durationSec = (meta?.duration ?? 0) / 40;
+        const target = Math.max(0, Math.min(positionSec, durationSec || positionSec));
+
+        this.currentTime = target;
+        const targetTicks = target * 40;
+
+        // 各轨道跳到第一条 time ≥ 目标刻的音符（略过的音符不再播放）
+        for (let t = 0; t < this.tracks.length; t++) {
+            const arr = this.tracks[t];
+            let idx = 0;
+            while (idx + 1 < arr.length && arr[idx + 1] < targetTicks) idx += 4;
+            this.indices[t] = idx;
+        }
+
+        if (this.state === "idle" || this.state === "stopped") {
+            this.state = "playing";
+            this.lastTime = Date.now();
+        }
+
+        this.signal.publish();
+    }
+
     end() {
         this.state = "stopped";
         this.tracks = [];
@@ -302,6 +334,9 @@ export class MidiPlayer {
         const currentNoteIndex =
             this.indices.reduce((sum, i) => sum + i, 0) / 4;
 
+        const durationMs = (this.queue.current()?.duration ?? 0) * 25; // 1 tick = 25ms（40 tick/s）
+        const durationSec = durationMs / 1000;
+
         return {
             pos: this.pos,
             dimension: this.dimension,
@@ -312,10 +347,16 @@ export class MidiPlayer {
 
             currentNoteIndex,
 
+            // 时间制进度（与拖动条/时间显示一致）：currentTime / 时长，0~1
             progress:
-                this.totalNotes === 0 ? 0 : currentNoteIndex / this.totalNotes,
+                durationSec > 0
+                    ? Math.min(1, Math.max(0, this.currentTime / durationSec))
+                    : 0,
 
             currentTime: this.currentTime,
+
+            /** 曲目总时长（ms；meta.duration 为内部 tick，1 tick = 25ms） */
+            durationMs,
 
             queueIndex: this.queue.getIndex(),
             queueLength: this.queue.getLength(),

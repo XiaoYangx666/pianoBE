@@ -1,5 +1,5 @@
 import { nameDb } from "@ext";
-import { midiManager, playListStore } from "@midiPlayer";
+import { midiManager, playlist } from "@midiPlayer";
 import { MidiPlayer } from "@midiPlayer/player";
 import type { PlaylistMeta } from "@piano/core";
 import { Player } from "@minecraft/server";
@@ -15,10 +15,15 @@ function canManage(player: Player, meta: PlaylistMeta) {
 export const PlayListMainForm = CommonForm.ButtonForm<
     {
         midiPlayer: MidiPlayer;
+        metas?: PlaylistMeta[];
     },
     PlaylistMeta
 >({
     title: "播放列表管理",
+    async generator(form, player, args) {
+        args.metas = await playlist.listMy(player.id);
+        form.body(`我的列表: ${args.metas.length} 个`);
+    },
     buttons: [
         {
             label: "公开广场",
@@ -32,8 +37,8 @@ export const PlayListMainForm = CommonForm.ButtonForm<
             func: (ctx) => ctx.push(CreatePlayListForm, {}),
         },
     ],
-    buttonGenerator(player) {
-        return playListStore.getMetasByOwner(player.id).map((meta) => ({
+    buttonGenerator(player, args) {
+        return (args.metas ?? []).map((meta) => ({
             label: `${meta.public ? "§q[公开]" : "§s[私有]"} §r${meta.name}\n播放: ${meta.playCount}`,
             data: meta,
         }));
@@ -49,12 +54,18 @@ export const PlayListMainForm = CommonForm.ButtonForm<
 
 // --- 公开广场 ---
 const PublicPlayListForm = CommonForm.ButtonForm<
-    { midiPlayer: MidiPlayer },
+    {
+        midiPlayer: MidiPlayer;
+        metas?: PlaylistMeta[];
+    },
     PlaylistMeta
 >({
     title: "公开播放列表",
-    buttonGenerator: () =>
-        playListStore.getPublicMetas(true).map((meta) => ({
+    async generator(form, ctx, args) {
+        args.metas = await playlist.listPublic();
+    },
+    buttonGenerator: (player, args) =>
+        (args.metas ?? []).map((meta) => ({
             label: `${meta.name}\n作者: ${nameDb.getNameById(meta.owner) ?? meta.owner} | 播放: ${meta.playCount}`,
             data: meta,
         })),
@@ -71,37 +82,39 @@ const PublicPlayListForm = CommonForm.ButtonForm<
 });
 
 // --- 详情页 ---
-const PlayListDetailForm = CommonForm.ButtonForm<{
-    meta: PlaylistMeta;
-    midiPlayer: MidiPlayer;
-}>({
+const PlayListDetailForm = CommonForm.ButtonForm<
+    {
+        meta: PlaylistMeta;
+        midiPlayer: MidiPlayer;
+        items?: string[];
+    },
+    PlaylistMeta
+>({
     title: "列表详情",
-    generator(form, player, args) {
+    async generator(form, ctx, args) {
         const m = args.meta;
-        // 直接加载 items 获取准确数量
-        const items = playListStore.getContent(m.id);
+        args.items = await playlist.getContent(m.id);
         form.body(
             `名称: ${m.name}\n` +
                 `状态: ${m.public ? "公开" : "私有"}\n` +
                 `播放量: ${m.playCount}\n` +
-                `歌曲数: ${items.length} 首`
+                `歌曲数: ${args.items.length} 首`
         );
-    },
-    validator(ctx) {
-        // 如果列表已被删除，自动退回
-        if (!playListStore.getMeta(ctx.args.meta.id)) {
-            ctx.back();
-        }
     },
     buttons: [
         {
             label: "▶ 替换并播放序列",
-            func(ctx) {
+            async func(ctx) {
                 const { meta, midiPlayer } = ctx.args;
-                const songIds = playListStore.getContent(meta.id);
-                const midiInfos = songIds
-                    .map((id) => midiManager.getInfo(id))
-                    .filter((i) => !!i);
+                const songIds = await playlist.getContent(meta.id);
+                // 按需解析元信息（远程源逐 id 拉取，不依赖全量快照）
+                const midiInfos = (
+                    await Promise.all(
+                        songIds.map((id) =>
+                            midiManager.infoOf(id).catch(() => undefined)
+                        )
+                    )
+                ).filter((i): i is NonNullable<typeof i> => !!i);
 
                 if (midiInfos.length === 0) {
                     return ctx.player.sendMessage(
@@ -111,8 +124,8 @@ const PlayListDetailForm = CommonForm.ButtonForm<{
 
                 midiPlayer.queue.import(midiInfos as any);
                 midiPlayer.play();
-                // 增加播放数 (限制每人每天一次)
-                playListStore.incPlayCount(meta.id, ctx.player.id);
+                // 播放计数（远程实现上报后端）
+                await playlist.incPlayCount(meta.id, ctx.player.id);
                 ctx.player.sendMessage(`§a成功导入 ${midiInfos.length} 首歌曲`);
                 ctx.back();
             },
@@ -132,20 +145,28 @@ const PlayListDetailForm = CommonForm.ButtonForm<{
             label: "设为公开",
             shouldShow: (player, args) =>
                 canManage(player, args.meta) && !args.meta.public,
-            func(ctx) {
-                playListStore.updateMeta(ctx.args.meta.id, { public: true });
-                ctx.args.meta.public = true;
-                ctx.replace(PlayListDetailForm, ctx.args);
+            async func(ctx) {
+                const updated = await playlist.update(ctx.args.meta.id, { public: true });
+                if (updated) {
+                    ctx.args.meta = updated;
+                    ctx.replace(PlayListDetailForm, ctx.args);
+                } else {
+                    ctx.player.sendMessage("§c操作失败（列表不存在或无权限）");
+                }
             },
         },
         {
             label: "设为私有",
             shouldShow: (player, args) =>
                 canManage(player, args.meta) && args.meta.public,
-            func(ctx) {
-                playListStore.updateMeta(ctx.args.meta.id, { public: false });
-                ctx.args.meta.public = false;
-                ctx.replace(PlayListDetailForm, ctx.args);
+            async func(ctx) {
+                const updated = await playlist.update(ctx.args.meta.id, { public: false });
+                if (updated) {
+                    ctx.args.meta = updated;
+                    ctx.replace(PlayListDetailForm, ctx.args);
+                } else {
+                    ctx.player.sendMessage("§c操作失败（列表不存在或无权限）");
+                }
             },
         },
         {
@@ -164,17 +185,19 @@ const PlayListItemsManager = CommonForm.ButtonForm<
     {
         meta: PlaylistMeta;
         p: number;
+        items?: string[];
     },
     number
 >({
     title: "管理列表歌曲",
-    generator(form, player, args) {
-        const items = playListStore.getContent(args.meta.id);
-        const maxPage = Math.ceil(items.length / PAGE_SIZE) || 1;
+    async generator(form, ctx, args) {
+        // 内容为小数据（歌曲 id 数组），每次打开现拉一整个数组即可
+        args.items = await playlist.getContent(args.meta.id);
+        const maxPage = Math.ceil(args.items.length / PAGE_SIZE) || 1;
         if (args.p > maxPage) args.p = maxPage;
 
         form.body(
-            `列表: ${args.meta.name}\n总计: ${items.length} 首\n页码: ${args.p} / ${maxPage}`
+            `列表: ${args.meta.name}\n总计: ${args.items.length} 首\n页码: ${args.p} / ${maxPage}`
         );
     },
     buttons: [
@@ -207,8 +230,8 @@ const PlayListItemsManager = CommonForm.ButtonForm<
         {
             label: "下一页",
             shouldShow: (p, args) => {
-                const items = playListStore.getContent(args.meta.id);
-                return args.p * PAGE_SIZE < items.length;
+                const items = args.items;
+                return items ? args.p * PAGE_SIZE < items.length : false;
             },
             func: (ctx) =>
                 ctx.replace(PlayListItemsManager, {
@@ -218,31 +241,39 @@ const PlayListItemsManager = CommonForm.ButtonForm<
         },
     ],
     buttonGenerator(player, args) {
-        const items = playListStore.getContent(args.meta.id);
+        const items = args.items ?? [];
         const start = (args.p - 1) * PAGE_SIZE;
         const end = start + PAGE_SIZE;
 
+        // 按需解析本页歌名（远程源逐 id 拉取，不依赖全量快照；未命中显示 id 兜底）
+        void Promise.all(
+            items
+                .slice(start, end)
+                .map((id) => midiManager.infoOf(id).catch(() => undefined))
+        );
+
         return items.slice(start, end).map((id, i) => {
             const realIndex = start + i; // 全局索引
+            const name = midiManager.getInfo(id)?.name ?? id;
             return {
-                label: `${realIndex}. ${midiManager.getInfo(id)?.name ?? "未知歌曲"} [移除]`,
+                label: `${realIndex}. ${name} [移除]`,
                 data: realIndex, // 传递全局索引
             };
         });
     },
-    handler(ctx, button) {
+    async handler(ctx, button) {
         if (!canManage(ctx.player, ctx.args.meta)) return;
 
         const realIndex = button.data;
-        const items = playListStore.getContent(ctx.args.meta.id);
+        const items = ctx.args.items ?? [];
 
         if (realIndex >= 0 && realIndex < items.length) {
             const removed = items.splice(realIndex, 1)[0];
-            const name = midiManager.getInfo(removed)?.name ?? removed;
-            playListStore.setContent(ctx.args.meta.id, items);
-            ctx.player.sendMessage(`§e已移除: ${name}`);
+            await playlist.setContent(ctx.args.meta.id, items);
+            // 按需解析歌名用于提示（不依赖全量快照）
+            const info = await midiManager.infoOf(removed).catch(() => undefined);
+            ctx.player.sendMessage(`§e已移除: ${info?.name ?? removed}`);
         }
-
         // 刷新当前页
         ctx.replace(PlayListItemsManager, ctx.args);
     },
@@ -260,18 +291,22 @@ const RenamePlayListForm = CommonForm.InputForm<any, any>({
             .validator(Validators.stringLength(2, 8, "播放列表名字长度错误")),
     ],
     submitButton: "确定",
-    onSubmit(data, ctx) {
+    async onSubmit(data, ctx) {
         const newName = data.newName?.trim();
         if (!newName) return ctx.player.sendMessage("§c名称不能为空");
 
-        playListStore.updateMeta(ctx.args.meta.id, { name: newName });
-        ctx.args.meta.name = newName; // 同步引用数据
-        ctx.player.sendMessage("§a修改成功！");
+        const updated = await playlist.update(ctx.args.meta.id, { name: newName });
+        if (updated) {
+            ctx.args.meta.name = updated.name; // 同步引用数据
+            ctx.player.sendMessage("§a修改成功！");
+        } else {
+            ctx.player.sendMessage("§c操作失败（列表不存在或无权限）");
+        }
         ctx.back();
     },
 });
 
-// --- 创建和确认删除 (略，逻辑同前) ---
+// --- 创建和确认删除 ---
 const CreatePlayListForm = CommonForm.InputForm<{ name: string }>({
     title: "创建列表",
     fields: [
@@ -280,10 +315,15 @@ const CreatePlayListForm = CommonForm.InputForm<{ name: string }>({
             .validator(Validators.stringLength(2, 8, "播放列表名字长度错误")),
     ],
     submitButton: "创建",
-    onSubmit: (data, ctx) => {
-        playListStore.create(ctx.player.id, data.name || "未命名");
-        nameDb.set(ctx.player);
-        ctx.back();
+    async onSubmit(data, ctx) {
+        const meta = await playlist.create(ctx.player.id, data.name || "未命名");
+        if (meta) {
+            nameDb.set(ctx.player);
+            ctx.player.sendMessage(`§a已创建: ${meta.name}`);
+        } else {
+            ctx.player.sendMessage("§c创建失败");
+        }
+        ctx.back(); // 返回歌单首页（onSubmit 被框架 await，导航在生命周期内）
     },
 });
 
@@ -294,8 +334,9 @@ const ConfirmDeleteForm = CommonForm.SimpleMessageForm<any>({
     },
     button1: {
         text: "确定",
-        func: (ctx) => {
-            playListStore.delete(ctx.args.meta.id);
+        async func(ctx) {
+            await playlist.remove(ctx.args.meta.id);
+            ctx.player.sendMessage("§a已删除");
             ctx.back();
         },
     },

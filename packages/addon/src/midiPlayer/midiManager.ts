@@ -47,9 +47,35 @@ export class MidiManager {
         return this.metas;
     }
 
-    /** 根据 id 获取元信息 */
+    /** 根据 midiId 获取元信息 */
     getInfo(id: string): MidiSongMeta | undefined {
         return this.metaMap.get(id);
+    }
+
+    /**
+     * 按需解析单曲元信息：内存已登记直接返回；未命中时经 source 拉取
+     * （远程源会请求单曲接口）并登记，供播放列表按 id 显示歌名等场景。
+     */
+    async infoOf(id: string): Promise<MidiSongMeta | undefined> {
+        const known = this.getInfo(id);
+        if (known) return known;
+        const song = await this.source.get(id).catch(() => undefined);
+        if (!song) return undefined;
+        const meta: MidiSongMeta = {
+            id: song.id,
+            name: song.name,
+            duration: song.duration,
+        };
+        this.register(meta);
+        return meta;
+    }
+
+    /** 登记单条元信息（已存在则跳过） */
+    private register(meta: MidiSongMeta): void {
+        if (!this.metaMap.has(meta.id)) {
+            this.metas.push(meta);
+            this.metaMap.set(meta.id, meta);
+        }
     }
 
     /** 加载曲目内容（懒加载；未找到返回 undefined） */
@@ -62,5 +88,39 @@ export class MidiManager {
         return ids
             .map((id) => this.metaMap.get(id))
             .filter((m): m is MidiSongMeta => m !== undefined);
+    }
+
+    /**
+     * 分页查询（远程源走服务端分页 + q 服务端搜索；内嵌源回退本地快照过滤）。
+     * 返回该页 items 与匹配总数，供列表 UI 按需取页。
+     */
+    async page(
+        page: number,
+        pageSize: number,
+        q?: string
+    ): Promise<{ items: MidiSongMeta[]; total: number }> {
+        if (this.source.page) {
+            return this.source.page(page, pageSize, q);
+        }
+        const list = this.list();
+        const filtered = q
+            ? list.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()))
+            : list;
+        const start = (page - 1) * pageSize;
+        return {
+            items: filtered.slice(start, start + pageSize),
+            total: filtered.length,
+        };
+    }
+
+    /** 批量取全部（远程源后端过滤；内嵌源本地过滤），"一键添加"等批量操作用 */
+    async metaAll(q?: string): Promise<MidiSongMeta[]> {
+        if (this.source.metaAll) {
+            return this.source.metaAll(q);
+        }
+        const list = this.list();
+        return q
+            ? list.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()))
+            : list;
     }
 }

@@ -1,6 +1,6 @@
 import { getPlayModeName, PlayMode } from "@midiPlayer/queue";
 import { Block, Player, system } from "@minecraft/server";
-import { CustomForm, ObservableString } from "@minecraft/server-ui";
+import { CustomForm, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import { formManager } from "sapi-pro";
 import { MidiPlayer } from "../player";
 import { PlayListMainForm } from "./playListUI";
@@ -11,13 +11,24 @@ export interface MidiPlayerUIContext {
     midiName: ObservableString;
     queue: ObservableString;
 
-    progressBar: ObservableString;
+    /** 文本进度：只显示时长（当前 / 总时长） */
     progressText: ObservableString;
+
+    /** 进度拖动条：值与播放进度同步；玩家拖动即 seek（clientWritable） */
+    progressSlider: ObservableNumber;
 
     buttonText: ObservableString;
     playMode: ObservableString;
 
     block: Block;
+}
+
+/** 秒 → mm:ss */
+function formatTime(sec: number): string {
+    const s = Math.max(0, Math.floor(sec));
+    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
 }
 
 const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
@@ -45,8 +56,10 @@ export function createMidiPlayerUI(
 
         .label("   ")
 
-        .label(ctx.progressBar)
         .label(ctx.progressText)
+
+        // 进度拖动条：双向绑定进度；拖动修改播放进度（seek 由 playerUIManager 监听处理）
+        .slider("播放进度 (%)", ctx.progressSlider, 0, 100, { step: 1 })
 
         .label("   ")
 
@@ -130,21 +143,9 @@ export function updateUI(ctx: MidiPlayerUIContext, player: MidiPlayer) {
     ctx.midiName.setData(`§7当前: §b${info.midiName}`);
     ctx.queue.setData(`§7队列长度: §e${info.queueLength}`);
 
-    const percent = (info.progress * 100).toFixed(1);
-
-    const barLength = 20;
-    const filled = Math.floor(info.progress * barLength);
-
-    let bar = "§7[";
-    for (let i = 0; i < barLength; i++) {
-        bar += i < filled ? "§a|" : "§8|";
-    }
-    bar += "§7]";
-
-    ctx.progressBar.setData(bar);
-
+    // 文本进度只显示时长（当前 / 总时长）；进度条交给滑块
     ctx.progressText.setData(
-        `§7进度: §e${percent}%  §7(${info.currentNoteIndex}/${info.totalNotes})`
+        `§7${formatTime(info.currentTime)} / ${formatTime((info.durationMs ?? 0) / 1000)}`
     );
 
     ctx.buttonText.setData(info.state === "playing" ? "⏸ 暂停" : "▶ 播放");
