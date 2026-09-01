@@ -38,7 +38,9 @@ export function playlistsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         return c.json({ ...meta, items: deps.playlistStore.getContent(id) });
     });
 
-    // POST /api/playlists {name}
+    // POST /api/playlists {name, owner?}
+    // owner 可选：游戏内以玩家临时 id（player.id，视为永久）作为拥有者；
+    // 不传则默认令牌 label（网页管理页行为不变）。
     app.post("/", requireRole("write"), async (c) => {
         const token = getToken(c)!;
         const body = await c.req.json().catch(() => null);
@@ -46,7 +48,12 @@ export function playlistsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         if (name.length < 2 || name.length > 24) {
             return c.json({ error: "名称长度需在 2~24 之间" }, 400);
         }
-        const meta = deps.playlistStore.create(token.label, name);
+        let owner = token.label;
+        if (typeof body?.owner === "string") {
+            const o = body.owner.trim().slice(0, 64);
+            if (o) owner = o;
+        }
+        const meta = deps.playlistStore.create(owner, name);
         return c.json(meta, 201);
     });
 

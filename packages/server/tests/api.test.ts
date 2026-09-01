@@ -215,6 +215,25 @@ describe("播放列表 API", () => {
         expect(detail.items).toEqual([]);
     });
 
+    test("创建可携带 owner（游戏内玩家临时 id）", async () => {
+        const res = await req("/api/playlists", {
+            token: writerToken,
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: "玩家私有歌单", owner: "game-player-123" }),
+        });
+        expect(res.status).toBe(201);
+        const meta = (await res.json()) as { owner: string };
+        expect(meta.owner).toBe("game-player-123");
+
+        // 按玩家 owner 可查
+        const byOwner = await j<{ items: { owner: string }[] }>(await req("/api/playlists?owner=game-player-123", { token: readerToken }));
+        expect(byOwner.items.some((m) => m.owner === "game-player-123")).toBe(true);
+        // 不污染令牌 label 的列表
+        const byWriter = await j<{ items: { owner: string }[] }>(await req("/api/playlists?owner=writer", { token: readerToken }));
+        expect(byWriter.items.every((m) => m.owner === "writer")).toBe(true);
+    });
+
     test("改名/设公开（仅 owner 或 admin）", async () => {
         const otherRes = await req("/api/playlists", {
             token: writer2Token, method: "POST",
