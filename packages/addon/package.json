@@ -24,7 +24,7 @@
         "sapi-pro": "^0.4.1"
     },
     "devDependencies": {
-        "@bepack/cli": "file:/server/mcdev/BEPack",
+        "@bepack/cli": "^0.1.0-beta.1",
         "sapi-kit": "^0.2.3"
     }
 }
