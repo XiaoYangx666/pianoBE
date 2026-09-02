@@ -14,6 +14,7 @@ import {
 } from "@piano/core";
 import { loadTemplate, parseExistingMidis } from "../packages/generator/src/template.ts";
 import { generateAddonZip } from "../packages/generator/src/export.ts";
+import { songEntryToEvents } from "../packages/generator/src/player.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const MIDI_A = "midis/files/Beyond - 海阔天空.mid";
@@ -48,6 +49,9 @@ tplZip.file(
 const embTemplate = await loadTemplate(await zipBytes(tplZip));
 assert(embTemplate.songs.length === 1, "内嵌模板解析出 1 首");
 assert(embTemplate.songs[0].id === songA.id && embTemplate.songs[0].isOriginal, "原曲目标记 isOriginal");
+// 模板内嵌曲目（moduleText 路径）必须可转换为试听事件（回归：Uint16Array 的 "16" 陷阱）
+const embEvents = songEntryToEvents(embTemplate.songs[0]);
+assert(embEvents.length > 0, `内嵌曲目可转为试听事件：${embEvents.length} 个`);
 
 // 3. 添加新曲目 B，导出
 const songB = midiBufferToSong(new Uint8Array(readFileSync(MIDI_B)), "ChiliChill - 让风告诉你");

@@ -21,9 +21,11 @@ export function songEntryToEvents(entry: SongEntry): NoteEvent[] {
             pushQuads(events, track.notes);
         }
     } else if (entry.moduleText) {
+        // 注意：不能用 /[\d,]+/ 从整段匹配里取数字——会命中 "Uint16Array" 里的 "16"！
+        // 必须用捕获组精确取中括号内的音符数组
         const noteArrays = entry.moduleText.match(/notes:new Uint16Array\(\[([\d,]+)\]\)/g) ?? [];
         for (const m of noteArrays) {
-            const nums = (m.match(/[\d,]+/)![0]).split(",").map(Number);
+            const nums = m.match(/\[([\d,]+)\]/)![1].split(",").map(Number);
             pushQuads(events, nums);
         }
     }
