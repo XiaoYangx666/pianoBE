@@ -3,6 +3,7 @@ cache
 node_modules
 /scripts
 output.zip
+/dist
 bp/scripts
 packages/*/bp/scripts
 midis/files/*
