@@ -1,7 +1,7 @@
 build
 cache
 node_modules
-scripts
+/scripts
 output.zip
 bp/scripts
 packages/*/bp/scripts
@@ -10,6 +10,7 @@ midis/js/*
 tools/piano_source/*
 packages/*/dist
 packages/*/data
+packages/generator/public/library
 .env
 *.mid
 *.mcaddon

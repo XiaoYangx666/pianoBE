@@ -8,6 +8,8 @@ export interface SongEntry {
     duration: number;
     noteCount: number;
     isOriginal: boolean;
+    /** 来自内置曲库（仅作标签展示，导出逻辑不变） */
+    fromLibrary?: boolean;
     /** 模板中已存在的模块原文（导出时字节保真保留） */
     moduleText?: string;
     /** 新导入曲目（导出时由 core 生成模块文本） */

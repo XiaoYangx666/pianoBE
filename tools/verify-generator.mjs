@@ -6,7 +6,12 @@
 import { readFileSync } from "node:fs";
 import JSZip from "jszip";
 import { midiBufferToSong } from "@piano/core/convert";
-import { metasToAddonIndex, songToAddonModule } from "@piano/core";
+import {
+    decodeSongFromBinary,
+    encodeSongToBinary,
+    metasToAddonIndex,
+    songToAddonModule,
+} from "@piano/core";
 import { loadTemplate, parseExistingMidis } from "../packages/generator/src/template.ts";
 import { generateAddonZip } from "../packages/generator/src/export.ts";
 
@@ -87,6 +92,51 @@ assert(moduleB === songToAddonModule(songB), "新曲目 B 模块与 core 输出�
 // 6. 回读闭环：导出的包再次用生成器解析
 const roundTrip = await parseExistingMidis(outZip, midisDir);
 assert(roundTrip.length === 2, `导出后再解析：${roundTrip.length} 首（原 1 + 新 1）`);
+
+// 7. 曲库：二进制编解码往返
+const songACodec = decodeSongFromBinary(encodeSongToBinary(songA));
+assert(
+    JSON.stringify(songACodec) === JSON.stringify(songA),
+    "曲库二进制编解码往返一致"
+);
+
+// 8. 真实曲库读取：index.json 与二进制一致
+const libIndex = JSON.parse(readFileSync("midis/library/index.json", "utf8"));
+assert(libIndex.length >= 225, `曲库目录 ${libIndex.length} 首`);
+const libMeta = libIndex[0];
+assert(!!libMeta.id && !!libMeta.name, "曲库 index 条目结构正确");
+const libSong = decodeSongFromBinary(
+    new Uint8Array(readFileSync(`midis/library/${libMeta.id}.bin`))
+);
+assert(
+    libSong.id === libMeta.id &&
+        libSong.name === libMeta.name &&
+        libSong.duration === libMeta.duration &&
+        libSong.tracks.length > 0,
+    "曲库 index 与二进制解码一致"
+);
+
+// 9. 从曲库选曲导出闭环（模拟用户点"添加"）
+const libTpl = await loadTemplate(readFileSync(TEMPLATE).buffer);
+const libEntry = {
+    id: libSong.id,
+    name: libSong.name,
+    duration: libSong.duration,
+    noteCount: libSong.tracks.reduce((s, t) => s + t.notes.length / 4, 0),
+    isOriginal: false,
+    fromLibrary: true,
+    song: libSong,
+};
+const libBlob = await generateAddonZip(libTpl, [libEntry], {
+    name: "曲库测试",
+    desc: "曲库导出验证",
+    randomUuid: false,
+});
+const libZip = await JSZip.loadAsync(await libBlob.arrayBuffer());
+const libIndexText = await libZip.file(`bp/scripts/midis/index.js`).async("string");
+assert(libIndexText.includes(`id:"${libMeta.id}"`), "曲库曲目已写入导出 index.js");
+const libModule = await libZip.file(`bp/scripts/midis/${libMeta.id}.js`).async("string");
+assert(libModule === songToAddonModule(libSong), "曲库曲目导出模块与 core 输出一致");
 
 console.log(failed === 0 ? "\n🎉 生成器 e2e 全部通过" : `\n💥 ${failed} 项失败`);
 process.exit(failed === 0 ? 0 : 1);

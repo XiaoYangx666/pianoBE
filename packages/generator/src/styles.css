@@ -291,6 +291,154 @@ header button {
     color: var(--danger);
 }
 
+/* 试听 / 曲库添加按钮 */
+.btn-play {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 11px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-play svg {
+    display: block;
+}
+
+.btn-play:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-play.on {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.btn-add {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: #f0fdf4;
+    color: #16a34a;
+    font-size: 15px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-add svg {
+    display: block;
+}
+
+.btn-add:disabled {
+    background: #f1f3f5;
+    color: #9ca3af;
+}
+
+/* 试听加载中的小转圈 */
+.mini-spinner {
+    width: 11px;
+    height: 11px;
+    border: 2px solid #bfdbfe;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+
+/* 曲库弹窗 */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal {
+    background: var(--card);
+    border-radius: 14px;
+    width: min(640px, 94vw);
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.modal-head h3 {
+    margin: 0;
+    font-size: 15px;
+    color: var(--text);
+}
+
+.modal-head .lib-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.modal-close {
+    border: none;
+    background: none;
+    font-size: 16px;
+    color: var(--muted);
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: var(--danger);
+}
+
+.modal .lib-search {
+    margin-bottom: 10px;
+}
+
+.import-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.import-actions .file-btn {
+    margin-top: 0;
+}
+
+.lib-list {
+    max-height: 55vh;
+}
+
+.tag.lib {
+    color: #9333ea;
+    font-weight: 700;
+}
+
 .empty {
     color: var(--muted);
     text-align: center;

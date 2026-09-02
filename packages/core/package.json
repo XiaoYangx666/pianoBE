@@ -17,6 +17,10 @@
             "types": "./dist/convert.d.ts",
             "import": "./dist/convert.js"
         },
+        "./player": {
+            "types": "./dist/midi/audioPlayer.d.ts",
+            "import": "./dist/midi/audioPlayer.js"
+        },
         "./note": {
             "types": "./dist/midi/note.d.ts",
             "import": "./dist/midi/note.js"
@@ -33,6 +37,7 @@
         "@tonejs/midi": "^2.0.28"
     },
     "devDependencies": {
+        "@types/node": "^26.2.0",
         "vitest": "^4.1.10"
     }
 }

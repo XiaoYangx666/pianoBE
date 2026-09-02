@@ -3,6 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563eb'/%3E%3Crect x='4' y='12' width='24' height='16' rx='2' fill='white'/%3E%3Cpath d='M9 16v9M14 16v9M19 16v9M24 16v9' stroke='%231f2430' stroke-width='2.4'/%3E%3C/svg%3E" />
         <title>基岩版钢琴模组生成器</title>
     </head>
     <body>
@@ -12,7 +13,7 @@
         </div>
 
         <header>
-            <h1>🎹 钢琴模组生成器</h1>
+            <h1>钢琴模组生成器</h1>
             <button id="generateBtn" disabled>导出包</button>
         </header>
 
@@ -51,10 +52,13 @@
                         <h3>MIDI 音乐导入</h3>
                         <p>批量导入 MIDI，自动内嵌为 addon 脚本</p>
                     </div>
-                    <label class="file-btn primary">
-                        选择 MIDI 文件
-                        <input type="file" id="midiInput" multiple accept=".mid,.midi" hidden />
-                    </label>
+                    <div class="import-actions">
+                        <button id="openLibBtn" class="file-btn">MIDI 曲库</button>
+                        <label class="file-btn primary">
+                            选择 MIDI 文件
+                            <input type="file" id="midiInput" multiple accept=".mid,.midi" hidden />
+                        </label>
+                    </div>
                 </div>
 
                 <div class="list-head">
@@ -64,6 +68,18 @@
                 <div id="midiList" class="midi-list"></div>
             </section>
         </main>
+
+        <!-- MIDI 曲库弹窗 -->
+        <div id="libModal" class="modal-overlay" hidden>
+            <div class="modal">
+                <div class="modal-head">
+                    <h3>MIDI 曲库 <span class="lib-sub">（<span id="libCount">0</span> 首 · 试听音色取自底包模板）</span></h3>
+                    <button id="libClose" class="modal-close" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                </div>
+                <input type="text" id="libSearch" placeholder="搜索曲名 / ID…" />
+                <div id="libList" class="midi-list lib-list"></div>
+            </div>
+        </div>
 
         <footer>© PianoBE · 转换与打包逻辑由 @piano/core 提供</footer>
 

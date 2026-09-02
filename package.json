@@ -20,6 +20,8 @@
         "build:template": "npm run build:template -w @piano/addon",
         "build:server": "npm run build:server -w @piano/addon",
         "convert": "node tools/convert.js",
+        "add-song": "node tools/add-song.mjs",
+        "show-song": "node tools/show-song.mjs",
         "import:midis": "node tools/import-midis.mjs",
         "build:core": "npm run build -w @piano/core",
         "build:all": "npm run build:core && npm run build:web && npm run build:generator && npm run build:template && npm run build:server && npm run build",
