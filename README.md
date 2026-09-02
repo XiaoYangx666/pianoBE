@@ -80,8 +80,8 @@ pianoBE/
 │   └── generator/     # 独立生成器 @piano/generator（Cloudflare 可部署）
 ├── midis/             # 曲库数据资产（见"曲库与贡献"）
 ├── tools/             # 转换与验证脚本
-└── vendor/            # sapi-pro tarball（仓库自包含）
 ```
+（sapi-pro 使用 npm 发布版，不再 vendor 内置）
 
 **依赖方向**：`addon`、`server`、`generator` → `core`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
 
