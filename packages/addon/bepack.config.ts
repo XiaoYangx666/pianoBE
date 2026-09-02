@@ -7,7 +7,7 @@ export default defineConfig({
     root: ".",
     target: "latest",
     manifestFormat: 3,
-    version: "1.2.0",
+    version: "1.3.0",
     name: "钢琴",
     description: "钢琴附加包",
 

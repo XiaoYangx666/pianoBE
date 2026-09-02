@@ -13,7 +13,7 @@ export default defineConfig({
     root: ".",
     target: "latest",
     manifestFormat: 3,
-    version: "1.2.0",
+    version: "1.3.0",
     name: "钢琴(服务器版)",
     description: "钢琴附加包（服务器专用，搭配后端曲库）",
 
