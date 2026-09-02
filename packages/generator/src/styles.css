@@ -169,6 +169,12 @@ header button {
     font-weight: 600;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .text-danger {
     color: var(--danger);
     border: none;
@@ -447,10 +453,134 @@ header button {
 }
 
 footer {
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
     color: var(--muted);
+    font-size: 12px;
+    padding: 18px 24px;
+}
+
+.log-btn {
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 999px;
+}
+
+.log-btn:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+/* footer 链接（旧版风格：图标 + 文字，hover 变色） */
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.footer-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 12px;
+    transition: color 0.15s;
+}
+
+.footer-links a svg {
+    width: 17px;
+    height: 17px;
+}
+
+.footer-links a:hover {
+    color: #1f2430;
+}
+
+.footer-links a[href*="bilibili"]:hover {
+    color: #fb7299;
+}
+
+/* 更新日志 tabs */
+.log-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.log-tab {
+    flex: 1;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-size: 12px;
+    padding: 6px 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.log-tab.on {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* 曲库版权声明 */
+.lib-notice {
+    margin: 10px 0 0;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
     font-size: 11px;
-    padding: 14px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+/* 更新日志弹窗 */
+.log-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.log-item {
+    border-left: 3px solid #dbeafe;
+    padding: 2px 0 2px 12px;
+}
+
+.log-item .log-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.log-item .log-head b {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.log-item .log-head span {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.log-item ul {
+    margin: 6px 0 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: #4b5563;
+    line-height: 1.8;
 }
 
 .loading {

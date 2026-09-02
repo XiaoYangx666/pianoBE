@@ -147,12 +147,16 @@ async function handleMidiUpload(files: FileList | null) {
 }
 
 // ---------- 曲库 ----------
+/** 正在添加的曲目（按钮显示转圈，避免全屏遮罩闪屏） */
+let pendingAddId: string | null = null;
+
 async function addFromLibrary(id: string) {
     if (!library) return;
     if (songs.some((s) => s.id === id)) return;
     const meta = library.find((m) => m.id === id);
     if (!meta) return;
-    showLoading("加载曲目...");
+    pendingAddId = id;
+    renderLibrary();
     try {
         const song = await loadLibrarySong(meta);
         songs.push(libraryMetaToEntry(meta, song));
@@ -160,9 +164,9 @@ async function addFromLibrary(id: string) {
         console.error("[generator] 曲库加载失败：", e);
         alert("曲库加载失败: " + (e as Error).message);
     }
+    pendingAddId = null;
     renderList();
     renderLibrary();
-    hideLoading();
 }
 
 /** 渲染曲库列表（搜索过滤 + 播放/添加按钮状态） */
@@ -195,7 +199,7 @@ function renderLibrary() {
                     <span class="id">${m.id}</span>
                 </div>
             </div>
-            <button class="btn-add" data-add="${m.id}" ${inList ? "disabled" : ""} title="${inList ? "已在列表中" : "添加到列表"}">${inList ? ICON_CHECK : ICON_PLUS}</button>
+            <button class="btn-add" data-add="${m.id}" ${inList || pendingAddId ? "disabled" : ""} title="${inList ? "已在列表中" : "添加到列表"}">${inList ? ICON_CHECK : pendingAddId === m.id ? SPINNER : ICON_PLUS}</button>
         </div>`;
         })
         .join("");
@@ -276,7 +280,139 @@ async function generateAddon() {
     hideLoading();
 }
 
+// ---------- 更新日志 ----------
+interface ChangelogEntry {
+    /** 版本号（项目日志不写版本号，仅模板包日志有） */
+    version?: string;
+    date: string;
+    content: string[];
+}
+
+const openLogBtn = $<HTMLButtonElement>("openLogBtn");
+const logModal = $<HTMLDivElement>("logModal");
+const logClose = $<HTMLButtonElement>("logClose");
+const logList = $<HTMLDivElement>("logList");
+const logTabs = Array.from(document.querySelectorAll<HTMLButtonElement>(".log-tab"));
+
+let logTab: "project" | "addon" = "project";
+let projectLog: ChangelogEntry[] | null = null;
+/** 渲染代际：快速切换 tab 时丢弃过期的异步渲染结果，避免内容闪白/串台 */
+let logRenderGen = 0;
+
+async function loadChangelog(): Promise<ChangelogEntry[]> {
+    try {
+        const res = await fetch("./changelog.json?t=" + Date.now());
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as ChangelogEntry[];
+    } catch (e) {
+        console.error("[generator] 更新日志加载失败：", e);
+        return [];
+    }
+}
+
+function renderLogEntries(entries: ChangelogEntry[]) {
+    if (entries.length === 0) {
+        logList.innerHTML = '<div class="empty">暂无更新记录</div>';
+        return;
+    }
+    logList.innerHTML = entries
+        .map((e) => {
+            const head = e.version
+                ? `<b>${escapeHtml(e.version)}</b><span>${escapeHtml(e.date)}</span>`
+                : `<b>${escapeHtml(e.date)}</b>`;
+            return `<div class="log-item">
+            <div class="log-head">${head}</div>
+            <ul>${e.content.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
+        </div>`;
+        })
+        .join("");
+}
+
+/** 解析 addon 的 rp/changelog.txt：版本头（v1.2.0 (2026-06-19) / Preview-26-04-16）+ 编号条目 */
+function parseAddonChangelog(text: string): ChangelogEntry[] {
+    const entries: ChangelogEntry[] = [];
+    let cur: ChangelogEntry | null = null;
+    for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim();
+        if (!line) continue;
+        if (/^(v\d+(\.\d+)+|preview)/i.test(line)) {
+            // 日期支持 "v1.3.0 (2026-09-02)" 与 "Preview-26-04-16" 两种写法：
+            // 先剥掉版本前缀，再从剩余串开头匹配日期
+            const dateStr = line
+                .replace(/^v\d+(\.\d+)+[\s(（]*/i, "")
+                .replace(/^preview[\s-]*/i, "");
+            const m4 = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            const m2 = dateStr.match(/^(\d{2})-(\d{2})-(\d{2})/);
+            cur = {
+                version: line.replace(/\s*[\(（]\d{2,4}-\d{2}-\d{2}[\)）]\s*$/, "").trim(),
+                date: m4
+                    ? `${m4[1]}-${m4[2]}-${m4[3]}`
+                    : m2
+                      ? `20${m2[1]}-${m2[2]}-${m2[3]}`
+                      : "",
+                content: [],
+            };
+            entries.push(cur);
+        } else if (cur) {
+            cur.content.push(line.replace(/^\d+[.、]\s*/, "").replace(/^[-•]\s*/, ""));
+        }
+    }
+    return entries;
+}
+
+async function renderProjectLog() {
+    const gen = ++logRenderGen;
+    if (!projectLog) projectLog = await loadChangelog();
+    if (gen !== logRenderGen) return; // 已被更新的切换取代，丢弃
+    renderLogEntries(projectLog);
+}
+
+/** 模板包更新日志：从当前加载的模板 mcaddon 内读取（跟随用户更换的模板包） */
+async function renderAddonLog() {
+    const gen = ++logRenderGen;
+    logList.innerHTML = '<div class="empty">加载中…</div>';
+    if (!template) {
+        if (gen === logRenderGen) logList.innerHTML = '<div class="empty">尚未加载模板包</div>';
+        return;
+    }
+    try {
+        const file = template.zip.file(`${template.rpPath}changelog.txt`);
+        if (!file) {
+            if (gen === logRenderGen) logList.innerHTML = '<div class="empty">当前模板包不含更新日志</div>';
+            return;
+        }
+        const entries = parseAddonChangelog(await file.async("string"));
+        if (gen !== logRenderGen) return; // 快速切换时丢弃过期结果
+        renderLogEntries(entries);
+    } catch (e) {
+        console.error("[generator] 模板包更新日志读取失败：", e);
+        if (gen === logRenderGen) logList.innerHTML = '<div class="empty">模板包更新日志读取失败</div>';
+    }
+}
+
+function renderLog() {
+    if (logTab === "addon") void renderAddonLog();
+    else void renderProjectLog();
+}
+
 // ---------- 事件 ----------
+// 更新日志弹窗（顶栏入口）
+openLogBtn.onclick = () => {
+    logModal.hidden = false;
+    renderLog();
+};
+logClose.onclick = () => (logModal.hidden = true);
+logModal.onclick = (e) => {
+    if (e.target === logModal) logModal.hidden = true;
+};
+logTabs.forEach((btn) => {
+    btn.onclick = () => {
+        logTab = btn.dataset.tab === "addon" ? "addon" : "project";
+        for (const t of logTabs) t.classList.toggle("on", t === btn);
+        renderLog();
+    };
+});
+
 // 曲库弹窗
 openLibBtn.onclick = () => {
     if (!library) loadLibraryIndex().then((idx) => {
@@ -291,7 +427,9 @@ libModal.onclick = (e) => {
     if (e.target === libModal) libModal.hidden = true;
 };
 window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !libModal.hidden) libModal.hidden = true;
+    if (e.key !== "Escape") return;
+    if (!libModal.hidden) libModal.hidden = true;
+    if (!logModal.hidden) logModal.hidden = true;
 });
 
 midiInput.onchange = (e) => handleMidiUpload((e.target as HTMLInputElement).files);
