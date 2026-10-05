@@ -19,7 +19,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 | 部分 | 说明 |
 |---|---|
 | **附加包（addon）** | 游戏内钢琴方块：实时弹奏、MIDI 播放器、播放队列与多钢琴支持 |
-| **在线生成器（generator）** | 网页端将 `.mid` 文件与内置曲库打包为 `.mcaddon`，可直接部署到 Cloudflare Workers |
+| **在线生成器（generator）** | 网页端将 `.mid` 文件与内置曲库打包为 `.mcaddon`，Cloudflare Workers Static Assets 部署；D1 记录试听播放量 |
 | **自托管后端（server + web）** | Hono + SQLite 文件曲库与播放列表服务，配套 React 管理页；BDS 服务器经 server-net 远程拉取曲目 |
 | **共享核心库（core）** | MIDI 转换/打包、曲库编解码、音符映射、存储端口等无游戏依赖的领域逻辑 |
 
@@ -133,6 +133,45 @@ npm run test -w @piano/addon  # addon netSource 缓存/降级
 # 运行
 npm run dev:generator    # 生成器开发模式（predev 自动同步底包与曲库到 public/）
 ```
+
+### Cloudflare 生成器播放统计
+
+生成器的网页、`library/index.json` 与 `library/{id}.bin` 仍由 **Workers Static Assets** 托管；
+D1 只保存可变的播放量与防刷状态，不引入传统后端，也不改变现有加歌/构建流程。
+
+首次启用统计需要在 `packages/generator` 下执行一次：
+
+```bash
+cd packages/generator
+
+# 已创建 D1：先查数据库名与 UUID
+npx wrangler d1 list
+
+# 将下面三项写入 packages/generator/wrangler.toml：
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "<你的数据库名>"
+# database_id = "<你的数据库 UUID>"
+
+# 应用全部 migration（包含试听量与添加量）
+npx wrangler d1 migrations apply <你的数据库名> --remote
+
+# 用于 HMAC-SHA256(IP)，只保存在 Cloudflare Secret 中
+npx wrangler secret put IP_HASH_SECRET
+
+npm run build
+npx wrangler deploy
+```
+
+统计规则：
+
+- 只在试听播放器**成功开始播放后**上报，不把加载失败/误点算播放。
+- 试听量（PLAYS）与添加量（ADDS）独立统计；添加量只在歌曲成功加入当前列表后上报。
+- 同一 Cloudflare 访客 IP + 同一首歌 + 同一行为，15 分钟内只计 1 次。
+- D1 只保存 HMAC 后的访客摘要，不保存明文 IP。
+- 每个“歌曲 + 访客 + 行为”最多一条去重记录，不会按 15 分钟时间桶无限增长。
+- `/api/stats` 一次返回全部试听量和添加量；曲库默认按 ADDS 降序、PLAYS 次序排列。
+- D1/API 未配置或暂时故障时，曲库、试听和 addon 生成仍可正常工作；播放量显示回退为 0。
 
 ### Docker 开发模式（热重载）
 

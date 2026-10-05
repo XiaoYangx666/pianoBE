@@ -2,7 +2,7 @@ import "./styles.css";
 import { loadTemplate, type TemplateInfo } from "./template";
 import { generateAddonZip } from "./export";
 import { midiFileToEntry } from "./convert";
-import { loadLibraryIndex, loadLibrarySong, libraryMetaToEntry, type LibraryMeta } from "./library";
+import { loadLibraryIndex, loadLibrarySong, libraryMetaToEntry, recordLibraryAdd, recordLibraryPlay, type LibraryMeta } from "./library";
 import { previewPlayer } from "./player";
 import type { SongEntry } from "./types";
 
@@ -86,6 +86,15 @@ async function togglePreview(entryOrPromise: SongEntry | Promise<SongEntry>) {
     renderLibrary();
     try {
         await previewPlayer.play(entry);
+        // 只统计已经成功启动的内置曲库试听；统计失败不能反向影响播放器。
+        const libraryMeta = library?.find((m) => m.id === entry.id);
+        if (libraryMeta) {
+            void recordLibraryPlay(entry.id).then((counted) => {
+                if (!counted) return;
+                libraryMeta.plays += 1;
+                renderLibrary();
+            });
+        }
     } catch (e) {
         console.error("[generator] 预览失败：", e);
         alert("预览失败: " + (e as Error).message);
@@ -160,6 +169,12 @@ async function addFromLibrary(id: string) {
     try {
         const song = await loadLibrarySong(meta);
         songs.push(libraryMetaToEntry(meta, song));
+        // 只有歌曲真正成功加入列表后才统计；统计失败不影响添加本身。
+        void recordLibraryAdd(id).then((counted) => {
+            if (!counted) return;
+            meta.adds += 1;
+            renderLibrary();
+        });
     } catch (e) {
         console.error("[generator] 曲库加载失败：", e);
         alert("曲库加载失败: " + (e as Error).message);
@@ -177,9 +192,11 @@ function renderLibrary() {
     }
     libCount.innerText = String(library.length);
     const kw = libFilter.trim().toLowerCase();
-    const items = library.filter(
-        (m) => !kw || m.name.toLowerCase().includes(kw) || m.id === kw
-    );
+    const items = library
+        .filter((m) => !kw || m.name.toLowerCase().includes(kw) || m.id === kw)
+        // 默认按“实际添加量”排序；同添加量时用试听量做次级排序。
+        // Array#sort 在现代浏览器中稳定，因此完全相同时保留原曲库顺序。
+        .sort((a, b) => b.adds - a.adds || b.plays - a.plays);
     if (items.length === 0) {
         libList.innerHTML = '<div class="empty">没有匹配的曲目</div>';
         return;
@@ -196,6 +213,8 @@ function renderLibrary() {
                 <div class="tags">
                     <span class="tag blue">${m.noteCount.toLocaleString()} NOTES</span>
                     <span class="tag">${formatDuration(m.duration)}</span>
+                    <span class="tag">${m.adds.toLocaleString()} ADDS</span>
+                    <span class="tag">${m.plays.toLocaleString()} PLAYS</span>
                     <span class="id">${m.id}</span>
                 </div>
             </div>
