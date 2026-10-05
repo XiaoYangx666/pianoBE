@@ -79,7 +79,15 @@
                     <h3>MIDI 曲库 <span class="lib-sub">（<span id="libCount">0</span> 首 · 试听音色取自底包模板）</span></h3>
                     <button id="libClose" class="modal-close" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
                 </div>
-                <input type="text" id="libSearch" placeholder="搜索曲名 / ID…" />
+                <div class="lib-toolbar">
+                    <input type="text" id="libSearch" placeholder="搜索曲名 / ID…" />
+                    <select id="libSort" aria-label="曲库排序">
+                        <option value="adds" selected>按添加量</option>
+                        <option value="plays">按播放量</option>
+                        <option value="name">按曲名</option>
+                        <option value="default">曲库默认</option>
+                    </select>
+                </div>
                 <div id="libList" class="midi-list lib-list"></div>
                 <p class="lib-notice">曲库内歌曲仅供学习交流使用，版权归原著作权人所有；如涉及侵权，请联系我们删除。</p>
             </div>

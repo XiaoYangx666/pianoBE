@@ -422,8 +422,37 @@ header button {
     color: var(--danger);
 }
 
-.modal .lib-search {
+.lib-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
     margin-bottom: 10px;
+}
+
+.lib-toolbar input,
+.lib-toolbar select {
+    min-width: 0;
+}
+
+.lib-toolbar select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 30px 8px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text);
+    background: #fbfcfd;
+    cursor: pointer;
+}
+
+@media (max-width: 520px) {
+    .lib-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .lib-toolbar select {
+        width: 100%;
+    }
 }
 
 .import-actions {

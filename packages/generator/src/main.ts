@@ -28,6 +28,14 @@ let songs: SongEntry[] = [];
 let library: LibraryMeta[] | null = null;
 let libFilter = "";
 
+type LibrarySort = "adds" | "plays" | "name" | "default";
+let libSort: LibrarySort = "adds";
+/**
+ * 当前曲库顺序快照。
+ * 统计数字可以即时更新，但不会因此重排；只有曲库首次加载或用户主动切换排序时重建。
+ */
+let libOrder: string[] = [];
+
 // ---------- DOM ----------
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -46,6 +54,7 @@ const countEl = $<HTMLSpanElement>("count");
 const clearBtn = $<HTMLButtonElement>("clearBtn");
 const libCount = $<HTMLSpanElement>("libCount");
 const libSearch = $<HTMLInputElement>("libSearch");
+const libSortSelect = $<HTMLSelectElement>("libSort");
 const libList = $<HTMLDivElement>("libList");
 const openLibBtn = $<HTMLButtonElement>("openLibBtn");
 const libModal = $<HTMLDivElement>("libModal");
@@ -156,6 +165,46 @@ async function handleMidiUpload(files: FileList | null) {
 }
 
 // ---------- 曲库 ----------
+function rebuildLibraryOrder() {
+    if (!library) {
+        libOrder = [];
+        return;
+    }
+
+    const originalIndex = new Map(library.map((meta, index) => [meta.id, index]));
+    const ordered = [...library];
+
+    switch (libSort) {
+        case "adds":
+            ordered.sort(
+                (a, b) =>
+                    b.adds - a.adds ||
+                    b.plays - a.plays ||
+                    (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0)
+            );
+            break;
+        case "plays":
+            ordered.sort(
+                (a, b) =>
+                    b.plays - a.plays ||
+                    b.adds - a.adds ||
+                    (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0)
+            );
+            break;
+        case "name":
+            ordered.sort(
+                (a, b) =>
+                    a.name.localeCompare(b.name, "zh-CN") ||
+                    (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0)
+            );
+            break;
+        case "default":
+            break;
+    }
+
+    libOrder = ordered.map((meta) => meta.id);
+}
+
 /** 正在添加的曲目（按钮显示转圈，避免全屏遮罩闪屏） */
 let pendingAddId: string | null = null;
 
@@ -192,11 +241,13 @@ function renderLibrary() {
     }
     libCount.innerText = String(library.length);
     const kw = libFilter.trim().toLowerCase();
-    const items = library
-        .filter((m) => !kw || m.name.toLowerCase().includes(kw) || m.id === kw)
-        // 默认按“实际添加量”排序；同添加量时用试听量做次级排序。
-        // Array#sort 在现代浏览器中稳定，因此完全相同时保留原曲库顺序。
-        .sort((a, b) => b.adds - a.adds || b.plays - a.plays);
+    if (libOrder.length !== library.length) rebuildLibraryOrder();
+
+    const byId = new Map(library.map((meta) => [meta.id, meta]));
+    const items = libOrder
+        .map((id) => byId.get(id))
+        .filter((meta): meta is LibraryMeta => Boolean(meta))
+        .filter((meta) => !kw || meta.name.toLowerCase().includes(kw) || meta.id === kw);
     if (items.length === 0) {
         libList.innerHTML = '<div class="empty">没有匹配的曲目</div>';
         return;
@@ -436,6 +487,7 @@ logTabs.forEach((btn) => {
 openLibBtn.onclick = () => {
     if (!library) loadLibraryIndex().then((idx) => {
         library = idx;
+        rebuildLibraryOrder();
         renderLibrary();
     });
     renderLibrary();
@@ -527,10 +579,17 @@ libSearch.oninput = (e) => {
     renderLibrary();
 };
 
+libSortSelect.onchange = (e) => {
+    libSort = (e.target as HTMLSelectElement).value as LibrarySort;
+    rebuildLibraryOrder();
+    renderLibrary();
+};
+
 window.addEventListener("DOMContentLoaded", async () => {
     // 曲库目录与默认底包并行加载
     loadLibraryIndex().then((idx) => {
         library = idx;
+        rebuildLibraryOrder();
         renderLibrary();
     });
     try {
