@@ -1,118 +1,96 @@
-import {
-    Block,
-    BlockCustomComponent,
-    BlockPermutation,
-    GameMode,
-    ItemStack,
-    system,
-    world,
-} from "@minecraft/server";
+import { createBlockResourceEvents, createNativeDropSuppression } from "@begame/tabletop/minecraft";
+import { eventHost } from "@piano/minecraft";
+import { BlockCustomComponent, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";
+import { openMidiPlayer } from "@midiPlayer/ui/playerUIManager";
 import { openPiano } from "@piano/piano";
-import { Cardinal_Direction } from "@types";
-import { PairOffsets } from "@utils/block";
-import { Vector3Utils } from "sapi-pro";
-
-function getPairedBlockOffset(block: BlockPermutation) {
-    const dir = block.getState(
-        "minecraft:cardinal_direction"
-    ) as Cardinal_Direction;
-    if (!dir) return;
-
-    return block.type.id === "xypiano:piano_left"
-        ? PairOffsets[dir].left
-        : PairOffsets[dir].right;
-}
+import { pianoWorld } from "@piano/world";
+import { destroyInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced, inspectInstrument, InstrumentLocation, resolveInstrument, resolveInstrumentSnapshot } from "@instrument/runtime";
 
 export const PianoBlockComponent: BlockCustomComponent = {
+    onTick({ block }) {
+        const location = resolveInstrument(block);
+        if (location) pianoWorld.blockTick(location);
+    },
     onBreak(e) {
-        const block = e.brokenBlockPermutation;
-        const offset = getPairedBlockOffset(block);
-        if (!offset) return;
-
-        const nearByBlock = e.block.offset(offset);
-        //同时破坏旁边的
-        if (
-            nearByBlock?.isValid &&
-            nearByBlock.typeId.startsWith("xypiano:piano")
-        ) {
-            nearByBlock.setType("air");
-        }
+        // Player breaks are handled by the native after-event. This also
+        // catches pistons and destroy-mode commands without dropping a module.
+        const location = resolveInstrumentSnapshot(e.block.dimension, e.block.location, e.brokenBlockPermutation);
+        if (location) system.run(() => {
+            if (inspectInstrument(location) === "incomplete") destroyInstrument(location, true);
+        });
     },
     onPlayerInteract(e) {
-        if (!e.player) {
-            return;
-        }
-        if (
-            Vector3Utils.squaredDistance(e.player.location, e.block.location) >
-            16
-        ) {
-            e.player.onScreenDisplay.setActionBar("距离钢琴过远");
-            return;
-        }
-        openPiano(e.player, e.block);
+        if (!e.player) return;
+        const location = resolveInstrument(e.block);
+        if (!location || !pianoWorld.beginInteraction(e.player)) return;
+        const piano = pianoWorld.get(location);
+        if (!piano) return;
+        const hit = pianoWorld.interactFromView(e.player, piano);
+        if (hit === "menu") void openPiano(e.player, e.block);
+        else if (hit === "midi") void openMidiPlayer(e.player, e.block);
     },
 };
 
+const suppressNativeDrop = createNativeDropSuppression(eventHost);
+
 export function regEvents() {
-    world.beforeEvents.playerBreakBlock.subscribe((t) => {
-        if (!t.block.typeId.startsWith("xypiano:piano")) return;
+    interface PendingBreak {
+        blasts: ExplosionBeforeEvent[];
+    }
+    const pending = new Map<string, PendingBreak>();
 
-        t.cancel = true;
-
+    function queueBreak(location: InstrumentLocation): PendingBreak {
+        const key = instrumentKey(location.dimension, location.pos);
+        const existing = pending.get(key);
+        if (existing) return existing;
+        const request: PendingBreak = { blasts: [] };
+        pending.set(key, request);
         system.run(() => {
-            t.block.setType("air");
-            //手动生成掉落物
-            if (t.player?.getGameMode() !== GameMode.Creative) {
-                const loot = new ItemStack("xypiano:piano_item");
-                t.block.dimension.spawnItem(loot, t.block.center());
+            // Placement and destruction both invalidate work for the old assembly.
+            if (pending.get(key) !== request) return;
+            pending.delete(key);
+            if (request.blasts.some(event => !event.cancel)) {
+                destroyInstrument(location, true);
             }
         });
+        return request;
+    }
+
+    instrumentPlaced.subscribe(({ dimension, pos }) => pending.delete(instrumentKey(dimension, pos)));
+    instrumentDestroyed.subscribe(location => {
+        const { dimension, pos } = location;
+        pending.delete(instrumentKey(dimension, pos));
     });
-
-    world.beforeEvents.explosion.subscribe((t) => {
-        if (t.source?.typeId == "minecraft:wind_charge_projectile") return;
-
-        const blocks = t.getImpactedBlocks();
-        if (blocks.length === 0) return;
-
-        // 先快速检测：有没有钢琴方块
-        let hasPiano = false;
-        for (const block of blocks) {
-            if (block.typeId.startsWith("xypiano")) {
-                hasPiano = true;
-                break;
-            }
-        }
-
-        // 没有就直接退出
-        if (!hasPiano) return;
-
-        const visited = new Set<string>();
-        const result: Block[] = [];
-
-        for (const block of blocks) {
-            if (!block.typeId.startsWith("xypiano")) {
-                result.push(block);
-                continue;
-            }
-
-            const key = `${block.location.x},${block.location.y},${block.location.z}`;
-            if (visited.has(key)) continue;
-
-            const offset = getPairedBlockOffset(block.permutation);
-            if (offset) {
-                const pairX = block.location.x + offset.x;
-                const pairY = block.location.y + offset.y;
-                const pairZ = block.location.z + offset.z;
-
-                const pairKey = `${pairX},${pairY},${pairZ}`;
-                visited.add(pairKey);
-            }
-
-            visited.add(key);
-            result.push(block);
-        }
-
-        t.setImpactedBlocks(result);
+    world.beforeEvents.playerBreakBlock.subscribe(e => {
+        if (e.cancel) return;
+        const location = resolveInstrument(e.block);
+        // Wait for the partner rather than committing a partial break at a chunk edge.
+        if (location && inspectInstrument(location) === "unloaded") e.cancel = true;
+    });
+    const blockEvents = createBlockResourceEvents(eventHost, suppressNativeDrop);
+    blockEvents.register({
+        blockTypes: ["xypiano:piano_left", "xypiano:piano_right"],
+        boundary: "piano",
+        broken: (e, suppressDrop) => {
+            const location = resolveInstrumentSnapshot(e.dimension, e.block.location, e.brokenBlockPermutation);
+            if (!location) return;
+            const drop = e.player.getGameMode() === GameMode.Survival || e.player.getGameMode() === GameMode.Adventure;
+            if (drop && e.itemStackBeforeBreak?.getComponent("minecraft:enchantable")?.getEnchantment("silk_touch")) suppressDrop();
+            if (inspectInstrument(location) === "incomplete") destroyInstrument(location, drop);
+        },
+    });
+    blockEvents.start();
+    world.beforeEvents.explosion.subscribe(e => {
+        if (e.cancel || e.source?.typeId === "minecraft:wind_charge_projectile") return;
+        const assemblies = new Map<string, InstrumentLocation>();
+        const rest = e.getImpactedBlocks().filter(block => {
+            const location = resolveInstrument(block);
+            if (!location) return true;
+            assemblies.set(instrumentKey(location.dimension, location.pos), location);
+            return false;
+        });
+        if (!assemblies.size) return;
+        e.setImpactedBlocks(rest);
+        for (const location of assemblies.values()) queueBreak(location).blasts.push(e);
     });
 }

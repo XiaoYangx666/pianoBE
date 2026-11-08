@@ -22,6 +22,7 @@
                 }
             },
             "xypiano:piano_block": {},
+            "minecraft:tick": { "interval_range": [35, 50], "looping": true },
             "minecraft:destructible_by_mining": {
                 "seconds_to_destroy": 1.6,
                 "item_specific_speeds": [
@@ -39,8 +40,12 @@
                 "explosion_resistance": 2
             },
             "minecraft:collision_box": {
-                "origin": [-8, 0, -8],
-                "size": [16, 14, 16]
+                "origin": [-8, 0, -4.25],
+                "size": [16, 17.25, 8.25]
+            },
+            "minecraft:selection_box": {
+                "origin": [-8, 0, -4.25],
+                "size": [16, 16, 8.25]
             },
             "minecraft:light_dampening": 0
         },

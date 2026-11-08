@@ -1,8 +1,8 @@
-import { KeyMap, NoteInfo, PianoEnv } from "@types";
+import { KeyMap, NoteInfo } from "@types";
 import { processNote } from "@utils/note";
-import { summonParticle } from "@utils/particle";
 import { keyMaps } from "./keymap";
 import { PianoState } from "./ui";
+import type { PianoRuntime } from "./world";
 
 export const soundTypes = [
     { name: "长音(4s)", id: "piano_long" },
@@ -10,7 +10,7 @@ export const soundTypes = [
     { name: "短音(0.5s)", id: "piano_short" },
 ];
 
-export function handleInput(val: string, state: PianoState, env: PianoEnv) {
+export function handleInput(val: string, state: PianoState, piano: PianoRuntime) {
     if (!val) return { keys: [], last: undefined, shouldClear: false };
     const comMode = state.mode.getData();
     const keyMap = keyMaps[state.keyMap.getData()].value;
@@ -18,7 +18,7 @@ export function handleInput(val: string, state: PianoState, env: PianoEnv) {
     const { keys, notes } = parseInput(val, comMode, keyMap, octave);
 
     const sound = soundTypes[state.sound.getData()]?.id ?? "piano_long";
-    playNotes(env, notes, sound);
+    for (const note of notes) piano.playNote(note, sound, .15);
 
     return { keys, last: notes.at(-1), shouldClear: !comMode };
 }
@@ -47,18 +47,4 @@ function parseInput(
     }
 
     return { keys, notes };
-}
-
-/**播放钢琴音符 */
-function playNotes(env: PianoEnv, notes: NoteInfo[], id: string) {
-    for (const note of notes) {
-        if (note.sample === "none") continue;
-
-        env.dim.playSound(`${id}.${note.sample}`, env.pos, {
-            pitch: note.pitch,
-            volume: 2.0,
-        });
-
-        summonParticle(env.dim, env.pos, env.dir, note.midi);
-    }
 }

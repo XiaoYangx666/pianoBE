@@ -1,9 +1,9 @@
-import { Block, Player } from "@minecraft/server";
-import { CustomForm, ObservableNumber, ObservableString } from "@minecraft/server-ui";
-import { Cardinal_Direction } from "@types";
+import { resolveInstrument } from "@instrument/runtime";
+import { Block, Player, system } from "@minecraft/server";
+import { CustomForm, DataDrivenScreenClosedReason, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
-import { midiPlayerManager } from "../index";
+import { pianoWorld } from "@piano/world";
 import { MidiPlayer } from "../player";
 import { createMidiPlayerUI, MidiPlayerUIContext, updateUI } from "./playerUI";
 
@@ -21,6 +21,10 @@ class MidiPlayerInstance {
 
     private inited = false;
     private unsub?: () => void;
+    /** 防止连续交互导致 show() 并发调用 */
+    private opening = false;
+    /** 上一次表单关闭的 tick，用于避免“刚关闭就重开”的 DDUI 竞态 */
+    private lastClosedTick = -1;
 
     constructor(private player: Player) {}
 
@@ -28,17 +32,11 @@ class MidiPlayerInstance {
         const left = getLeftPianoBlock(block);
         if (!left) return false;
 
+        const location = resolveInstrument(left);
+        const piano = location && pianoWorld.get(location);
+        if (!piano) return false;
         this.leftBlock = left;
-
-        const dir = left.permutation.getState(
-            "minecraft:cardinal_direction"
-        ) as Cardinal_Direction;
-
-        const newPlayer =
-            midiPlayerManager.get(left.dimension, left.location) ??
-            midiPlayerManager.add(
-                new MidiPlayer(left.dimension, left.location, dir)
-            );
+        const newPlayer = piano.getMidiPlayer();
 
         if (this.unsub) {
             try {
@@ -99,7 +97,7 @@ class MidiPlayerInstance {
     }
 
     private init() {
-        if (this.inited || !this.leftBlock) return;
+        if (this.inited || !this.leftBlock || !this.player.isValid) return;
         this.inited = true;
 
         // === Observable（只创建一次）===
@@ -135,22 +133,74 @@ class MidiPlayerInstance {
         this.init();
         if (!this.form || !this.playerInst) return;
 
-        // 每次打开刷新 UI
-        updateUI(this.ctx, this.playerInst);
+        // 已在显示 / 正在打开时不要重复 show
+        if (this.opening || this.form.isShowing()) return;
 
+        this.opening = true;
         try {
-            await this.form.show();
+            // 每次打开刷新 UI
+            updateUI(this.ctx, this.playerInst);
+
+            await this.showForm();
         } catch (e) {
             console.error(e);
             this.close();
+        } finally {
+            this.opening = false;
+            this.lastClosedTick = system.currentTick;
         }
     }
 
+    /** 显示表单；UserBusy 时稍等重试，避免留下“看似打开但无写权限”的旧界面 */
+    private async showForm() {
+        // 避免 hide→show 竞态
+        if (this.lastClosedTick >= 0) {
+            const wait = 2 - (system.currentTick - this.lastClosedTick);
+            if (wait > 0) {
+                await new Promise<void>((resolve) =>
+                    system.runTimeout(() => resolve(), wait)
+                );
+            }
+        }
+
+        for (let attempt = 0; attempt < 10; attempt++) {
+            let reason: DataDrivenScreenClosedReason;
+            try {
+                reason = await this.form!.show();
+            } catch (e) {
+                if ((e as { reason?: string })?.reason === "AlreadyShowing") {
+                    return;
+                }
+                throw e;
+            }
+
+            if (reason !== DataDrivenScreenClosedReason.UserBusy) return;
+
+            if (!this.player.isValid) return;
+            await new Promise<void>((resolve) =>
+                system.runTimeout(() => resolve(), 2)
+            );
+        }
+        console.warn("[midi] 表单打开失败：玩家界面持续处于忙碌状态");
+    }
+
     close() {
-        if (this.form?.isShowing()) {
-            this.form.close();
+        try {
+            if (this.form?.isShowing()) {
+                this.form.close();
+            }
+        } catch {
+            // 旧会话的 Player 已失效
         }
         this.unsub?.();
+        this.unsub = undefined;
+    }
+
+    /** 实例被新会话替换时清理订阅与旧表单 */
+    dispose() {
+        this.close();
+        this.inited = false;
+        this.sliderObs = undefined;
     }
 
     isShowing() {
@@ -163,7 +213,13 @@ class MidiPlayerUIManager extends DDUIManager<MidiPlayerInstance> {
         return new MidiPlayerInstance(player);
     }
 
+    protected discard(inst: MidiPlayerInstance): void {
+        inst.dispose();
+    }
+
     async open(player: Player, block: Block) {
+        if (!player.isValid) return;
+
         const inst = this.get(player);
 
         const result = inst.setBlock(block);

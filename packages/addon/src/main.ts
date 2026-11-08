@@ -1,7 +1,9 @@
 import { blockPlacerComponent } from "@addon/blockPlacer";
 import { PianoBlockComponent, regEvents } from "@addon/pianoBlock";
-import { initPlayer, midiPlayerManager } from "@midiPlayer";
-import { system } from "@minecraft/server";
+import { midiUIManager } from "@midiPlayer/ui/playerUIManager";
+import { pianoManager } from "@piano/piano";
+import { pianoWorld } from "@piano/world";
+import { system, world } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
 
 //注册模组组件
@@ -17,7 +19,14 @@ system.beforeEvents.startup.subscribe((e) => {
 });
 
 regEvents();
-initPlayer();
+
+// 玩家离开后旧 DDUI 表单的客户端写权限立即失效。
+// 及时丢弃实例（并解绑 MIDI 信号订阅），重进时由 DDUIManager 重建表单，
+// 避免复用失效表单调按钮时报 "does not have access"。
+world.afterEvents.playerLeave.subscribe((e) => {
+    pianoManager.invalidate(e.playerId);
+    midiUIManager.invalidate(e.playerId);
+});
 
 // 启动标记：确认行为包脚本已加载及其构建目标（模板包=client / 服务器专用包=server）
 console.log(`[piano] 主脚本已加载，构建目标: ${__PIANO_TARGET__}`);
@@ -33,7 +42,7 @@ initSAPIPro({
 
 pcommand.registerCommand(
     new Command("midilist", "查看midi播放器列表", true, (player) => {
-        player.sendMessage(midiPlayerManager.debugDump());
+        player.sendMessage(pianoWorld.debugDump());
     })
 );
 

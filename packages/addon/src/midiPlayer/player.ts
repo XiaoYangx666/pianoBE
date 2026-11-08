@@ -1,14 +1,19 @@
 import { midiManager } from "@midiPlayer";
 import { Dimension, Vector3 } from "@minecraft/server";
 import { getSoundIdByDuration, processNote } from "@utils/note";
-import { summonParticle } from "@utils/particle";
 import { Signal } from "@utils/signal";
 import { packNotes } from "@piano/core";
 import type { MidiSong, MidiSongMeta } from "@piano/core";
 import { Cardinal_Direction, NoteInfo } from "../types";
 import { PlayQueue } from "./queue";
+import type { PlaybackRecord } from "@piano/playbackRecord";
 
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
+
+interface MidiOutput {
+    note(note: NoteInfo, sound: string, duration: number): void;
+    playing(value: boolean): void;
+}
 
 export class MidiPlayer {
     pos: Vector3;
@@ -25,6 +30,7 @@ export class MidiPlayer {
     private state: PlayerState = "idle";
 
     private isLoading = false;
+    private generation = 0;
 
     readonly queue = new PlayQueue();
     readonly signal: Signal<void>;
@@ -33,7 +39,7 @@ export class MidiPlayer {
 
     private readonly MAX_DELTA = 0.1;
 
-    constructor(dimension: Dimension, pos: Vector3, dir: Cardinal_Direction) {
+    constructor(dimension: Dimension, pos: Vector3, dir: Cardinal_Direction, private readonly output: MidiOutput) {
         this.dimension = dimension;
         this.pos = pos;
         this.dir = dir;
@@ -46,16 +52,44 @@ export class MidiPlayer {
         return this.tracks.length > 0;
     }
 
+    checkpoint(): PlaybackRecord | undefined {
+        if (this.state === "stopped" || this.isLoading) return;
+        return { version: 1, ...this.queue.snapshot(), state: this.state, seconds: this.currentTime };
+    }
+
+    async restore(record: PlaybackRecord) {
+        this.queue.restore(record);
+        const song = this.queue.current();
+        if (!song || record.state === "idle") return;
+        const generation = ++this.generation;
+        this.isLoading = true;
+        await this.loadMidi(song, generation);
+        if (generation !== this.generation) return;
+        this.isLoading = false;
+        this.state = "paused";
+        this.currentTime = record.seconds;
+        if (!this.hasContent()) return;
+        this.seek(record.seconds);
+        if (record.state === "playing") this.resume();
+    }
+
     /* ================== 控制接口 ================== */
 
     async play() {
+        if (!this.isAlive()) return;
+        const generation = ++this.generation;
         const info = this.queue.current();
         if (!info) {
             this.state = "idle";
+            this.isLoading = false;
+            this.output.playing(false);
             return;
         }
 
-        await this.loadMidi(info);
+        this.isLoading = true;
+        await this.loadMidi(info, generation);
+        if (generation !== this.generation) return;
+        this.isLoading = false;
 
         if (!this.hasContent()) {
             this.prepareNext();
@@ -63,12 +97,14 @@ export class MidiPlayer {
         }
 
         this.state = "playing";
+        this.output.playing(true);
         this.lastTime = Date.now();
     }
 
     pause() {
         if (this.state !== "playing") return;
         this.state = "paused";
+        this.output.playing(false);
     }
 
     resume() {
@@ -80,16 +116,12 @@ export class MidiPlayer {
         }
 
         this.state = "playing";
+        this.output.playing(true);
         this.lastTime = Date.now();
     }
 
     async restart() {
-        const info = this.queue.current();
-        if (!info) return;
-
-        await this.loadMidi(info);
-        this.state = "playing";
-        this.lastTime = Date.now();
+        if (this.queue.current()) await this.play();
     }
 
     /**
@@ -118,6 +150,7 @@ export class MidiPlayer {
 
         if (this.state === "idle" || this.state === "stopped") {
             this.state = "playing";
+            this.output.playing(true);
             this.lastTime = Date.now();
         }
 
@@ -125,34 +158,28 @@ export class MidiPlayer {
     }
 
     end() {
+        this.generation++;
         this.state = "stopped";
+        this.output.playing(false);
         this.tracks = [];
         this.indices = [];
         this.currentTime = 0;
         this.isLoading = false;
+        this.queue.clear();
+        this.signal.publish();
         this.signal.dispose();
     }
 
     /* ================== 调度 ================== */
+
+    holdClock(now: number) { this.lastTime = now; }
 
     tick(now: number) {
         if (this.state === "stopped") {
             return;
         }
 
-        const block = this.dimension.getBlock(this.pos);
-
-        if (!block || this.state == "idle") {
-            this.lastTime = now;
-            return;
-        }
-
-        if (block.typeId !== "xypiano:piano_left") {
-            this.end();
-            return;
-        }
-
-        if (this.state === "paused") {
+        if (this.state === "paused" || this.state === "idle") {
             this.lastTime = now;
             return;
         }
@@ -195,30 +222,31 @@ export class MidiPlayer {
         if (this.isLoading) return;
 
         this.isLoading = true;
+        const generation = ++this.generation;
 
         // ✅ 清空当前数据
         this.tracks = [];
         this.indices = [];
         this.totalNotes = 0;
 
-        while (true) {
+        const limit = this.queue.getLength();
+        for (let attempt = 0; attempt < limit; attempt++) {
             const nextInfo = this.queue.next();
-
-            if (!nextInfo) {
-                this.state = "idle";
-                this.isLoading = false;
-                return;
-            }
-
-            await this.loadMidi(nextInfo);
+            if (!nextInfo) break;
+            await this.loadMidi(nextInfo, generation);
+            if (generation !== this.generation) return;
 
             if (this.hasContent()) {
                 this.state = "playing";
+                this.output.playing(true);
                 this.lastTime = Date.now();
                 this.isLoading = false;
                 return;
             }
         }
+        this.state = "idle";
+        this.output.playing(false);
+        this.isLoading = false;
     }
 
     private processPlayback() {
@@ -264,9 +292,10 @@ export class MidiPlayer {
         }
     }
 
-    private async loadMidi(info: MidiSongMeta) {
+    private async loadMidi(info: MidiSongMeta, generation: number) {
         try {
             const midi = await midiManager.load(info);
+            if (generation !== this.generation) return;
             if (!midi) throw new Error(`曲目内容不存在: ${info.id}`);
 
             this.tracks = this.extractTracks(midi);
@@ -280,6 +309,7 @@ export class MidiPlayer {
                 0
             );
         } catch (e) {
+            if (generation !== this.generation) return;
             console.error(`加载 MIDI 失败: ${info.name}`, e);
             this.tracks = [];
             this.indices = [];
@@ -302,16 +332,7 @@ export class MidiPlayer {
     }
 
     private playNote(info: NoteInfo, duration: number) {
-        if (info.sample === "none") return;
-
-        const id = getSoundIdByDuration(duration);
-
-        this.dimension.playSound(`${id}.${info.sample}`, this.pos, {
-            pitch: info.pitch,
-            volume: 2,
-        });
-
-        summonParticle(this.dimension, this.pos, this.dir, info.midi);
+        this.output.note(info, getSoundIdByDuration(duration), duration);
     }
 
     /* ================== 状态判断 ================== */

@@ -1,16 +1,9 @@
-import { Dimension, Vector3 } from "@minecraft/server";
 import type { MidiSong, MidiSongMeta } from "@piano/core";
 
 export type { MidiSong, MidiSongMeta, MidiTrack, MidiTrackInstrument, PlaylistMeta, NoteInfo } from "@piano/core";
 
 export type Cardinal_Direction = "east" | "west" | "north" | "south";
 
-/**钢琴信息 */
-export interface PianoEnv {
-    pos: Vector3;
-    dim: Dimension;
-    dir: Cardinal_Direction;
-}
 //键盘映射
 export interface KeyMapInfo {
     name: string;

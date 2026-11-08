@@ -1,14 +1,10 @@
 import { midis } from "@midis";
 import { EmbeddedMidiSource } from "@midiSource/embedded";
 import { MidiManager } from "./midiManager";
-import { MidiPlayerManager } from "./playerManager";
 import {
     createLocalPlaylistFacade,
     type PlaylistFacade,
 } from "./playlistFacade";
-
-/**播放器管理 */
-export const midiPlayerManager = new MidiPlayerManager();
 
 /**
  * 播放列表门面（UI 唯一入口）：
@@ -24,8 +20,3 @@ export function useRemotePlaylist(facade: PlaylistFacade): void {
 
 /**midi曲库管理（内嵌来源：懒加载，行为与历史一致） */
 export const midiManager = new MidiManager(new EmbeddedMidiSource(midis));
-
-export function initPlayer() {
-    //初始化
-    midiPlayerManager.init();
-}

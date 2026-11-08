@@ -1,0 +1,58 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "xypiano:piano_display",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/blocks/piano"
+      },
+      "geometry": {
+        "default": "geometry.piano_display"
+      },
+      "animations": {
+        "keys": "animation.xypiano.piano_display",
+        "lamp": "animation.xypiano.playback_light"
+      },
+      "scripts": {
+        "initialize": [
+          "v.key_tail=0;",
+          "v.key_21=0;v.key_22=0;v.key_23=0;v.key_24=0;v.key_25=0;v.key_26=0;v.key_27=0;v.key_28=0;v.key_29=0;v.key_30=0;v.key_31=0;",
+          "v.key_32=0;v.key_33=0;v.key_34=0;v.key_35=0;v.key_36=0;v.key_37=0;v.key_38=0;v.key_39=0;v.key_40=0;v.key_41=0;v.key_42=0;",
+          "v.key_43=0;v.key_44=0;v.key_45=0;v.key_46=0;v.key_47=0;v.key_48=0;v.key_49=0;v.key_50=0;v.key_51=0;v.key_52=0;v.key_53=0;",
+          "v.key_54=0;v.key_55=0;v.key_56=0;v.key_57=0;v.key_58=0;v.key_59=0;v.key_60=0;v.key_61=0;v.key_62=0;v.key_63=0;v.key_64=0;",
+          "v.key_65=0;v.key_66=0;v.key_67=0;v.key_68=0;v.key_69=0;v.key_70=0;v.key_71=0;v.key_72=0;v.key_73=0;v.key_74=0;v.key_75=0;",
+          "v.key_76=0;v.key_77=0;v.key_78=0;v.key_79=0;v.key_80=0;v.key_81=0;v.key_82=0;v.key_83=0;v.key_84=0;v.key_85=0;v.key_86=0;",
+          "v.key_87=0;v.key_88=0;v.key_89=0;v.key_90=0;v.key_91=0;v.key_92=0;v.key_93=0;v.key_94=0;v.key_95=0;v.key_96=0;v.key_97=0;",
+          "v.key_98=0;v.key_99=0;v.key_100=0;v.key_101=0;v.key_102=0;v.key_103=0;v.key_104=0;v.key_105=0;v.key_106=0;v.key_107=0;v.key_108=0;"
+        ],
+        "pre_animation": [
+          "v.keys_0=q.property('xypiano:keys_0')-1;",
+          "v.keys_1=q.property('xypiano:keys_1')-1;",
+          "v.keys_2=q.property('xypiano:keys_2')-1;",
+          "v.keys_3=q.property('xypiano:keys_3')-1;",
+          "v.keys_4=q.property('xypiano:keys_4')-1;",
+          "v.keys_5=q.property('xypiano:keys_5')-1;",
+          "v.keys_6=q.property('xypiano:keys_6')-1;",
+          "v.keys_7=q.property('xypiano:keys_7')-1;",
+          "v.key_down=(v.keys_0+v.keys_1+v.keys_2+v.keys_3+v.keys_4+v.keys_5+v.keys_6+v.keys_7)>0;",
+          "v.key_animate=v.key_down||v.key_tail>0;",
+          "v.key_dt=math.max(0,q.delta_time);",
+          "v.key_tail=v.key_down?0.08:math.max(0,v.key_tail-v.key_dt);",
+          "v.key_press_step=v.key_dt/0.04;v.key_release_step=v.key_dt/0.08;"
+        ],
+        "animate": [
+          {
+            "keys": "v.key_animate"
+          },
+          "lamp"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ]
+    }
+  }
+}

@@ -177,6 +177,16 @@ export class PlayQueue {
         return this.list.length;
     }
 
+    snapshot() {
+        return { songs: this.list.slice(), index: this.index, mode: this.mode };
+    }
+
+    restore({ songs, index, mode }: ReturnType<PlayQueue["snapshot"]>) {
+        this.list = songs.slice();
+        this.index = index;
+        this.mode = mode;
+    }
+
     /* ================== 导入与导出 ================== */
 
     /**导入播放列表，覆盖当前 */
