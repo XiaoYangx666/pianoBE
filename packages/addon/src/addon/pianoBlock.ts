@@ -3,6 +3,7 @@ import { eventHost } from "@piano/minecraft";
 import { BlockCustomComponent, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";
 import { openMidiPlayer } from "@midiPlayer/ui/playerUIManager";
 import { openPiano } from "@piano/piano";
+import { openPianoSettings } from "@piano/settingsUI";
 import { pianoWorld } from "@piano/world";
 import { destroyInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced, inspectInstrument, InstrumentLocation, resolveInstrument, resolveInstrumentSnapshot } from "@instrument/runtime";
 
@@ -28,6 +29,7 @@ export const PianoBlockComponent: BlockCustomComponent = {
         const hit = pianoWorld.interactFromView(e.player, piano);
         if (hit === "menu") void openPiano(e.player, e.block);
         else if (hit === "midi") void openMidiPlayer(e.player, e.block);
+        else if (hit === "settings") void openPianoSettings(e.player, piano);
     },
 };
 

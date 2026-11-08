@@ -1,5 +1,5 @@
 import type { Vector3 } from "@minecraft/server";
-import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX } from "./hitboxes.generated";
+import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "./hitboxes.generated";
 
 type Vec = readonly [number, number, number];
 type Box = readonly [number, number, number, number, number, number];
@@ -12,7 +12,11 @@ const COS = Math.cos(KEY_PRESS_DEGREES * Math.PI / 180);
 const FIRST_COLUMN = Math.floor(KEYBOARD_HITBOX[0]);
 const LAST_COLUMN = Math.floor(KEYBOARD_HITBOX[3]);
 const columns: KeyBox[][] = Array.from({ length: LAST_COLUMN - FIRST_COLUMN + 1 }, () => []);
+const keyCenters = new Map<number, Vec>();
 for (const key of KEY_HITBOXES) {
+    const [midi, x, , z, X, Y, Z] = key;
+    // The front section of each white key is centered on its playing surface.
+    if (!keyCenters.has(midi)) keyCenters.set(midi, [(x + X) / 2, Y, (z + Z) / 2]);
     for (let x = Math.floor(key[1]); x <= Math.floor(key[4]); x++) {
         columns[x - FIRST_COLUMN].push(key);
     }
@@ -31,6 +35,24 @@ export function pianoRay(center: Vector3, right: Vector3, head: Vector3, view: V
         origin: toModel(head.x - center.x, head.y + HEAD_TO_EYE_Y - center.y, head.z - center.z),
         direction: toModel(view.x, view.y, view.z),
     };
+}
+
+export function pianoModelOffset(right: Vector3, x: number, y: number, z: number): Vector3 {
+    return {
+        x: (-right.x * x + right.z * z) / 16,
+        y: y / 16,
+        z: (-right.z * x - right.x * z) / 16,
+    };
+}
+
+export function pianoParticleOrigin(center: Vector3, right: Vector3, midi: number, onKey = false): Vector3 | undefined {
+    const key = keyCenters.get(midi);
+    if (!key) return;
+    const [x, y, z] = key;
+    const offset = onKey
+        ? pianoModelOffset(right, x, y + .4, z)
+        : pianoModelOffset(right, x, PIANO_PARTICLE_LINE.y, PIANO_PARTICLE_LINE.z);
+    return { x: center.x + offset.x, y: center.y + offset.y, z: center.z + offset.z };
 }
 
 function inverseKeyPose(ray: PianoRay, box: KeyBox): PianoRay {
@@ -94,9 +116,10 @@ export function pickPianoKey(ray: PianoRay, range = 4, isDown?: (midi: number) =
     return midi;
 }
 
-export function pickPianoMenu(ray: PianoRay, range = 4): "menu" | "midi" | undefined {
-    let nearest: { kind: "menu" | "midi"; distance: number } | undefined;
-    for (const [kind, box] of [["menu", MENU_HITBOX], ["midi", MIDI_MENU_HITBOX]] as const) {
+export function pickPianoMenu(ray: PianoRay, range = 4) {
+    const buttons = [["menu", MENU_HITBOX], ["midi", MIDI_MENU_HITBOX], ["settings", SETTINGS_HITBOX]] as const;
+    let nearest: { kind: typeof buttons[number][0]; distance: number } | undefined;
+    for (const [kind, box] of buttons) {
         const hit = intersect(ray, box, 0, range);
         if (hit && (!nearest || hit.enter < nearest.distance)) nearest = { kind, distance: hit.enter };
     }

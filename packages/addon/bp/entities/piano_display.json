@@ -10,7 +10,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -19,7 +19,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -28,7 +28,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -37,7 +37,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -46,7 +46,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -55,7 +55,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -64,7 +64,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true
@@ -73,7 +73,7 @@
           "type": "int",
           "range": [
             1,
-            2048
+            4194304
           ],
           "default": 1,
           "client_sync": true

@@ -28,6 +28,7 @@ HEIGHT_SCALE = HORIZONTAL_SCALE / .86  # Preserve the current model's proportion
 KEY_PRESS_DEGREES = 8
 KEY_PRESS_SECONDS = .04
 KEY_RELEASE_SECONDS = .08
+KEY_RESTRIKE_LIFT_SECONDS = .025
 DISPLAY = "xypiano:piano_display"
 KEYS_PER_MASK = 11
 PITCHES = range(21, 109)
@@ -45,6 +46,7 @@ SURFACES = {
     "label": (47, 52, 58), "led_off": (18, 40, 48), "led_on": (84, 225, 246),
     "keys_cap": (63, 74, 85), "midi_cap": (37, 74, 83),
     "lcd": (23, 48, 52), "bezel": (30, 35, 42),
+    "settings_cap": (75, 66, 53),
 }
 TILES = {name: (i % 4 * 32, i // 4 * 16) for i, name in enumerate(SURFACES)}
 
@@ -69,7 +71,7 @@ def part(name, start, end, surface, *, top=None, bone="case", pivot=(0, 0, 0), o
             continue
         u, v = TILES[top if face == "up" and top else surface]
         faces[face] = (u + 1, v + 1, 30, 14)
-    if top in {"label", "keys_cap", "midi_cap"}:
+    if top in {"label", "keys_cap", "midi_cap", "settings_cap"}:
         u, v, w, h = faces["up"]
         faces["up"] = (u + w, v, -w, h)
     def scale(point):
@@ -139,6 +141,8 @@ def author_piano():
              top="pedal", bone=bone, pivot=pivot)
     part("menu button", (-.84, 14.16, -.28), (.84, 14.26, .38), "button", top="keys_cap")
     part("MIDI button", (-4.45, 14.16, -.28), (-2.60, 14.26, .38), "button", top="midi_cap")
+    part("settings button", (2.60, 14.16, -.28), (4.10, 14.26, .38), "button",
+         top="settings_cap", bone="settings_button")
     part("LCD bezel front", (-4.35, 14.16, .85), (4.35, 14.36, 1.04), "bezel")
     part("LCD bezel back", (-4.35, 14.16, 2.81), (4.35, 14.36, 3), "bezel")
     part("LCD bezel left", (4.14, 14.16, 1.04), (4.35, 14.36, 2.81), "bezel")
@@ -186,7 +190,9 @@ def atlas():
                 image.putpixel((u + x, v + y), tuple(max(0, min(255, c + tone)) for c in rgb))
     u, v = TILES["label"]
     draw.text((u + 4, v + 1), "P-88", fill=(190, 198, 202))
-    for tile, label, color in (("keys_cap", "KEYS", (221, 226, 223)), ("midi_cap", "MIDI", (157, 228, 222))):
+    for tile, label, color in (("keys_cap", "KEYS", (221, 226, 223)),
+                               ("midi_cap", "MIDI", (157, 228, 222)),
+                               ("settings_cap", "SET", (249, 220, 159))):
         u, v = TILES[tile]
         draw.text((u + 16, v + 8), label, anchor="mm", fill=color)
     u, v = TILES["led_on"]
@@ -357,7 +363,9 @@ def sync_property(high):
 
 
 def display_assets():
-    properties = {f"xypiano:keys_{i}": sync_property(2**KEYS_PER_MASK) for i in range(8)}
+    mask_base = 2**KEYS_PER_MASK
+    groups = range(len(PITCHES) // KEYS_PER_MASK)
+    properties = {f"xypiano:keys_{i}": sync_property(mask_base**2) for i in groups}
     properties["xypiano:playback_light"] = sync_property(2)
     write(BP / "entities/piano_display.json", {"format_version": "1.21.100", "minecraft:entity": {
         "description": {"identifier": DISPLAY, "is_spawnable": False, "is_summonable": True, "properties": properties},
@@ -369,8 +377,12 @@ def display_assets():
             "minecraft:fire_immune": {}, "minecraft:persistent": {},
         },
     }})
-    groups = range(len(PITCHES) // KEYS_PER_MASK)
-    reads = [f"v.keys_{i}=q.property('xypiano:keys_{i}')-1;" for i in groups]
+    reads = [
+        f"t.mask=q.property('xypiano:keys_{i}')-1;"
+        f"v.keys_{i}=math.mod(t.mask,{mask_base});"
+        f"v.strikes_{i}=math.floor(t.mask/{mask_base});"
+        for i in groups
+    ]
     key_sum = "+".join(f"v.keys_{i}" for i in groups)
     write(RP / "entity/piano_display.entity.json", {"format_version": "1.10.0", "minecraft:client_entity": {
         "description": {"identifier": DISPLAY, "materials": {"default": "entity_alphatest"},
@@ -380,7 +392,8 @@ def display_assets():
                                        "lamp": "animation.xypiano.playback_light"},
                         "scripts": {
                             "initialize": ["v.key_tail=0;"] + [
-                                "".join(f"v.key_{midi}=0;" for midi in PITCHES[i*KEYS_PER_MASK:(i+1)*KEYS_PER_MASK])
+                                "".join(f"v.key_{midi}=0;v.strike_{midi}=0;v.lift_{midi}=0;"
+                                        for midi in PITCHES[i*KEYS_PER_MASK:(i+1)*KEYS_PER_MASK])
                                 for i in groups
                             ],
                             "pre_animation": reads + [
@@ -388,7 +401,7 @@ def display_assets():
                                 "v.key_animate=v.key_down||v.key_tail>0;",
                                 "v.key_dt=math.max(0,q.delta_time);",
                                 f"v.key_tail=v.key_down?{KEY_RELEASE_SECONDS}:math.max(0,v.key_tail-v.key_dt);",
-                                f"v.key_press_step=v.key_dt/{KEY_PRESS_SECONDS};v.key_release_step=v.key_dt/{KEY_RELEASE_SECONDS};",
+                                f"v.key_release_step=v.key_dt/{KEY_RELEASE_SECONDS};",
                             ],
                             "animate": [{"keys": "v.key_animate"}, "lamp"],
                         },
@@ -398,9 +411,20 @@ def display_assets():
     for midi in PITCHES:
         mask, bit = divmod(midi - 21, KEYS_PER_MASK)
         weight = 2**bit
-        step = f"(math.mod(v.keys_{mask},{2*weight})>={weight}?v.key_press_step:-v.key_release_step)"
         value = f"v.key_{midi}"
-        motion = f"{value}=math.clamp({value}+{step},0,1);return {value}*{KEY_PRESS_DEGREES};"
+        strike = f"v.strike_{midi}"
+        lift = f"v.lift_{midi}"
+        motion = (
+            f"t.down=math.mod(v.keys_{mask},{2*weight})>={weight};"
+            f"t.strike=math.mod(v.strikes_{mask},{2*weight})>={weight};"
+            f"{lift}=!t.down?0:((t.strike!={strike}&&{value}>0)?{KEY_RESTRIKE_LIFT_SECONDS}:{lift});"
+            f"{strike}=t.strike;"
+            f"t.lift_dt=math.min(v.key_dt,{lift});"
+            f"{lift}={lift}-t.lift_dt;"
+            f"t.depth=math.max(0,{value}-t.lift_dt/{KEY_RESTRIKE_LIFT_SECONDS});"
+            f"t.step=t.down?(v.key_dt-t.lift_dt)/{KEY_PRESS_SECONDS}:-v.key_release_step;"
+            f"{value}=math.clamp(t.depth+t.step,0,1);return {value}*{KEY_PRESS_DEGREES};"
+        )
         bones[f"key_{midi}"] = {"rotation": [motion, 0, 0]}
     write(RP / "animations/piano_display.animation.json", {"format_version": "1.8.0",
           "animations": {
@@ -434,6 +458,7 @@ def write_hitboxes():
     # Calibrate between the observed high (0.38) and low (0.0625) positions.
     screen_pose = {"center": rounded([(x + X) / 2, Y + .22, (z + Z) / 2]),
                    "width": round(X - x, 5), "height": round(Z - z, 5)}
+    particle_line = {"y": round(Y + .6, 5), "z": screen_pose["center"][2]}
     keyboard = [min(row[axis] for row in keys) for axis in range(1, 4)]
     keyboard += [max(row[axis] for row in keys) for axis in range(4, 7)]
     angle = math.radians(-KEY_PRESS_DEGREES)
@@ -454,7 +479,9 @@ def write_hitboxes():
         f"export const KEYBOARD_HITBOX = {keyboard} as const;\n\n"
         f"export const MENU_HITBOX = {button_hitbox('menu button')} as const;\n"
         f"export const MIDI_MENU_HITBOX = {button_hitbox('MIDI button')} as const;\n"
+        f"export const SETTINGS_HITBOX = {button_hitbox('settings button')} as const;\n"
         f"export const PIANO_SCREEN = {json.dumps(screen_pose)} as const;\n\n"
+        f"export const PIANO_PARTICLE_LINE = {json.dumps(particle_line)} as const;\n\n"
         "export const KEY_HITBOXES = [\n"
         + "".join(f"    {list(row)},\n" for row in keys)
         + "] as const;\n\nexport const CASE_HITBOXES = [\n"

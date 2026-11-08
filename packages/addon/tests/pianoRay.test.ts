@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX } from "../src/piano/hitboxes.generated";
-import { hitsPianoMenu, pickPianoMenu, pianoRay, pickPianoKey } from "../src/piano/keyRay";
+import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/piano/hitboxes.generated";
+import { hitsPianoMenu, pickPianoMenu, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/piano/keyRay";
 
 describe("direct piano key ray", () => {
     test("all 88 playable surfaces resolve to their MIDI pitch", () => {
@@ -13,6 +13,28 @@ describe("direct piano key ray", () => {
             expect(hit).toBe(midi);
         }
         expect(seen.size).toBe(88);
+    });
+
+    test("particle origins line up with their keys above the cabinet in all four orientations", () => {
+        const center = { x: 12, y: 64, z: -7 };
+        expect(CASE_HITBOXES.some(box =>
+            box[2] <= PIANO_PARTICLE_LINE.z && PIANO_PARTICLE_LINE.z < box[5] &&
+            box[4] < PIANO_PARTICLE_LINE.y && PIANO_PARTICLE_LINE.y - box[4] < 2
+        )).toBe(true);
+        for (const [x, z] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const right = { x, y: 0, z };
+            for (let midi = 21; midi <= 108; midi++) {
+                const origin = pianoParticleOrigin(center, right, midi)!;
+                const [, keyLeft, , , keyRight] = KEY_HITBOXES.find(box => box[0] === midi)!;
+                const [modelX, , modelZ] = pianoRay(center, right, origin, { x: 0, y: -1, z: 0 }).origin;
+                expect(modelX).toBeCloseTo((keyLeft + keyRight) / 2);
+                expect(modelZ).toBeCloseTo(PIANO_PARTICLE_LINE.z);
+                const glimmer = pianoParticleOrigin(center, right, midi, true)!;
+                expect(pickPianoKey(pianoRay(center, right, glimmer, { x: 0, y: -1, z: 0 }))).toBe(midi);
+            }
+            expect(pianoParticleOrigin(center, right, 20)).toBeUndefined();
+            expect(pianoParticleOrigin(center, right, 109)).toBeUndefined();
+        }
     });
 
     test("rejects rays behind the case, between keys, or beyond reach", () => {
@@ -49,7 +71,7 @@ describe("direct piano key ray", () => {
     });
 
     test("distinct menu caps resolve to their own actions and miss outside", () => {
-        for (const [box, kind] of [[MENU_HITBOX, "menu"], [MIDI_MENU_HITBOX, "midi"]] as const) {
+        for (const [box, kind] of [[MENU_HITBOX, "menu"], [MIDI_MENU_HITBOX, "midi"], [SETTINGS_HITBOX, "settings"]] as const) {
             const [x, , z, X, , Z] = box;
             expect(pickPianoMenu({ origin: [(x + X) / 2, 22, (z + Z) / 2], direction: [0, -16, 0] })).toBe(kind);
         }

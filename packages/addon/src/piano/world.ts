@@ -13,13 +13,16 @@ import { RightOffsets } from "@utils/block";
 import { processNote } from "@utils/note";
 import { summonParticle } from "@utils/particle";
 import { Signal } from "@utils/signal";
-import { displayAnchor, PianoDisplay, PIANO_DISPLAY, removeDormantDisplay } from "./display";
-import { pickPianoMenu, pianoRay, pickPianoKey } from "./keyRay";
+import { displayAnchor, PianoDisplay, PIANO_DISPLAY, removeDormantDisplay, removePianoDisplay } from "./display";
+import { pickPianoMenu, pianoModelOffset, pianoRay, pickPianoKey } from "./keyRay";
+import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "./settings";
 
 const VIEW_RANGE_SQUARED = 48 ** 2;
 const UNLOAD_GRACE = 200;
 const SWEEP_INTERVAL = 20;
 const VERIFY_INTERVAL = 10;
+const TEXT_SETTINGS = ["textVisible", "titleColor", "statusColor", "textScale",
+    "textRight", "textUp", "textForward", "textDistance"] as const;
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -75,6 +78,18 @@ export class PianoRuntime {
     }
 
     get displayId() { return this.display?.entity.id; }
+    get settings() { return this.display?.entity.isValid ? this.display.settings : undefined; }
+
+    updateSettings(previous: PianoSettings, next: PianoSettings) {
+        if (this.disposed || !this.display || this.settings !== previous) return false;
+        this.display.updateSettings(next);
+        if (TEXT_SETTINGS.some(key => previous[key] !== next[key])) this.textValue = undefined;
+        return true;
+    }
+
+    flushSettings(displayId: string) {
+        if (!this.disposed && this.display?.entity.id === displayId) this.display.flushSettings();
+    }
 
     ensureVisual(tick: number) {
         if (this.disposed || tick < this.visualRetryAt || this.display?.entity.isValid) return;
@@ -82,7 +97,9 @@ export class PianoRuntime {
             this.visualScope?.dispose();
             this.text = undefined;
             this.textValue = undefined;
+            this.display?.detachSettings();
             this.display = PianoDisplay.recover(this.location, this.center);
+            this.display.retrySettingsSave();
             this.visualScope = this.scope.child();
             this.text = new NativeTextSurface(this.display.entity, this.visualScope,
                 { distance: 12, background: { red: 0, green: 0, blue: 0, alpha: 0 } },
@@ -125,18 +142,26 @@ export class PianoRuntime {
 
     playNote(note: NoteInfo, sound: string, duration: number) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
-        const { dimension, pos, direction } = this.location;
-        dimension.playSound(`${sound}.${note.sample}`, this.center, { pitch: note.pitch, volume: 2 });
+        const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
+        const settings = this.settings ?? DEFAULT_PIANO_SETTINGS;
+        const volume = 2 * settings.volume / 100;
+        if (volume > 0) dimension.playSound(`${sound}.${note.sample}`, this.center, { pitch: note.pitch, volume });
         this.display?.strike(note.midi, duration);
         this.activate();
-        summonParticle(dimension, pos, direction, note.midi);
+        if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings);
     }
 
     refreshScreen() { this.refreshText(); }
 
     private refreshText() {
         if (!this.text || !this.display?.entity.isValid) return;
+        const settings = this.display.settings;
+        if (!settings.textVisible) {
+            if (this.text.size) this.text.clear();
+            this.textValue = undefined;
+            return;
+        }
         const info = this.midi?.getInfo();
         const hasSong = info && info.queueIndex >= 0 && info.queueIndex < info.queueLength;
         const { title, columns } = lcdTitle(hasSong ? info.midiName : "P-88");
@@ -146,23 +171,22 @@ export class PianoRuntime {
             : `${state} · MIDI`;
         const value = `${title}\n${status}`;
         if (value === this.textValue && this.text.has("title") && this.text.has("status")) return;
-        const [x, y, z] = PIANO_SCREEN.center;
-        const linePosition = (depth: number) => ({
-            x: (-this.right.x * x + this.right.z * depth) / 16,
-            y: y / 16,
-            z: (-this.right.z * x - this.right.x * depth) / 16,
-        });
+        const [centerX, y, centerZ] = PIANO_SCREEN.center;
+        const x = centerX - settings.textRight;
+        const z = centerZ - settings.textForward;
+        const linePosition = (depth: number) => pianoModelOffset(this.right, x, y + settings.textUp, depth);
         const style = {
-            depthTest: true, useRotation: true,
+            depthTest: true, useRotation: true, distance: settings.textDistance,
             rotation: { x: 90, y: this.display.entity.getRotation().y + 180, z: 0 },
         };
+        const scale = settings.textScale / 100;
         const success = this.text.sync(new Map([
             ["title", { ...style, value: title, at: linePosition(z + PIANO_SCREEN.height * .22),
-                color: { red: .83, green: 1, blue: .91, alpha: 1 },
-                scale: Math.min(.23, PIANO_SCREEN.width / 16 * 3.55 / Math.max(7, columns)) }],
+                color: pianoTextColor(settings.titleColor),
+                scale: scale * Math.min(.23, PIANO_SCREEN.width / 16 * 3.55 / Math.max(7, columns)) }],
             ["status", { ...style, value: status, at: linePosition(z - PIANO_SCREEN.height * .27),
-                color: { red: .65, green: .92, blue: .81, alpha: 1 },
-                scale: .095 }],
+                color: pianoTextColor(settings.statusColor),
+                scale: scale * .095 }],
         ]));
         if (success) this.textValue = value;
     }
@@ -179,6 +203,7 @@ export class PianoRuntime {
 
     checkpoint() {
         if (!this.display?.entity.isValid) return;
+        this.display.retrySettingsSave();
         const record = this.midi?.checkpoint();
         if (!record) return;
         try { this.display.checkpoint(record); }
@@ -224,17 +249,17 @@ class PianoWorld {
             system.run(() => {
                 if (!entity.isValid) return;
                 const pos = displayAnchor(entity);
-                if (!pos) { entity.remove(); return; }
+                if (!pos) { removePianoDisplay(entity); return; }
                 const dimension = entity.dimension;
                 if (!dimension.isChunkLoaded(pos)) return;
                 const block = dimension.getBlock(pos);
                 const location = block?.typeId === "xypiano:piano_left" ? resolveInstrument(block) : undefined;
-                if (!location) { entity.remove(); return; }
+                if (!location) { removePianoDisplay(entity); return; }
                 const integrity = inspectInstrument(location);
-                if (integrity === "incomplete") { entity.remove(); return; }
+                if (integrity === "incomplete") { removePianoDisplay(entity); return; }
                 if (integrity === "unloaded" || !this.isNear(location)) return;
                 const current = this.get(location);
-                if (current?.displayId && current.displayId !== entity.id && entity.isValid) entity.remove();
+                if (current?.displayId && current.displayId !== entity.id && entity.isValid) removePianoDisplay(entity);
             });
         });
     }

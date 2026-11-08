@@ -4,7 +4,10 @@ export const KEYBOARD_HITBOX = [-15.10748, 14.12957, -3.64327, 15.10748, 15.8390
 
 export const MENU_HITBOX = [-1.01879, 16.83335, -0.40626, 1.01879, 16.95223, 0.5085] as const;
 export const MIDI_MENU_HITBOX = [-4.70952, 16.83335, -0.40626, -2.49815, 16.95223, 0.5085] as const;
+export const SETTINGS_HITBOX = [2.49815, 16.83335, -0.40626, 4.35169, 16.95223, 0.5085] as const;
 export const PIANO_SCREEN = {"center": [0.0, 17.196, 1.96805], "width": 8.40383, "height": 1.74824} as const;
+
+export const PIANO_PARTICLE_LINE = {"y": 17.576, "z": 1.96805} as const;
 
 export const KEY_HITBOXES = [
     [21, 14.57254, 14.52708, -3.5885, 15.10748, 15.35924, -2.423, 14.76484, -0.71565],

@@ -1,0 +1,7 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:texture_set": {
+    "color": "piano_fx",
+    "metalness_emissive_roughness": "piano_fx_mer"
+  }
+}

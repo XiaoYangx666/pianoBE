@@ -6,616 +6,616 @@
       "bones": {
         "key_21": {
           "rotation": [
-            "v.key_21=math.clamp(v.key_21+(math.mod(v.keys_0,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_21*8;",
+            "t.down=math.mod(v.keys_0,2)>=1;t.strike=math.mod(v.strikes_0,2)>=1;v.lift_21=!t.down?0:((t.strike!=v.strike_21&&v.key_21>0)?0.025:v.lift_21);v.strike_21=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_21);v.lift_21=v.lift_21-t.lift_dt;t.depth=math.max(0,v.key_21-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_21=math.clamp(t.depth+t.step,0,1);return v.key_21*8;",
             0,
             0
           ]
         },
         "key_22": {
           "rotation": [
-            "v.key_22=math.clamp(v.key_22+(math.mod(v.keys_0,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_22*8;",
+            "t.down=math.mod(v.keys_0,4)>=2;t.strike=math.mod(v.strikes_0,4)>=2;v.lift_22=!t.down?0:((t.strike!=v.strike_22&&v.key_22>0)?0.025:v.lift_22);v.strike_22=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_22);v.lift_22=v.lift_22-t.lift_dt;t.depth=math.max(0,v.key_22-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_22=math.clamp(t.depth+t.step,0,1);return v.key_22*8;",
             0,
             0
           ]
         },
         "key_23": {
           "rotation": [
-            "v.key_23=math.clamp(v.key_23+(math.mod(v.keys_0,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_23*8;",
+            "t.down=math.mod(v.keys_0,8)>=4;t.strike=math.mod(v.strikes_0,8)>=4;v.lift_23=!t.down?0:((t.strike!=v.strike_23&&v.key_23>0)?0.025:v.lift_23);v.strike_23=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_23);v.lift_23=v.lift_23-t.lift_dt;t.depth=math.max(0,v.key_23-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_23=math.clamp(t.depth+t.step,0,1);return v.key_23*8;",
             0,
             0
           ]
         },
         "key_24": {
           "rotation": [
-            "v.key_24=math.clamp(v.key_24+(math.mod(v.keys_0,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_24*8;",
+            "t.down=math.mod(v.keys_0,16)>=8;t.strike=math.mod(v.strikes_0,16)>=8;v.lift_24=!t.down?0:((t.strike!=v.strike_24&&v.key_24>0)?0.025:v.lift_24);v.strike_24=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_24);v.lift_24=v.lift_24-t.lift_dt;t.depth=math.max(0,v.key_24-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_24=math.clamp(t.depth+t.step,0,1);return v.key_24*8;",
             0,
             0
           ]
         },
         "key_25": {
           "rotation": [
-            "v.key_25=math.clamp(v.key_25+(math.mod(v.keys_0,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_25*8;",
+            "t.down=math.mod(v.keys_0,32)>=16;t.strike=math.mod(v.strikes_0,32)>=16;v.lift_25=!t.down?0:((t.strike!=v.strike_25&&v.key_25>0)?0.025:v.lift_25);v.strike_25=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_25);v.lift_25=v.lift_25-t.lift_dt;t.depth=math.max(0,v.key_25-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_25=math.clamp(t.depth+t.step,0,1);return v.key_25*8;",
             0,
             0
           ]
         },
         "key_26": {
           "rotation": [
-            "v.key_26=math.clamp(v.key_26+(math.mod(v.keys_0,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_26*8;",
+            "t.down=math.mod(v.keys_0,64)>=32;t.strike=math.mod(v.strikes_0,64)>=32;v.lift_26=!t.down?0:((t.strike!=v.strike_26&&v.key_26>0)?0.025:v.lift_26);v.strike_26=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_26);v.lift_26=v.lift_26-t.lift_dt;t.depth=math.max(0,v.key_26-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_26=math.clamp(t.depth+t.step,0,1);return v.key_26*8;",
             0,
             0
           ]
         },
         "key_27": {
           "rotation": [
-            "v.key_27=math.clamp(v.key_27+(math.mod(v.keys_0,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_27*8;",
+            "t.down=math.mod(v.keys_0,128)>=64;t.strike=math.mod(v.strikes_0,128)>=64;v.lift_27=!t.down?0:((t.strike!=v.strike_27&&v.key_27>0)?0.025:v.lift_27);v.strike_27=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_27);v.lift_27=v.lift_27-t.lift_dt;t.depth=math.max(0,v.key_27-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_27=math.clamp(t.depth+t.step,0,1);return v.key_27*8;",
             0,
             0
           ]
         },
         "key_28": {
           "rotation": [
-            "v.key_28=math.clamp(v.key_28+(math.mod(v.keys_0,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_28*8;",
+            "t.down=math.mod(v.keys_0,256)>=128;t.strike=math.mod(v.strikes_0,256)>=128;v.lift_28=!t.down?0:((t.strike!=v.strike_28&&v.key_28>0)?0.025:v.lift_28);v.strike_28=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_28);v.lift_28=v.lift_28-t.lift_dt;t.depth=math.max(0,v.key_28-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_28=math.clamp(t.depth+t.step,0,1);return v.key_28*8;",
             0,
             0
           ]
         },
         "key_29": {
           "rotation": [
-            "v.key_29=math.clamp(v.key_29+(math.mod(v.keys_0,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_29*8;",
+            "t.down=math.mod(v.keys_0,512)>=256;t.strike=math.mod(v.strikes_0,512)>=256;v.lift_29=!t.down?0:((t.strike!=v.strike_29&&v.key_29>0)?0.025:v.lift_29);v.strike_29=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_29);v.lift_29=v.lift_29-t.lift_dt;t.depth=math.max(0,v.key_29-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_29=math.clamp(t.depth+t.step,0,1);return v.key_29*8;",
             0,
             0
           ]
         },
         "key_30": {
           "rotation": [
-            "v.key_30=math.clamp(v.key_30+(math.mod(v.keys_0,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_30*8;",
+            "t.down=math.mod(v.keys_0,1024)>=512;t.strike=math.mod(v.strikes_0,1024)>=512;v.lift_30=!t.down?0:((t.strike!=v.strike_30&&v.key_30>0)?0.025:v.lift_30);v.strike_30=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_30);v.lift_30=v.lift_30-t.lift_dt;t.depth=math.max(0,v.key_30-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_30=math.clamp(t.depth+t.step,0,1);return v.key_30*8;",
             0,
             0
           ]
         },
         "key_31": {
           "rotation": [
-            "v.key_31=math.clamp(v.key_31+(math.mod(v.keys_0,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_31*8;",
+            "t.down=math.mod(v.keys_0,2048)>=1024;t.strike=math.mod(v.strikes_0,2048)>=1024;v.lift_31=!t.down?0:((t.strike!=v.strike_31&&v.key_31>0)?0.025:v.lift_31);v.strike_31=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_31);v.lift_31=v.lift_31-t.lift_dt;t.depth=math.max(0,v.key_31-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_31=math.clamp(t.depth+t.step,0,1);return v.key_31*8;",
             0,
             0
           ]
         },
         "key_32": {
           "rotation": [
-            "v.key_32=math.clamp(v.key_32+(math.mod(v.keys_1,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_32*8;",
+            "t.down=math.mod(v.keys_1,2)>=1;t.strike=math.mod(v.strikes_1,2)>=1;v.lift_32=!t.down?0:((t.strike!=v.strike_32&&v.key_32>0)?0.025:v.lift_32);v.strike_32=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_32);v.lift_32=v.lift_32-t.lift_dt;t.depth=math.max(0,v.key_32-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_32=math.clamp(t.depth+t.step,0,1);return v.key_32*8;",
             0,
             0
           ]
         },
         "key_33": {
           "rotation": [
-            "v.key_33=math.clamp(v.key_33+(math.mod(v.keys_1,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_33*8;",
+            "t.down=math.mod(v.keys_1,4)>=2;t.strike=math.mod(v.strikes_1,4)>=2;v.lift_33=!t.down?0:((t.strike!=v.strike_33&&v.key_33>0)?0.025:v.lift_33);v.strike_33=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_33);v.lift_33=v.lift_33-t.lift_dt;t.depth=math.max(0,v.key_33-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_33=math.clamp(t.depth+t.step,0,1);return v.key_33*8;",
             0,
             0
           ]
         },
         "key_34": {
           "rotation": [
-            "v.key_34=math.clamp(v.key_34+(math.mod(v.keys_1,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_34*8;",
+            "t.down=math.mod(v.keys_1,8)>=4;t.strike=math.mod(v.strikes_1,8)>=4;v.lift_34=!t.down?0:((t.strike!=v.strike_34&&v.key_34>0)?0.025:v.lift_34);v.strike_34=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_34);v.lift_34=v.lift_34-t.lift_dt;t.depth=math.max(0,v.key_34-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_34=math.clamp(t.depth+t.step,0,1);return v.key_34*8;",
             0,
             0
           ]
         },
         "key_35": {
           "rotation": [
-            "v.key_35=math.clamp(v.key_35+(math.mod(v.keys_1,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_35*8;",
+            "t.down=math.mod(v.keys_1,16)>=8;t.strike=math.mod(v.strikes_1,16)>=8;v.lift_35=!t.down?0:((t.strike!=v.strike_35&&v.key_35>0)?0.025:v.lift_35);v.strike_35=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_35);v.lift_35=v.lift_35-t.lift_dt;t.depth=math.max(0,v.key_35-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_35=math.clamp(t.depth+t.step,0,1);return v.key_35*8;",
             0,
             0
           ]
         },
         "key_36": {
           "rotation": [
-            "v.key_36=math.clamp(v.key_36+(math.mod(v.keys_1,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_36*8;",
+            "t.down=math.mod(v.keys_1,32)>=16;t.strike=math.mod(v.strikes_1,32)>=16;v.lift_36=!t.down?0:((t.strike!=v.strike_36&&v.key_36>0)?0.025:v.lift_36);v.strike_36=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_36);v.lift_36=v.lift_36-t.lift_dt;t.depth=math.max(0,v.key_36-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_36=math.clamp(t.depth+t.step,0,1);return v.key_36*8;",
             0,
             0
           ]
         },
         "key_37": {
           "rotation": [
-            "v.key_37=math.clamp(v.key_37+(math.mod(v.keys_1,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_37*8;",
+            "t.down=math.mod(v.keys_1,64)>=32;t.strike=math.mod(v.strikes_1,64)>=32;v.lift_37=!t.down?0:((t.strike!=v.strike_37&&v.key_37>0)?0.025:v.lift_37);v.strike_37=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_37);v.lift_37=v.lift_37-t.lift_dt;t.depth=math.max(0,v.key_37-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_37=math.clamp(t.depth+t.step,0,1);return v.key_37*8;",
             0,
             0
           ]
         },
         "key_38": {
           "rotation": [
-            "v.key_38=math.clamp(v.key_38+(math.mod(v.keys_1,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_38*8;",
+            "t.down=math.mod(v.keys_1,128)>=64;t.strike=math.mod(v.strikes_1,128)>=64;v.lift_38=!t.down?0:((t.strike!=v.strike_38&&v.key_38>0)?0.025:v.lift_38);v.strike_38=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_38);v.lift_38=v.lift_38-t.lift_dt;t.depth=math.max(0,v.key_38-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_38=math.clamp(t.depth+t.step,0,1);return v.key_38*8;",
             0,
             0
           ]
         },
         "key_39": {
           "rotation": [
-            "v.key_39=math.clamp(v.key_39+(math.mod(v.keys_1,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_39*8;",
+            "t.down=math.mod(v.keys_1,256)>=128;t.strike=math.mod(v.strikes_1,256)>=128;v.lift_39=!t.down?0:((t.strike!=v.strike_39&&v.key_39>0)?0.025:v.lift_39);v.strike_39=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_39);v.lift_39=v.lift_39-t.lift_dt;t.depth=math.max(0,v.key_39-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_39=math.clamp(t.depth+t.step,0,1);return v.key_39*8;",
             0,
             0
           ]
         },
         "key_40": {
           "rotation": [
-            "v.key_40=math.clamp(v.key_40+(math.mod(v.keys_1,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_40*8;",
+            "t.down=math.mod(v.keys_1,512)>=256;t.strike=math.mod(v.strikes_1,512)>=256;v.lift_40=!t.down?0:((t.strike!=v.strike_40&&v.key_40>0)?0.025:v.lift_40);v.strike_40=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_40);v.lift_40=v.lift_40-t.lift_dt;t.depth=math.max(0,v.key_40-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_40=math.clamp(t.depth+t.step,0,1);return v.key_40*8;",
             0,
             0
           ]
         },
         "key_41": {
           "rotation": [
-            "v.key_41=math.clamp(v.key_41+(math.mod(v.keys_1,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_41*8;",
+            "t.down=math.mod(v.keys_1,1024)>=512;t.strike=math.mod(v.strikes_1,1024)>=512;v.lift_41=!t.down?0:((t.strike!=v.strike_41&&v.key_41>0)?0.025:v.lift_41);v.strike_41=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_41);v.lift_41=v.lift_41-t.lift_dt;t.depth=math.max(0,v.key_41-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_41=math.clamp(t.depth+t.step,0,1);return v.key_41*8;",
             0,
             0
           ]
         },
         "key_42": {
           "rotation": [
-            "v.key_42=math.clamp(v.key_42+(math.mod(v.keys_1,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_42*8;",
+            "t.down=math.mod(v.keys_1,2048)>=1024;t.strike=math.mod(v.strikes_1,2048)>=1024;v.lift_42=!t.down?0:((t.strike!=v.strike_42&&v.key_42>0)?0.025:v.lift_42);v.strike_42=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_42);v.lift_42=v.lift_42-t.lift_dt;t.depth=math.max(0,v.key_42-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_42=math.clamp(t.depth+t.step,0,1);return v.key_42*8;",
             0,
             0
           ]
         },
         "key_43": {
           "rotation": [
-            "v.key_43=math.clamp(v.key_43+(math.mod(v.keys_2,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_43*8;",
+            "t.down=math.mod(v.keys_2,2)>=1;t.strike=math.mod(v.strikes_2,2)>=1;v.lift_43=!t.down?0:((t.strike!=v.strike_43&&v.key_43>0)?0.025:v.lift_43);v.strike_43=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_43);v.lift_43=v.lift_43-t.lift_dt;t.depth=math.max(0,v.key_43-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_43=math.clamp(t.depth+t.step,0,1);return v.key_43*8;",
             0,
             0
           ]
         },
         "key_44": {
           "rotation": [
-            "v.key_44=math.clamp(v.key_44+(math.mod(v.keys_2,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_44*8;",
+            "t.down=math.mod(v.keys_2,4)>=2;t.strike=math.mod(v.strikes_2,4)>=2;v.lift_44=!t.down?0:((t.strike!=v.strike_44&&v.key_44>0)?0.025:v.lift_44);v.strike_44=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_44);v.lift_44=v.lift_44-t.lift_dt;t.depth=math.max(0,v.key_44-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_44=math.clamp(t.depth+t.step,0,1);return v.key_44*8;",
             0,
             0
           ]
         },
         "key_45": {
           "rotation": [
-            "v.key_45=math.clamp(v.key_45+(math.mod(v.keys_2,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_45*8;",
+            "t.down=math.mod(v.keys_2,8)>=4;t.strike=math.mod(v.strikes_2,8)>=4;v.lift_45=!t.down?0:((t.strike!=v.strike_45&&v.key_45>0)?0.025:v.lift_45);v.strike_45=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_45);v.lift_45=v.lift_45-t.lift_dt;t.depth=math.max(0,v.key_45-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_45=math.clamp(t.depth+t.step,0,1);return v.key_45*8;",
             0,
             0
           ]
         },
         "key_46": {
           "rotation": [
-            "v.key_46=math.clamp(v.key_46+(math.mod(v.keys_2,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_46*8;",
+            "t.down=math.mod(v.keys_2,16)>=8;t.strike=math.mod(v.strikes_2,16)>=8;v.lift_46=!t.down?0:((t.strike!=v.strike_46&&v.key_46>0)?0.025:v.lift_46);v.strike_46=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_46);v.lift_46=v.lift_46-t.lift_dt;t.depth=math.max(0,v.key_46-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_46=math.clamp(t.depth+t.step,0,1);return v.key_46*8;",
             0,
             0
           ]
         },
         "key_47": {
           "rotation": [
-            "v.key_47=math.clamp(v.key_47+(math.mod(v.keys_2,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_47*8;",
+            "t.down=math.mod(v.keys_2,32)>=16;t.strike=math.mod(v.strikes_2,32)>=16;v.lift_47=!t.down?0:((t.strike!=v.strike_47&&v.key_47>0)?0.025:v.lift_47);v.strike_47=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_47);v.lift_47=v.lift_47-t.lift_dt;t.depth=math.max(0,v.key_47-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_47=math.clamp(t.depth+t.step,0,1);return v.key_47*8;",
             0,
             0
           ]
         },
         "key_48": {
           "rotation": [
-            "v.key_48=math.clamp(v.key_48+(math.mod(v.keys_2,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_48*8;",
+            "t.down=math.mod(v.keys_2,64)>=32;t.strike=math.mod(v.strikes_2,64)>=32;v.lift_48=!t.down?0:((t.strike!=v.strike_48&&v.key_48>0)?0.025:v.lift_48);v.strike_48=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_48);v.lift_48=v.lift_48-t.lift_dt;t.depth=math.max(0,v.key_48-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_48=math.clamp(t.depth+t.step,0,1);return v.key_48*8;",
             0,
             0
           ]
         },
         "key_49": {
           "rotation": [
-            "v.key_49=math.clamp(v.key_49+(math.mod(v.keys_2,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_49*8;",
+            "t.down=math.mod(v.keys_2,128)>=64;t.strike=math.mod(v.strikes_2,128)>=64;v.lift_49=!t.down?0:((t.strike!=v.strike_49&&v.key_49>0)?0.025:v.lift_49);v.strike_49=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_49);v.lift_49=v.lift_49-t.lift_dt;t.depth=math.max(0,v.key_49-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_49=math.clamp(t.depth+t.step,0,1);return v.key_49*8;",
             0,
             0
           ]
         },
         "key_50": {
           "rotation": [
-            "v.key_50=math.clamp(v.key_50+(math.mod(v.keys_2,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_50*8;",
+            "t.down=math.mod(v.keys_2,256)>=128;t.strike=math.mod(v.strikes_2,256)>=128;v.lift_50=!t.down?0:((t.strike!=v.strike_50&&v.key_50>0)?0.025:v.lift_50);v.strike_50=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_50);v.lift_50=v.lift_50-t.lift_dt;t.depth=math.max(0,v.key_50-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_50=math.clamp(t.depth+t.step,0,1);return v.key_50*8;",
             0,
             0
           ]
         },
         "key_51": {
           "rotation": [
-            "v.key_51=math.clamp(v.key_51+(math.mod(v.keys_2,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_51*8;",
+            "t.down=math.mod(v.keys_2,512)>=256;t.strike=math.mod(v.strikes_2,512)>=256;v.lift_51=!t.down?0:((t.strike!=v.strike_51&&v.key_51>0)?0.025:v.lift_51);v.strike_51=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_51);v.lift_51=v.lift_51-t.lift_dt;t.depth=math.max(0,v.key_51-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_51=math.clamp(t.depth+t.step,0,1);return v.key_51*8;",
             0,
             0
           ]
         },
         "key_52": {
           "rotation": [
-            "v.key_52=math.clamp(v.key_52+(math.mod(v.keys_2,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_52*8;",
+            "t.down=math.mod(v.keys_2,1024)>=512;t.strike=math.mod(v.strikes_2,1024)>=512;v.lift_52=!t.down?0:((t.strike!=v.strike_52&&v.key_52>0)?0.025:v.lift_52);v.strike_52=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_52);v.lift_52=v.lift_52-t.lift_dt;t.depth=math.max(0,v.key_52-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_52=math.clamp(t.depth+t.step,0,1);return v.key_52*8;",
             0,
             0
           ]
         },
         "key_53": {
           "rotation": [
-            "v.key_53=math.clamp(v.key_53+(math.mod(v.keys_2,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_53*8;",
+            "t.down=math.mod(v.keys_2,2048)>=1024;t.strike=math.mod(v.strikes_2,2048)>=1024;v.lift_53=!t.down?0:((t.strike!=v.strike_53&&v.key_53>0)?0.025:v.lift_53);v.strike_53=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_53);v.lift_53=v.lift_53-t.lift_dt;t.depth=math.max(0,v.key_53-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_53=math.clamp(t.depth+t.step,0,1);return v.key_53*8;",
             0,
             0
           ]
         },
         "key_54": {
           "rotation": [
-            "v.key_54=math.clamp(v.key_54+(math.mod(v.keys_3,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_54*8;",
+            "t.down=math.mod(v.keys_3,2)>=1;t.strike=math.mod(v.strikes_3,2)>=1;v.lift_54=!t.down?0:((t.strike!=v.strike_54&&v.key_54>0)?0.025:v.lift_54);v.strike_54=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_54);v.lift_54=v.lift_54-t.lift_dt;t.depth=math.max(0,v.key_54-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_54=math.clamp(t.depth+t.step,0,1);return v.key_54*8;",
             0,
             0
           ]
         },
         "key_55": {
           "rotation": [
-            "v.key_55=math.clamp(v.key_55+(math.mod(v.keys_3,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_55*8;",
+            "t.down=math.mod(v.keys_3,4)>=2;t.strike=math.mod(v.strikes_3,4)>=2;v.lift_55=!t.down?0:((t.strike!=v.strike_55&&v.key_55>0)?0.025:v.lift_55);v.strike_55=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_55);v.lift_55=v.lift_55-t.lift_dt;t.depth=math.max(0,v.key_55-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_55=math.clamp(t.depth+t.step,0,1);return v.key_55*8;",
             0,
             0
           ]
         },
         "key_56": {
           "rotation": [
-            "v.key_56=math.clamp(v.key_56+(math.mod(v.keys_3,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_56*8;",
+            "t.down=math.mod(v.keys_3,8)>=4;t.strike=math.mod(v.strikes_3,8)>=4;v.lift_56=!t.down?0:((t.strike!=v.strike_56&&v.key_56>0)?0.025:v.lift_56);v.strike_56=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_56);v.lift_56=v.lift_56-t.lift_dt;t.depth=math.max(0,v.key_56-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_56=math.clamp(t.depth+t.step,0,1);return v.key_56*8;",
             0,
             0
           ]
         },
         "key_57": {
           "rotation": [
-            "v.key_57=math.clamp(v.key_57+(math.mod(v.keys_3,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_57*8;",
+            "t.down=math.mod(v.keys_3,16)>=8;t.strike=math.mod(v.strikes_3,16)>=8;v.lift_57=!t.down?0:((t.strike!=v.strike_57&&v.key_57>0)?0.025:v.lift_57);v.strike_57=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_57);v.lift_57=v.lift_57-t.lift_dt;t.depth=math.max(0,v.key_57-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_57=math.clamp(t.depth+t.step,0,1);return v.key_57*8;",
             0,
             0
           ]
         },
         "key_58": {
           "rotation": [
-            "v.key_58=math.clamp(v.key_58+(math.mod(v.keys_3,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_58*8;",
+            "t.down=math.mod(v.keys_3,32)>=16;t.strike=math.mod(v.strikes_3,32)>=16;v.lift_58=!t.down?0:((t.strike!=v.strike_58&&v.key_58>0)?0.025:v.lift_58);v.strike_58=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_58);v.lift_58=v.lift_58-t.lift_dt;t.depth=math.max(0,v.key_58-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_58=math.clamp(t.depth+t.step,0,1);return v.key_58*8;",
             0,
             0
           ]
         },
         "key_59": {
           "rotation": [
-            "v.key_59=math.clamp(v.key_59+(math.mod(v.keys_3,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_59*8;",
+            "t.down=math.mod(v.keys_3,64)>=32;t.strike=math.mod(v.strikes_3,64)>=32;v.lift_59=!t.down?0:((t.strike!=v.strike_59&&v.key_59>0)?0.025:v.lift_59);v.strike_59=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_59);v.lift_59=v.lift_59-t.lift_dt;t.depth=math.max(0,v.key_59-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_59=math.clamp(t.depth+t.step,0,1);return v.key_59*8;",
             0,
             0
           ]
         },
         "key_60": {
           "rotation": [
-            "v.key_60=math.clamp(v.key_60+(math.mod(v.keys_3,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_60*8;",
+            "t.down=math.mod(v.keys_3,128)>=64;t.strike=math.mod(v.strikes_3,128)>=64;v.lift_60=!t.down?0:((t.strike!=v.strike_60&&v.key_60>0)?0.025:v.lift_60);v.strike_60=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_60);v.lift_60=v.lift_60-t.lift_dt;t.depth=math.max(0,v.key_60-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_60=math.clamp(t.depth+t.step,0,1);return v.key_60*8;",
             0,
             0
           ]
         },
         "key_61": {
           "rotation": [
-            "v.key_61=math.clamp(v.key_61+(math.mod(v.keys_3,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_61*8;",
+            "t.down=math.mod(v.keys_3,256)>=128;t.strike=math.mod(v.strikes_3,256)>=128;v.lift_61=!t.down?0:((t.strike!=v.strike_61&&v.key_61>0)?0.025:v.lift_61);v.strike_61=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_61);v.lift_61=v.lift_61-t.lift_dt;t.depth=math.max(0,v.key_61-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_61=math.clamp(t.depth+t.step,0,1);return v.key_61*8;",
             0,
             0
           ]
         },
         "key_62": {
           "rotation": [
-            "v.key_62=math.clamp(v.key_62+(math.mod(v.keys_3,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_62*8;",
+            "t.down=math.mod(v.keys_3,512)>=256;t.strike=math.mod(v.strikes_3,512)>=256;v.lift_62=!t.down?0:((t.strike!=v.strike_62&&v.key_62>0)?0.025:v.lift_62);v.strike_62=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_62);v.lift_62=v.lift_62-t.lift_dt;t.depth=math.max(0,v.key_62-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_62=math.clamp(t.depth+t.step,0,1);return v.key_62*8;",
             0,
             0
           ]
         },
         "key_63": {
           "rotation": [
-            "v.key_63=math.clamp(v.key_63+(math.mod(v.keys_3,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_63*8;",
+            "t.down=math.mod(v.keys_3,1024)>=512;t.strike=math.mod(v.strikes_3,1024)>=512;v.lift_63=!t.down?0:((t.strike!=v.strike_63&&v.key_63>0)?0.025:v.lift_63);v.strike_63=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_63);v.lift_63=v.lift_63-t.lift_dt;t.depth=math.max(0,v.key_63-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_63=math.clamp(t.depth+t.step,0,1);return v.key_63*8;",
             0,
             0
           ]
         },
         "key_64": {
           "rotation": [
-            "v.key_64=math.clamp(v.key_64+(math.mod(v.keys_3,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_64*8;",
+            "t.down=math.mod(v.keys_3,2048)>=1024;t.strike=math.mod(v.strikes_3,2048)>=1024;v.lift_64=!t.down?0:((t.strike!=v.strike_64&&v.key_64>0)?0.025:v.lift_64);v.strike_64=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_64);v.lift_64=v.lift_64-t.lift_dt;t.depth=math.max(0,v.key_64-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_64=math.clamp(t.depth+t.step,0,1);return v.key_64*8;",
             0,
             0
           ]
         },
         "key_65": {
           "rotation": [
-            "v.key_65=math.clamp(v.key_65+(math.mod(v.keys_4,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_65*8;",
+            "t.down=math.mod(v.keys_4,2)>=1;t.strike=math.mod(v.strikes_4,2)>=1;v.lift_65=!t.down?0:((t.strike!=v.strike_65&&v.key_65>0)?0.025:v.lift_65);v.strike_65=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_65);v.lift_65=v.lift_65-t.lift_dt;t.depth=math.max(0,v.key_65-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_65=math.clamp(t.depth+t.step,0,1);return v.key_65*8;",
             0,
             0
           ]
         },
         "key_66": {
           "rotation": [
-            "v.key_66=math.clamp(v.key_66+(math.mod(v.keys_4,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_66*8;",
+            "t.down=math.mod(v.keys_4,4)>=2;t.strike=math.mod(v.strikes_4,4)>=2;v.lift_66=!t.down?0:((t.strike!=v.strike_66&&v.key_66>0)?0.025:v.lift_66);v.strike_66=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_66);v.lift_66=v.lift_66-t.lift_dt;t.depth=math.max(0,v.key_66-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_66=math.clamp(t.depth+t.step,0,1);return v.key_66*8;",
             0,
             0
           ]
         },
         "key_67": {
           "rotation": [
-            "v.key_67=math.clamp(v.key_67+(math.mod(v.keys_4,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_67*8;",
+            "t.down=math.mod(v.keys_4,8)>=4;t.strike=math.mod(v.strikes_4,8)>=4;v.lift_67=!t.down?0:((t.strike!=v.strike_67&&v.key_67>0)?0.025:v.lift_67);v.strike_67=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_67);v.lift_67=v.lift_67-t.lift_dt;t.depth=math.max(0,v.key_67-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_67=math.clamp(t.depth+t.step,0,1);return v.key_67*8;",
             0,
             0
           ]
         },
         "key_68": {
           "rotation": [
-            "v.key_68=math.clamp(v.key_68+(math.mod(v.keys_4,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_68*8;",
+            "t.down=math.mod(v.keys_4,16)>=8;t.strike=math.mod(v.strikes_4,16)>=8;v.lift_68=!t.down?0:((t.strike!=v.strike_68&&v.key_68>0)?0.025:v.lift_68);v.strike_68=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_68);v.lift_68=v.lift_68-t.lift_dt;t.depth=math.max(0,v.key_68-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_68=math.clamp(t.depth+t.step,0,1);return v.key_68*8;",
             0,
             0
           ]
         },
         "key_69": {
           "rotation": [
-            "v.key_69=math.clamp(v.key_69+(math.mod(v.keys_4,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_69*8;",
+            "t.down=math.mod(v.keys_4,32)>=16;t.strike=math.mod(v.strikes_4,32)>=16;v.lift_69=!t.down?0:((t.strike!=v.strike_69&&v.key_69>0)?0.025:v.lift_69);v.strike_69=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_69);v.lift_69=v.lift_69-t.lift_dt;t.depth=math.max(0,v.key_69-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_69=math.clamp(t.depth+t.step,0,1);return v.key_69*8;",
             0,
             0
           ]
         },
         "key_70": {
           "rotation": [
-            "v.key_70=math.clamp(v.key_70+(math.mod(v.keys_4,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_70*8;",
+            "t.down=math.mod(v.keys_4,64)>=32;t.strike=math.mod(v.strikes_4,64)>=32;v.lift_70=!t.down?0:((t.strike!=v.strike_70&&v.key_70>0)?0.025:v.lift_70);v.strike_70=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_70);v.lift_70=v.lift_70-t.lift_dt;t.depth=math.max(0,v.key_70-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_70=math.clamp(t.depth+t.step,0,1);return v.key_70*8;",
             0,
             0
           ]
         },
         "key_71": {
           "rotation": [
-            "v.key_71=math.clamp(v.key_71+(math.mod(v.keys_4,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_71*8;",
+            "t.down=math.mod(v.keys_4,128)>=64;t.strike=math.mod(v.strikes_4,128)>=64;v.lift_71=!t.down?0:((t.strike!=v.strike_71&&v.key_71>0)?0.025:v.lift_71);v.strike_71=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_71);v.lift_71=v.lift_71-t.lift_dt;t.depth=math.max(0,v.key_71-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_71=math.clamp(t.depth+t.step,0,1);return v.key_71*8;",
             0,
             0
           ]
         },
         "key_72": {
           "rotation": [
-            "v.key_72=math.clamp(v.key_72+(math.mod(v.keys_4,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_72*8;",
+            "t.down=math.mod(v.keys_4,256)>=128;t.strike=math.mod(v.strikes_4,256)>=128;v.lift_72=!t.down?0:((t.strike!=v.strike_72&&v.key_72>0)?0.025:v.lift_72);v.strike_72=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_72);v.lift_72=v.lift_72-t.lift_dt;t.depth=math.max(0,v.key_72-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_72=math.clamp(t.depth+t.step,0,1);return v.key_72*8;",
             0,
             0
           ]
         },
         "key_73": {
           "rotation": [
-            "v.key_73=math.clamp(v.key_73+(math.mod(v.keys_4,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_73*8;",
+            "t.down=math.mod(v.keys_4,512)>=256;t.strike=math.mod(v.strikes_4,512)>=256;v.lift_73=!t.down?0:((t.strike!=v.strike_73&&v.key_73>0)?0.025:v.lift_73);v.strike_73=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_73);v.lift_73=v.lift_73-t.lift_dt;t.depth=math.max(0,v.key_73-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_73=math.clamp(t.depth+t.step,0,1);return v.key_73*8;",
             0,
             0
           ]
         },
         "key_74": {
           "rotation": [
-            "v.key_74=math.clamp(v.key_74+(math.mod(v.keys_4,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_74*8;",
+            "t.down=math.mod(v.keys_4,1024)>=512;t.strike=math.mod(v.strikes_4,1024)>=512;v.lift_74=!t.down?0:((t.strike!=v.strike_74&&v.key_74>0)?0.025:v.lift_74);v.strike_74=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_74);v.lift_74=v.lift_74-t.lift_dt;t.depth=math.max(0,v.key_74-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_74=math.clamp(t.depth+t.step,0,1);return v.key_74*8;",
             0,
             0
           ]
         },
         "key_75": {
           "rotation": [
-            "v.key_75=math.clamp(v.key_75+(math.mod(v.keys_4,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_75*8;",
+            "t.down=math.mod(v.keys_4,2048)>=1024;t.strike=math.mod(v.strikes_4,2048)>=1024;v.lift_75=!t.down?0:((t.strike!=v.strike_75&&v.key_75>0)?0.025:v.lift_75);v.strike_75=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_75);v.lift_75=v.lift_75-t.lift_dt;t.depth=math.max(0,v.key_75-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_75=math.clamp(t.depth+t.step,0,1);return v.key_75*8;",
             0,
             0
           ]
         },
         "key_76": {
           "rotation": [
-            "v.key_76=math.clamp(v.key_76+(math.mod(v.keys_5,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_76*8;",
+            "t.down=math.mod(v.keys_5,2)>=1;t.strike=math.mod(v.strikes_5,2)>=1;v.lift_76=!t.down?0:((t.strike!=v.strike_76&&v.key_76>0)?0.025:v.lift_76);v.strike_76=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_76);v.lift_76=v.lift_76-t.lift_dt;t.depth=math.max(0,v.key_76-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_76=math.clamp(t.depth+t.step,0,1);return v.key_76*8;",
             0,
             0
           ]
         },
         "key_77": {
           "rotation": [
-            "v.key_77=math.clamp(v.key_77+(math.mod(v.keys_5,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_77*8;",
+            "t.down=math.mod(v.keys_5,4)>=2;t.strike=math.mod(v.strikes_5,4)>=2;v.lift_77=!t.down?0:((t.strike!=v.strike_77&&v.key_77>0)?0.025:v.lift_77);v.strike_77=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_77);v.lift_77=v.lift_77-t.lift_dt;t.depth=math.max(0,v.key_77-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_77=math.clamp(t.depth+t.step,0,1);return v.key_77*8;",
             0,
             0
           ]
         },
         "key_78": {
           "rotation": [
-            "v.key_78=math.clamp(v.key_78+(math.mod(v.keys_5,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_78*8;",
+            "t.down=math.mod(v.keys_5,8)>=4;t.strike=math.mod(v.strikes_5,8)>=4;v.lift_78=!t.down?0:((t.strike!=v.strike_78&&v.key_78>0)?0.025:v.lift_78);v.strike_78=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_78);v.lift_78=v.lift_78-t.lift_dt;t.depth=math.max(0,v.key_78-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_78=math.clamp(t.depth+t.step,0,1);return v.key_78*8;",
             0,
             0
           ]
         },
         "key_79": {
           "rotation": [
-            "v.key_79=math.clamp(v.key_79+(math.mod(v.keys_5,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_79*8;",
+            "t.down=math.mod(v.keys_5,16)>=8;t.strike=math.mod(v.strikes_5,16)>=8;v.lift_79=!t.down?0:((t.strike!=v.strike_79&&v.key_79>0)?0.025:v.lift_79);v.strike_79=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_79);v.lift_79=v.lift_79-t.lift_dt;t.depth=math.max(0,v.key_79-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_79=math.clamp(t.depth+t.step,0,1);return v.key_79*8;",
             0,
             0
           ]
         },
         "key_80": {
           "rotation": [
-            "v.key_80=math.clamp(v.key_80+(math.mod(v.keys_5,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_80*8;",
+            "t.down=math.mod(v.keys_5,32)>=16;t.strike=math.mod(v.strikes_5,32)>=16;v.lift_80=!t.down?0:((t.strike!=v.strike_80&&v.key_80>0)?0.025:v.lift_80);v.strike_80=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_80);v.lift_80=v.lift_80-t.lift_dt;t.depth=math.max(0,v.key_80-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_80=math.clamp(t.depth+t.step,0,1);return v.key_80*8;",
             0,
             0
           ]
         },
         "key_81": {
           "rotation": [
-            "v.key_81=math.clamp(v.key_81+(math.mod(v.keys_5,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_81*8;",
+            "t.down=math.mod(v.keys_5,64)>=32;t.strike=math.mod(v.strikes_5,64)>=32;v.lift_81=!t.down?0:((t.strike!=v.strike_81&&v.key_81>0)?0.025:v.lift_81);v.strike_81=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_81);v.lift_81=v.lift_81-t.lift_dt;t.depth=math.max(0,v.key_81-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_81=math.clamp(t.depth+t.step,0,1);return v.key_81*8;",
             0,
             0
           ]
         },
         "key_82": {
           "rotation": [
-            "v.key_82=math.clamp(v.key_82+(math.mod(v.keys_5,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_82*8;",
+            "t.down=math.mod(v.keys_5,128)>=64;t.strike=math.mod(v.strikes_5,128)>=64;v.lift_82=!t.down?0:((t.strike!=v.strike_82&&v.key_82>0)?0.025:v.lift_82);v.strike_82=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_82);v.lift_82=v.lift_82-t.lift_dt;t.depth=math.max(0,v.key_82-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_82=math.clamp(t.depth+t.step,0,1);return v.key_82*8;",
             0,
             0
           ]
         },
         "key_83": {
           "rotation": [
-            "v.key_83=math.clamp(v.key_83+(math.mod(v.keys_5,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_83*8;",
+            "t.down=math.mod(v.keys_5,256)>=128;t.strike=math.mod(v.strikes_5,256)>=128;v.lift_83=!t.down?0:((t.strike!=v.strike_83&&v.key_83>0)?0.025:v.lift_83);v.strike_83=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_83);v.lift_83=v.lift_83-t.lift_dt;t.depth=math.max(0,v.key_83-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_83=math.clamp(t.depth+t.step,0,1);return v.key_83*8;",
             0,
             0
           ]
         },
         "key_84": {
           "rotation": [
-            "v.key_84=math.clamp(v.key_84+(math.mod(v.keys_5,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_84*8;",
+            "t.down=math.mod(v.keys_5,512)>=256;t.strike=math.mod(v.strikes_5,512)>=256;v.lift_84=!t.down?0:((t.strike!=v.strike_84&&v.key_84>0)?0.025:v.lift_84);v.strike_84=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_84);v.lift_84=v.lift_84-t.lift_dt;t.depth=math.max(0,v.key_84-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_84=math.clamp(t.depth+t.step,0,1);return v.key_84*8;",
             0,
             0
           ]
         },
         "key_85": {
           "rotation": [
-            "v.key_85=math.clamp(v.key_85+(math.mod(v.keys_5,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_85*8;",
+            "t.down=math.mod(v.keys_5,1024)>=512;t.strike=math.mod(v.strikes_5,1024)>=512;v.lift_85=!t.down?0:((t.strike!=v.strike_85&&v.key_85>0)?0.025:v.lift_85);v.strike_85=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_85);v.lift_85=v.lift_85-t.lift_dt;t.depth=math.max(0,v.key_85-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_85=math.clamp(t.depth+t.step,0,1);return v.key_85*8;",
             0,
             0
           ]
         },
         "key_86": {
           "rotation": [
-            "v.key_86=math.clamp(v.key_86+(math.mod(v.keys_5,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_86*8;",
+            "t.down=math.mod(v.keys_5,2048)>=1024;t.strike=math.mod(v.strikes_5,2048)>=1024;v.lift_86=!t.down?0:((t.strike!=v.strike_86&&v.key_86>0)?0.025:v.lift_86);v.strike_86=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_86);v.lift_86=v.lift_86-t.lift_dt;t.depth=math.max(0,v.key_86-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_86=math.clamp(t.depth+t.step,0,1);return v.key_86*8;",
             0,
             0
           ]
         },
         "key_87": {
           "rotation": [
-            "v.key_87=math.clamp(v.key_87+(math.mod(v.keys_6,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_87*8;",
+            "t.down=math.mod(v.keys_6,2)>=1;t.strike=math.mod(v.strikes_6,2)>=1;v.lift_87=!t.down?0:((t.strike!=v.strike_87&&v.key_87>0)?0.025:v.lift_87);v.strike_87=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_87);v.lift_87=v.lift_87-t.lift_dt;t.depth=math.max(0,v.key_87-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_87=math.clamp(t.depth+t.step,0,1);return v.key_87*8;",
             0,
             0
           ]
         },
         "key_88": {
           "rotation": [
-            "v.key_88=math.clamp(v.key_88+(math.mod(v.keys_6,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_88*8;",
+            "t.down=math.mod(v.keys_6,4)>=2;t.strike=math.mod(v.strikes_6,4)>=2;v.lift_88=!t.down?0:((t.strike!=v.strike_88&&v.key_88>0)?0.025:v.lift_88);v.strike_88=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_88);v.lift_88=v.lift_88-t.lift_dt;t.depth=math.max(0,v.key_88-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_88=math.clamp(t.depth+t.step,0,1);return v.key_88*8;",
             0,
             0
           ]
         },
         "key_89": {
           "rotation": [
-            "v.key_89=math.clamp(v.key_89+(math.mod(v.keys_6,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_89*8;",
+            "t.down=math.mod(v.keys_6,8)>=4;t.strike=math.mod(v.strikes_6,8)>=4;v.lift_89=!t.down?0:((t.strike!=v.strike_89&&v.key_89>0)?0.025:v.lift_89);v.strike_89=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_89);v.lift_89=v.lift_89-t.lift_dt;t.depth=math.max(0,v.key_89-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_89=math.clamp(t.depth+t.step,0,1);return v.key_89*8;",
             0,
             0
           ]
         },
         "key_90": {
           "rotation": [
-            "v.key_90=math.clamp(v.key_90+(math.mod(v.keys_6,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_90*8;",
+            "t.down=math.mod(v.keys_6,16)>=8;t.strike=math.mod(v.strikes_6,16)>=8;v.lift_90=!t.down?0:((t.strike!=v.strike_90&&v.key_90>0)?0.025:v.lift_90);v.strike_90=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_90);v.lift_90=v.lift_90-t.lift_dt;t.depth=math.max(0,v.key_90-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_90=math.clamp(t.depth+t.step,0,1);return v.key_90*8;",
             0,
             0
           ]
         },
         "key_91": {
           "rotation": [
-            "v.key_91=math.clamp(v.key_91+(math.mod(v.keys_6,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_91*8;",
+            "t.down=math.mod(v.keys_6,32)>=16;t.strike=math.mod(v.strikes_6,32)>=16;v.lift_91=!t.down?0:((t.strike!=v.strike_91&&v.key_91>0)?0.025:v.lift_91);v.strike_91=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_91);v.lift_91=v.lift_91-t.lift_dt;t.depth=math.max(0,v.key_91-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_91=math.clamp(t.depth+t.step,0,1);return v.key_91*8;",
             0,
             0
           ]
         },
         "key_92": {
           "rotation": [
-            "v.key_92=math.clamp(v.key_92+(math.mod(v.keys_6,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_92*8;",
+            "t.down=math.mod(v.keys_6,64)>=32;t.strike=math.mod(v.strikes_6,64)>=32;v.lift_92=!t.down?0:((t.strike!=v.strike_92&&v.key_92>0)?0.025:v.lift_92);v.strike_92=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_92);v.lift_92=v.lift_92-t.lift_dt;t.depth=math.max(0,v.key_92-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_92=math.clamp(t.depth+t.step,0,1);return v.key_92*8;",
             0,
             0
           ]
         },
         "key_93": {
           "rotation": [
-            "v.key_93=math.clamp(v.key_93+(math.mod(v.keys_6,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_93*8;",
+            "t.down=math.mod(v.keys_6,128)>=64;t.strike=math.mod(v.strikes_6,128)>=64;v.lift_93=!t.down?0:((t.strike!=v.strike_93&&v.key_93>0)?0.025:v.lift_93);v.strike_93=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_93);v.lift_93=v.lift_93-t.lift_dt;t.depth=math.max(0,v.key_93-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_93=math.clamp(t.depth+t.step,0,1);return v.key_93*8;",
             0,
             0
           ]
         },
         "key_94": {
           "rotation": [
-            "v.key_94=math.clamp(v.key_94+(math.mod(v.keys_6,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_94*8;",
+            "t.down=math.mod(v.keys_6,256)>=128;t.strike=math.mod(v.strikes_6,256)>=128;v.lift_94=!t.down?0:((t.strike!=v.strike_94&&v.key_94>0)?0.025:v.lift_94);v.strike_94=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_94);v.lift_94=v.lift_94-t.lift_dt;t.depth=math.max(0,v.key_94-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_94=math.clamp(t.depth+t.step,0,1);return v.key_94*8;",
             0,
             0
           ]
         },
         "key_95": {
           "rotation": [
-            "v.key_95=math.clamp(v.key_95+(math.mod(v.keys_6,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_95*8;",
+            "t.down=math.mod(v.keys_6,512)>=256;t.strike=math.mod(v.strikes_6,512)>=256;v.lift_95=!t.down?0:((t.strike!=v.strike_95&&v.key_95>0)?0.025:v.lift_95);v.strike_95=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_95);v.lift_95=v.lift_95-t.lift_dt;t.depth=math.max(0,v.key_95-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_95=math.clamp(t.depth+t.step,0,1);return v.key_95*8;",
             0,
             0
           ]
         },
         "key_96": {
           "rotation": [
-            "v.key_96=math.clamp(v.key_96+(math.mod(v.keys_6,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_96*8;",
+            "t.down=math.mod(v.keys_6,1024)>=512;t.strike=math.mod(v.strikes_6,1024)>=512;v.lift_96=!t.down?0:((t.strike!=v.strike_96&&v.key_96>0)?0.025:v.lift_96);v.strike_96=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_96);v.lift_96=v.lift_96-t.lift_dt;t.depth=math.max(0,v.key_96-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_96=math.clamp(t.depth+t.step,0,1);return v.key_96*8;",
             0,
             0
           ]
         },
         "key_97": {
           "rotation": [
-            "v.key_97=math.clamp(v.key_97+(math.mod(v.keys_6,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_97*8;",
+            "t.down=math.mod(v.keys_6,2048)>=1024;t.strike=math.mod(v.strikes_6,2048)>=1024;v.lift_97=!t.down?0:((t.strike!=v.strike_97&&v.key_97>0)?0.025:v.lift_97);v.strike_97=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_97);v.lift_97=v.lift_97-t.lift_dt;t.depth=math.max(0,v.key_97-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_97=math.clamp(t.depth+t.step,0,1);return v.key_97*8;",
             0,
             0
           ]
         },
         "key_98": {
           "rotation": [
-            "v.key_98=math.clamp(v.key_98+(math.mod(v.keys_7,2)>=1?v.key_press_step:-v.key_release_step),0,1);return v.key_98*8;",
+            "t.down=math.mod(v.keys_7,2)>=1;t.strike=math.mod(v.strikes_7,2)>=1;v.lift_98=!t.down?0:((t.strike!=v.strike_98&&v.key_98>0)?0.025:v.lift_98);v.strike_98=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_98);v.lift_98=v.lift_98-t.lift_dt;t.depth=math.max(0,v.key_98-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_98=math.clamp(t.depth+t.step,0,1);return v.key_98*8;",
             0,
             0
           ]
         },
         "key_99": {
           "rotation": [
-            "v.key_99=math.clamp(v.key_99+(math.mod(v.keys_7,4)>=2?v.key_press_step:-v.key_release_step),0,1);return v.key_99*8;",
+            "t.down=math.mod(v.keys_7,4)>=2;t.strike=math.mod(v.strikes_7,4)>=2;v.lift_99=!t.down?0:((t.strike!=v.strike_99&&v.key_99>0)?0.025:v.lift_99);v.strike_99=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_99);v.lift_99=v.lift_99-t.lift_dt;t.depth=math.max(0,v.key_99-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_99=math.clamp(t.depth+t.step,0,1);return v.key_99*8;",
             0,
             0
           ]
         },
         "key_100": {
           "rotation": [
-            "v.key_100=math.clamp(v.key_100+(math.mod(v.keys_7,8)>=4?v.key_press_step:-v.key_release_step),0,1);return v.key_100*8;",
+            "t.down=math.mod(v.keys_7,8)>=4;t.strike=math.mod(v.strikes_7,8)>=4;v.lift_100=!t.down?0:((t.strike!=v.strike_100&&v.key_100>0)?0.025:v.lift_100);v.strike_100=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_100);v.lift_100=v.lift_100-t.lift_dt;t.depth=math.max(0,v.key_100-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_100=math.clamp(t.depth+t.step,0,1);return v.key_100*8;",
             0,
             0
           ]
         },
         "key_101": {
           "rotation": [
-            "v.key_101=math.clamp(v.key_101+(math.mod(v.keys_7,16)>=8?v.key_press_step:-v.key_release_step),0,1);return v.key_101*8;",
+            "t.down=math.mod(v.keys_7,16)>=8;t.strike=math.mod(v.strikes_7,16)>=8;v.lift_101=!t.down?0:((t.strike!=v.strike_101&&v.key_101>0)?0.025:v.lift_101);v.strike_101=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_101);v.lift_101=v.lift_101-t.lift_dt;t.depth=math.max(0,v.key_101-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_101=math.clamp(t.depth+t.step,0,1);return v.key_101*8;",
             0,
             0
           ]
         },
         "key_102": {
           "rotation": [
-            "v.key_102=math.clamp(v.key_102+(math.mod(v.keys_7,32)>=16?v.key_press_step:-v.key_release_step),0,1);return v.key_102*8;",
+            "t.down=math.mod(v.keys_7,32)>=16;t.strike=math.mod(v.strikes_7,32)>=16;v.lift_102=!t.down?0:((t.strike!=v.strike_102&&v.key_102>0)?0.025:v.lift_102);v.strike_102=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_102);v.lift_102=v.lift_102-t.lift_dt;t.depth=math.max(0,v.key_102-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_102=math.clamp(t.depth+t.step,0,1);return v.key_102*8;",
             0,
             0
           ]
         },
         "key_103": {
           "rotation": [
-            "v.key_103=math.clamp(v.key_103+(math.mod(v.keys_7,64)>=32?v.key_press_step:-v.key_release_step),0,1);return v.key_103*8;",
+            "t.down=math.mod(v.keys_7,64)>=32;t.strike=math.mod(v.strikes_7,64)>=32;v.lift_103=!t.down?0:((t.strike!=v.strike_103&&v.key_103>0)?0.025:v.lift_103);v.strike_103=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_103);v.lift_103=v.lift_103-t.lift_dt;t.depth=math.max(0,v.key_103-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_103=math.clamp(t.depth+t.step,0,1);return v.key_103*8;",
             0,
             0
           ]
         },
         "key_104": {
           "rotation": [
-            "v.key_104=math.clamp(v.key_104+(math.mod(v.keys_7,128)>=64?v.key_press_step:-v.key_release_step),0,1);return v.key_104*8;",
+            "t.down=math.mod(v.keys_7,128)>=64;t.strike=math.mod(v.strikes_7,128)>=64;v.lift_104=!t.down?0:((t.strike!=v.strike_104&&v.key_104>0)?0.025:v.lift_104);v.strike_104=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_104);v.lift_104=v.lift_104-t.lift_dt;t.depth=math.max(0,v.key_104-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_104=math.clamp(t.depth+t.step,0,1);return v.key_104*8;",
             0,
             0
           ]
         },
         "key_105": {
           "rotation": [
-            "v.key_105=math.clamp(v.key_105+(math.mod(v.keys_7,256)>=128?v.key_press_step:-v.key_release_step),0,1);return v.key_105*8;",
+            "t.down=math.mod(v.keys_7,256)>=128;t.strike=math.mod(v.strikes_7,256)>=128;v.lift_105=!t.down?0:((t.strike!=v.strike_105&&v.key_105>0)?0.025:v.lift_105);v.strike_105=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_105);v.lift_105=v.lift_105-t.lift_dt;t.depth=math.max(0,v.key_105-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_105=math.clamp(t.depth+t.step,0,1);return v.key_105*8;",
             0,
             0
           ]
         },
         "key_106": {
           "rotation": [
-            "v.key_106=math.clamp(v.key_106+(math.mod(v.keys_7,512)>=256?v.key_press_step:-v.key_release_step),0,1);return v.key_106*8;",
+            "t.down=math.mod(v.keys_7,512)>=256;t.strike=math.mod(v.strikes_7,512)>=256;v.lift_106=!t.down?0:((t.strike!=v.strike_106&&v.key_106>0)?0.025:v.lift_106);v.strike_106=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_106);v.lift_106=v.lift_106-t.lift_dt;t.depth=math.max(0,v.key_106-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_106=math.clamp(t.depth+t.step,0,1);return v.key_106*8;",
             0,
             0
           ]
         },
         "key_107": {
           "rotation": [
-            "v.key_107=math.clamp(v.key_107+(math.mod(v.keys_7,1024)>=512?v.key_press_step:-v.key_release_step),0,1);return v.key_107*8;",
+            "t.down=math.mod(v.keys_7,1024)>=512;t.strike=math.mod(v.strikes_7,1024)>=512;v.lift_107=!t.down?0:((t.strike!=v.strike_107&&v.key_107>0)?0.025:v.lift_107);v.strike_107=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_107);v.lift_107=v.lift_107-t.lift_dt;t.depth=math.max(0,v.key_107-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_107=math.clamp(t.depth+t.step,0,1);return v.key_107*8;",
             0,
             0
           ]
         },
         "key_108": {
           "rotation": [
-            "v.key_108=math.clamp(v.key_108+(math.mod(v.keys_7,2048)>=1024?v.key_press_step:-v.key_release_step),0,1);return v.key_108*8;",
+            "t.down=math.mod(v.keys_7,2048)>=1024;t.strike=math.mod(v.strikes_7,2048)>=1024;v.lift_108=!t.down?0:((t.strike!=v.strike_108&&v.key_108>0)?0.025:v.lift_108);v.strike_108=t.strike;t.lift_dt=math.min(v.key_dt,v.lift_108);v.lift_108=v.lift_108-t.lift_dt;t.depth=math.max(0,v.key_108-t.lift_dt/0.025);t.step=t.down?(v.key_dt-t.lift_dt)/0.04:-v.key_release_step;v.key_108=math.clamp(t.depth+t.step,0,1);return v.key_108*8;",
             0,
             0
           ]
