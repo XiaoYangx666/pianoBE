@@ -1,0 +1,161 @@
+# PianoBE Addon Design
+
+本文记录 addon 的长期架构约束。重点不是“文件在哪”，而是**谁拥有什么、谁可以依赖谁、哪些行为不能随意改**。
+
+## 1. 模块分层
+
+```text
+data        静态内容：内嵌 MIDI、生成数据
+  ↑
+domain      纯业务逻辑：MIDI 状态机、队列、键位、几何、设置、输入解析、乐器定义
+  ↑
+runtime     通用运行时机制：PianoScope（只依赖 Tabletop 核心）
+  ↑
+platform    Minecraft 宿主适配：实体、方块、显示、粒子、存储、服务器通信
+  ↑
+app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、UI、启动
+```
+
+依赖规则：
+
+- `domain/**` 不得依赖 `@minecraft/server`、`@minecraft/server-ui`、`sapi-pro`、`@begame/tabletop/minecraft`、`runtime`、`platform`、`app`。
+- `runtime/**` 不得依赖 Minecraft，也不得依赖 `app`、`platform`；可以依赖 `@begame/tabletop` 核心。
+- `platform/**` 可以依赖 `domain`、`runtime`、`data` 和 Minecraft/Tabletop 平台 API，但不得依赖 `app`。
+- `app/**` 负责组装，可以依赖所有层。
+- `data/**` 只放静态数据/生成数据，不得反向依赖 `domain`、`runtime`、`platform`、`app`。
+
+自动检查：`tests/architecture.test.ts` 使用 TypeScript 编译器 API 解析真实模块图（包括路径别名、re-export、type-only import 和动态 import），并检查依赖方向与循环依赖。
+
+## 2. 核心对象与所有权
+
+| 对象 | 所有者 | 职责 |
+| --- | --- | --- |
+| `PianoScope` | `runtime/scope.ts` | 基于 Tabletop `RuntimeScope` 的钢琴专用包装；负责资源登记、命名诊断、非抛出式销毁。 |
+| `PianoRuntime` | `app/PianoRuntime.ts` | 单台钢琴的运行时：播放、设置、显示协调、文字、粒子、checkpoint。 |
+| `PianoWorld` | `app/PianoWorld.ts` | 钢琴注册表、发现、交互路由、距离卸载、sweep、verify。 |
+| `PianoDisplay` | `platform/display.ts` | 持久显示实体的创建、恢复、绑定、去重、属性写入、设置/播放数据持久化。 |
+| `MidiPlayer` | `domain/playback/player.ts` | 播放状态机、队列推进、暂停/恢复/seek/结束；通过注入的 `MidiLoader` 加载曲目。 |
+| `MidiManager` | `domain/playback/midiManager.ts` | 曲目元信息注册、分页查询、按 id 加载。 |
+| `midiManager` 单例 | `app/midi.ts` | 组合内嵌/远程 MIDI 源与播放列表 facade；只在 app 层初始化。 |
+| UI 管理器 | `app/ui/**` | 玩家级 DDUI 表单、失效检测、异步交互保护；可直接依赖 `PianoWorld`/`PianoRuntime`。 |
+| 存储驱动 | `platform/storage/**` | 动态属性播放列表存储；不依赖 UI。 |
+| 服务器适配 | `platform/server/**` | `server-net` 传输、远程 MIDI/播放列表读取；不依赖 app。 |
+| 服务器初始化 | `app/serverAdmin.ts` | 读取 secrets/variables，切换 `midiManager` 与播放列表 facade；属于组装逻辑。 |
+
+`PianoWorld → PianoRuntime` 是单向依赖。`PianoRuntime` 不导入 `PianoWorld`。
+
+## 3. 生命周期
+
+### 放置 / 发现
+
+1. 方块组件解析乐器装配，发布 `instrumentPlaced`。
+2. `PianoWorld.get()` 创建或复用 `PianoRuntime`。
+3. `PianoRuntime.ensureVisual()` 恢复或创建持久显示实体，并创建临时文字资源。
+
+### 运行
+
+- `PianoWorld` 每 20 tick sweep 一次：更新附近玩家、检查装配完整性、处理距离卸载。
+- `PianoRuntime.verify()` 按 `VERIFY_INTERVAL` 检查装配完整性。
+- `PianoRuntime.tick()` 推进 MIDI 状态机、更新键位/灯光和 LCD。
+- 播放状态机通过 `MidiOutput` 回调发声；状态机本身不直接调用 Minecraft。
+
+### 卸载
+
+- 运行时释放 **不等于** 删除钢琴显示实体。
+- `PianoRuntime.dispose(false)`：checkpoint 播放记录、释放临时文字/MIDI、保留显示实体和设置。
+- `PianoRuntime.dispose(true)`：真正拆除时删除所属显示实体。
+- `PianoDisplay.recover()` 负责锚点动态属性、朝向检查、重复实体处理、数据迁移。
+- `PianoScope` 只负责订阅、定时器、文字、显示/MIDI 清理等运行时资源；不决定业务状态，也不删除物理钢琴。
+
+### 销毁顺序
+
+1. 停止/释放运行时（播放、文字、显示协调）。
+2. 再处理物理装配/显示实体。
+3. 全局方块事件订阅由 addon 生命周期持有，不随单台钢琴销毁。
+
+## 4. 持久实体与临时资源
+
+- **持久显示实体**：`xypiano:piano_display` / `xypiano:grand_display`，是钢琴外观的一部分，不因玩家离开而删除。它持有键位属性、灯光、设置和播放记录。
+- **临时运行时资源**：`NativeTextSurface`、MIDI 播放器、定时器、订阅、`PianoScope` 子作用域。它们随 `PianoRuntime.dispose()` 回收。
+- 不采用棋牌盒的 Anchor / Visual 分离：钢琴显示实体不是可随时删除的派生投影，键位和灯光就是乐器外观本身。
+
+## 5. MIDI 边界
+
+```text
+MidiManager / MidiSource
+        ↓ 注入 MidiLoader
+MidiPlayer 状态机（domain）
+        ↓ MidiOutput.note / playing
+PianoRuntime
+        ↓
+Minecraft playSound / 粒子 / 显示
+```
+
+- `MidiPlayer` 不依赖 `@app/midi` 全局单例；构造时接收 `MidiLoader`。
+- 曲目加载、队列、暂停、恢复、seek、结束事件保持原有行为。
+- `getInfo()` 不再携带 `Dimension`/`Vector3`；UI 只消费播放状态与进度。
+- 异步加载使用 generation 校验；运行时销毁后旧请求不会继续产生副作用。
+
+## 6. UI、存储与服务器
+
+- UI 业务控制保留在 `app/ui/**`，允许直接使用 Minecraft UI API 和 `PianoWorld`/`PianoRuntime`。
+- 可复用的平台操作（显示、方块、粒子、存储、网络）放在 `platform/**`。
+- `platform/**` 不反向依赖 `app`；服务器初始化这种跨模块编排放在 `app/serverAdmin.ts`。
+- `__PIANO_TARGET__` 双构建语义保持不变：client 构建通过 `compile.define` 折叠并裁剪 server 分支；server 构建保留 `server-admin`/`server-net` 动态加载。
+- 内嵌 MIDI 仍由构建流程拷贝到 `scripts/midis`；远程曲库仍通过 `midiManager.setSource()` 切换。
+
+## 7. 有意保留的保护措施
+
+以下机制不要因为“看起来多余”而删除：
+
+- `PianoDisplay.recover()` 的锚点、朝向、重复实体、数据迁移逻辑。
+- `PianoRuntime.dispose(false)` 与 `dispose(true)` 的区分。
+- `unloadedSettings` 的暂存与重试保存。
+- `PianoWorld` 的 sweep、verify、距离卸载宽限。
+- MIDI 异步加载的 generation 校验。
+- UI 的失效检测、异步打开保护和 `Doudizhu` 式“表单不可释放”处理。
+- 装配完整性三态（`complete` / `incomplete` / `unloaded`）、放置回滚、精准采集掉落抑制。
+- 方块事件、爆炸聚合、显示实体去重。
+
+## 8. 明确不采用的方案
+
+- 不采用 `GameSession`、回合、席位、决策系统：钢琴是连续实时乐器，不是棋牌对局。
+- 不采用 Anchor / Visual 分离：显示实体是钢琴外观和持久状态的一部分。
+- 不为每个类/接口创建文件，不引入 DI 容器或大型事件总线。
+- 不为了“无 MC import”重写现有 UI 或方块组件。
+
+## 9. 验证
+
+自动检查：
+
+```sh
+npx tsc -p packages/addon/tsconfig.json --noEmit
+cd packages/addon && bun test
+cd packages/addon && npx bepack build --skip-copy
+cd packages/addon && npx bepack build --config bepack.server.config.ts --skip-copy
+```
+
+测试覆盖：
+
+- `tests/architecture.test.ts`：依赖方向、循环依赖、`PianoRuntime` 不依赖 `PianoWorld`。
+- `tests/pianoScope.test.ts`：清理失败不阻断其它清理、子作用域级联、幂等销毁。
+- `tests/pianoPlayback.test.ts`：MIDI 恢复、暂停/恢复、销毁后旧加载不复活。
+- `tests/instrument.test.ts`：装配完整性、放置/销毁、回滚。
+- `tests/pianoDisplay.test.ts`、`pianoRay.test.ts`、`pianoSettings.test.ts`、`pianoTimbres.test.ts`、`netSource.test.ts`、`remotePlaylist.test.ts`。
+
+无法可靠自动覆盖、需要实机验证的场景：
+
+- 真实客户端上的 DDUI 表单行为与写权限。
+- 区块卸载/重载时显示实体的恢复与去重。
+- 数字钢琴/三角钢琴的 LCD 朝向、键位动画、灯光。
+- 精准采集、爆炸、活塞/命令破坏的掉落与清理。
+- BDS 上 `server-admin`/`server-net` 的 secrets/variables 与远程曲库初始化。
+
+实机建议步骤：
+
+1. 放置数字钢琴，确认显示、LCD、按键发声。
+2. 放置三角钢琴，确认多方块装配、LCD、菜单、粒子。
+3. 离开 200 tick 以上再返回，确认运行时重载、显示不重复、设置/播放记录保留。
+4. 卸载/重载区块，确认显示恢复且旧重复实体被清理。
+5. 精准采集、爆炸、活塞/命令破坏，确认模块掉落与显示清理正确。
+6. BDS server 构建：配置 variables/secrets，确认远程曲库加载与播放列表切换。

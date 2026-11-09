@@ -23,7 +23,7 @@ export default defineConfig({
             uuid: "32559cdb-d3be-49cf-9f05-2a9a774fe17f",
             moduleUuid: "544d1620-bdcb-4c71-a0a7-8c32fb059a44",
             compile: {
-                entry: "src/main.ts",
+                entry: "src/app/main.ts",
                 // @minecraft/server-admin/server-net 等 catalog 依赖自动 external
                 //（catalog 自动 external，无需显式配置）
                 // 条件编译注入：保留 server 分支（clean 模式同下）

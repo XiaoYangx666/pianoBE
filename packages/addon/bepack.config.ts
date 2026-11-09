@@ -17,7 +17,7 @@ export default defineConfig({
             uuid: "04f4bc5e-60a2-49f6-840c-5a22dbb19bf7",
             moduleUuid: "f2c4ed57-79a9-4e3c-b876-f7bf697417d0",
             compile: {
-                entry: "src/main.ts",
+                entry: "src/app/main.ts",
                 // 条件编译注入：标识符引用级替换（rolldown transform.define），
                 // 优于 replace.values（不触碰对象键/字符串字面量/注释）
                 // @minecraft/server-admin/server-net 等 catalog 依赖自动 external
