@@ -148,13 +148,15 @@ function renderPreviewOptions() {
     const previous = previewTimbreId;
     previewTimbreSelect.innerHTML = "";
     for (const meta of timbreIndex) {
-        if (!selectedTimbres.has(meta.id)) continue;
+        // 试听独立于导出勾选：只要有音色包就可以试听，按需加载，不自动下载。
+        if (!meta.bundled && !meta.file) continue;
         const option = document.createElement("option");
         option.value = meta.id;
         option.textContent = meta.label;
         previewTimbreSelect.append(option);
     }
-    if (!selectedTimbres.has(previewTimbreId) || !findTimbre(previewTimbreId)) {
+    const current = findTimbre(previewTimbreId);
+    if (!current || (!current.bundled && !current.file)) {
         previewTimbreId = "piano";
     }
     previewTimbreSelect.value = previewTimbreId;
@@ -211,12 +213,7 @@ function toggleTimbre(meta: TimbreIndexEntry, checked: boolean) {
     if (meta.required) return;
     if (checked) selectedTimbres.add(meta.id);
     else selectedTimbres.delete(meta.id);
-    if (!checked && previewTimbreId === meta.id) {
-        previewTimbreId = "piano";
-        if (template) void applyPreviewTimbre("piano");
-    }
     updateTimbreSummary();
-    renderPreviewOptions();
 }
 
 /** 按需加载并切换试听音色。 */
@@ -783,11 +780,8 @@ async function initTimbres() {
     const index = await loadTimbreIndex();
     timbreIndex = index.length ? index : fallbackTimbreIndex();
     selectedTimbres.clear();
+    // 默认只选经典 P-88；其余音色保持未勾选，勾选后才在导出时按需加载。
     selectedTimbres.add("piano");
-    // 默认勾选全部可用音色；用户取消勾选后导出包会相应变小。
-    for (const meta of timbreIndex) {
-        if (!meta.required && meta.file) selectedTimbres.add(meta.id);
-    }
     if (!findTimbre(previewTimbreId)) previewTimbreId = "piano";
     renderTimbres();
 }
