@@ -1,9 +1,11 @@
 import { describe, expect, mock, test } from "bun:test";
 mock.module("@minecraft/server", () => ({
+    system: { currentTick: 0 },
     BlockPermutation: { resolve: (typeId: string, states: Record<string, string>) => ({ type: { id: typeId }, getState: (key: string) => states[key] }) },
     ItemStack: class { constructor(public typeId: string) {} },
 }));
-const { grandDefinition, pianoDefinition, inspectInstrument, placeInstrument, destroyInstrument, resolveInstrument } = await import("../src/instrument/runtime");
+const { grandDefinition, pianoDefinition } = await import("../src/domain/instrument/definition");
+const { inspectInstrument, placeInstrument, destroyInstrument, resolveInstrument } = await import("../src/platform/assembly");
 
 function fixture() {
     const cells = new Map<string, any>();

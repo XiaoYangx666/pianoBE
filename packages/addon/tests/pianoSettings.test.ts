@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
-import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, readPianoSettings } from "../src/piano/settings";
+import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, readPianoSettings } from "../src/domain/piano/settings";
 
 describe("piano timbre settings", () => {
     test("默认音色为经典 P-88", () => {

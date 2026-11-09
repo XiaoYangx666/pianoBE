@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
     CachedRemoteSource,
     type NetFetch,
-} from "../src/serverAdmin/netSource";
+} from "../src/platform/server/admin/netSource";
 
 const SONG_A = {
     id: "aaa",

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/piano/hitboxes.generated";
-import { GRAND_BUTTONS, GRAND_KEY_HITBOXES } from "../src/instrument/grand.generated";
-import { grandPianoHitModel, hitsPianoMenu, pickPianoMenu, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/piano/keyRay";
+import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/data/hitboxes.generated";
+import { GRAND_BUTTONS, GRAND_KEY_HITBOXES } from "../src/data/grand.generated";
+import { grandPianoHitModel, hitsPianoMenu, pickPianoMenu, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/domain/geometry/keyRay";
 
 test("grand keys resolve all 88 pitches and the three controls can be reached from the bench", () => {
     const seen = new Set<number>();

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { flatTextYaw } from "../src/piano/textRotation";
+import { flatTextYaw } from "../src/domain/piano/textRotation";
 
 // A pitch-90 text primitive lies face-up, so its yaw controls the in-plane
 // heading rather than the facing normal.

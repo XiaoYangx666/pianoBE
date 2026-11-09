@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { RemotePlaylistFacade } from "../src/serverAdmin/remotePlaylist";
-import type { NetFetch } from "../src/serverAdmin/netSource";
+import { RemotePlaylistFacade } from "../src/platform/server/admin/remotePlaylist";
+import type { NetFetch } from "../src/platform/server/admin/netSource";
 
 const BASE = "http://test:3000";
 
