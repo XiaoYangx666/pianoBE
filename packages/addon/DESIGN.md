@@ -23,6 +23,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 - `platform/**` 可以依赖 `domain`、`runtime`、`data` 和 Minecraft/Tabletop 平台 API，但不得依赖 `app`。
 - `app/**` 负责组装，可以依赖所有层。
 - `data/**` 只放静态数据/生成数据，不得反向依赖 `domain`、`runtime`、`platform`、`app`。
+- `src/midis/index.ts` 是构建钩子的固定入口：`bepack` 的 `afterBuild` 会把仓库根目录 `midis/js/` 覆盖到 preserve-modules 输出中的 `packages/addon/src/midis/`（与 `app/midiManager.ts` 的相对导入一致），所以这个生成入口保留在 `src/midis/`，不随其他数据移入 `data/`。
 
 自动检查：`tests/architecture.test.ts` 使用 TypeScript 编译器 API 解析真实模块图（包括路径别名、re-export、type-only import 和动态 import），并检查依赖方向与循环依赖。
 

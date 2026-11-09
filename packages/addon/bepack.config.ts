@@ -83,7 +83,9 @@ export default defineConfig({
                 ctx.logger.error("scripts目录不存在");
                 return;
             }
-            await cp("../../midis/js/", join(ctx.paths.scriptOutDir, "midis"), {
+            // Generated MIDI modules are emitted under the preserved source path.
+            // Keep this in sync with src/app/midiManager.ts -> ../midis/index.js.
+            await cp("../../midis/js/", join(ctx.paths.scriptOutDir, "packages/addon/src/midis"), {
                 recursive: true,
                 force: true,
             });

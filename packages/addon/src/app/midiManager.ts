@@ -1,4 +1,4 @@
-import { midis } from "@data/midis";
+import { midis } from "../midis/index.js";
 import { EmbeddedMidiSource } from "@data/midiSource/embedded";
 import { MidiManager } from "@domain/playback/midiManager";
 
