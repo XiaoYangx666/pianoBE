@@ -62,6 +62,9 @@ export default defineConfig({
     },
     copy: {
         defaultTarget: platform == "linux" ? "server" : "win",
+        // Keep local Windows deployments in the long-standing pianobe-p88
+        // folders; the server target below overrides these names.
+        name: { bp: "pianobe-p88-bp", rp: "pianobe-p88-rp" },
         targets: {
             server: {
                 type: "gameRoot",
