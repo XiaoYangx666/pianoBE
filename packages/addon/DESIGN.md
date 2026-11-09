@@ -103,6 +103,8 @@ Minecraft playSound / 粒子 / 显示
 ## 6. UI、存储与服务器
 
 - UI 业务控制保留在 `app/ui/**`，允许直接使用 Minecraft UI API 和 `PianoWorld`/`PianoRuntime`。
+- MIDI 播放器主界面固定 6 个按钮：播放/暂停、点歌、上一首、下一首、播放模式、歌单；队列与播放列表合并进“歌单”，避免继续增加主界面按钮。
+- 点歌列表固定“上一页/下一页 + 搜索/页码”，点击歌曲加入队尾；队列已有该曲目时直接跳到已有项，不重复添加。
 - 可复用的平台操作（显示、方块、粒子、存储、网络）放在 `platform/**`。
 - `platform/**` 不反向依赖 `app`；服务器初始化这种跨模块编排放在 `app/serverAdmin.ts`。
 - `__PIANO_TARGET__` 双构建语义保持不变：client 构建通过 `compile.define` 折叠并裁剪 server 分支；server 构建保留 `server-admin`/`server-net` 动态加载。

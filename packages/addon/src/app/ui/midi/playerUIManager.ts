@@ -6,8 +6,8 @@ import { pianoWorld } from "@app/PianoWorld";
 import { MidiPlayer } from "@domain/playback/player";
 import { formManager } from "sapi-pro";
 import { createMidiPlayerUI, MidiPlayerUIContext, updateUI } from "./playerUI";
-import { QueueListForm } from "./queueUI";
-import { PlayListMainForm } from "./playListUI";
+import { MidiListForm } from "./midiList";
+import { LibraryForm } from "./libraryUI";
 
 class MidiPlayerInstance {
     private form: CustomForm | undefined;
@@ -128,18 +128,25 @@ class MidiPlayerInstance {
             () => this.playerInst!,
             () => this.close(),
             {
-                openQueue: () => this.openQueue(),
-                openPlaylist: () => this.openPlaylist(),
+                openSongPicker: () => this.openSongPicker(),
+                openLibrary: () => this.openLibrary(),
             }
         );
     }
 
-    private openQueue() {
-        if (!this.player.isValid || !this.playerInst?.isAlive() || !this.leftBlock) return;
-        formManager.open(this.player, QueueListForm, {
+    private openSongPicker() {
+        if (!this.player.isValid || !this.playerInst?.isAlive()) return;
+        formManager.open(this.player, MidiListForm, {
             midiPlayer: this.playerInst,
-            p: -1,
-            block: this.leftBlock,
+            p: 1,
+            onBack: () => this.reopen(),
+        });
+    }
+
+    private openLibrary() {
+        if (!this.player.isValid || !this.playerInst?.isAlive()) return;
+        formManager.open(this.player, LibraryForm, {
+            midiPlayer: this.playerInst,
             onBack: () => this.reopen(),
         });
     }
@@ -155,13 +162,6 @@ class MidiPlayerInstance {
         if (!this.player.isValid || !this.leftBlock) return;
         void midiUIManager.open(this.player, this.leftBlock)
             .catch(error => console.error("[midi] 返回播放器失败", error));
-    }
-
-    private openPlaylist() {
-        if (!this.player.isValid || !this.playerInst?.isAlive()) return;
-        formManager.open(this.player, PlayListMainForm, {
-            midiPlayer: this.playerInst,
-        });
     }
 
     async show() {

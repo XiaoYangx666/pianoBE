@@ -177,6 +177,11 @@ export class PlayQueue {
         return this.list.length;
     }
 
+    /** 查找曲目在队列中的位置；不存在返回 -1。 */
+    indexOf(id: string) {
+        return this.list.findIndex((song) => song.id === id);
+    }
+
     snapshot() {
         return { songs: this.list.slice(), index: this.index, mode: this.mode };
     }

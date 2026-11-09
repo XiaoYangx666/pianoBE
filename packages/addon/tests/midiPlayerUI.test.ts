@@ -111,6 +111,11 @@ mock.module("@app/PianoWorld", () => ({
 
 const openedForms: { form: unknown; args: any }[] = [];
 
+class FakeField {
+    key() { return this; }
+    validator() { return this; }
+}
+
 mock.module("sapi-pro", () => ({
     formManager: {
         open: (_player: unknown, form: unknown, args: unknown) => {
@@ -120,12 +125,28 @@ mock.module("sapi-pro", () => ({
     CommonForm: {
         // 返回表单定义本身，测试可以直接调用 oncancel。
         ButtonForm: (config: unknown) => config,
+        InputForm: (config: unknown) => config,
+        SimpleMessageForm: (config: unknown) => config,
+    },
+    NumberField: FakeField,
+    TextField: FakeField,
+    Validators: {
+        numberRange: () => () => undefined,
+        stringLength: () => () => undefined,
     },
 }));
 
-mock.module(path.join(midiDir, "midiList.ts"), () => ({
-    MidiListForm: { name: "MidiListForm" },
-    MidiSearchForm: { name: "MidiSearchForm" },
+mock.module("@app/midi", () => ({
+    midiManager: {
+        page: async () => ({ items: [], total: 0 }),
+        metaAll: async () => [],
+        infoOf: async () => undefined,
+        getInfo: () => undefined,
+    },
+    playlist: {
+        getContent: async () => [],
+        setContent: async () => {},
+    },
 }));
 
 mock.module(path.join(midiDir, "playListUI.ts"), () => ({
@@ -162,18 +183,25 @@ function lastForm() {
     return FakeCustomForm.forms.at(-1)!;
 }
 
-function openQueueFromPlayer(playerForm: FakeCustomForm) {
-    const handler = playerForm.buttons.get("队列管理");
+function openSongPickerFromPlayer(playerForm: FakeCustomForm) {
+    const handler = playerForm.buttons.get("🎵 点歌");
     expect(handler).toBeDefined();
     handler!();
     return openedForms.at(-1)!;
 }
 
-/** 模拟玩家取消队列表单，走真实的 QueueListForm.oncancel。 */
-function backFromQueue(queue: { form: any; args: any }) {
-    queue.form.oncancel({}, {
-        args: queue.args,
-        back: () => { throw new Error("queue should return to the player UI"); },
+function openLibraryFromPlayer(playerForm: FakeCustomForm) {
+    const handler = playerForm.buttons.get("歌单");
+    expect(handler).toBeDefined();
+    handler!();
+    return openedForms.at(-1)!;
+}
+
+/** 模拟玩家取消点歌列表，走真实的 MidiListForm.oncancel。 */
+function backFromSongPicker(picker: { form: any; args: any }) {
+    picker.form.oncancel({}, {
+        args: picker.args,
+        back: () => { throw new Error("song picker should return to the player UI"); },
     });
 }
 
@@ -192,7 +220,7 @@ beforeEach(() => {
 });
 
 describe("MIDI 播放器返回路径", () => {
-    test("队列返回后重新订阅 MIDI 信号并继续刷新界面", async () => {
+    test("点歌返回后重新订阅 MIDI 信号并继续刷新界面", async () => {
         const midi = makeMidi();
         currentPiano = { getMidiPlayer: () => midi };
         const player = makePlayer();
@@ -203,14 +231,15 @@ describe("MIDI 播放器返回路径", () => {
 
         const form = lastForm();
         expect(form.isShowing()).toBe(true);
+        expect(form.buttons.size).toBe(6);
         expect(midi.signal.listenerCount()).toBe(1);
 
-        const queue = openQueueFromPlayer(form);
+        const queue = openSongPickerFromPlayer(form);
         await flush();
         expect(midi.signal.listenerCount()).toBe(0);
         expect(form.isShowing()).toBe(false);
 
-        backFromQueue(queue);
+        backFromSongPicker(queue);
         await flush();
 
         expect(form.isShowing()).toBe(true);
@@ -221,7 +250,67 @@ describe("MIDI 播放器返回路径", () => {
         expect(observableWrites()).toBeGreaterThan(before);
     });
 
-    test("多次进出队列不会累积订阅", async () => {
+    test("歌单返回播放器时恢复订阅", async () => {
+        const midi = makeMidi();
+        currentPiano = { getMidiPlayer: () => midi };
+        const player = makePlayer();
+        const block = makeBlock();
+
+        void openMidiPlayer(player, block);
+        await flush();
+
+        const form = lastForm();
+        const library = openLibraryFromPlayer(form);
+        await flush();
+        expect((library.form as any).buttons.length).toBe(3);
+        expect(midi.signal.listenerCount()).toBe(0);
+        expect(form.isShowing()).toBe(false);
+
+        library.form.oncancel({}, {
+            args: library.args,
+            back: () => { throw new Error("library should return to the player UI"); },
+        });
+        await flush();
+
+        expect(form.isShowing()).toBe(true);
+        expect(midi.signal.listenerCount()).toBe(1);
+    });
+
+    test("歌单 → 当前队列 → 返回歌单", async () => {
+        const midi = makeMidi();
+        currentPiano = { getMidiPlayer: () => midi };
+        const player = makePlayer();
+        const block = makeBlock();
+
+        void openMidiPlayer(player, block);
+        await flush();
+
+        const form = lastForm();
+        const library = openLibraryFromPlayer(form);
+        const pushed: { form: any; args: any }[] = [];
+        const libraryCtx = {
+            args: library.args,
+            push: (nextForm: any, nextArgs: any) => pushed.push({ form: nextForm, args: nextArgs }),
+            back: () => {},
+        };
+        const queueButton = (library.form as any).buttons.find(
+            (button: any) => button.label === "当前队列"
+        );
+        expect(queueButton).toBeDefined();
+        queueButton.func(libraryCtx);
+
+        const queue = pushed.at(-1)!;
+        expect(queue.form).toBeDefined();
+
+        let backed = false;
+        queue.form.oncancel({}, {
+            args: queue.args,
+            back: () => { backed = true; },
+        });
+        expect(backed).toBe(true);
+    });
+
+    test("多次进出点歌不会累积订阅", async () => {
         const midi = makeMidi();
         currentPiano = { getMidiPlayer: () => midi };
         const player = makePlayer();
@@ -232,11 +321,11 @@ describe("MIDI 播放器返回路径", () => {
         const form = lastForm();
 
         for (let i = 0; i < 3; i++) {
-            const queue = openQueueFromPlayer(form);
+            const queue = openSongPickerFromPlayer(form);
             await flush();
             expect(midi.signal.listenerCount()).toBe(0);
 
-            backFromQueue(queue);
+            backFromSongPicker(queue);
             await flush();
             expect(midi.signal.listenerCount()).toBe(1);
             expect(form.isShowing()).toBe(true);
@@ -257,7 +346,7 @@ describe("MIDI 播放器返回路径", () => {
         expect(midi.signal.listenerCount()).toBe(0);
     });
 
-    test("队列打开期间钢琴被拆除时，返回不会重新打开失效界面", async () => {
+    test("点歌列表打开期间钢琴被拆除时，返回不会重新打开失效界面", async () => {
         const midi = makeMidi();
         currentPiano = { getMidiPlayer: () => midi };
         const player = makePlayer();
@@ -266,11 +355,11 @@ describe("MIDI 播放器返回路径", () => {
         void openMidiPlayer(player, block);
         await flush();
         const form = lastForm();
-        const queue = openQueueFromPlayer(form);
+        const queue = openSongPickerFromPlayer(form);
         await flush();
 
         location = undefined;
-        backFromQueue(queue);
+        backFromSongPicker(queue);
         await flush();
 
         expect(form.isShowing()).toBe(false);
@@ -287,14 +376,14 @@ describe("MIDI 播放器返回路径", () => {
         void openMidiPlayer(player, block);
         await flush();
         const form = lastForm();
-        const queue = openQueueFromPlayer(form);
+        const queue = openSongPickerFromPlayer(form);
         await flush();
 
         const newMidi = makeMidi();
         currentPiano = { getMidiPlayer: () => newMidi };
         oldMidi.end();
 
-        backFromQueue(queue);
+        backFromSongPicker(queue);
         await flush();
 
         expect(form.isShowing()).toBe(true);
@@ -315,11 +404,11 @@ describe("MIDI 播放器返回路径", () => {
         void openMidiPlayer(player, block);
         await flush();
         const form = lastForm();
-        const queue = openQueueFromPlayer(form);
+        const queue = openSongPickerFromPlayer(form);
         await flush();
 
         player.isValid = false;
-        backFromQueue(queue);
+        backFromSongPicker(queue);
         await flush();
 
         expect(form.isShowing()).toBe(false);

@@ -39,8 +39,8 @@ function switchPlayMode(player: MidiPlayer, label: ObservableString) {
 }
 
 export interface MidiPlayerUIActions {
-    openQueue(): void;
-    openPlaylist(): void;
+    openSongPicker(): void;
+    openLibrary(): void;
 }
 
 export function createMidiPlayerUI(
@@ -78,12 +78,12 @@ export function createMidiPlayerUI(
             updateUI(ctx, player);
         })
 
-        .button("队列管理", () => {
+        .button("🎵 点歌", () => {
             close();
             if (!getPlayer().isAlive()) {
                 return;
             }
-            system.runTimeout(() => actions.openQueue(), 20);
+            system.runTimeout(() => actions.openSongPicker(), 20);
         })
 
         .button("⏮ 上一首", () => {
@@ -110,12 +110,12 @@ export function createMidiPlayerUI(
             }
             switchPlayMode(getPlayer(), ctx.playMode);
         })
-        .button("播放列表管理", () => {
+        .button("歌单", () => {
             close();
             if (!getPlayer().isAlive()) {
                 return;
             }
-            system.runTimeout(() => actions.openPlaylist(), 20);
+            system.runTimeout(() => actions.openLibrary(), 20);
         });
 
     return form;

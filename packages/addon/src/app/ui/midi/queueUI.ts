@@ -1,15 +1,18 @@
 import { MidiPlayer } from "@domain/playback/player";
-import { Block } from "@minecraft/server";
-import { CommonForm, FuncButton } from "sapi-pro";
-import { MidiListForm, MidiSearchForm } from "./midiList";
+import { CommonForm, FuncButton, NumberField, Validators } from "sapi-pro";
+import { MidiListForm } from "./midiList";
 import { PAGE_SIZE } from "./static";
 
-export const QueueListForm = CommonForm.ButtonForm<{
+export interface QueueListArgs {
     midiPlayer: MidiPlayer;
-    block: Block;
     p: number;
     onBack?: () => void;
-}>({
+}
+
+export const QueueListForm = CommonForm.ButtonForm<
+    QueueListArgs,
+    void
+>({
     title: "播放器序列",
     generator(form, player, args) {
         const queue = args.midiPlayer.queue;
@@ -19,79 +22,65 @@ export const QueueListForm = CommonForm.ButtonForm<{
         // p = -1 时跳转到当前播放页
         if (args.p === -1) {
             const current = queue.getIndex();
-            if (current >= 0) {
-                args.p = Math.floor(current / PAGE_SIZE) + 1;
-            } else {
-                args.p = 1;
-            }
+            args.p =
+                current >= 0 && current < total
+                    ? Math.floor(current / PAGE_SIZE) + 1
+                    : maxPage;
         }
 
         if (args.p > maxPage) args.p = maxPage;
         if (args.p < 1) args.p = 1;
 
-        form.body(`选择一项\n第 ${args.p} / ${maxPage} 页`);
+        const current = queue.current()?.name;
+        form.body(
+            `第 ${args.p} / ${maxPage} 页\n队列: ${total} 首` +
+                (current ? `\n当前: ${current}` : "")
+        );
     },
     buttons: [
         {
-            label: "添加",
+            label: "添加歌曲",
             func(ctx) {
                 ctx.push(MidiListForm, {
-                    queue: ctx.args.midiPlayer.queue,
-                    p: 1,
-                    filter: undefined,
-                });
-            },
-            shouldShow(player, args) {
-                return args.p == 1; //仅第一页显示
-            },
-        },
-        {
-            label: "搜索添加",
-            func(ctx) {
-                ctx.push(MidiSearchForm, {
-                    queue: ctx.args.midiPlayer.queue,
-                });
-            },
-            shouldShow(player, args) {
-                return args.p == 1; //仅第一页显示
-            },
-        },
-        {
-            label: "返回首页",
-            func(ctx) {
-                ctx.replace(QueueListForm, {
-                    ...ctx.args,
+                    midiPlayer: ctx.args.midiPlayer,
                     p: 1,
                 });
             },
-            shouldShow(player, args) {
-                return args.p != 1;
-            },
         },
         {
-            label: "上一页",
+            label: "当前播放",
             func(ctx) {
-                ctx.replace(QueueListForm, {
-                    ...ctx.args,
-                    p: ctx.args.p - 1,
-                });
+                const queue = ctx.args.midiPlayer.queue;
+                const total = queue.getLength();
+                const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                const current = queue.getIndex();
+                const p =
+                    current >= 0 && current < total
+                        ? Math.floor(current / PAGE_SIZE) + 1
+                        : maxPage;
+                ctx.replace(QueueListForm, { ...ctx.args, p });
             },
-            shouldShow(player, args) {
-                return args.p > 1;
-            },
+            shouldShow: (player, args) => args.midiPlayer.queue.getLength() > 0,
         },
         {
-            label: "下一页",
+            label: "页码",
             func(ctx) {
-                ctx.replace(QueueListForm, {
-                    ...ctx.args,
-                    p: ctx.args.p + 1,
+                ctx.push(QueuePageForm, {
+                    len: ctx.args.midiPlayer.queue.getLength(),
+                    args: ctx.args,
                 });
             },
-            shouldShow(player, args) {
-                const queue = args.midiPlayer.queue;
-                return args.p * PAGE_SIZE < queue.getLength();
+            shouldShow: (player, args) =>
+                args.midiPlayer.queue.getLength() > PAGE_SIZE,
+        },
+        {
+            label: "§c清空列表",
+            func(ctx) {
+                ctx.push(ClearQueueForm, {
+                    midiPlayer: ctx.args.midiPlayer,
+                });
             },
+            shouldShow: (player, args) => args.midiPlayer.queue.getLength() > 0,
         },
     ],
 
@@ -116,14 +105,6 @@ export const QueueListForm = CommonForm.ButtonForm<{
                             : `${realIndex}. ${name}`,
                 };
             });
-        buttons.push({
-            label: "§c§l清空列表",
-            shouldShow: () => args.p == 1,
-            func(ctx) {
-                ctx.args.midiPlayer.queue.clear();
-                ctx.back();
-            },
-        });
         return buttons;
     },
 
@@ -141,6 +122,59 @@ export const QueueListForm = CommonForm.ButtonForm<{
     oncancel(res, ctx) {
         if (ctx.args.onBack) ctx.args.onBack();
         else ctx.back();
+    },
+});
+
+const QueuePageForm = CommonForm.InputForm<
+    { p: number },
+    {
+        len: number;
+        args: QueueListArgs;
+    }
+>({
+    title: "跳页",
+    fieldsGenerator(player, args) {
+        const maxPage = Math.max(1, Math.ceil(args.len / PAGE_SIZE));
+        return [
+            new NumberField("页码", `1-${maxPage}`)
+                .key("p")
+                .validator(
+                    Validators.numberRange(1, maxPage, "页码超出范围")
+                ),
+        ];
+    },
+    onSubmit(data, ctx) {
+        ctx.offUntil(QueueListForm, QueueListForm, {
+            ...ctx.args.args,
+            p: data.p,
+        });
+    },
+    onCancel(res, ctx) {
+        ctx.back();
+    },
+});
+
+const ClearQueueForm = CommonForm.SimpleMessageForm<{
+    midiPlayer: MidiPlayer;
+}>({
+    title: "清空队列",
+    generator(form, player, args) {
+        form.body(
+            `确定清空队列中的 ${args.midiPlayer.queue.getLength()} 首歌曲？`
+        );
+    },
+    button1: {
+        text: "清空",
+        func(ctx) {
+            ctx.args.midiPlayer.queue.clear();
+            ctx.back();
+        },
+    },
+    button2: {
+        text: "取消",
+        func(ctx) {
+            ctx.back();
+        },
     },
 });
 
@@ -172,7 +206,9 @@ const QueueItemForm = CommonForm.ButtonForm<{
                 const { player, index } = ctx.args;
 
                 player.queue.jump(index);
-                player.play();
+                void player
+                    .play()
+                    .catch((error) => console.error("[midi] 播放失败", error));
 
                 ctx.back();
             },
@@ -188,7 +224,9 @@ const QueueItemForm = CommonForm.ButtonForm<{
                 queue.remove(index);
 
                 if (isCurrent) {
-                    player.play();
+                    void player
+                        .play()
+                        .catch((error) => console.error("[midi] 播放失败", error));
                 }
                 ctx.back();
             },

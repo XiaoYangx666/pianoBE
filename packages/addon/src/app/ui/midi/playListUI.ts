@@ -16,6 +16,7 @@ export const PlayListMainForm = CommonForm.ButtonForm<
     {
         midiPlayer: MidiPlayer;
         metas?: PlaylistMeta[];
+        onBack?: () => void;
     },
     PlaylistMeta
 >({
@@ -49,6 +50,10 @@ export const PlayListMainForm = CommonForm.ButtonForm<
                 meta: button.data,
                 midiPlayer: ctx.args.midiPlayer,
             });
+    },
+    oncancel(res, ctx) {
+        if (ctx.args.onBack) ctx.args.onBack();
+        else ctx.back();
     },
 });
 
@@ -304,6 +309,9 @@ const RenamePlayListForm = CommonForm.InputForm<any, any>({
         }
         ctx.back();
     },
+    onCancel(res, ctx) {
+        ctx.back();
+    },
 });
 
 // --- 创建和确认删除 ---
@@ -324,6 +332,9 @@ const CreatePlayListForm = CommonForm.InputForm<{ name: string }>({
             ctx.player.sendMessage("§c创建失败");
         }
         ctx.back(); // 返回歌单首页（onSubmit 被框架 await，导航在生命周期内）
+    },
+    onCancel(res, ctx) {
+        ctx.back();
     },
 });
 
