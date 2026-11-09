@@ -1,3 +1,16 @@
+import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES } from "@piano/core";
+import { ENABLED_PIANO_TIMBRES } from "./timbres";
+
+/** 按启用列表过滤音色；空列表回退到默认音色，保证设置里至少有一个选项。 */
+export function availablePianoTimbres(enabled: readonly string[]) {
+    const set = new Set(enabled);
+    const available = PIANO_TIMBRES.filter((timbre) => set.has(timbre.id));
+    return available.length ? available : [PIANO_TIMBRES[0]];
+}
+
+/** 当前包内可选的音色（生成器可能裁剪掉部分音色） */
+export const AVAILABLE_PIANO_TIMBRES = availablePianoTimbres(ENABLED_PIANO_TIMBRES);
+
 export const PIANO_PARTICLE_STYLES = [
     { value: 3, label: "魔法流光", effect: "xypiano:magic_trail" },
     { value: 4, label: "蓝眼泪 · 发光气泡", effect: "xypiano:blue_tears" },
@@ -20,6 +33,7 @@ export const DEFAULT_PIANO_SETTINGS = {
     particleStyle: PIANO_PARTICLE_STYLES[0].value as number,
     particlePalette: 0,
     volume: 100,
+    timbre: DEFAULT_PIANO_TIMBRE as number,
     textVisible: true,
     titleColor: "#D4FFE8",
     statusColor: "#A6EBCF",
@@ -77,6 +91,8 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         particlePalette: PIANO_PARTICLE_PALETTES.find(palette => palette.value === saved.particlePalette)?.value
             ?? defaults.particlePalette,
         volume: number("volume"),
+        timbre: AVAILABLE_PIANO_TIMBRES.find(timbre => timbre.value === saved.timbre)?.value
+            ?? defaults.timbre,
         textVisible: typeof saved.textVisible === "boolean" ? saved.textVisible : defaults.textVisible,
         titleColor: normalizePianoColor(saved.titleColor) ?? defaults.titleColor,
         statusColor: normalizePianoColor(saved.statusColor) ?? defaults.statusColor,

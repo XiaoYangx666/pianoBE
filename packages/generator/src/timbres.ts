@@ -1,0 +1,65 @@
+import JSZip from "jszip";
+
+/** public/timbres/index.json 的条目。可选音色额外带 file/size。 */
+export interface TimbreIndexEntry {
+    id: string;
+    value: number;
+    label: string;
+    description: string;
+    required: boolean;
+    bundled: boolean;
+    dirs: Record<string, string>;
+    notes: string[];
+    layers: string[];
+    size: number;
+    file: string | null;
+}
+
+export interface LoadedTimbrePack {
+    meta: TimbreIndexEntry;
+    /** 包内文件（相对 rp 根目录，如 sounds/meta_piano/C4.ogg） */
+    files: Map<string, Uint8Array>;
+    soundDefinitions: Record<string, unknown>;
+}
+
+const packCache = new Map<string, Promise<LoadedTimbrePack>>();
+
+/** 加载音色选择清单；加载失败时返回空列表，生成器仍可使用内置默认音色。 */
+export async function loadTimbreIndex(): Promise<TimbreIndexEntry[]> {
+    try {
+        const res = await fetch("./timbres/index.json?t=" + Date.now());
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as TimbreIndexEntry[];
+    } catch (e) {
+        console.error("[generator] 音色清单加载失败：", e);
+        return [];
+    }
+}
+
+/** 按需加载单个可选音色包（缓存；失败时下次会重试）。 */
+export function loadTimbrePack(meta: TimbreIndexEntry): Promise<LoadedTimbrePack> {
+    if (meta.bundled || !meta.file) {
+        return Promise.reject(new Error(`${meta.label} 已内置在基础模板中`));
+    }
+    let pending = packCache.get(meta.id);
+    if (!pending) {
+        pending = (async () => {
+            const res = await fetch(`./timbres/${meta.file}?t=` + Date.now());
+            if (!res.ok) throw new Error(`音色包加载失败：${meta.label} (${res.status})`);
+            const zip = await JSZip.loadAsync(await res.arrayBuffer());
+            const files = new Map<string, Uint8Array>();
+            for (const file of Object.values(zip.files)) {
+                if (file.dir) continue;
+                files.set(file.name, await file.async("uint8array"));
+            }
+            const definitionsFile = zip.file("sound_definitions.json");
+            const soundDefinitions = definitionsFile
+                ? (JSON.parse(await definitionsFile.async("string")).sound_definitions ?? {})
+                : {};
+            return { meta, files, soundDefinitions };
+        })();
+        pending.catch(() => packCache.delete(meta.id));
+        packCache.set(meta.id, pending);
+    }
+    return pending;
+}

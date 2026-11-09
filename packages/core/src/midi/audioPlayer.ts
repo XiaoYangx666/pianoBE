@@ -1,9 +1,17 @@
-import { processNote, getSoundIdByDuration, noteNameToMidi } from "./note.js";
+import {
+    processNote,
+    getSoundLayerByDuration,
+    noteNameToMidi,
+    pianoSoundId,
+    DEFAULT_PIANO_TIMBRE,
+    PIANO_SAMPLE_KEYS,
+    PIANO_SOUND_LAYERS,
+} from "./note.js";
 
 /**
  * WebAudio 采样播放引擎（前端播放器共享核心：管理端 web 与独立生成器共用）。
  *
- * - 音符→采样映射用 core 的 processNote / getSoundIdByDuration，与游戏内一致
+ * - 音符→采样映射用 core 的 processNote / pianoSoundId，与游戏内一致
  * - 采样来源可插拔（SampleSource）：web 用 URL（fetch /piano/...），
  *   生成器从模板 mcaddon 的 rp/sounds 提取；文件名差异由各端 source 自行处理
  * - 模板/静态目录只有基础采样键（A0-A7/C1-C8/D#/F# 等），缺键时按音高距离
@@ -46,17 +54,20 @@ export const SAMPLE_DIRS: Record<string, string> = {
 };
 
 /** 全部采样键名（基础键 C/D#/F#/A；文件系统命名差异由 SampleSource 处理） */
-export const SAMPLE_KEYS = [
-    "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
-    "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8",
-    "D#1", "D#2", "D#3", "D#4", "D#5", "D#6", "D#7",
-    "F#1", "F#2", "F#3", "F#4", "F#5", "F#6", "F#7",
-];
+export const SAMPLE_KEYS = PIANO_SAMPLE_KEYS;
 
-/** 全量采样清单：3 档 × 30 键 = 90 个 */
+/** 默认音色全量采样清单：3 档 × 30 键 = 90 个 */
 export const ALL_SAMPLES = Object.values(SAMPLE_DIRS).flatMap((dir) =>
     SAMPLE_KEYS.map((key) => ({ dir, sample: key }))
 );
+
+/** 指定音色的全量采样清单（3 档 × 30 键） */
+export function pianoSamples(timbre: number) {
+    return PIANO_SOUND_LAYERS.flatMap((layer) => {
+        const dir = pianoSoundId(timbre, layer);
+        return PIANO_SAMPLE_KEYS.map((sample) => ({ dir, sample }));
+    });
+}
 
 // ---- WebAudio 最小类型面（core 不引 DOM lib，避免污染全局类型） ----
 interface ParamLike {
@@ -126,6 +137,8 @@ export abstract class SampledMidiPlayer {
 
     /** 采样加载器；未设置时不可播放（available = false） */
     sampleSource: SampleSource | null = null;
+
+    private timbreValue: number = DEFAULT_PIANO_TIMBRE;
 
     private state: PlayerState = {
         status: "idle",
@@ -209,7 +222,7 @@ export abstract class SampledMidiPlayer {
         await ctx.resume();
 
         // 首次播放前全量加载采样（仅一次，之后永久缓存）
-        await Promise.all(ALL_SAMPLES.map(({ dir, sample }) => this.getSample(ctx, dir, sample)));
+        await Promise.all(pianoSamples(this.timbreValue).map(({ dir, sample }) => this.getSample(ctx, dir, sample)));
         if (!this.ctx || this.state.status !== "playing") return; // 预加载期间可能已 stop
 
         // 预加载耗时不计入进度：从当前时刻重新起算
@@ -276,6 +289,18 @@ export abstract class SampledMidiPlayer {
         this.preloaded = false;
     }
 
+    /** 当前播放音色（音色编号与 @piano/core 的 PIANO_TIMBRES 一致） */
+    get timbre() {
+        return this.timbreValue;
+    }
+
+    /** 切换音色；清空采样缓存，下一次播放/预热按新音色加载。播放中切换只影响后续音符。 */
+    setTimbre(timbre: number) {
+        if (this.timbreValue === timbre) return;
+        this.timbreValue = timbre;
+        this.clearSampleCache();
+    }
+
     /**
      * 后台预热采样：模板加载后尽早调用，用 OfflineAudioContext 预先解码全部采样，
      * 用户点播放时零等待（避免首次播放的前置延迟/页面遮罩闪烁）。
@@ -291,7 +316,7 @@ export abstract class SampledMidiPlayer {
         try {
             const off = new OfflineCtx(1, 1, 44100);
             await Promise.all(
-                ALL_SAMPLES.map(({ dir, sample }) => this.getSample(off, dir, sample))
+                pianoSamples(this.timbreValue).map(({ dir, sample }) => this.getSample(off, dir, sample))
             );
             this.preloaded = true;
         } catch {
@@ -342,7 +367,7 @@ export abstract class SampledMidiPlayer {
     /** 播放单个音符：core 映射选采样 + 变调（playbackRate），与 addon 一致 */
     private async playNote(ctx: CtxLike, master: GainLike, note: NoteEvent, when: number) {
         const info = processNote(note.midi, false);
-        const dir = SAMPLE_DIRS[getSoundIdByDuration(note.duration)];
+        const dir = pianoSoundId(this.timbreValue, getSoundLayerByDuration(note.duration));
         let buffer = await this.getSample(ctx, dir, info.sample);
         let pitch = info.pitch;
         if (!buffer) {

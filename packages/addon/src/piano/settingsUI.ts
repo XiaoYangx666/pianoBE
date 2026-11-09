@@ -1,7 +1,7 @@
 import { Player, system } from "@minecraft/server";
 import { CustomForm, DataDrivenScreenClosedReason, ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import { DDUIManager } from "@utils/ddui";
-import { DEFAULT_PIANO_SETTINGS, normalizePianoColor, normalizePianoSettings, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, type PianoSettings } from "./settings";
+import { AVAILABLE_PIANO_TIMBRES, DEFAULT_PIANO_SETTINGS, normalizePianoColor, normalizePianoSettings, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, type PianoSettings } from "./settings";
 import type { PianoRuntime } from "./world";
 
 class PianoSettingsForm {
@@ -39,6 +39,10 @@ class PianoSettingsForm {
         this.bind("particlePalette", particlePalette);
         this.form.dropdown("粒子配色", particlePalette, PIANO_PARTICLE_PALETTES.map(({ label, value }) => ({ label, value })));
         slider("钢琴音量（%，0 为静音）", "volume");
+        const timbre = new ObservableNumber(DEFAULT_PIANO_SETTINGS.timbre, writable);
+        this.bind("timbre", timbre);
+        this.form.dropdown("钢琴音色", timbre,
+            AVAILABLE_PIANO_TIMBRES.map(({ label, value, description }) => ({ label, value, description })));
         this.form.divider();
         toggle("显示琴面文字", "textVisible");
         color("标题颜色", "titleColor");

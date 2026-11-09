@@ -125,7 +125,7 @@ export function updatePianoUI(
     );
     //更新sound类型
     const sound = state.sound.getData() ?? 0;
-    ui.soundLabel.setData(soundTypes[sound].name);
+    ui.soundLabel.setData(`音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`);
 
     if (last) {
         ui.status.setData(

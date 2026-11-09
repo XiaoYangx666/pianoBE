@@ -1,6 +1,6 @@
 import { midiManager } from "@midiPlayer";
 import { Dimension, Vector3 } from "@minecraft/server";
-import { getSoundIdByDuration, processNote } from "@utils/note";
+import { processNote } from "@utils/note";
 import { Signal } from "@utils/signal";
 import { packNotes } from "@piano/core";
 import type { MidiSong, MidiSongMeta } from "@piano/core";
@@ -11,7 +11,7 @@ import type { PlaybackRecord } from "@piano/playbackRecord";
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
 
 interface MidiOutput {
-    note(note: NoteInfo, sound: string, duration: number): void;
+    note(note: NoteInfo, duration: number): void;
     playing(value: boolean): void;
 }
 
@@ -332,7 +332,7 @@ export class MidiPlayer {
     }
 
     private playNote(info: NoteInfo, duration: number) {
-        this.output.note(info, getSoundIdByDuration(duration), duration);
+        this.output.note(info, duration);
     }
 
     /* ================== 状态判断 ================== */

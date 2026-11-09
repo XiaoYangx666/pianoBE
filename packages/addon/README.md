@@ -72,3 +72,16 @@ npm run build:template   # 产出 dist/template.mcaddon（生成器底包）
 npm run build            # 编译 + 拷贝到测试服
 npm run test -w @piano/addon  # bun test（netSource 缓存/降级逻辑）
 ```
+
+## 音色包与生成器
+
+- `npm run build`：开发构建，包含全部音色，并复制到本地游戏开发包目录。
+- `npm run build:template`：生成供生成器使用的精简基础模板，只保留经典 P-88；
+  可选音色由生成器按用户勾选合并，不再把整套音色塞进模板。
+- `npm run build:timbres`：重新下载/裁剪/转码音色采样，并生成
+  `rp/sounds/sound_definitions.json`。
+- `npm run verify:timbres`：验证“只选默认 / 默认 + 某个音色”的导出结果，
+  检查采样目录、音效定义和 `scripts/piano/timbres.js` 是否一致。
+
+生成器导出时会覆写 `bp/scripts/piano/timbres.js`，游戏内设置只显示该包实际
+包含的音色；经典 P-88 始终保留，因此至少有一套音色可用。

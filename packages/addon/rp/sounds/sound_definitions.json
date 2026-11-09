@@ -1,543 +1,2883 @@
 {
     "format_version": "1.26.0",
     "sound_definitions": {
-        "piano.A0": {
-            "category": "record",
-            "sounds": ["sounds/piano/A0"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A1": {
-            "category": "record",
-            "sounds": ["sounds/piano/A1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A2": {
-            "category": "record",
-            "sounds": ["sounds/piano/A2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A3": {
-            "category": "record",
-            "sounds": ["sounds/piano/A3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A4": {
-            "category": "record",
-            "sounds": ["sounds/piano/A4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A5": {
-            "category": "record",
-            "sounds": ["sounds/piano/A5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A6": {
-            "category": "record",
-            "sounds": ["sounds/piano/A6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.A7": {
-            "category": "record",
-            "sounds": ["sounds/piano/A7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C1": {
-            "category": "record",
-            "sounds": ["sounds/piano/C1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C2": {
-            "category": "record",
-            "sounds": ["sounds/piano/C2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C3": {
-            "category": "record",
-            "sounds": ["sounds/piano/C3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C4": {
-            "category": "record",
-            "sounds": ["sounds/piano/C4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C5": {
-            "category": "record",
-            "sounds": ["sounds/piano/C5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C6": {
-            "category": "record",
-            "sounds": ["sounds/piano/C6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C7": {
-            "category": "record",
-            "sounds": ["sounds/piano/C7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.C8": {
-            "category": "record",
-            "sounds": ["sounds/piano/C8"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#1": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#2": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#3": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#4": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#5": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#6": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.D#7": {
-            "category": "record",
-            "sounds": ["sounds/piano/D#7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#1": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#2": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#3": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#4": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#5": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#6": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano.F#7": {
-            "category": "record",
-            "sounds": ["sounds/piano/F#7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A0": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A0"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A1": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A2": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A3": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A4": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A5": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A6": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.A7": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/A7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C1": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C2": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C3": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C4": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C5": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C6": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C7": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.C8": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/C8"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#1": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#2": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#3": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#4": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#5": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#6": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.D#7": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/D#7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#1": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#1"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#2": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#2"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#3": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#3"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#4": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#4"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#5": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#5"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#6": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#6"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
-        "piano_long.F#7": {
-            "category": "record",
-            "sounds": ["sounds/piano_long/F#7"],
-            "min_distance": 8,
-            "max_distance": 32
-        },
         "piano_short.A0": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A0"],
+            "sounds": [
+                "sounds/piano_short/A0"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A1": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A1"],
+            "sounds": [
+                "sounds/piano_short/A1"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A2": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A2"],
+            "sounds": [
+                "sounds/piano_short/A2"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A3": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A3"],
+            "sounds": [
+                "sounds/piano_short/A3"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A4": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A4"],
+            "sounds": [
+                "sounds/piano_short/A4"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A5": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A5"],
+            "sounds": [
+                "sounds/piano_short/A5"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A6": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A6"],
+            "sounds": [
+                "sounds/piano_short/A6"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.A7": {
             "category": "record",
-            "sounds": ["sounds/piano_short/A7"],
+            "sounds": [
+                "sounds/piano_short/A7"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C1": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C1"],
+            "sounds": [
+                "sounds/piano_short/C1"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C2": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C2"],
+            "sounds": [
+                "sounds/piano_short/C2"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C3": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C3"],
+            "sounds": [
+                "sounds/piano_short/C3"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C4": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C4"],
+            "sounds": [
+                "sounds/piano_short/C4"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C5": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C5"],
+            "sounds": [
+                "sounds/piano_short/C5"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C6": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C6"],
+            "sounds": [
+                "sounds/piano_short/C6"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C7": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C7"],
+            "sounds": [
+                "sounds/piano_short/C7"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.C8": {
             "category": "record",
-            "sounds": ["sounds/piano_short/C8"],
+            "sounds": [
+                "sounds/piano_short/C8"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#1": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#1"],
+            "sounds": [
+                "sounds/piano_short/D#1"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#2": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#2"],
+            "sounds": [
+                "sounds/piano_short/D#2"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#3": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#3"],
+            "sounds": [
+                "sounds/piano_short/D#3"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#4": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#4"],
+            "sounds": [
+                "sounds/piano_short/D#4"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#5": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#5"],
+            "sounds": [
+                "sounds/piano_short/D#5"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#6": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#6"],
+            "sounds": [
+                "sounds/piano_short/D#6"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.D#7": {
             "category": "record",
-            "sounds": ["sounds/piano_short/D#7"],
+            "sounds": [
+                "sounds/piano_short/D#7"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#1": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#1"],
+            "sounds": [
+                "sounds/piano_short/F#1"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#2": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#2"],
+            "sounds": [
+                "sounds/piano_short/F#2"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#3": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#3"],
+            "sounds": [
+                "sounds/piano_short/F#3"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#4": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#4"],
+            "sounds": [
+                "sounds/piano_short/F#4"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#5": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#5"],
+            "sounds": [
+                "sounds/piano_short/F#5"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#6": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#6"],
+            "sounds": [
+                "sounds/piano_short/F#6"
+            ],
             "min_distance": 8,
             "max_distance": 32
         },
         "piano_short.F#7": {
             "category": "record",
-            "sounds": ["sounds/piano_short/F#7"],
+            "sounds": [
+                "sounds/piano_short/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "piano_long.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/piano_long/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_short.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_short/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "meta_piano_long.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/meta_piano_long/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_short.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_short/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "upright_kw_long.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/upright_kw_long/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_short.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_short/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand/F#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A0": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A0"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.A7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/A7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.C8": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/C8"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.D#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/D#7"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#1": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#1"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#2": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#2"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#3": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#3"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#4": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#4"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#5": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#5"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#6": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#6"
+            ],
+            "min_distance": 8,
+            "max_distance": 32
+        },
+        "ydp_grand_long.F#7": {
+            "category": "record",
+            "sounds": [
+                "sounds/ydp_grand_long/F#7"
+            ],
             "min_distance": 8,
             "max_distance": 32
         }

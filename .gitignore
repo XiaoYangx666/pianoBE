@@ -9,9 +9,11 @@ packages/*/bp/scripts
 midis/files/*
 midis/js/*
 tools/piano_source/*
+tools/piano_timbres_source/*
 packages/*/dist
 packages/*/data
 packages/generator/public/library
+packages/generator/public/timbres
 .env
 *.mid
 *.mcaddon

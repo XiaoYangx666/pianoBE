@@ -10,6 +10,7 @@ import {
 } from "@instrument/runtime";
 import { MidiPlayer } from "@midiPlayer/player";
 import { NoteInfo } from "@types";
+import { pianoSoundId, getSoundLayerByDuration, type PianoSoundLayer } from "@piano/core";
 import { RightOffsets } from "@utils/block";
 import { processNote } from "@utils/note";
 import { summonParticle } from "@utils/particle";
@@ -129,7 +130,7 @@ export class PianoRuntime {
     getMidiPlayer() {
         const { dimension, pos, direction } = this.location;
         return this.midi ??= new MidiPlayer(dimension, pos, direction, {
-            note: (note, sound, duration) => this.playNote(note, sound, duration),
+            note: (note, duration) => this.playNote(note, getSoundLayerByDuration(duration), duration),
             playing: value => {
                 if (value) this.activate();
                 this.checkpoint();
@@ -138,21 +139,21 @@ export class PianoRuntime {
         });
     }
 
-    playKey(midi: number, sound = "piano_short") {
-        this.playNote(processNote(midi, false), sound, .15);
+    playKey(midi: number, layer: PianoSoundLayer = "short") {
+        this.playNote(processNote(midi, false), layer, .15);
     }
 
     isKeyDown(midi: number) {
         return this.display?.isKeyDown(midi) ?? false;
     }
 
-    playNote(note: NoteInfo, sound: string, duration: number) {
+    playNote(note: NoteInfo, layer: PianoSoundLayer, duration: number) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
         const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
         const settings = this.settings ?? DEFAULT_PIANO_SETTINGS;
         const volume = 2 * settings.volume / 100;
-        if (volume > 0) dimension.playSound(`${sound}.${note.sample}`, this.center, { pitch: note.pitch, volume });
+        if (volume > 0) dimension.playSound(`${pianoSoundId(settings.timbre, layer)}.${note.sample}`, this.center, { pitch: note.pitch, volume });
         this.display?.strike(note.midi, duration);
         this.activate();
         if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);

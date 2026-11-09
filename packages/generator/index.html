@@ -32,6 +32,24 @@
                     随机化 UUID
                 </label>
 
+                <details class="timbre-section">
+                    <summary>
+                        <span class="timbre-title">钢琴音色</span>
+                        <span class="timbre-summary">
+                            <span>已选 <b id="timbreCount">1</b> 套</span>
+                            <span id="timbreSize">内置默认</span>
+                        </span>
+                    </summary>
+                    <div id="timbreList" class="timbre-list">
+                        <div class="timbre-loading">音色清单加载中...</div>
+                    </div>
+                    <label class="timbre-preview">
+                        试听音色
+                        <select id="previewTimbre" disabled></select>
+                    </label>
+                    <p class="timbre-hint">经典 P-88 始终包含；勾选其他音色会按需加载并打包。</p>
+                </details>
+
                 <h3>模板底包状态</h3>
                 <div class="tpl-box">
                     <div>

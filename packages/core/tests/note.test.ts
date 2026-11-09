@@ -4,6 +4,10 @@ import {
     midiToNoteName,
     noteNameToMidi,
     getSoundIdByDuration,
+    getSoundLayerByDuration,
+    pianoSoundId,
+    PIANO_TIMBRES,
+    DEFAULT_PIANO_TIMBRE,
 } from "../src/midi/note.js";
 
 describe("note.ts（采样映射，addon/前端共用）", () => {
@@ -41,5 +45,29 @@ describe("note.ts（采样映射，addon/前端共用）", () => {
         expect(getSoundIdByDuration(0.5)).toBe("piano_short");
         expect(getSoundIdByDuration(2)).toBe("piano");
         expect(getSoundIdByDuration(5)).toBe("piano_long");
+    });
+
+    it("音色档位映射到独立采样目录", () => {
+        expect(PIANO_TIMBRES[0].value).toBe(DEFAULT_PIANO_TIMBRE);
+        expect(pianoSoundId(0, "short")).toBe("piano_short");
+        expect(pianoSoundId(0, "standard")).toBe("piano");
+        expect(pianoSoundId(0, "long")).toBe("piano_long");
+        for (const timbre of PIANO_TIMBRES.slice(1)) {
+            expect(pianoSoundId(timbre.value, "short")).toBe(`${timbre.id}_short`);
+            expect(pianoSoundId(timbre.value, "standard")).toBe(timbre.id);
+            expect(pianoSoundId(timbre.value, "long")).toBe(`${timbre.id}_long`);
+        }
+        expect(getSoundIdByDuration(2, 1)).toBe("meta_piano");
+    });
+
+    it("未知音色编号回退到默认音色", () => {
+        expect(pianoSoundId(999, "short")).toBe("piano_short");
+    });
+
+    it("getSoundLayerByDuration 的边界", () => {
+        expect(getSoundLayerByDuration(0.99)).toBe("short");
+        expect(getSoundLayerByDuration(1)).toBe("standard");
+        expect(getSoundLayerByDuration(4)).toBe("standard");
+        expect(getSoundLayerByDuration(4.01)).toBe("long");
     });
 });

@@ -6,9 +6,9 @@
     "license": "GPL-3.0-only",
     "private": true,
     "scripts": {
-        "predev": "node scripts/sync-template.mjs && node scripts/sync-library.mjs",
+        "predev": "node scripts/sync-template.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs",
         "dev": "vite",
-        "prebuild": "node scripts/sync-template.mjs && node scripts/sync-library.mjs",
+        "prebuild": "node scripts/sync-template.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs",
         "build": "vite build",
         "preview": "vite preview"
     },

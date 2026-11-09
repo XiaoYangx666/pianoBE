@@ -1,9 +1,11 @@
 import "./styles.css";
+import { PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
 import { loadTemplate, type TemplateInfo } from "./template";
 import { generateAddonZip } from "./export";
 import { midiFileToEntry } from "./convert";
 import { loadLibraryIndex, loadLibrarySong, libraryMetaToEntry, recordLibraryAdd, recordLibraryPlay, type LibraryMeta } from "./library";
 import { previewPlayer } from "./player";
+import { loadTimbreIndex, loadTimbrePack, type LoadedTimbrePack, type TimbreIndexEntry } from "./timbres";
 import type { SongEntry } from "./types";
 
 const TIME_SCALE = 40;
@@ -27,6 +29,15 @@ let template: TemplateInfo | null = null;
 let songs: SongEntry[] = [];
 let library: LibraryMeta[] | null = null;
 let libFilter = "";
+
+/** 音色清单（来自 public/timbres/index.json，按需下载） */
+let timbreIndex: TimbreIndexEntry[] = [];
+/** 已勾选要打进导出包的音色 id（经典 P-88 始终包含） */
+const selectedTimbres = new Set<string>(["piano"]);
+/** 已下载并解析的音色包 */
+const loadedTimbres = new Map<string, LoadedTimbrePack>();
+/** 试听使用的音色 id */
+let previewTimbreId = "piano";
 
 type LibrarySort = "adds" | "plays" | "name" | "default";
 let libSort: LibrarySort = "adds";
@@ -59,6 +70,10 @@ const libList = $<HTMLDivElement>("libList");
 const openLibBtn = $<HTMLButtonElement>("openLibBtn");
 const libModal = $<HTMLDivElement>("libModal");
 const libClose = $<HTMLButtonElement>("libClose");
+const timbreList = $<HTMLDivElement>("timbreList");
+const timbreCount = $<HTMLElement>("timbreCount");
+const timbreSize = $<HTMLElement>("timbreSize");
+const previewTimbreSelect = $<HTMLSelectElement>("previewTimbre");
 
 const showLoading = (text: string) => {
     loadingText.innerText = text;
@@ -71,6 +86,159 @@ const formatDuration = (scaled: number) => {
     const m = Math.floor(s / 60);
     return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 };
+
+// ---------- 音色 ----------
+const formatMB = (bytes: number) => `${(bytes / 1048576).toFixed(2)} MB`;
+
+/** 音色清单加载失败时的兜底：只有默认音色可直接使用，但仍知道可选目录以便裁剪旧模板。 */
+function fallbackTimbreIndex(): TimbreIndexEntry[] {
+    return PIANO_TIMBRES.map((timbre) => ({
+        id: timbre.id,
+        value: timbre.value,
+        label: timbre.label,
+        description: timbre.description,
+        required: timbre.id === "piano",
+        bundled: timbre.id === "piano",
+        dirs: Object.fromEntries(
+            PIANO_SOUND_LAYERS.map((layer) => [layer, pianoSoundId(timbre.value, layer)])
+        ),
+        notes: [...PIANO_SAMPLE_KEYS],
+        layers: [...PIANO_SOUND_LAYERS],
+        size: 0,
+        file: null,
+    }));
+}
+
+function findTimbre(id: string) {
+    return timbreIndex.find((meta) => meta.id === id);
+}
+
+/** 把已下载的音色包写入当前模板 zip（供试听和导出共用）。 */
+function attachTimbrePack(pack: LoadedTimbrePack) {
+    if (!template) return;
+    for (const [path, data] of pack.files) {
+        if (path.startsWith("sounds/")) {
+            template.zip.file(`${template.rpPath}${path}`, data);
+        }
+    }
+}
+
+async function ensureTimbrePack(meta: TimbreIndexEntry): Promise<LoadedTimbrePack> {
+    let pack = loadedTimbres.get(meta.id);
+    if (!pack) {
+        pack = await loadTimbrePack(meta);
+        loadedTimbres.set(meta.id, pack);
+    }
+    attachTimbrePack(pack);
+    return pack;
+}
+
+function updateTimbreSummary() {
+    const selected = timbreIndex.filter((meta) => selectedTimbres.has(meta.id));
+    const optionalBytes = selected
+        .filter((meta) => !meta.bundled)
+        .reduce((sum, meta) => sum + meta.size, 0);
+    timbreCount.textContent = String(selected.length);
+    timbreSize.textContent = optionalBytes > 0
+        ? `附加约 ${formatMB(optionalBytes)}`
+        : "内置默认";
+}
+
+function renderPreviewOptions() {
+    const previous = previewTimbreId;
+    previewTimbreSelect.innerHTML = "";
+    for (const meta of timbreIndex) {
+        if (!selectedTimbres.has(meta.id)) continue;
+        const option = document.createElement("option");
+        option.value = meta.id;
+        option.textContent = meta.label;
+        previewTimbreSelect.append(option);
+    }
+    if (!selectedTimbres.has(previewTimbreId) || !findTimbre(previewTimbreId)) {
+        previewTimbreId = "piano";
+    }
+    previewTimbreSelect.value = previewTimbreId;
+    previewTimbreSelect.disabled = !template || !timbreIndex.length;
+    if (previous !== previewTimbreId) {
+        void applyPreviewTimbre(previewTimbreId);
+    }
+}
+
+function renderTimbres() {
+    timbreList.innerHTML = "";
+    if (!timbreIndex.length) {
+        timbreList.innerHTML = '<div class="timbre-loading">未找到音色清单</div>';
+        return;
+    }
+    for (const meta of timbreIndex) {
+        const item = document.createElement("label");
+        item.className = `timbre-item${meta.required ? " disabled" : ""}`;
+
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = selectedTimbres.has(meta.id);
+        input.disabled = meta.required || (!meta.bundled && !meta.file);
+        input.addEventListener("change", () => toggleTimbre(meta, input.checked));
+
+        const copy = document.createElement("div");
+        copy.className = "timbre-copy";
+        const name = document.createElement("div");
+        name.className = "timbre-name";
+        name.textContent = meta.label;
+        if (meta.required) {
+            const tag = document.createElement("span");
+            tag.className = "tag orig";
+            tag.textContent = "内置";
+            name.append(tag);
+        }
+        const desc = document.createElement("div");
+        desc.className = "timbre-desc";
+        desc.textContent = meta.description;
+        copy.append(name, desc);
+
+        const size = document.createElement("span");
+        size.className = "timbre-size";
+        size.textContent = meta.bundled ? "内置" : meta.file ? formatMB(meta.size) : "缺失";
+
+        item.append(input, copy, size);
+        timbreList.append(item);
+    }
+    updateTimbreSummary();
+    renderPreviewOptions();
+}
+
+function toggleTimbre(meta: TimbreIndexEntry, checked: boolean) {
+    if (meta.required) return;
+    if (checked) selectedTimbres.add(meta.id);
+    else selectedTimbres.delete(meta.id);
+    if (!checked && previewTimbreId === meta.id) {
+        previewTimbreId = "piano";
+        if (template) void applyPreviewTimbre("piano");
+    }
+    updateTimbreSummary();
+    renderPreviewOptions();
+}
+
+/** 按需加载并切换试听音色。 */
+async function applyPreviewTimbre(id: string) {
+    const meta = findTimbre(id);
+    if (!meta || !template) return;
+    previewPlayer.stop();
+    if (!meta.bundled) {
+        showLoading("加载音色包...");
+        try {
+            await ensureTimbrePack(meta);
+        } catch (e) {
+            console.error("[generator] 音色包加载失败：", e);
+            alert("音色包加载失败: " + (e as Error).message);
+            hideLoading();
+            return;
+        }
+        hideLoading();
+    }
+    previewPlayer.setTimbre(meta.value);
+    previewPlayer.warmup().catch(() => {});
+}
 
 // ---------- 预览 ----------
 /** 正在加载采样/启动播放的曲目（按钮显示 ⏳，避免全屏遮罩闪烁） */
@@ -118,7 +286,15 @@ async function applyTemplate(fileOrBlob: Blob) {
     showLoading("解析 Addon 模板...");
     try {
         template = await loadTemplate(fileOrBlob);
+        // 换模板后，之前下载过的音色包要重新写进新 zip（导出/试听共用同一份数据）
+        for (const pack of loadedTimbres.values()) attachTimbrePack(pack);
         previewPlayer.bindTemplate(template);
+        const previewMeta = findTimbre(previewTimbreId);
+        if (!previewMeta || (!previewMeta.bundled && !loadedTimbres.has(previewMeta.id))) {
+            previewTimbreId = "piano";
+        }
+        previewPlayer.setTimbre(findTimbre(previewTimbreId)?.value ?? 0);
+        renderPreviewOptions();
         // 后台预热采样（OfflineAudioContext 解码，点试听时零等待、不闪遮罩）
         previewPlayer.warmup().catch(() => {});
         addonName.value = template.bpManifest.header?.name ?? "";
@@ -329,14 +505,28 @@ function escapeHtml(s: string): string {
 // ---------- 导出 ----------
 async function generateAddon() {
     if (!template) return;
-    showLoading("导出打包中...");
+    previewPlayer.stop();
+    showLoading("加载音色包...");
     try {
+        const selectedPacks: LoadedTimbrePack[] = [];
+        for (const meta of timbreIndex) {
+            if (meta.bundled || !selectedTimbres.has(meta.id)) continue;
+            selectedPacks.push(await ensureTimbrePack(meta));
+        }
+        showLoading("导出打包中...");
         const name = addonName.value.trim() || "Piano Addon";
         const desc = addonDesc.value.trim() || "Powered by PianoBE";
         const blob = await generateAddonZip(template, songs, {
             name,
             desc,
             randomUuid: randomUuid.checked,
+            timbres: {
+                all: timbreIndex,
+                selected: selectedPacks,
+                enabledIds: timbreIndex
+                    .filter((meta) => selectedTimbres.has(meta.id))
+                    .map((meta) => meta.id),
+            },
         });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
@@ -508,6 +698,10 @@ templateInput.onchange = (e) => {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (f) applyTemplate(f);
 };
+previewTimbreSelect.onchange = () => {
+    previewTimbreId = previewTimbreSelect.value;
+    void applyPreviewTimbre(previewTimbreId);
+};
 generateBtn.onclick = generateAddon;
 clearBtn.onclick = () => {
     if (confirm("确定清空当前列表？")) {
@@ -585,13 +779,27 @@ libSortSelect.onchange = (e) => {
     renderLibrary();
 };
 
+async function initTimbres() {
+    const index = await loadTimbreIndex();
+    timbreIndex = index.length ? index : fallbackTimbreIndex();
+    selectedTimbres.clear();
+    selectedTimbres.add("piano");
+    // 默认勾选全部可用音色；用户取消勾选后导出包会相应变小。
+    for (const meta of timbreIndex) {
+        if (!meta.required && meta.file) selectedTimbres.add(meta.id);
+    }
+    if (!findTimbre(previewTimbreId)) previewTimbreId = "piano";
+    renderTimbres();
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
-    // 曲库目录与默认底包并行加载
+    // 曲库目录、音色清单与默认底包并行加载
     loadLibraryIndex().then((idx) => {
         library = idx;
         rebuildLibraryOrder();
         renderLibrary();
     });
+    void initTimbres();
     try {
         const res = await fetch("./template.mcaddon?v=" + Date.now());
         if (res.ok) await applyTemplate(await res.blob());
