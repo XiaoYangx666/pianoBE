@@ -184,7 +184,7 @@ function lastForm() {
 }
 
 function openSongPickerFromPlayer(playerForm: FakeCustomForm) {
-    const handler = playerForm.buttons.get("🎵 点歌");
+    const handler = playerForm.buttons.get("♪ 点歌");
     expect(handler).toBeDefined();
     handler!();
     return openedForms.at(-1)!;

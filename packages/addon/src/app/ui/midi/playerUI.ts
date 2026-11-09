@@ -78,7 +78,7 @@ export function createMidiPlayerUI(
             updateUI(ctx, player);
         })
 
-        .button("🎵 点歌", () => {
+        .button("♪ 点歌", () => {
             close();
             if (!getPlayer().isAlive()) {
                 return;
