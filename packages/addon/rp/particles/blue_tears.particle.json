@@ -52,14 +52,14 @@
           "math.pow(1 - (math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1)), 0.85) * (0.6 + 0.4 * variable.particle_random_3)"
         ]
       },
-      "minecraft:particle_initial_speed": "math.random(0.42, 1.48)",
+      "minecraft:particle_initial_speed": "math.random(0.9, 2.2)",
       "minecraft:particle_motion_dynamic": {
         "linear_acceleration": [
           0,
-          0.27,
+          0.34,
           0
         ],
-        "linear_drag_coefficient": 1.4,
+        "linear_drag_coefficient": 0.95,
         "rotation_drag_coefficient": 1.1
       },
       "minecraft:particle_initial_spin": {

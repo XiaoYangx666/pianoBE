@@ -52,14 +52,14 @@
           "(1 - (math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1))) * 0.94"
         ]
       },
-      "minecraft:particle_initial_speed": 0.62,
+      "minecraft:particle_initial_speed": 1.1,
       "minecraft:particle_motion_dynamic": {
         "linear_acceleration": [
           0,
-          0.19,
+          0.24,
           0
         ],
-        "linear_drag_coefficient": 1.6,
+        "linear_drag_coefficient": 1.0,
         "rotation_drag_coefficient": 0.8
       },
       "minecraft:particle_initial_spin": {
