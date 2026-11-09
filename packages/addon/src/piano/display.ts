@@ -6,6 +6,9 @@ import { readPlaybackRecord, type PlaybackRecord } from "./playbackRecord";
 import { readPianoSettings, type PianoSettings } from "./settings";
 
 export const PIANO_DISPLAY = "xypiano:piano_display";
+export function pianoDisplayType(location: InstrumentLocation) {
+    return location.definition?.displayId ?? PIANO_DISPLAY;
+}
 const ANCHOR = "xypiano:anchor";
 const PLAYBACK = "xypiano:playback_v1";
 const SETTINGS = "xypiano:settings_v1";
@@ -26,8 +29,9 @@ export function displayAnchor(entity: Entity): Vector3 | undefined {
     return typeof anchor === "object" ? anchor : undefined;
 }
 
-function ownedDisplays({ dimension, pos }: InstrumentLocation, point: Vector3) {
-    return dimension.getEntities({ type: PIANO_DISPLAY, location: point, maxDistance: .25 })
+function ownedDisplays(location: InstrumentLocation, point: Vector3) {
+    const { dimension, pos } = location;
+    return dimension.getEntities({ type: pianoDisplayType(location), location: point, maxDistance: .25 })
         .filter(candidate => {
             const anchor = displayAnchor(candidate);
             return anchor?.x === pos.x && anchor.y === pos.y && anchor.z === pos.z;
@@ -74,7 +78,7 @@ export class PianoDisplay {
             const delta = (candidate.getRotation().y - yaw) % 360;
             return Math.abs(delta) <= .01;
         });
-        const identifier = PIANO_DISPLAY as Parameters<typeof dimension.spawnEntity>[0];
+        const identifier = pianoDisplayType(location) as Parameters<typeof dimension.spawnEntity>[0];
         const entity = match ?? dimension.spawnEntity(identifier, point, { initialRotation: yaw });
         try {
             if (!match) entity.setDynamicProperty(ANCHOR, pos);

@@ -3,7 +3,7 @@ mock.module("@minecraft/server", () => ({
     BlockPermutation: { resolve: (typeId: string, states: Record<string, string>) => ({ type: { id: typeId }, getState: (key: string) => states[key] }) },
     ItemStack: class { constructor(public typeId: string) {} },
 }));
-const { inspectInstrument, placeInstrument, destroyInstrument, resolveInstrument } = await import("../src/instrument/runtime");
+const { grandDefinition, pianoDefinition, inspectInstrument, placeInstrument, destroyInstrument, resolveInstrument } = await import("../src/instrument/runtime");
 
 function fixture() {
     const cells = new Map<string, any>();
@@ -57,5 +57,49 @@ describe("instrument assemblies", () => {
         expect(destroyInstrument(location, true)).toBe(true);
         expect(right.typeId).toBe("xypiano:piano_right");
         expect(dimension.spawnItem).toHaveBeenCalledTimes(1);
+    });
+    test("digital and grand instruments drop their own item", () => {
+        expect(pianoDefinition.itemId).toBe("xypiano:piano_item");
+        expect(grandDefinition.itemId).toBe("xypiano:grand_piano_item");
+    });
+    test("places and resolves the full grand in every rotation, then drops its own item", () => {
+        const transforms = {
+            north: (x: number, z: number) => [x, z],
+            east: (x: number, z: number) => [-z, x],
+            south: (x: number, z: number) => [-x, -z],
+            west: (x: number, z: number) => [z, -x],
+        };
+        for (const [direction, rotate] of Object.entries(transforms)) {
+            const { dimension, location } = fixture();
+            Object.assign(location, { direction, definition: grandDefinition, pos: { x: 10, y: 64, z: 20 } });
+            expect(placeInstrument(location)).toBe(true);
+            expect(inspectInstrument(location)).toBe("complete");
+            const blocks = grandDefinition.parts.map(({ typeId }) => {
+                const [y, z, x] = typeId.split("_").slice(-3).map(Number);
+                const [dx, dz] = rotate(x - 1, z);
+                const block = dimension.getBlock({ x: 10 + dx, y: 64 + y, z: 20 + dz });
+                expect(block.typeId).toBe(typeId);
+                const owner = resolveInstrument(block);
+                expect(owner?.pos).toEqual(location.pos);
+                expect(owner?.definition).toBe(grandDefinition);
+                return block;
+            });
+            const owner = resolveInstrument(blocks.at(-1))!;
+            blocks.at(-1).setType("minecraft:air");
+            expect(destroyInstrument(owner, true)).toBe(true);
+            expect(blocks.every(block => block.isAir)).toBe(true);
+            expect(dimension.spawnItem).toHaveBeenCalledTimes(1);
+            expect(dimension.spawnItem.mock.calls[0][0].typeId).toBe("xypiano:grand_piano_item");
+        }
+    });
+    test("an obstruction in the grand's tail leaves the anchor untouched", () => {
+        const { dimension, location } = fixture();
+        location.definition = grandDefinition;
+        const tail = dimension.getBlock({ x: 0, y: 1, z: 4 });
+        tail.isAir = false;
+        tail.typeId = "minecraft:stone";
+        expect(placeInstrument(location)).toBe(false);
+        expect(dimension.getBlock(location.pos).typeId).toBe("minecraft:air");
+        expect(tail.typeId).toBe("minecraft:stone");
     });
 });

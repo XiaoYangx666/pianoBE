@@ -5,10 +5,18 @@ import { openMidiPlayer } from "@midiPlayer/ui/playerUIManager";
 import { openPiano } from "@piano/piano";
 import { openPianoSettings } from "@piano/settingsUI";
 import { pianoWorld } from "@piano/world";
-import { destroyInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced, inspectInstrument, InstrumentLocation, resolveInstrument, resolveInstrumentSnapshot } from "@instrument/runtime";
+import { GRAND_INTERACTION_CELLS, GRAND_RETIRED_CELLS } from "@instrument/grand.generated";
+import { destroyInstrument, grandDefinition, instrumentBlockTypes, instrumentDestroyed, instrumentKey, instrumentPlaced, inspectInstrument, InstrumentLocation, resolveInstrument, resolveInstrumentSnapshot } from "@instrument/runtime";
+
+const grandInteractionCells = new Set<string>(GRAND_INTERACTION_CELLS);
+const grandRetiredCells = new Set<string>(GRAND_RETIRED_CELLS);
 
 export const PianoBlockComponent: BlockCustomComponent = {
     onTick({ block }) {
+        if (grandRetiredCells.has(block.typeId)) {
+            block.setType("minecraft:air");
+            return;
+        }
         const location = resolveInstrument(block);
         if (location) pianoWorld.blockTick(location);
     },
@@ -23,7 +31,9 @@ export const PianoBlockComponent: BlockCustomComponent = {
     onPlayerInteract(e) {
         if (!e.player) return;
         const location = resolveInstrument(e.block);
-        if (!location || !pianoWorld.beginInteraction(e.player)) return;
+        if (!location) return;
+        if (location.definition === grandDefinition && !grandInteractionCells.has(e.block.typeId)) return;
+        if (!pianoWorld.beginInteraction(e.player)) return;
         const piano = pianoWorld.get(location);
         if (!piano) return;
         const hit = pianoWorld.interactFromView(e.player, piano);
@@ -71,7 +81,7 @@ export function regEvents() {
     });
     const blockEvents = createBlockResourceEvents(eventHost, suppressNativeDrop);
     blockEvents.register({
-        blockTypes: ["xypiano:piano_left", "xypiano:piano_right"],
+        blockTypes: instrumentBlockTypes,
         boundary: "piano",
         broken: (e, suppressDrop) => {
             const location = resolveInstrumentSnapshot(e.dimension, e.block.location, e.brokenBlockPermutation);

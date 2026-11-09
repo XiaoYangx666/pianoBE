@@ -1,0 +1,18 @@
+{
+    "format_version": "1.17",
+    "minecraft:recipe_shaped": {
+        "description": {
+            "identifier": "xypiano:grand_piano_recipe"
+        },
+        "tags": ["crafting_table"],
+        "pattern": [" G ", "GPG", " G "],
+        "key": {
+            "G": { "item": "minecraft:gold_block" },
+            "P": { "item": "xypiano:piano_item" }
+        },
+        "result": {
+            "item": "xypiano:grand_piano_item",
+            "count": 1
+        }
+    }
+}

@@ -1,7 +1,6 @@
 import { resolveInstrument } from "@instrument/runtime";
 import { Block, Player, system } from "@minecraft/server";
 import { CustomForm, DataDrivenScreenClosedReason, ObservableNumber, ObservableString } from "@minecraft/server-ui";
-import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
 import { pianoWorld } from "@piano/world";
 import { MidiPlayer } from "../player";
@@ -29,13 +28,12 @@ class MidiPlayerInstance {
     constructor(private player: Player) {}
 
     setBlock(block: Block): boolean {
-        const left = getLeftPianoBlock(block);
-        if (!left) return false;
-
-        const location = resolveInstrument(left);
-        const piano = location && pianoWorld.get(location);
-        if (!piano) return false;
-        this.leftBlock = left;
+        const location = resolveInstrument(block);
+        if (!location) return false;
+        const anchor = location.dimension.getBlock(location.pos);
+        const piano = pianoWorld.get(location);
+        if (!anchor || !piano) return false;
+        this.leftBlock = anchor;
         const newPlayer = piano.getMidiPlayer();
 
         if (this.unsub) {
@@ -56,7 +54,7 @@ class MidiPlayerInstance {
 
         // 同步上下文
         if (this.ctx) {
-            this.ctx.block = left;
+            this.ctx.block = anchor;
         }
         return true;
     }

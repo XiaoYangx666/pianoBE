@@ -1,0 +1,23 @@
+{
+    "format_version": "1.26.10",
+    "minecraft:item": {
+        "description": {
+            "identifier": "xypiano:grand_piano_item",
+            "menu_category": {
+                "category": "items"
+            }
+        },
+        "components": {
+            "minecraft:display_name": {
+                "value": "三角钢琴"
+            },
+            "minecraft:icon": {
+                "textures": {
+                    "default": "piano:grand_piano_item"
+                }
+            },
+            "minecraft:max_stack_size": 1,
+            "xypiano:placer": {}
+        }
+    }
+}

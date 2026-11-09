@@ -2,9 +2,10 @@ import { RuntimeScope } from "@begame/tabletop";
 import { NativeTextSurface } from "@begame/tabletop/minecraft";
 import { hostScope, textPort } from "./minecraft";
 import { PIANO_SCREEN } from "./hitboxes.generated";
+import { GRAND_TEXT } from "@instrument/grand.generated";
 import { Player, Vector3, system, world } from "@minecraft/server";
 import {
-    destroyInstrument, inspectInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced,
+    destroyInstrument, grandDefinition, inspectInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced,
     InstrumentLocation, resolveInstrument,
 } from "@instrument/runtime";
 import { MidiPlayer } from "@midiPlayer/player";
@@ -13,8 +14,9 @@ import { RightOffsets } from "@utils/block";
 import { processNote } from "@utils/note";
 import { summonParticle } from "@utils/particle";
 import { Signal } from "@utils/signal";
-import { displayAnchor, PianoDisplay, PIANO_DISPLAY, removeDormantDisplay, removePianoDisplay } from "./display";
-import { pickPianoMenu, pianoModelOffset, pianoRay, pickPianoKey } from "./keyRay";
+import { displayAnchor, PianoDisplay, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, removePianoDisplay } from "./display";
+import { flatTextYaw } from "./textRotation";
+import { digitalPianoHitModel, grandPianoHitModel, pickPianoMenu, pianoModelOffset, pianoRay, pickPianoKey } from "./keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "./settings";
 
 const VIEW_RANGE_SQUARED = 48 ** 2;
@@ -41,14 +43,17 @@ function lcdTitle(name: string) {
     return { title: title || "P-88", columns };
 }
 
-function pianoCenter({ pos, direction }: InstrumentLocation): Vector3 {
+function pianoCenter(location: InstrumentLocation): Vector3 {
+    const { pos, direction } = location;
     const right = RightOffsets[direction];
-    return { x: pos.x + .5 + right.x / 2, y: pos.y, z: pos.z + .5 + right.z / 2 };
+    const center = location.definition === grandDefinition ? 0 : .5;
+    return { x: pos.x + .5 + right.x * center, y: pos.y, z: pos.z + .5 + right.z * center };
 }
 
 export class PianoRuntime {
     readonly center: Vector3;
     readonly right: Vector3;
+    readonly hitModel;
     readonly disposedSignal = new Signal<void>();
     private display?: PianoDisplay;
     private readonly scope = hostScope.child();
@@ -65,6 +70,7 @@ export class PianoRuntime {
     constructor(readonly location: InstrumentLocation, private readonly activate: () => void) {
         this.right = RightOffsets[location.direction];
         this.center = pianoCenter(location);
+        this.hitModel = location.definition === grandDefinition ? grandPianoHitModel : digitalPianoHitModel;
     }
 
     isAlive() { return !this.disposed; }
@@ -149,7 +155,7 @@ export class PianoRuntime {
         if (volume > 0) dimension.playSound(`${sound}.${note.sample}`, this.center, { pitch: note.pitch, volume });
         this.display?.strike(note.midi, duration);
         this.activate();
-        if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings);
+        if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);
     }
 
     refreshScreen() { this.refreshText(); }
@@ -164,27 +170,29 @@ export class PianoRuntime {
         }
         const info = this.midi?.getInfo();
         const hasSong = info && info.queueIndex >= 0 && info.queueIndex < info.queueLength;
-        const { title, columns } = lcdTitle(hasSong ? info.midiName : "P-88");
+        const grand = this.location.definition === grandDefinition;
+        const screen = grand ? GRAND_TEXT : PIANO_SCREEN;
+        const { title, columns } = lcdTitle(hasSong ? info.midiName : grand ? "Nocturne" : "P-88");
         const state = info?.state === "playing" ? "播放" : info?.state === "paused" ? "暂停" : "就绪";
         const status = hasSong
             ? `${state} ${lcdTime(info.currentTime)} / ${lcdTime(info.durationMs / 1000)}  ${info.queueIndex + 1}/${info.queueLength}`
             : `${state} · MIDI`;
         const value = `${title}\n${status}`;
         if (value === this.textValue && this.text.has("title") && this.text.has("status")) return;
-        const [centerX, y, centerZ] = PIANO_SCREEN.center;
+        const [centerX, y, centerZ] = screen.center;
         const x = centerX - settings.textRight;
         const z = centerZ - settings.textForward;
         const linePosition = (depth: number) => pianoModelOffset(this.right, x, y + settings.textUp, depth);
         const style = {
             depthTest: true, useRotation: true, distance: settings.textDistance,
-            rotation: { x: 90, y: this.display.entity.getRotation().y + 180, z: 0 },
+            rotation: { x: 90, y: flatTextYaw(this.display.entity.getRotation().y), z: 0 },
         };
         const scale = settings.textScale / 100;
         const success = this.text.sync(new Map([
-            ["title", { ...style, value: title, at: linePosition(z + PIANO_SCREEN.height * .22),
+            ["title", { ...style, value: title, at: linePosition(z + screen.height * .22),
                 color: pianoTextColor(settings.titleColor),
-                scale: scale * Math.min(.23, PIANO_SCREEN.width / 16 * 3.55 / Math.max(7, columns)) }],
-            ["status", { ...style, value: status, at: linePosition(z - PIANO_SCREEN.height * .27),
+                scale: scale * Math.min(.23, screen.width / 16 * 3.55 / Math.max(7, columns)) }],
+            ["status", { ...style, value: status, at: linePosition(z - screen.height * .27),
                 color: pianoTextColor(settings.statusColor),
                 scale: scale * .095 }],
         ]));
@@ -245,7 +253,7 @@ class PianoWorld {
         system.runInterval(() => this.sweep(), SWEEP_INTERVAL);
         system.runInterval(() => this.tick());
         world.afterEvents.entityLoad.subscribe(({ entity }) => {
-            if (entity.typeId !== PIANO_DISPLAY) return;
+            if (entity.typeId !== PIANO_DISPLAY && entity.typeId !== grandDefinition.displayId) return;
             system.run(() => {
                 if (!entity.isValid) return;
                 const pos = displayAnchor(entity);
@@ -253,8 +261,12 @@ class PianoWorld {
                 const dimension = entity.dimension;
                 if (!dimension.isChunkLoaded(pos)) return;
                 const block = dimension.getBlock(pos);
-                const location = block?.typeId === "xypiano:piano_left" ? resolveInstrument(block) : undefined;
-                if (!location) { removePianoDisplay(entity); return; }
+                const location = block && resolveInstrument(block);
+                if (!location || pianoDisplayType(location) !== entity.typeId ||
+                    location.pos.x !== pos.x || location.pos.y !== pos.y || location.pos.z !== pos.z) {
+                    removePianoDisplay(entity);
+                    return;
+                }
                 const integrity = inspectInstrument(location);
                 if (integrity === "incomplete") { removePianoDisplay(entity); return; }
                 if (integrity === "unloaded" || !this.isNear(location)) return;
@@ -267,14 +279,18 @@ class PianoWorld {
     get(location: InstrumentLocation): PianoRuntime | undefined {
         const key = instrumentKey(location.dimension, location.pos);
         let piano = this.pianos.get(key);
-        if (piano && piano.location.direction !== location.direction) {
+        if (piano && (piano.location.direction !== location.direction ||
+            pianoDisplayType(piano.location) !== pianoDisplayType(location))) {
             this.unload(piano.location, true);
             piano = undefined;
         }
         const tick = system.currentTick;
         if (!piano) {
             const runtime = new PianoRuntime(location, () => this.active.add(runtime));
-            if (runtime.verify(tick) !== "complete") return;
+            if (runtime.verify(tick) !== "complete") {
+                runtime.dispose(false);
+                return;
+            }
             this.pianos.set(key, runtime);
             piano = runtime;
         } else if (piano.verify(tick) !== "complete") {
@@ -303,12 +319,12 @@ class PianoWorld {
 
     interactFromView(player: Player, piano: PianoRuntime) {
         const ray = pianoRay(piano.center, piano.right, player.getHeadLocation(), player.getViewDirection());
-        const midi = pickPianoKey(ray, 4, midi => piano.isKeyDown(midi));
+        const midi = pickPianoKey(ray, 4, midi => piano.isKeyDown(midi), piano.hitModel);
         if (midi !== undefined) {
             piano.playKey(midi);
             return "key";
         }
-        return pickPianoMenu(ray);
+        return pickPianoMenu(ray, 4, piano.hitModel);
     }
 
     private isNear({ dimension, pos }: InstrumentLocation) {

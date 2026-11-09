@@ -9,7 +9,7 @@
         },
         "components": {
             "minecraft:display_name": {
-                "value": "钢琴"
+                "value": "电子钢琴"
             },
             "minecraft:icon": {
                 "textures": {

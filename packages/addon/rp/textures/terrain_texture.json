@@ -2,6 +2,9 @@
     "texture_data": {
         "piano:texture": {
             "textures": "textures/blocks/piano"
+        },
+        "piano:grand": {
+            "textures": "textures/blocks/grand"
         }
     }
 }

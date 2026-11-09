@@ -1,0 +1,25 @@
+{
+    "format_version": "1.8.0",
+    "animations": {
+        "animation.xypiano.grand_piano_item.first_person": {
+            "loop": true,
+            "bones": {
+                "piano": {
+                    "rotation": [31.2871, 6.4986, -116.1917],
+                    "position": [4.37193, 24.9729, -3.349],
+                    "scale": 1.1
+                }
+            }
+        },
+        "animation.xypiano.grand_piano_item.third_person": {
+            "loop": true,
+            "bones": {
+                "piano": {
+                    "rotation": [13.3725, -3.4841, -3.7075],
+                    "position": [0, 20.69866, -8.88469],
+                    "scale": 0.62
+                }
+            }
+        }
+    }
+}

@@ -6,8 +6,9 @@ const palettes = PIANO_PARTICLE_PALETTES.map(({ value, colors }) => ({
     value, colors: colors.map(pianoTextColor),
 }));
 
-export function summonParticle(dim: Dimension, center: Vector3, right: Vector3, midi: number, settings: PianoSettings) {
-    const origin = pianoParticleOrigin(center, right, midi);
+export function summonParticle(dim: Dimension, center: Vector3, right: Vector3, midi: number, settings: PianoSettings,
+    model?: Parameters<typeof pianoParticleOrigin>[4]) {
+    const origin = pianoParticleOrigin(center, right, midi, false, model);
     if (!origin) return;
     const effect = PIANO_PARTICLE_STYLES.find(option => option.value === settings.particleStyle) ?? PIANO_PARTICLE_STYLES[0];
     const { colors } = palettes.find(option => option.value === settings.particlePalette) ?? palettes[0];
@@ -21,7 +22,7 @@ export function summonParticle(dim: Dimension, center: Vector3, right: Vector3, 
     variables.setFloat("variable.piano_green", low.green + (high.green - low.green) * pitch);
     variables.setFloat("variable.piano_blue", low.blue + (high.blue - low.blue) * pitch);
     dim.spawnParticle(effect.effect, origin, variables);
-    const key = pianoParticleOrigin(center, right, midi, true);
+    const key = pianoParticleOrigin(center, right, midi, true, model);
     if (key) {
         variables.setFloat("variable.piano_key_axis_x", Math.abs(right.x));
         dim.spawnParticle("xypiano:key_glimmer", key, variables);

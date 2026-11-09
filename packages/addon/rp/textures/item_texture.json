@@ -2,6 +2,9 @@
     "texture_data": {
         "piano:piano_item": {
             "textures": "textures/items/piano_item"
+        },
+        "piano:grand_piano_item": {
+            "textures": "textures/items/grand_piano_item"
         }
     }
 }

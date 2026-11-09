@@ -1,7 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/piano/hitboxes.generated";
-import { hitsPianoMenu, pickPianoMenu, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/piano/keyRay";
+import { GRAND_BUTTONS, GRAND_KEY_HITBOXES } from "../src/instrument/grand.generated";
+import { grandPianoHitModel, hitsPianoMenu, pickPianoMenu, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/piano/keyRay";
+
+test("grand keys resolve all 88 pitches and the three controls can be reached from the bench", () => {
+    const seen = new Set<number>();
+    for (const [midi, x, , z, X, , Z] of GRAND_KEY_HITBOXES) {
+        if (seen.has(midi)) continue;
+        seen.add(midi);
+        const ray = { origin: [(x + X) / 2, 27, (z + Z) / 2], direction: [0, -16, 0] } as const;
+        expect(pickPianoKey(ray, 4, undefined, grandPianoHitModel)).toBe(midi);
+    }
+    expect(seen.size).toBe(88);
+    for (const [action, [x, , z, X, Y, Z]] of GRAND_BUTTONS) {
+        const ray = { origin: [(x + X) / 2, 28, -20], direction: [0, Y - 28, (z + Z) / 2 + 20] } as const;
+        expect(pickPianoMenu(ray, 4, grandPianoHitModel)).toBe(action);
+    }
+});
 
 describe("direct piano key ray", () => {
     test("all 88 playable surfaces resolve to their MIDI pitch", () => {

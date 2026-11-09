@@ -1,6 +1,5 @@
 import { resolveInstrument } from "@instrument/runtime";
 import { Block, Player, system } from "@minecraft/server";
-import { getLeftPianoBlock } from "@utils/block";
 import { DDUIManager } from "@utils/ddui";
 import { Vector3Utils } from "sapi-pro";
 import { handleInput } from "./input";
@@ -32,11 +31,12 @@ class PianoInstance {
 
     /** 设置当前钢琴方块 */
     setPianoBlock(block: Block) {
-        const left = getLeftPianoBlock(block);
-        const location = left && resolveInstrument(left);
-        const piano = location && pianoWorld.get(location);
-        if (!left || !piano) return false;
-        this.leftBlock = left;
+        const location = resolveInstrument(block);
+        if (!location) return false;
+        const anchor = location.dimension.getBlock(location.pos);
+        const piano = pianoWorld.get(location);
+        if (!anchor || !piano) return false;
+        this.leftBlock = anchor;
         if (this.piano !== piano) {
             this.unsubscribePiano?.();
             this.piano = piano;
