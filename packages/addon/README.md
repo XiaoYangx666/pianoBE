@@ -82,7 +82,7 @@ npm run verify:addon-build    # client/server 构建 + MIDI 路径与 server-onl
 - `npm run build:timbres`：重新下载/裁剪/转码音色采样，并生成
   `rp/sounds/sound_definitions.json`。
 - `npm run verify:timbres`：验证“只选默认 / 默认 + 某个音色”的导出结果，
-  检查采样目录、音效定义和 `scripts/piano/timbres.js` 是否一致。
+  检查采样目录、音效定义和 `scripts/packages/addon/src/domain/piano/timbres.js` 是否一致。
 
-生成器导出时会覆写 `bp/scripts/piano/timbres.js`，游戏内设置只显示该包实际
+生成器导出时会覆写 `bp/scripts/packages/addon/src/domain/piano/timbres.js`，游戏内设置只显示该包实际
 包含的音色；经典 P-88 始终保留，因此至少有一套音色可用。

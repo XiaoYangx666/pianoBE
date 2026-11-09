@@ -10,6 +10,8 @@ import { generateAddonZip } from "../packages/generator/src/export.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const TIMBRES = "packages/generator/public/timbres";
+/** preserve-modules 输出中的音色开关模块（与 generator/src/timbres.ts 保持一致）。 */
+const TIMBRES_MODULE = "bp/scripts/packages/addon/src/domain/piano/timbres.js";
 const index = JSON.parse(readFileSync(`${TIMBRES}/index.json`, "utf8"));
 const optional = index.filter((t) => !t.bundled);
 
@@ -61,7 +63,7 @@ assert(!hasDir(onlyDefault, "ydp_grand"), "仅默认：不包含 YDP 采样");
 const defaultDefs = parseDefinitions(onlyDefault);
 assert(Object.keys(defaultDefs).length === 90, `仅默认：音效定义 90 条（实际 ${Object.keys(defaultDefs).length}）`);
 assert(
-    onlyDefault.readTextSync("bp/scripts/piano/timbres.js").includes('["piano"]'),
+    onlyDefault.readTextSync(TIMBRES_MODULE).includes('["piano"]'),
     "仅默认：timbres.js 只启用钢琴"
 );
 
@@ -72,7 +74,7 @@ assert(!hasDir(withMeta, "ydp_grand"), "默认 + Meta：不包含 YDP 采样");
 const metaDefs = parseDefinitions(withMeta);
 assert(Object.keys(metaDefs).length === 180, `默认 + Meta：音效定义 180 条（实际 ${Object.keys(metaDefs).length}）`);
 assert(
-    withMeta.readTextSync("bp/scripts/piano/timbres.js").includes('"meta_piano"'),
+    withMeta.readTextSync(TIMBRES_MODULE).includes('"meta_piano"'),
     "默认 + Meta：timbres.js 启用 Meta"
 );
 
@@ -81,7 +83,7 @@ const withAll = await build(allPacks, ["piano", ...optional.map((t) => t.id)]);
 assert(optional.every((t) => hasDir(withAll, t.id)), "全选：包含全部可选音色采样");
 const allDefs = parseDefinitions(withAll);
 assert(Object.keys(allDefs).length === 360, `全选：音效定义 360 条（实际 ${Object.keys(allDefs).length}）`);
-const allTimbres = withAll.readTextSync("bp/scripts/piano/timbres.js");
+const allTimbres = withAll.readTextSync(TIMBRES_MODULE);
 assert(optional.every((t) => allTimbres.includes(`"${t.id}"`)), "全选：timbres.js 启用全部音色");
 
 console.log(failed === 0 ? "\n🎉 音色选配验证通过" : `\n💥 ${failed} 项失败`);

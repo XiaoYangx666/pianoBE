@@ -3,6 +3,7 @@ import { metasToAddonIndex, songToAddonModule } from "@piano/core";
 import type { SongEntry } from "./types";
 import type { TemplateInfo } from "./template";
 import type { LoadedTimbrePack, TimbreIndexEntry } from "./timbres";
+import { TIMBRES_SCRIPT_PATH } from "./timbres";
 
 export interface ExportOptions {
     name: string;
@@ -17,7 +18,7 @@ export interface TimbreExportSelection {
     all: TimbreIndexEntry[];
     /** 已按需加载、需要写入导出包的可选音色 */
     selected: LoadedTimbrePack[];
-    /** 实际启用的音色 id，会写进 scripts/piano/timbres.js */
+    /** 实际启用的音色 id，会写进 scripts/packages/addon/src/domain/piano/timbres.js */
     enabledIds: string[];
 }
 
@@ -68,7 +69,7 @@ export async function generateAddonZip(
  * 把模板裁剪成“只包含选中音色”的状态：
  * - 先移除所有已知可选音色目录和 sound_definitions 条目（兼容旧的完整模板）
  * - 再合并已按需加载的音色包
- * - 最后覆写 scripts/piano/timbres.js，让游戏内设置只显示实际存在的音色
+ * - 最后覆写 scripts/packages/addon/src/domain/piano/timbres.js，让游戏内设置只显示实际存在的音色
  */
 function applyTimbres(
     addon: AddonTemplate,
@@ -105,7 +106,7 @@ function applyTimbres(
 
     addon.writeText(definitionsPath, `${JSON.stringify(definitions, null, 4)}\n`);
     const enabled = [...new Set(["piano", ...selection.enabledIds])];
-    const timbresModule = `${bpPath}scripts/piano/timbres.js`;
+    const timbresModule = `${bpPath}${TIMBRES_SCRIPT_PATH}`;
     if (!addon.has(timbresModule)) {
         console.warn(`[generator] 模板缺少 ${timbresModule}，音色勾选可能无法在游戏内生效`);
     }

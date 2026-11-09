@@ -24,6 +24,12 @@ export interface LoadedTimbrePack {
 
 const packCache = new Map<string, Promise<LoadedTimbrePack>>();
 
+/**
+ * preserve-modules 输出中 `domain/piano/timbres.ts` 的固定路径（相对 bp 根）。
+ * 生成器覆写此模块，让游戏内设置只显示实际打包的音色。
+ */
+export const TIMBRES_SCRIPT_PATH = "scripts/packages/addon/src/domain/piano/timbres.js";
+
 /** 加载音色选择清单；加载失败时返回空列表，生成器仍可使用内置默认音色。 */
 export async function loadTimbreIndex(): Promise<TimbreIndexEntry[]> {
     try {

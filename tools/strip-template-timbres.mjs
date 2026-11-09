@@ -43,7 +43,8 @@ if (definitionsText) {
     addon.writeText(definitionsPath, `${JSON.stringify(definitions, null, 4)}\n`);
 }
 
-const timbresPath = `${bpPath}scripts/piano/timbres.js`;
+// 与 generator/src/timbres.ts 的 TIMBRES_SCRIPT_PATH 保持一致（preserve-modules 输出）。
+const timbresPath = `${bpPath}scripts/packages/addon/src/domain/piano/timbres.js`;
 if (addon.has(timbresPath)) {
     addon.writeText(timbresPath, `export const ENABLED_PIANO_TIMBRES = ["piano"];\n`);
 }
