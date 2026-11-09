@@ -17,7 +17,7 @@ import { PianoDisplay } from "@platform/display";
 import { flatTextYaw } from "@domain/piano/textRotation";
 import { digitalPianoHitModel, grandPianoHitModel, pickPianoMenu, pianoModelOffset, pianoRay, pickPianoKey } from "@domain/geometry/keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@domain/piano/settings";
-import { midiManager } from "@app/midi";
+import { midiManager } from "@app/midiManager";
 import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL } from "@app/pianoConfig";
 
 function lcdTime(seconds: number) {
