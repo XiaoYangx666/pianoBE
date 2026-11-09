@@ -118,7 +118,7 @@ function attachTimbrePack(pack: LoadedTimbrePack) {
     if (!template) return;
     for (const [path, data] of pack.files) {
         if (path.startsWith("sounds/")) {
-            template.zip.file(`${template.rpPath}${path}`, data);
+            template.addon.write(`${template.rpPath}${path}`, data);
         }
     }
 }
@@ -633,12 +633,12 @@ async function renderAddonLog() {
         return;
     }
     try {
-        const file = template.zip.file(`${template.rpPath}changelog.txt`);
-        if (!file) {
+        const text = await template.addon.readText(`${template.rpPath}changelog.txt`);
+        if (text === undefined) {
             if (gen === logRenderGen) logList.innerHTML = '<div class="empty">当前模板包不含更新日志</div>';
             return;
         }
-        const entries = parseAddonChangelog(await file.async("string"));
+        const entries = parseAddonChangelog(text);
         if (gen !== logRenderGen) return; // 快速切换时丢弃过期结果
         renderLogEntries(entries);
     } catch (e) {

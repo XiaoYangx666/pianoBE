@@ -1,4 +1,4 @@
-import JSZip from "jszip";
+import { readAddonArchive } from "@bepack/addon";
 
 /** public/timbres/index.json 的条目。可选音色额外带 file/size。 */
 export interface TimbreIndexEntry {
@@ -46,15 +46,14 @@ export function loadTimbrePack(meta: TimbreIndexEntry): Promise<LoadedTimbrePack
         pending = (async () => {
             const res = await fetch(`./timbres/${meta.file}?t=` + Date.now());
             if (!res.ok) throw new Error(`音色包加载失败：${meta.label} (${res.status})`);
-            const zip = await JSZip.loadAsync(await res.arrayBuffer());
-            const files = new Map<string, Uint8Array>();
-            for (const file of Object.values(zip.files)) {
-                if (file.dir) continue;
-                files.set(file.name, await file.async("uint8array"));
-            }
-            const definitionsFile = zip.file("sound_definitions.json");
-            const soundDefinitions = definitionsFile
-                ? (JSON.parse(await definitionsFile.async("string")).sound_definitions ?? {})
+            const entries = await readAddonArchive(new Uint8Array(await res.arrayBuffer()));
+            const files = new Map(entries.map((file) => [file.path, file.bytes]));
+            const definitionsEntry = entries.find(
+                (file) => file.path === "sound_definitions.json"
+            );
+            const soundDefinitions = definitionsEntry
+                ? (JSON.parse(new TextDecoder().decode(definitionsEntry.bytes))
+                      .sound_definitions ?? {})
                 : {};
             return { meta, files, soundDefinitions };
         })();

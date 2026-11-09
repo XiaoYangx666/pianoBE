@@ -72,10 +72,9 @@ export class PreviewPlayer extends SampledMidiPlayer {
         if (!info) return;
         const soundsRoot = `${info.rpPath}sounds/`;
         this.sampleSource = async (dir: string, fileName: string) => {
-            const file = info.zip.file(`${soundsRoot}${dir}/${fileName}.ogg`);
+            const file = await info.addon.read(`${soundsRoot}${dir}/${fileName}.ogg`);
             if (!file) return null;
-            const blob = await file.async("blob");
-            return blob.arrayBuffer();
+            return file.bytes.slice().buffer;
         };
     }
 

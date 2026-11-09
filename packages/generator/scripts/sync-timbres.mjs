@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import JSZip from "jszip";
+import { writeAddonArchiveFile } from "@bepack/addon/node";
 import { PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -41,8 +41,9 @@ for (const timbre of PIANO_TIMBRES) {
         continue;
     }
 
-    const zip = new JSZip();
+    const entries = [];
     const definitions = {};
+    const encoder = new TextEncoder();
     for (const layer of PIANO_SOUND_LAYERS) {
         const dir = dirs[layer];
         for (const note of PIANO_SAMPLE_KEYS) {
@@ -51,7 +52,7 @@ for (const timbre of PIANO_TIMBRES) {
                 throw new Error(`缺少采样 ${file}，请先执行 npm run build:timbres`);
             }
             const data = fs.readFileSync(file);
-            zip.file(`sounds/${dir}/${note}.ogg`, data);
+            entries.push({ path: `sounds/${dir}/${note}.ogg`, bytes: data });
             definitions[`${dir}.${note}`] = {
                 category: "record",
                 sounds: [`sounds/${dir}/${note}`],
@@ -60,20 +61,30 @@ for (const timbre of PIANO_TIMBRES) {
             };
         }
     }
-    zip.file("sound_definitions.json", JSON.stringify({ sound_definitions: definitions }));
-    zip.file("meta.json", JSON.stringify({
-        id: timbre.id,
-        dirs,
-        notes: PIANO_SAMPLE_KEYS,
-        layers: PIANO_SOUND_LAYERS,
-    }));
+    entries.push({
+        path: "sound_definitions.json",
+        bytes: encoder.encode(JSON.stringify({ sound_definitions: definitions })),
+    });
+    entries.push({
+        path: "meta.json",
+        bytes: encoder.encode(
+            JSON.stringify({
+                id: timbre.id,
+                dirs,
+                notes: PIANO_SAMPLE_KEYS,
+                layers: PIANO_SOUND_LAYERS,
+            })
+        ),
+    });
 
-    const buffer = await zip.generateAsync({ type: "nodebuffer", compression: "STORE" });
     const file = `${timbre.id}.zip`;
-    fs.writeFileSync(path.join(outDir, file), buffer);
+    const { bytes } = await writeAddonArchiveFile(path.join(outDir, file), entries, {
+        // 与旧实现一致：音色包不压缩，直接 STORE。
+        storedExtensions: /.*/,
+    });
     entry.file = file;
-    entry.size = buffer.length;
-    totalBytes += buffer.length;
+    entry.size = bytes;
+    totalBytes += bytes;
     optionalCount++;
     index.push(entry);
 }

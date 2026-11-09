@@ -1,4 +1,4 @@
-import JSZip from "jszip";
+import type { AddonTemplate } from "@bepack/addon";
 import { metasToAddonIndex, songToAddonModule } from "@piano/core";
 import type { SongEntry } from "./types";
 import type { TemplateInfo } from "./template";
@@ -21,13 +21,6 @@ export interface TimbreExportSelection {
     enabledIds: string[];
 }
 
-function generateUUID(): string {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
-        const r = (Math.random() * 16) | 0;
-        return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
-    });
-}
-
 /**
  * 生成最终 .mcaddon（zip Blob）。
  * - 曲目模块：模板已有曲目原样保留（字节保真），新曲目由 core 生成；
@@ -39,62 +32,36 @@ export async function generateAddonZip(
     songs: SongEntry[],
     opts: ExportOptions
 ): Promise<Blob> {
-    const { zip, bpPath, rpPath, bpManifest, rpManifest } = info;
+    const { addon, bpPath, rpPath } = info;
 
-    // ---- manifest 应用名称/描述 ----
-    const bp = JSON.parse(JSON.stringify(bpManifest));
-    const rp = JSON.parse(JSON.stringify(rpManifest));
-    bp.header.name = opts.name;
-    bp.header.description = opts.desc;
-    rp.header.name = `${opts.name} (RP)`;
-    rp.header.description = opts.desc;
-
-    if (opts.randomUuid) {
-        const oldB = bp.header.uuid;
-        const oldR = rp.header.uuid;
-        const newB = generateUUID();
-        const newR = generateUUID();
-        bp.header.uuid = newB;
-        rp.header.uuid = newR;
-        bp.dependencies?.forEach((d: Record<string, any>) => {
-            if (d.uuid === oldR) {
-                d.uuid = newR;
-                d.version = rp.header.version;
-            }
-        });
-        rp.dependencies?.forEach((d: Record<string, any>) => {
-            if (d.uuid === oldB) {
-                d.uuid = newB;
-                d.version = bp.header.version;
-            }
-        });
-        bp.modules?.forEach((m: Record<string, any>) => (m.uuid = generateUUID()));
-        rp.modules?.forEach((m: Record<string, any>) => (m.uuid = generateUUID()));
-    }
-
-    zip.file(`${bpPath}manifest.json`, JSON.stringify(bp, null, 4));
-    zip.file(`${rpPath}manifest.json`, JSON.stringify(rp, null, 4));
+    addon.updateIdentity(
+        {
+            name: opts.name,
+            description: opts.desc,
+            resourceName: `${opts.name} (RP)`,
+            randomizeUuids: opts.randomUuid,
+        },
+        { indent: 4 }
+    );
 
     // ---- 重写 scripts/midis ----
     const midisDir = `${bpPath}scripts/midis/`.replace(/\/+/g, "/");
-    for (const f of Object.keys(zip.files)) {
-        if (f.startsWith(midisDir)) zip.remove(f);
-    }
+    addon.removeTree(midisDir);
 
     for (const entry of songs) {
         const content = entry.song
             ? songToAddonModule(entry.song)
             : (entry.moduleText ?? "");
-        zip.file(`${midisDir}${entry.id}.js`, content);
+        addon.writeText(`${midisDir}${entry.id}.js`, content);
     }
-    zip.file(
+    addon.writeText(
         `${midisDir}index.js`,
         metasToAddonIndex(songs.map((s) => ({ id: s.id, name: s.name, duration: s.duration })))
     );
 
-    if (opts.timbres) await applyTimbres(zip, bpPath, rpPath, opts.timbres);
+    if (opts.timbres) applyTimbres(addon, bpPath, rpPath, opts.timbres);
 
-    return zip.generateAsync({ type: "blob" });
+    return addon.toBlob();
 }
 
 /**
@@ -103,17 +70,17 @@ export async function generateAddonZip(
  * - 再合并已按需加载的音色包
  * - 最后覆写 scripts/piano/timbres.js，让游戏内设置只显示实际存在的音色
  */
-async function applyTimbres(
-    zip: JSZip,
+function applyTimbres(
+    addon: AddonTemplate,
     bpPath: string,
     rpPath: string,
     selection: TimbreExportSelection
 ) {
     const soundRoot = `${rpPath}sounds/`;
     const definitionsPath = `${soundRoot}sound_definitions.json`;
-    const definitionsFile = zip.file(definitionsPath);
-    const definitions = definitionsFile
-        ? JSON.parse(await definitionsFile.async("string"))
+    const definitionsText = addon.readTextSync(definitionsPath);
+    const definitions = definitionsText
+        ? JSON.parse(definitionsText)
         : { format_version: "1.26.0", sound_definitions: {} };
     definitions.sound_definitions ??= {};
 
@@ -122,10 +89,7 @@ async function applyTimbres(
         if (timbre.id === "piano") continue;
         for (const dir of Object.values(timbre.dirs)) {
             optionalDirs.add(dir);
-            const prefix = `${soundRoot}${dir}/`;
-            for (const file of Object.keys(zip.files)) {
-                if (file.startsWith(prefix)) zip.remove(file);
-            }
+            addon.removeTree(`${soundRoot}${dir}/`);
         }
     }
     for (const key of Object.keys(definitions.sound_definitions)) {
@@ -134,18 +98,18 @@ async function applyTimbres(
 
     for (const pack of selection.selected) {
         for (const [path, data] of pack.files) {
-            if (path.startsWith("sounds/")) zip.file(`${rpPath}${path}`, data);
+            if (path.startsWith("sounds/")) addon.write(`${rpPath}${path}`, data);
         }
         Object.assign(definitions.sound_definitions, pack.soundDefinitions);
     }
 
-    zip.file(definitionsPath, `${JSON.stringify(definitions, null, 4)}\n`);
+    addon.writeText(definitionsPath, `${JSON.stringify(definitions, null, 4)}\n`);
     const enabled = [...new Set(["piano", ...selection.enabledIds])];
     const timbresModule = `${bpPath}scripts/piano/timbres.js`;
-    if (!zip.file(timbresModule)) {
+    if (!addon.has(timbresModule)) {
         console.warn(`[generator] 模板缺少 ${timbresModule}，音色勾选可能无法在游戏内生效`);
     }
-    zip.file(
+    addon.writeText(
         timbresModule,
         `export const ENABLED_PIANO_TIMBRES = ${JSON.stringify(enabled)};\n`
     );

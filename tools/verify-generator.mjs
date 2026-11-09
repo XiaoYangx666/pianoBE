@@ -4,7 +4,7 @@
  * 转换真实 .mid → 生成最终 mcaddon → 解包断言（含字节保真与回读闭环）。
  */
 import { readFileSync } from "node:fs";
-import JSZip from "jszip";
+import { readAddon } from "@bepack/addon";
 import { midiBufferToSong } from "@piano/core/convert";
 import {
     decodeSongFromBinary,
@@ -28,25 +28,22 @@ function assert(cond, msg) {
         console.error(`❌ ${msg}`);
     }
 }
-async function zipBytes(zip) {
-    return (await zip.generateAsync({ type: "blob" })).arrayBuffer();
-}
 
 // 1. 默认模板：模板模式跳过 midi 拷贝，无内嵌曲目
-const templateInfo = await loadTemplate(readFileSync(TEMPLATE).buffer);
+const templateInfo = await loadTemplate(new Uint8Array(readFileSync(TEMPLATE)));
 assert(templateInfo.songs.length === 0, "默认模板无内嵌曲目（模板模式跳过 midi 拷贝）");
 assert(templateInfo.bpManifest.header?.name, "bp manifest 解析成功");
 
 // 2. 构造"含内嵌曲目的模板"：注入曲目 A 的模块 + index（模拟用户上传旧生成包）
 const songA = midiBufferToSong(new Uint8Array(readFileSync(MIDI_A)), "Beyond - 海阔天空");
 assert(songA.id === "4beea226", `曲目 A 转换 id 正确：${songA.id}`);
-const tplZip = templateInfo.zip;
-tplZip.file(`bp/scripts/midis/${songA.id}.js`, songToAddonModule(songA));
-tplZip.file(
+const tplAddon = templateInfo.addon;
+tplAddon.writeText(`bp/scripts/midis/${songA.id}.js`, songToAddonModule(songA));
+tplAddon.writeText(
     "bp/scripts/midis/index.js",
     metasToAddonIndex([{ id: songA.id, name: songA.name, duration: songA.duration }])
 );
-const embTemplate = await loadTemplate(await zipBytes(tplZip));
+const embTemplate = await loadTemplate(await tplAddon.toBlob());
 assert(embTemplate.songs.length === 1, "内嵌模板解析出 1 首");
 assert(embTemplate.songs[0].id === songA.id && embTemplate.songs[0].isOriginal, "原曲目标记 isOriginal");
 // 模板内嵌曲目（moduleText 路径）必须可转换为试听事件（回归：Uint16Array 的 "16" 陷阱）
@@ -69,11 +66,11 @@ const blob = await generateAddonZip(embTemplate, songs, {
 assert(blob.size > 0, `导出 zip 生成 (${(blob.size / 1024).toFixed(0)} KB)`);
 
 // 4. manifest 断言
-const outZip = await JSZip.loadAsync(await blob.arrayBuffer());
-const bpPath = Object.keys(outZip.files).find((f) => f.endsWith("bp/manifest.json"))?.replace("manifest.json", "");
-const rpPath = Object.keys(outZip.files).find((f) => f.endsWith("rp/manifest.json"))?.replace("manifest.json", "");
-const bpManifest = JSON.parse(await outZip.file(bpPath + "manifest.json").async("string"));
-const rpManifest = JSON.parse(await outZip.file(rpPath + "manifest.json").async("string"));
+const outAddon = await readAddon(blob);
+const bpPath = outAddon.packs.bp.root;
+const rpPath = outAddon.packs.rp.root;
+const bpManifest = outAddon.packs.bp.manifest;
+const rpManifest = outAddon.packs.rp.manifest;
 assert(bpManifest.header.name === "测试钢琴包", "manifest 名称已应用");
 assert(bpManifest.header.description === "e2e 描述", "manifest 描述已应用");
 assert(bpManifest.header.uuid !== oldB && rpManifest.header.uuid !== oldR, "UUID 已随机化");
@@ -84,17 +81,17 @@ assert(
 
 // 5. 曲目内容断言
 const midisDir = bpPath + "scripts/midis/";
-const indexText = await outZip.file(midisDir + "index.js").async("string");
+const indexText = outAddon.readTextSync(midisDir + "index.js");
 assert(indexText.startsWith("export const midis=["), "index.js 格式正确");
 assert(indexText.includes(`id:"${songA.id}"`) && indexText.includes(`id:"${songB.id}"`), "index.js 含两首曲目");
 
-const moduleA = await outZip.file(midisDir + songA.id + ".js").async("string");
+const moduleA = outAddon.readTextSync(midisDir + songA.id + ".js");
 assert(moduleA === songToAddonModule(songA), "原曲目 A 模块字节保真保留");
-const moduleB = await outZip.file(midisDir + songB.id + ".js").async("string");
+const moduleB = outAddon.readTextSync(midisDir + songB.id + ".js");
 assert(moduleB === songToAddonModule(songB), "新曲目 B 模块与 core 输出一致");
 
 // 6. 回读闭环：导出的包再次用生成器解析
-const roundTrip = await parseExistingMidis(outZip, midisDir);
+const roundTrip = parseExistingMidis(outAddon, midisDir);
 assert(roundTrip.length === 2, `导出后再解析：${roundTrip.length} 首（原 1 + 新 1）`);
 
 // 7. 曲库：二进制编解码往返
@@ -121,7 +118,7 @@ assert(
 );
 
 // 9. 从曲库选曲导出闭环（模拟用户点"添加"）
-const libTpl = await loadTemplate(readFileSync(TEMPLATE).buffer);
+const libTpl = await loadTemplate(new Uint8Array(readFileSync(TEMPLATE)));
 const libEntry = {
     id: libSong.id,
     name: libSong.name,
@@ -136,10 +133,10 @@ const libBlob = await generateAddonZip(libTpl, [libEntry], {
     desc: "曲库导出验证",
     randomUuid: false,
 });
-const libZip = await JSZip.loadAsync(await libBlob.arrayBuffer());
-const libIndexText = await libZip.file(`bp/scripts/midis/index.js`).async("string");
+const libAddon = await readAddon(libBlob);
+const libIndexText = libAddon.readTextSync("bp/scripts/midis/index.js");
 assert(libIndexText.includes(`id:"${libMeta.id}"`), "曲库曲目已写入导出 index.js");
-const libModule = await libZip.file(`bp/scripts/midis/${libMeta.id}.js`).async("string");
+const libModule = libAddon.readTextSync(`bp/scripts/midis/${libMeta.id}.js`);
 assert(libModule === songToAddonModule(libSong), "曲库曲目导出模块与 core 输出一致");
 
 console.log(failed === 0 ? "\n🎉 生成器 e2e 全部通过" : `\n💥 ${failed} 项失败`);
