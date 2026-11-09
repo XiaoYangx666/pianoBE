@@ -38,7 +38,8 @@ describe("SQLite 驱动专有行为", () => {
     });
 
     test("持久化：磁盘文件重开后可读（模拟重启）", () => {
-        const tmp = `/tmp/piano-test-${Date.now()}.db`;
+        const dbDir = mkdtempSync(join(tmpdir(), "piano-db-"));
+        const tmp = join(dbDir, "piano-test.db");
         const dir = mkdtempSync(join(tmpdir(), "piano-midis-"));
         const db1 = openDb(tmp);
         const p1 = new SqlitePlaylistPort(db1);
@@ -56,7 +57,7 @@ describe("SQLite 驱动专有行为", () => {
         expect(s2.getMeta("aaa")).toEqual({ id: "aaa", name: "A", duration: 10 });
         expect(p2.nextId()).toBe(2);
         db2.close();
-        rmSync(tmp, { force: true });
+        rmSync(dbDir, { recursive: true, force: true });
         rmSync(dir, { recursive: true, force: true });
     });
 

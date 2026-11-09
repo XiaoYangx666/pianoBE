@@ -135,23 +135,37 @@ class MidiPlayerInstance {
     }
 
     private openQueue() {
-        if (!this.playerInst || !this.leftBlock) return;
+        if (!this.player.isValid || !this.playerInst?.isAlive() || !this.leftBlock) return;
         formManager.open(this.player, QueueListForm, {
             midiPlayer: this.playerInst,
             p: -1,
             block: this.leftBlock,
-            onBack: () => { void this.show(); },
+            onBack: () => this.reopen(),
         });
     }
 
+    /**
+     * 从队列等子页面返回播放器：重新走一次打开入口，
+     * 重新解析钢琴/运行时并恢复 MIDI 信号订阅。
+     *
+     * 不能直接调用 show()：close() 会取消订阅，而 show() 不负责重新订阅；
+     * 同时旧运行时可能已被卸载或替换，必须重新获取 MidiPlayer。
+     */
+    private reopen() {
+        if (!this.player.isValid || !this.leftBlock) return;
+        void midiUIManager.open(this.player, this.leftBlock)
+            .catch(error => console.error("[midi] 返回播放器失败", error));
+    }
+
     private openPlaylist() {
-        if (!this.playerInst) return;
+        if (!this.player.isValid || !this.playerInst?.isAlive()) return;
         formManager.open(this.player, PlayListMainForm, {
             midiPlayer: this.playerInst,
         });
     }
 
     async show() {
+        if (!this.player.isValid) return;
         this.init();
         if (!this.form || !this.playerInst) return;
 

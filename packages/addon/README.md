@@ -70,7 +70,8 @@ server 构建会在控制台输出逐步诊断（不打印令牌）：
 ```bash
 npm run build:template   # 产出 dist/template.mcaddon（生成器底包）
 npm run build            # 编译 + 拷贝到测试服
-npm run test -w @piano/addon  # bun test（netSource 缓存/降级逻辑）
+npm run test -w @piano/addon  # bun test（架构边界、MIDI、生命周期、UI 回归等）
+npm run verify:addon-build    # client/server 构建 + MIDI 路径与 server-only 隔离检查
 ```
 
 ## 音色包与生成器

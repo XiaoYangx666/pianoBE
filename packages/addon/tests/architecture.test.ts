@@ -165,6 +165,12 @@ describe("addon architecture boundaries", () => {
             .toBeGreaterThan(0);
     });
 
+    test("app is intentionally allowed to use Minecraft APIs", () => {
+        // platform 不是唯一允许 MC 的层：app 的 UI / 事件入口可以直接使用宿主 API。
+        const appMain = normalize(path.join(sourceRoot, "app", "main.ts"));
+        expect(modules.get(appMain)?.external.has("@minecraft/server")).toBe(true);
+    });
+
     test("the boundary check rejects a real forbidden edge", () => {
         const domain = normalize(path.join(sourceRoot, "domain", "playback", "player.ts"));
         const platform = normalize(path.join(sourceRoot, "platform", "host.ts"));

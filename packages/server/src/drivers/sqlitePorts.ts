@@ -34,6 +34,11 @@ interface PlaylistRow {
     items: string;
 }
 
+/**
+ * 统一使用 Database.query()（按 SQL 缓存的预编译语句）而不是每次 prepare()。
+ * Bun 在 Windows 上 close() 后，临时 prepare() 语句可能延迟释放文件句柄，
+ * 导致删除数据库目录时 EBUSY；query 的缓存在 close() 时统一释放。
+ */
 export class SqliteSongPort implements SongPort {
     constructor(
         private readonly db: Database,
@@ -78,7 +83,7 @@ export class SqliteSongPort implements SongPort {
         dataSize: number
     ): void {
         this.db
-            .prepare(
+            .query(
                 `INSERT INTO songs(id,name,duration,note_count,data_size,created_at)
                  VALUES(?,?,?,?,?,?)
                  ON CONFLICT(id) DO UPDATE SET
@@ -90,7 +95,7 @@ export class SqliteSongPort implements SongPort {
 
     getMeta(id: string): MidiSongMeta | undefined {
         const r = this.db
-            .prepare(`SELECT id,name,duration FROM songs WHERE id=?`)
+            .query(`SELECT id,name,duration FROM songs WHERE id=?`)
             .get(id) as Pick<SongRow, "id" | "name" | "duration"> | null;
         return r ?? undefined;
     }
@@ -100,7 +105,7 @@ export class SqliteSongPort implements SongPort {
         const clean = name.trim().slice(0, 200);
         if (!clean) return undefined;
         const res = this.db
-            .prepare(`UPDATE songs SET name=? WHERE id=?`)
+            .query(`UPDATE songs SET name=? WHERE id=?`)
             .run(clean, id);
         if (res.changes === 0) return undefined;
         return this.getMeta(id);
@@ -136,19 +141,19 @@ export class SqliteSongPort implements SongPort {
     }
 
     has(id: string): boolean {
-        return !!this.db.prepare(`SELECT 1 FROM songs WHERE id=?`).get(id);
+        return !!this.db.query(`SELECT 1 FROM songs WHERE id=?`).get(id);
     }
 
     listMetas(): MidiSongMeta[] {
         return this.db
-            .prepare(`SELECT id,name,duration FROM songs ORDER BY rowid`)
+            .query(`SELECT id,name,duration FROM songs ORDER BY rowid`)
             .all() as MidiSongMeta[];
     }
 
     /** 带统计的列表（noteCount + dataSize），管理页展示用 */
     listMetasWithStats(): Array<MidiSongMeta & { noteCount: number; dataSize: number }> {
         return this.db
-            .prepare(
+            .query(
                 `SELECT id,name,duration,note_count AS noteCount,data_size AS dataSize
                  FROM songs ORDER BY rowid`
             )
@@ -156,7 +161,7 @@ export class SqliteSongPort implements SongPort {
     }
 
     remove(id: string): void {
-        this.db.prepare(`DELETE FROM songs WHERE id=?`).run(id);
+        this.db.query(`DELETE FROM songs WHERE id=?`).run(id);
         for (const p of [this.midiPath(id), this.jsonPath(id)]) {
             if (existsSync(p)) rmSync(p);
         }
@@ -168,14 +173,14 @@ export class SqlitePlaylistPort implements PlaylistPort {
 
     /** max(id)+1：顺序创建不碰撞，删除后可复用（与内存驱动契约一致） */
     nextId(): number {
-        const r = this.db.prepare(`SELECT MAX(id) AS m FROM playlists`).get() as {
+        const r = this.db.query(`SELECT MAX(id) AS m FROM playlists`).get() as {
             m: number | null;
         };
         return (r.m ?? 0) + 1;
     }
 
     getMeta(id: number): PlaylistMeta | undefined {
-        const r = this.db.prepare(`SELECT * FROM playlists WHERE id=?`).get(id) as
+        const r = this.db.query(`SELECT * FROM playlists WHERE id=?`).get(id) as
             | PlaylistRow
             | null;
         return r ? rowToMeta(r) : undefined;
@@ -183,14 +188,14 @@ export class SqlitePlaylistPort implements PlaylistPort {
 
     listAllMetas(): PlaylistMeta[] {
         return (
-            this.db.prepare(`SELECT * FROM playlists ORDER BY id`).all() as PlaylistRow[]
+            this.db.query(`SELECT * FROM playlists ORDER BY id`).all() as PlaylistRow[]
         ).map(rowToMeta);
     }
 
     setMeta(meta: PlaylistMeta): void {
         // UPSERT：items 列不参与更新（meta 更新不触碰列表内容），单语句原子
         this.db
-            .prepare(
+            .query(
                 `INSERT INTO playlists(id,owner,name,public,play_count,created_at,updated_at,items)
                  VALUES(?,?,?,?,?,?,?,'[]')
                  ON CONFLICT(id) DO UPDATE SET
@@ -209,11 +214,11 @@ export class SqlitePlaylistPort implements PlaylistPort {
     }
 
     deleteMeta(id: number): void {
-        this.db.prepare(`DELETE FROM playlists WHERE id=?`).run(id);
+        this.db.query(`DELETE FROM playlists WHERE id=?`).run(id);
     }
 
     getContent(id: number): string[] {
-        const r = this.db.prepare(`SELECT items FROM playlists WHERE id=?`).get(id) as
+        const r = this.db.query(`SELECT items FROM playlists WHERE id=?`).get(id) as
             | Pick<PlaylistRow, "items">
             | null;
         if (!r) return [];
@@ -227,7 +232,7 @@ export class SqlitePlaylistPort implements PlaylistPort {
 
     setContent(id: number, items: string[]): void {
         // 单行原子更新
-        this.db.prepare(`UPDATE playlists SET items=? WHERE id=?`).run(
+        this.db.query(`UPDATE playlists SET items=? WHERE id=?`).run(
             JSON.stringify(items),
             id
         );

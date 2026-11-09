@@ -20,9 +20,12 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 
 - `domain/**` 不得依赖 `@minecraft/server`、`@minecraft/server-ui`、`sapi-pro`、`@begame/tabletop/minecraft`、`runtime`、`platform`、`app`。
 - `runtime/**` 不得依赖 Minecraft，也不得依赖 `app`、`platform`；可以依赖 `@begame/tabletop` 核心。
-- `platform/**` 可以依赖 `domain`、`runtime`、`data` 和 Minecraft/Tabletop 平台 API，但不得依赖 `app`。
-- `app/**` 负责组装，可以依赖所有层。
+- `platform/**` 集中处理宿主适配，可以依赖 `domain`、`runtime`、`data` 和 Minecraft/Tabletop 平台 API，但不得依赖 `app`。
+- `app/**` 负责组装和业务协调，可以依赖所有层，也可以直接使用必要的 Minecraft 平台 API；UI 与方块/实体事件入口是明确允许的例外，不要求为每个 MC 调用建立 Port/Adapter。
 - `data/**` 只放静态数据/生成数据，不得反向依赖 `domain`、`runtime`、`platform`、`app`。
+
+因此 `platform` 不是“唯一允许访问 Minecraft API 的层”。边界保护的是依赖方向（尤其 `platform` 不反向依赖 `app`、`domain` 不接触宿主），而不是形式上的绝对隔离。
+
 - `src/midis/index.ts` 是构建钩子的固定入口：`bepack` 的 `afterBuild` 会把仓库根目录 `midis/js/` 覆盖到 preserve-modules 输出中的 `packages/addon/src/midis/`（与 `app/midiManager.ts` 的相对导入一致），所以这个生成入口保留在 `src/midis/`，不随其他数据移入 `data/`。
 
 自动检查：`tests/architecture.test.ts` 使用 TypeScript 编译器 API 解析真实模块图（包括路径别名、re-export、type-only import 和动态 import），并检查依赖方向与循环依赖。
@@ -37,7 +40,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 | `PianoDisplay` | `platform/display.ts` | 持久显示实体的创建、恢复、绑定、去重、属性写入、设置/播放数据持久化。 |
 | `MidiPlayer` | `domain/playback/player.ts` | 播放状态机、队列推进、暂停/恢复/seek/结束；通过注入的 `MidiLoader` 加载曲目。 |
 | `MidiManager` | `domain/playback/midiManager.ts` | 曲目元信息注册、分页查询、按 id 加载。 |
-| `midiManager` 单例 | `app/midi.ts` | 组合内嵌/远程 MIDI 源与播放列表 facade；只在 app 层初始化。 |
+| `midiManager` 单例 | `app/midiManager.ts`（由 `app/midi.ts` re-export） | 组合内嵌/远程 MIDI 源；只在 app 层初始化。 |
 | UI 管理器 | `app/ui/**` | 玩家级 DDUI 表单、失效检测、异步交互保护；可直接依赖 `PianoWorld`/`PianoRuntime`。 |
 | 存储驱动 | `platform/storage/**` | 动态属性播放列表存储；不依赖 UI。 |
 | 服务器适配 | `platform/server/**` | `server-net` 传输、远程 MIDI/播放列表读取；不依赖 app。 |
@@ -103,7 +106,7 @@ Minecraft playSound / 粒子 / 显示
 - 可复用的平台操作（显示、方块、粒子、存储、网络）放在 `platform/**`。
 - `platform/**` 不反向依赖 `app`；服务器初始化这种跨模块编排放在 `app/serverAdmin.ts`。
 - `__PIANO_TARGET__` 双构建语义保持不变：client 构建通过 `compile.define` 折叠并裁剪 server 分支；server 构建保留 `server-admin`/`server-net` 动态加载。
-- 内嵌 MIDI 仍由构建流程拷贝到 `scripts/midis`；远程曲库仍通过 `midiManager.setSource()` 切换。
+- 内嵌 MIDI 由构建钩子从仓库根目录 `midis/js/` 拷贝到 preserve-modules 输出中的 `packages/addon/src/midis/`，与 `app/midiManager.ts` 的 `../midis/index.js` 相对导入一致；远程曲库仍通过 `midiManager.setSource()` 切换。server 构建跳过该拷贝，使用远程源/空内嵌源。
 
 ## 7. 有意保留的保护措施
 
@@ -115,6 +118,7 @@ Minecraft playSound / 粒子 / 显示
 - `PianoWorld` 的 sweep、verify、距离卸载宽限。
 - MIDI 异步加载的 generation 校验。
 - UI 的失效检测、异步打开保护和 `Doudizhu` 式“表单不可释放”处理。
+- 从队列等子页面返回 MIDI 播放器时必须重新走 `openMidiPlayer()`/`setBlock()`，不能只调用 `show()`：`close()` 会解除 MIDI 信号订阅，旧运行时也可能已被卸载或替换。
 - 装配完整性三态（`complete` / `incomplete` / `unloaded`）、放置回滚、精准采集掉落抑制。
 - 方块事件、爆炸聚合、显示实体去重。
 
@@ -133,14 +137,22 @@ Minecraft playSound / 粒子 / 显示
 npx tsc -p packages/addon/tsconfig.json --noEmit
 cd packages/addon && bun test
 cd packages/addon && npx bepack build --skip-copy
+cd packages/addon && node ../../tools/verify-addon-build.mjs client
 cd packages/addon && npx bepack build --config bepack.server.config.ts --skip-copy
+cd packages/addon && node ../../tools/verify-addon-build.mjs server
 ```
+
+构建布局约束：preserve-modules 输出把入口相关模块放在 `bp/scripts/` 根层，路径别名模块保留 `packages/addon/src/**` 结构。`tools/verify-addon-build.mjs` 会同时校验源码导入、构建钩子目标目录和实际产物的相对解析，避免 MIDI 路径偏移导致运行时曲库为空。
 
 测试覆盖：
 
-- `tests/architecture.test.ts`：依赖方向、循环依赖、`PianoRuntime` 不依赖 `PianoWorld`。
+- `tests/architecture.test.ts`：依赖方向、循环依赖、`PianoRuntime` 不依赖 `PianoWorld`、负向违规检测。
+- `tests/midiPlayerUI.test.ts`：播放器→队列→返回后的重新订阅、重复进出不累积订阅、关闭/运行时结束解除订阅、钢琴拆除/运行时替换/玩家失效时不重开旧界面。
+- `tests/buildLayout.test.ts`：内嵌 MIDI 源码导入、构建钩子目标与产物入口的一致性。
 - `tests/pianoScope.test.ts`：清理失败不阻断其它清理、子作用域级联、幂等销毁。
-- `tests/pianoPlayback.test.ts`：MIDI 恢复、暂停/恢复、销毁后旧加载不复活。
+- `tests/pianoPlayback.test.ts`：MIDI 恢复、暂停/恢复、销毁后旧加载不复活、销毁后不再发声、多台钢琴状态隔离。
+- `tests/pianoDisplayLifecycle.test.ts`：运行时释放保留显示实体、真正拆除删除实体、重复实体恢复。
+- `tests/ddui.test.ts`：实例复用、失效、陈旧 owner、清空。
 - `tests/instrument.test.ts`：装配完整性、放置/销毁、回滚。
 - `tests/pianoDisplay.test.ts`、`pianoRay.test.ts`、`pianoSettings.test.ts`、`pianoTimbres.test.ts`、`netSource.test.ts`、`remotePlaylist.test.ts`。
 

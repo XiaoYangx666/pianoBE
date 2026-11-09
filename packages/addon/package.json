@@ -12,6 +12,7 @@
         "copy": "bepack copy",
         "build:template": "bepack build --skip-copy --pack --mode template && node ../../tools/strip-template-timbres.mjs",
         "build:server": "bepack build --config bepack.server.config.ts --skip-copy --pack",
+        "verify:build": "bepack build --skip-copy && node ../../tools/verify-addon-build.mjs client && bepack build --config bepack.server.config.ts --skip-copy && node ../../tools/verify-addon-build.mjs server",
         "test": "bun test"
     },
     "dependencies": {
