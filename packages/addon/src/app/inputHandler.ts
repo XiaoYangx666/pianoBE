@@ -1,6 +1,7 @@
 import { keyMaps } from "@domain/piano/keymap";
 import { parseInput } from "@domain/input/parse";
-import { soundTypes } from "@domain/piano/soundTypes";
+import { DEFAULT_PIANO_SETTINGS } from "@domain/piano/settings";
+import { resolveSoundLayer } from "@domain/piano/soundTypes";
 import type { PianoState } from "@app/ui/pianoState";
 import type { PianoRuntime } from "@app/PianoRuntime";
 
@@ -11,7 +12,8 @@ export function handleInput(val: string, state: PianoState, piano: PianoRuntime)
     const octave = state.octave.getData();
     const { keys, notes } = parseInput(val, comMode, keyMap, octave);
 
-    const layer = soundTypes[state.sound.getData()]?.layer ?? "long";
+    const layer = resolveSoundLayer(state.sound.getData(),
+        piano.settings?.soundLayer ?? DEFAULT_PIANO_SETTINGS.soundLayer);
     for (const note of notes) piano.playNote(note, layer, .15);
 
     return { keys, last: notes.at(-1), shouldClear: !comMode };

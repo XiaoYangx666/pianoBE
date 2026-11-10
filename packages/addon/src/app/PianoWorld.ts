@@ -8,8 +8,9 @@ import {
     type InstrumentLocation, resolveInstrument,
 } from "@platform/assembly";
 import { displayAnchor, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, removePianoDisplay } from "@platform/display";
-import { pickPianoKey, pickPianoMenu, pianoRay } from "@domain/geometry/keyRay";
+import { pickPianoKey, pickPianoMenu, pickPianoPanel, pianoRay } from "@domain/geometry/keyRay";
 import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
+import { playerSoundLayer } from "@app/playerSound";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
 
 class PianoWorld {
@@ -96,10 +97,12 @@ class PianoWorld {
         const ray = pianoRay(piano.center, piano.right, player.getHeadLocation(), player.getViewDirection());
         const midi = pickPianoKey(ray, 4, midi => piano.isKeyDown(midi), piano.hitModel);
         if (midi !== undefined) {
-            piano.playKey(midi);
+            piano.playKey(midi, playerSoundLayer(player, piano));
             return "key";
         }
-        return pickPianoMenu(ray, 4, piano.hitModel);
+        const button = pickPianoMenu(ray, 4, piano.hitModel);
+        if (button) return button;
+        return pickPianoPanel(ray, 4, piano.hitModel) ? "panel" : undefined;
     }
 
     private isNear({ dimension, pos }: InstrumentLocation) {

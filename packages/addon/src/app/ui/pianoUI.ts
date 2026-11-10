@@ -1,7 +1,7 @@
 import { Block, Player } from "@minecraft/server";
 import { CustomForm } from "@minecraft/server-ui";
 import { NoteInfo } from "@domain/types";
-import { soundTypes } from "@domain/piano/soundTypes";
+import { soundTypes, FOLLOW_PIANO_LAYER } from "@domain/piano/soundTypes";
 import { keyMaps } from "@domain/piano/keymap";
 import { PIANO_LAYOUT } from "@domain/piano/layout";
 import type { PianoState, PianoUIRefs } from "./pianoState";
@@ -19,18 +19,25 @@ function switchComMode(state: PianoState, p: Player) {
     p.setDynamicProperty("piano:comMode", newMode);
 }
 
+/** 面板里的音长按钮：跟随钢琴 → 长音 → 标准音 → 短音 → 跟随钢琴 */
 function switchSoundType(state: PianoState, p: Player) {
-    let idx = state.sound.getData();
-    idx = (idx + 1) % soundTypes.length;
+    const next = state.sound.getData() + 1;
+    const idx = next >= soundTypes.length ? FOLLOW_PIANO_LAYER : next;
     state.sound.setData(idx);
     p.setDynamicProperty("piano:sound", idx);
+}
+
+export interface PianoUIActions {
+    openMidi(): void;
+    openSettings(): void;
 }
 
 export function createPianoUI(
     p: Player,
     state: PianoState,
     ui: PianoUIRefs,
-    _getBlock: () => Block | null
+    _getBlock: () => Block | null,
+    actions: PianoUIActions
 ) {
     const options = { visible: state.fullUI };
 
@@ -42,7 +49,7 @@ export function createPianoUI(
 
     form.label("   ", options)
         .textField("在此处快速打字...", state.input)
-        .toggle("升8度 (高音模式)", state.octave, options)
+        .toggle("升8度 (高音模式)", state.octave)
         .button(
             ui.keyMapLabel,
             () => {
@@ -67,7 +74,9 @@ export function createPianoUI(
             },
             options
         )
-        .toggle("详细信息", state.fullUI);
+        .button("♪ MIDI 播放器", () => actions.openMidi(), options)
+        .button("钢琴设置", () => actions.openSettings(), options)
+        .toggle("简洁模式", state.compact);
 
     return form;
 }
@@ -103,8 +112,12 @@ export function updatePianoUI(
         state.mode.getData() ? "模式: 单音模式" : "模式: 连音模式"
     );
     //更新sound类型
-    const sound = state.sound.getData() ?? 0;
-    ui.soundLabel.setData(`音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`);
+    const sound = state.sound.getData();
+    ui.soundLabel.setData(
+        sound < 0
+            ? "音长: 跟随钢琴"
+            : `音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`
+    );
 
     if (last) {
         ui.status.setData(

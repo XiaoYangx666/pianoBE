@@ -6,6 +6,9 @@ import { handleInput } from "@app/inputHandler";
 import { pianoWorld } from "@app/PianoWorld";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { createPianoUI, updatePianoUI } from "@app/ui/pianoUI";
+import { FOLLOW_PIANO_LAYER, soundTypes } from "@domain/piano/soundTypes";
+import { openMidiPlayer } from "@app/ui/midi/playerUIManager";
+import { openPianoSettings } from "@app/ui/settingsUI";
 import type { PianoState, PianoUIRefs } from "@app/ui/pianoState";
 import {
     ObservableBoolean,
@@ -63,8 +66,10 @@ class PianoInstance {
         const mode =
             (this.player.getDynamicProperty("piano:comMode") as boolean) ??
             true;
-        const sound =
-            (this.player.getDynamicProperty("piano:sound") as number) ?? 0;
+        const storedSound = this.player.getDynamicProperty("piano:sound");
+        const sound = typeof storedSound === "number" && soundTypes[storedSound]
+            ? storedSound
+            : FOLLOW_PIANO_LAYER;
 
         this.state = {
             keyMap: new ObservableNumber(keyMapIdx),
@@ -72,9 +77,10 @@ class PianoInstance {
             octave: new ObservableBoolean(false, {
                 clientWritable: true,
             }),
-            fullUI: new ObservableBoolean(true, {
+            compact: new ObservableBoolean(false, {
                 clientWritable: true,
             }),
+            fullUI: new ObservableBoolean(true),
             input: new ObservableString("", {
                 clientWritable: true,
             }),
@@ -100,7 +106,11 @@ class PianoInstance {
             this.player,
             this.state,
             this.ui,
-            () => this.leftBlock
+            () => this.leftBlock,
+            {
+                openMidi: () => this.openMidi(),
+                openSettings: () => this.openSettings(),
+            }
         );
 
         // === 订阅（只注册一次）===
@@ -139,8 +149,9 @@ class PianoInstance {
             updatePianoUI(this.state, this.ui, []);
         });
 
-        // UI开关
-        this.state.fullUI.subscribe(() => {
+        // 简洁模式：隐藏文字与按钮，只留输入框和开关
+        this.state.compact.subscribe((compact) => {
+            this.state.fullUI.setData(!compact);
             updatePianoUI(this.state, this.ui, []);
         });
     }
@@ -220,6 +231,33 @@ class PianoInstance {
         } catch {
             // 玩家已离开/表单已随旧会话关闭
         }
+    }
+
+    /**
+     * 面板里的「MIDI 播放器」入口：DDUI 同一玩家同时只能有一个表单，
+     * 先关掉本表单，等客户端完成关闭后再打开 MIDI 播放器。
+     */
+    private openMidi() {
+        const block = this.leftBlock;
+        if (!block || !this.player.isValid) return;
+        this.close();
+        system.runTimeout(() => {
+            if (this.player.isValid && block.isValid) {
+                void openMidiPlayer(this.player, block);
+            }
+        }, 2);
+    }
+
+    /** 面板里的「钢琴设置」入口，与 MIDI 入口同样先关表单再打开。 */
+    private openSettings() {
+        const piano = this.piano;
+        if (!piano || !this.player.isValid) return;
+        this.close();
+        system.runTimeout(() => {
+            if (this.player.isValid && piano.isAlive()) {
+                void openPianoSettings(this.player, piano);
+            }
+        }, 2);
     }
 
     /** 实例被新会话替换时清理（旧 Player 表单已不可再交互） */

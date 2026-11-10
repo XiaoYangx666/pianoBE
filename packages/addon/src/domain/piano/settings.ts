@@ -1,5 +1,6 @@
 import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES } from "@piano/core";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
+import { soundTypes } from "./soundTypes";
 
 /** 按启用列表过滤音色；空列表回退到默认音色，保证设置里至少有一个选项。 */
 export function availablePianoTimbres(enabled: readonly string[]) {
@@ -34,6 +35,7 @@ export const DEFAULT_PIANO_SETTINGS = {
     particlePalette: 0,
     volume: 100,
     timbre: DEFAULT_PIANO_TIMBRE as number,
+    soundLayer: 1,
     textVisible: true,
     titleColor: "#D4FFE8",
     statusColor: "#A6EBCF",
@@ -93,6 +95,9 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         volume: number("volume"),
         timbre: AVAILABLE_PIANO_TIMBRES.find(timbre => timbre.value === saved.timbre)?.value
             ?? defaults.timbre,
+        soundLayer: typeof saved.soundLayer === "number" && soundTypes[saved.soundLayer]
+            ? saved.soundLayer
+            : defaults.soundLayer,
         textVisible: typeof saved.textVisible === "boolean" ? saved.textVisible : defaults.textVisible,
         titleColor: normalizePianoColor(saved.titleColor) ?? defaults.titleColor,
         statusColor: normalizePianoColor(saved.statusColor) ?? defaults.statusColor,

@@ -25,7 +25,10 @@ function hitModel(keyboard: Box, keys: readonly KeyBox[], caseBoxes: readonly Bo
             columns[column - firstColumn].push(key);
         }
     }
-    return { keyboard, caseBoxes, buttons, particleLine, firstColumn, columns, keyCenters };
+    // Only the body behind the keyboard opens the panel; the apron under the
+    // keys and the cheeks beside them stay inert so playing cannot pop it open.
+    const body = caseBoxes.filter(box => box[2] > keyboard[5]);
+    return { keyboard, caseBoxes, buttons, particleLine, firstColumn, columns, keyCenters, body };
 }
 
 export const digitalPianoHitModel = hitModel(KEYBOARD_HITBOX, KEY_HITBOXES, CASE_HITBOXES,
@@ -80,6 +83,8 @@ function inverseKeyPose(ray: PianoRay, box: KeyBox): PianoRay {
 function intersect(ray: PianoRay, bounds: Box | KeyBox, offset: 0 | 1, limit: number) {
     let enter = 0;
     let exit = limit;
+    let face = -1;
+    let sign = 0;
     for (const axis of AXES) {
         const origin = ray.origin[axis];
         const velocity = ray.direction[axis];
@@ -91,11 +96,16 @@ function intersect(ray: PianoRay, bounds: Box | KeyBox, offset: 0 | 1, limit: nu
         }
         const a = (min - origin) / velocity;
         const b = (max - origin) / velocity;
-        enter = Math.max(enter, Math.min(a, b));
+        const near = Math.min(a, b);
+        if (near > enter) {
+            enter = near;
+            face = axis;
+            sign = velocity > 0 ? -1 : 1;
+        }
         exit = Math.min(exit, Math.max(a, b));
         if (enter > exit) return;
     }
-    return { enter, exit };
+    return { enter, exit, face, sign };
 }
 
 export function pickPianoKey(ray: PianoRay, range = 4, isDown?: (midi: number) => boolean,
@@ -143,4 +153,23 @@ export function pickPianoMenu(ray: PianoRay, range = 4, model = digitalPianoHitM
 
 export function hitsPianoMenu(ray: PianoRay, range = 4): boolean {
     return pickPianoMenu(ray, range) === "menu";
+}
+
+/**
+ * True when the click opens the panel: the top or the back of the piano body,
+ * or a tap that misses every case box (touch players aim at the block, not at
+ * the model). The apron under the keys, the side cheeks, the legs, the front
+ * face and the sides stay inert so a missed key does not pop it open.
+ */
+export function pickPianoPanel(ray: PianoRay, range = 4, model = digitalPianoHitModel): boolean {
+    let nearest: { distance: number; box: Box; face: number; sign: number } | undefined;
+    for (const box of model.caseBoxes) {
+        const hit = intersect(ray, box, 0, range);
+        if (!hit || (nearest && hit.enter >= nearest.distance)) continue;
+        nearest = { distance: hit.enter, box, face: hit.face, sign: hit.sign };
+    }
+    if (!nearest) return true;
+    if (!model.body.includes(nearest.box)) return false;
+    // Top (+Y) or back (+Z) of the body only.
+    return nearest.sign > 0 && (nearest.face === 1 || nearest.face === 2);
 }

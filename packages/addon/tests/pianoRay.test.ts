@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/data/hitboxes.generated";
 import { GRAND_BUTTONS, GRAND_KEY_HITBOXES } from "../src/data/grand.generated";
-import { grandPianoHitModel, hitsPianoMenu, pickPianoMenu, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/domain/geometry/keyRay";
+import { grandPianoHitModel, hitsPianoMenu, pickPianoMenu, pickPianoPanel, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/domain/geometry/keyRay";
 
 test("grand keys resolve all 88 pitches and the three controls can be reached from the bench", () => {
     const seen = new Set<number>();
@@ -84,6 +84,43 @@ describe("direct piano key ray", () => {
         expect(hitsPianoMenu(menu)).toBe(true);
         expect(pickPianoKey(menu)).toBeUndefined();
         expect(hitsPianoMenu({ origin: [0, 22, -2.3], direction: [0, -16, 0] })).toBe(false);
+    });
+
+    test("the body behind the keys opens the panel", () => {
+        expect(pickPianoPanel({ origin: [0, 25, .5], direction: [0, -16, 0] })).toBe(true);
+        expect(pickPianoPanel({ origin: [0, 15.5, 10], direction: [0, 0, -16] })).toBe(true);
+        // Same shallow angle a standing player has when aiming at the panel.
+        expect(pickPianoPanel({ origin: [0, 25.92, -6], direction: [0, 16.8 - 25.92, .5 + 6] })).toBe(true);
+    });
+
+    test("the apron, cheeks, legs, front face and sides stay inert", () => {
+        expect(pickPianoPanel({ origin: [0, 25, -3.7], direction: [0, -16, 0] })).toBe(false);
+        expect(pickPianoPanel({ origin: [15.5, 25, -2], direction: [0, -16, 0] })).toBe(false);
+        expect(pickPianoPanel({ origin: [-20, 5, 0], direction: [16, 0, 0] })).toBe(false);
+        expect(pickPianoPanel({ origin: [0, 15, -10], direction: [0, 0, 16] })).toBe(false);
+        expect(pickPianoPanel({ origin: [-10, 15.5, 1.5], direction: [16, 0, 0] })).toBe(false);
+        // A miss under the keys from a player's angle must not open the panel.
+        expect(pickPianoPanel({ origin: [0, 25.92, -6], direction: [0, 14 - 25.92, -3.7 + 6] })).toBe(false);
+    });
+
+    test("a key click is never a panel click", () => {
+        const [midi, x, , z, X, , Z] = KEY_HITBOXES[0];
+        const ray = { origin: [(x + X) / 2, 25, (z + Z) / 2], direction: [0, -16, 0] } as const;
+        expect(pickPianoKey(ray)).toBe(midi);
+        expect(pickPianoPanel(ray)).toBe(false);
+    });
+
+    test("a tap that misses every case box still opens the panel", () => {
+        // Touch players aim at the block; the ray can pass through the open
+        // frame in front of the body without touching any case box.
+        expect(pickPianoPanel({ origin: [0, 20, -4], direction: [0, -16, 0] })).toBe(true);
+        expect(pickPianoPanel({ origin: [0, 5, -4.2], direction: [0, 0, 16] })).toBe(true);
+    });
+
+    test("the grand piano keeps its own body region", () => {
+        expect(pickPianoPanel({ origin: [0, 30, 1.5], direction: [0, -16, 0] }, 4, grandPianoHitModel)).toBe(true);
+        // Front apron below the grand keyboard.
+        expect(pickPianoPanel({ origin: [0, 30, -6.6], direction: [0, -16, 0] }, 4, grandPianoHitModel)).toBe(false);
     });
 
     test("distinct menu caps resolve to their own actions and miss outside", () => {
