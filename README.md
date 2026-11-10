@@ -112,6 +112,7 @@ pianoBE/
 - Node.js ≥ 22（core / generator / web）
 - Bun（server 运行与测试）
 - Docker（后端部署与开发模式）
+- Tabletop（私有依赖）：构建 addon 需要 `vendor/begame-tabletop-0.1.16.tgz`，它不随本仓库公开；拿到私有 `tabletop` 检出后执行 `npm run vendor:tabletop` 生成，详见 `vendor/README.md`
 
 ### 构建与测试
 

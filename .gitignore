@@ -17,3 +17,5 @@ packages/generator/public/timbres
 .env
 *.mid
 *.mcaddon
+# 私有依赖 @begame/tabletop，构建前用 npm run vendor:tabletop 生成（见 vendor/README.md）
+vendor/*.tgz

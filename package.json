@@ -38,7 +38,8 @@
         "dev:generator": "npm run dev -w @piano/generator",
         "build:generator": "npm run build -w @piano/generator",
         "build:timbres": "node tools/build-piano-timbres.mjs",
-        "verify:timbres": "bun tools/verify-timbres.mjs"
+        "verify:timbres": "bun tools/verify-timbres.mjs",
+        "vendor:tabletop": "node tools/pack-tabletop.mjs"
     },
     "devDependencies": {
         "typescript": "^5.5.0"
