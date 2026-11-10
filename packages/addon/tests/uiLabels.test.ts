@@ -14,7 +14,7 @@ function sourceFiles(dir: string): string[] {
 
 // DDUI renders labels as plain text: emoji (astral code points) and variation
 // selectors show up as boxes, so control labels stay inside the BMP.
-const controlLabel = /\.(?:button|toggle|label|dropdown)\(\s*"([^"]*)"/g;
+const controlLabel = /\.(?:button|toggle|label|dropdown|textField|slider)\(\s*"([^"]*)"/g;
 
 test("data-driven control labels stay plain text", () => {
     const offenders: string[] = [];
