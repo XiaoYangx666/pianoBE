@@ -27,7 +27,7 @@ function hitModel(keyboard: Box, keys: readonly KeyBox[], caseBoxes: readonly Bo
     }
     // Only the body behind the keyboard opens the panel; the apron under the
     // keys and the cheeks beside them stay inert so playing cannot pop it open.
-    const body = caseBoxes.filter(box => box[2] > keyboard[5]);
+    const body = new Set(caseBoxes.filter(box => box[2] > keyboard[5]));
     return { keyboard, caseBoxes, buttons, particleLine, firstColumn, columns, keyCenters, body };
 }
 
@@ -170,7 +170,7 @@ export function pickPianoPanel(ray: PianoRay, range = 4, model = digitalPianoHit
         nearest = { distance: hit.enter, box, face: hit.face, sign: hit.sign };
     }
     if (!nearest) return "miss";
-    if (!model.body.includes(nearest.box)) return "case";
+    if (!model.body.has(nearest.box)) return "case";
     // Top (+Y) or back (+Z) of the body only.
     return nearest.sign > 0 && (nearest.face === 1 || nearest.face === 2) ? "panel" : "case";
 }

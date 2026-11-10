@@ -70,6 +70,7 @@ class PianoInstance {
         const sound = typeof storedSound === "number" && soundTypes[storedSound]
             ? storedSound
             : FOLLOW_PIANO_LAYER;
+        const compact = this.player.getDynamicProperty("piano:compact") === true;
 
         this.state = {
             keyMap: new ObservableNumber(keyMapIdx),
@@ -77,10 +78,10 @@ class PianoInstance {
             octave: new ObservableBoolean(false, {
                 clientWritable: true,
             }),
-            compact: new ObservableBoolean(false, {
+            compact: new ObservableBoolean(compact, {
                 clientWritable: true,
             }),
-            controlsVisible: new ObservableBoolean(true),
+            controlsVisible: new ObservableBoolean(!compact),
             input: new ObservableString("", {
                 clientWritable: true,
             }),
@@ -149,8 +150,9 @@ class PianoInstance {
             updatePianoUI(this.state, this.ui, []);
         });
 
-        // 简洁模式：隐藏文字与按钮，只留输入框和开关
+        // 简洁模式：隐藏文字与按钮，只留输入框和开关；选择按玩家保存
         this.state.compact.subscribe((compact) => {
+            if (this.player.isValid) this.player.setDynamicProperty("piano:compact", compact);
             this.state.controlsVisible.setData(!compact);
             updatePianoUI(this.state, this.ui, []);
         });
