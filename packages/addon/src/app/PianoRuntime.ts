@@ -1,4 +1,4 @@
-import { NativeTextSurface } from "@begame/tabletop/minecraft";
+import { NativeTextSurface, textRotationForHeading } from "@begame/tabletop/minecraft";
 import { hostScope, textPort } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
@@ -14,7 +14,6 @@ import { processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
 import { PianoDisplay } from "@platform/display";
-import { flatTextYaw } from "@domain/piano/textRotation";
 import { digitalPianoHitModel, grandPianoHitModel, pickPianoMenu, pianoModelOffset, pianoRay, pickPianoKey } from "@domain/geometry/keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@domain/piano/settings";
 import { midiManager } from "@app/midiManager";
@@ -186,7 +185,7 @@ export class PianoRuntime {
         const linePosition = (depth: number) => pianoModelOffset(this.right, x, y + settings.textUp, depth);
         const style = {
             depthTest: true, useRotation: true, distance: settings.textDistance,
-            rotation: { x: 90, y: flatTextYaw(this.display.entity.getRotation().y), z: 0 },
+            rotation: textRotationForHeading(this.display.entity.getRotation().y + 180, "flat"),
         };
         const scale = settings.textScale / 100;
         const success = this.text.sync(new Map([

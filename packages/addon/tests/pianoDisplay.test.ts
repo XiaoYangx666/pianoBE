@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { flatTextYaw } from "../src/domain/piano/textRotation";
+import { textRotationForHeading } from "@begame/tabletop/minecraft";
 
 // A pitch-90 text primitive lies face-up, so its yaw controls the in-plane
 // heading rather than the facing normal.
@@ -15,7 +15,9 @@ describe("flat display text heading", () => {
         { facing: "east", yaw: -90, away: { x: -1, z: 0 } },
         { facing: "west", yaw: 90, away: { x: 1, z: 0 } },
     ])("$facing keeps the top of the text away from the player", ({ yaw, away }) => {
-        const heading = top(flatTextYaw(yaw));
+        // Tabletop treats the heading as the reader's side; the piano reads from
+        // the opposite edge, hence the 180° reading offset.
+        const heading = top(textRotationForHeading(yaw + 180, "flat").y);
         expect(heading.x).toBeCloseTo(away.x);
         expect(heading.z).toBeCloseTo(away.z);
     });
