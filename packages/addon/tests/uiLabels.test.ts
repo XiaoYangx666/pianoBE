@@ -12,15 +12,15 @@ function sourceFiles(dir: string): string[] {
     });
 }
 
-// DDUI renders button labels as plain text: emoji (astral code points) and
-// variation selectors show up as boxes, so labels stay inside the BMP.
-const buttonLabel = /\.button\(\s*"([^"]*)"/g;
+// DDUI renders labels as plain text: emoji (astral code points) and variation
+// selectors show up as boxes, so control labels stay inside the BMP.
+const controlLabel = /\.(?:button|toggle|label|dropdown)\(\s*"([^"]*)"/g;
 
-test("data-driven button labels stay plain text", () => {
+test("data-driven control labels stay plain text", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(uiRoot)) {
         const source = fs.readFileSync(file, "utf8");
-        for (const [, text] of source.matchAll(buttonLabel)) {
+        for (const [, text] of source.matchAll(controlLabel)) {
             const bad = [...text].some(char => char.codePointAt(0)! > 0xffff || char === "\uFE0F" || char === "\u200D");
             if (bad) offenders.push(`${path.relative(uiRoot, file).replace(/\\/g, "/")}: ${JSON.stringify(text)}`);
         }

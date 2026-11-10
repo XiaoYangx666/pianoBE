@@ -1,6 +1,6 @@
-import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES } from "@piano/core";
+import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES, type PianoSoundLayer } from "@piano/core";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
-import { soundTypes } from "./soundTypes";
+import { isSoundLayer, soundLayerAt } from "./soundTypes";
 
 /** 按启用列表过滤音色；空列表回退到默认音色，保证设置里至少有一个选项。 */
 export function availablePianoTimbres(enabled: readonly string[]) {
@@ -35,7 +35,7 @@ export const DEFAULT_PIANO_SETTINGS = {
     particlePalette: 0,
     volume: 100,
     timbre: DEFAULT_PIANO_TIMBRE as number,
-    soundLayer: 1,
+    soundLayer: "standard" as PianoSoundLayer,
     textVisible: true,
     titleColor: "#D4FFE8",
     statusColor: "#A6EBCF",
@@ -61,6 +61,12 @@ export function normalizePianoColor(value: unknown) {
     if (typeof value !== "string") return;
     const hex = value.trim().replace(/^#/, "");
     return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toUpperCase()}` : undefined;
+}
+
+/** 音长存稳定字符串；兼容早期版本存的下标。 */
+function normalizeSoundLayer(value: unknown): PianoSoundLayer | undefined {
+    if (isSoundLayer(value)) return value;
+    return typeof value === "number" ? soundLayerAt(value) : undefined;
 }
 
 export function pianoTextColor(hex: string) {
@@ -95,9 +101,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         volume: number("volume"),
         timbre: AVAILABLE_PIANO_TIMBRES.find(timbre => timbre.value === saved.timbre)?.value
             ?? defaults.timbre,
-        soundLayer: typeof saved.soundLayer === "number" && soundTypes[saved.soundLayer]
-            ? saved.soundLayer
-            : defaults.soundLayer,
+        soundLayer: normalizeSoundLayer(saved.soundLayer) ?? defaults.soundLayer,
         textVisible: typeof saved.textVisible === "boolean" ? saved.textVisible : defaults.textVisible,
         titleColor: normalizePianoColor(saved.titleColor) ?? defaults.titleColor,
         statusColor: normalizePianoColor(saved.statusColor) ?? defaults.statusColor,

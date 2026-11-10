@@ -39,7 +39,7 @@ export function createPianoUI(
     _getBlock: () => Block | null,
     actions: PianoUIActions
 ) {
-    const options = { visible: state.fullUI };
+    const options = { visible: state.controlsVisible };
 
     const form = new CustomForm(p, "文本钢琴")
         .label(ui.status, options)
@@ -94,7 +94,7 @@ export function updatePianoUI(
     keys: string[],
     last?: NoteInfo
 ) {
-    if (!state.fullUI.getData()) return;
+    if (!state.controlsVisible.getData()) return;
 
     const isHigh = state.octave.getData();
     const baseColor = isHigh ? "§b" : "§7";
@@ -134,8 +134,8 @@ export function updatePianoUI(
         );
         ui.status.setData(
             hasGaps
-                ? `§b🎹 钢琴已就绪\n§7深灰色按键为当前方案的空位`
-                : `§b🎹 钢琴已就绪`
+                ? `§b钢琴已就绪\n§7深灰色按键为当前方案的空位`
+                : `§b钢琴已就绪`
         );
     }
 

@@ -155,21 +155,22 @@ export function hitsPianoMenu(ray: PianoRay, range = 4): boolean {
     return pickPianoMenu(ray, range) === "menu";
 }
 
+export type PianoPanelHit = "panel" | "case" | "miss";
+
 /**
- * True when the click opens the panel: the top or the back of the piano body,
- * or a tap that misses every case box (touch players aim at the block, not at
- * the model). The apron under the keys, the side cheeks, the legs, the front
- * face and the sides stay inert so a missed key does not pop it open.
+ * Classify where a click that missed the keys landed: on the piano body's top
+ * or back ("panel"), on any other part of the case ("case"), or on nothing at
+ * all ("miss"). Callers decide whether a miss should still open the panel.
  */
-export function pickPianoPanel(ray: PianoRay, range = 4, model = digitalPianoHitModel): boolean {
+export function pickPianoPanel(ray: PianoRay, range = 4, model = digitalPianoHitModel): PianoPanelHit {
     let nearest: { distance: number; box: Box; face: number; sign: number } | undefined;
     for (const box of model.caseBoxes) {
         const hit = intersect(ray, box, 0, range);
         if (!hit || (nearest && hit.enter >= nearest.distance)) continue;
         nearest = { distance: hit.enter, box, face: hit.face, sign: hit.sign };
     }
-    if (!nearest) return true;
-    if (!model.body.includes(nearest.box)) return false;
+    if (!nearest) return "miss";
+    if (!model.body.includes(nearest.box)) return "case";
     // Top (+Y) or back (+Z) of the body only.
-    return nearest.sign > 0 && (nearest.face === 1 || nearest.face === 2);
+    return nearest.sign > 0 && (nearest.face === 1 || nearest.face === 2) ? "panel" : "case";
 }

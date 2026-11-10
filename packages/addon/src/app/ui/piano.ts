@@ -80,7 +80,7 @@ class PianoInstance {
             compact: new ObservableBoolean(false, {
                 clientWritable: true,
             }),
-            fullUI: new ObservableBoolean(true),
+            controlsVisible: new ObservableBoolean(true),
             input: new ObservableString("", {
                 clientWritable: true,
             }),
@@ -89,7 +89,7 @@ class PianoInstance {
 
         // === UI ===
         this.ui = {
-            status: new ObservableString("§b🎹 钢琴已就绪"),
+            status: new ObservableString("§b钢琴已就绪"),
             rows: [
                 new ObservableString(""),
                 new ObservableString(""),
@@ -132,7 +132,7 @@ class PianoInstance {
             this.lastLength = val.length;
 
             // 处理输入
-            const result = handleInput(val, this.state, this.piano!);
+            const result = handleInput(val, this.state, this.piano!, this.player);
 
             // 更新 UI
             updatePianoUI(this.state, this.ui, result.keys, result.last);
@@ -151,7 +151,7 @@ class PianoInstance {
 
         // 简洁模式：隐藏文字与按钮，只留输入框和开关
         this.state.compact.subscribe((compact) => {
-            this.state.fullUI.setData(!compact);
+            this.state.controlsVisible.setData(!compact);
             updatePianoUI(this.state, this.ui, []);
         });
     }
@@ -234,30 +234,34 @@ class PianoInstance {
     }
 
     /**
-     * 面板里的「MIDI 播放器」入口：DDUI 同一玩家同时只能有一个表单，
-     * 先关掉本表单，等客户端完成关闭后再打开 MIDI 播放器。
+     * 面板里的入口按钮：DDUI 同一玩家同时只能有一个表单，
+     * 先关掉本表单并记下关闭时刻，等客户端完成关闭后再打开目标界面。
      */
-    private openMidi() {
-        const block = this.leftBlock;
-        if (!block || !this.player.isValid) return;
+    private reopen(open: () => void) {
+        if (!this.player.isValid) return;
         this.close();
+        this.lastClosedTick = system.currentTick;
         system.runTimeout(() => {
-            if (this.player.isValid && block.isValid) {
-                void openMidiPlayer(this.player, block);
-            }
+            if (this.player.isValid) open();
         }, 2);
     }
 
-    /** 面板里的「钢琴设置」入口，与 MIDI 入口同样先关表单再打开。 */
+    /** 「MIDI 播放器」入口 */
+    private openMidi() {
+        const block = this.leftBlock;
+        if (!block || !this.player.isValid) return;
+        this.reopen(() => {
+            if (block.isValid) void openMidiPlayer(this.player, block);
+        });
+    }
+
+    /** 「钢琴设置」入口 */
     private openSettings() {
         const piano = this.piano;
         if (!piano || !this.player.isValid) return;
-        this.close();
-        system.runTimeout(() => {
-            if (this.player.isValid && piano.isAlive()) {
-                void openPianoSettings(this.player, piano);
-            }
-        }, 2);
+        this.reopen(() => {
+            if (piano.isAlive()) void openPianoSettings(this.player, piano);
+        });
     }
 
     /** 实例被新会话替换时清理（旧 Player 表单已不可再交互） */

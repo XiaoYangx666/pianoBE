@@ -102,7 +102,8 @@ class PianoWorld {
         }
         const button = pickPianoMenu(ray, 4, piano.hitModel);
         if (button) return button;
-        return pickPianoPanel(ray, 4, piano.hitModel) ? "panel" : undefined;
+        // 触屏玩家常点在模型空档上，完全没命中琴体盒时也开面板。
+        return pickPianoPanel(ray, 4, piano.hitModel) === "case" ? undefined : "panel";
     }
 
     private isNear({ dimension, pos }: InstrumentLocation) {

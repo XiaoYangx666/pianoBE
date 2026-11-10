@@ -9,11 +9,20 @@ export const soundTypes: readonly { name: string; layer: PianoSoundLayer }[] = [
     { name: "短音(0.5s)", layer: "short" },
 ];
 
+export function isSoundLayer(value: unknown): value is PianoSoundLayer {
+    return soundTypes.some(type => type.layer === value);
+}
+
 export function soundLayerAt(index: number | undefined): PianoSoundLayer | undefined {
     return index === undefined ? undefined : soundTypes[index]?.layer;
 }
 
+export function soundLayerIndexOf(layer: PianoSoundLayer): number {
+    const index = soundTypes.findIndex(type => type.layer === layer);
+    return index < 0 ? 0 : index;
+}
+
 /** 玩家覆盖优先，未覆盖（-1/非法值）时跟随钢琴设置。 */
-export function resolveSoundLayer(override: number, pianoIndex: number): PianoSoundLayer {
-    return soundLayerAt(override) ?? soundLayerAt(pianoIndex) ?? "standard";
+export function resolveSoundLayer(override: number, pianoLayer: PianoSoundLayer): PianoSoundLayer {
+    return soundLayerAt(override) ?? pianoLayer;
 }

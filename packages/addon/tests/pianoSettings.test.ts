@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
 import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, readPianoSettings } from "../src/domain/piano/settings";
-import { FOLLOW_PIANO_LAYER, resolveSoundLayer, soundTypes } from "../src/domain/piano/soundTypes";
+import { FOLLOW_PIANO_LAYER, resolveSoundLayer, soundLayerAt, soundLayerIndexOf, soundTypes } from "../src/domain/piano/soundTypes";
 
 describe("piano timbre settings", () => {
     test("默认音色为经典 P-88", () => {
@@ -43,14 +43,24 @@ describe("piano timbre settings", () => {
 
 describe("piano sound layer settings", () => {
     test("默认音长是标准音", () => {
-        expect(soundTypes[DEFAULT_PIANO_SETTINGS.soundLayer].layer).toBe("standard");
+        expect(DEFAULT_PIANO_SETTINGS.soundLayer).toBe("standard");
     });
 
-    test("合法层编号保留，非法值回退默认", () => {
-        expect(normalizePianoSettings({ soundLayer: 0 }).soundLayer).toBe(0);
-        expect(normalizePianoSettings({ soundLayer: 2 }).soundLayer).toBe(2);
+    test("合法音长字符串原样保留", () => {
+        for (const { layer } of soundTypes) {
+            expect(normalizePianoSettings({ soundLayer: layer }).soundLayer).toBe(layer);
+        }
+    });
+
+    test("旧版存的下标迁移成音长字符串", () => {
+        expect(normalizePianoSettings({ soundLayer: 0 }).soundLayer).toBe("long");
+        expect(normalizePianoSettings({ soundLayer: 2 }).soundLayer).toBe("short");
+    });
+
+    test("非法音长回退默认值", () => {
+        expect(normalizePianoSettings({ soundLayer: "bass" }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
         expect(normalizePianoSettings({ soundLayer: 9 }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
-        expect(normalizePianoSettings({ soundLayer: "1" }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
+        expect(normalizePianoSettings({ soundLayer: null }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
     });
 
     test("旧版设置没有 soundLayer 时平滑迁移", () => {
@@ -58,10 +68,17 @@ describe("piano sound layer settings", () => {
             .toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
     });
 
+    test("音长下标与设置值可以互转", () => {
+        for (const [index, { layer }] of soundTypes.entries()) {
+            expect(soundLayerAt(index)).toBe(layer);
+            expect(soundLayerIndexOf(layer)).toBe(index);
+        }
+    });
+
     test("玩家覆盖优先，跟随钢琴时用钢琴设置", () => {
-        expect(resolveSoundLayer(2, 0)).toBe("short");
-        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, 0)).toBe("long");
-        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, 1)).toBe("standard");
-        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, 99)).toBe("standard");
+        expect(resolveSoundLayer(2, "long")).toBe("short");
+        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, "long")).toBe("long");
+        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, "standard")).toBe("standard");
+        expect(resolveSoundLayer(99, "short")).toBe("short");
     });
 });
