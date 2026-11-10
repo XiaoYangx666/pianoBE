@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
-import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, readPianoSettings } from "../src/domain/piano/settings";
+import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, readPianoSettings } from "../src/domain/piano/settings";
 import { FOLLOW_PIANO_LAYER, resolveSoundLayer, soundLayerAt, soundLayerIndexOf, soundTypes } from "../src/domain/piano/soundTypes";
+
+test("old pianos start with the score off and the former peach selection becomes sakura", () => {
+    const old = readPianoSettings('{"particleStyle":5}');
+    expect(old.scoreMounted).toBe(false);
+    expect(PIANO_PARTICLE_STYLES.find(style => style.value === old.particleStyle)?.effect).toBe("xypiano:sakura_drift");
+    expect(readPianoSettings(JSON.stringify({ ...old, scoreMounted: true })).scoreMounted).toBe(true);
+});
 
 describe("piano timbre settings", () => {
     test("默认音色为经典 P-88", () => {

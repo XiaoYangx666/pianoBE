@@ -29,6 +29,7 @@ class PianoInstance {
     private lastLength = 0;
     /** 防止同一帧内连续交互导致 show() 并发调用（两次 show 会刷新表单实例，客户端写入被拒） */
     private opening = false;
+    private syncingCompact = false;
     /** 上一次表单关闭的 tick，用于避免“刚关闭就重开”的 DDUI 竞态 */
     private lastClosedTick = -1;
 
@@ -152,7 +153,7 @@ class PianoInstance {
 
         // 简洁模式：隐藏文字与按钮，只留输入框和开关；选择按玩家保存
         this.state.compact.subscribe((compact) => {
-            if (this.player.isValid) this.player.setDynamicProperty("piano:compact", compact);
+            if (!this.syncingCompact && this.player.isValid) this.player.setDynamicProperty("piano:compact", compact);
             this.state.controlsVisible.setData(!compact);
             updatePianoUI(this.state, this.ui, []);
         });
@@ -168,6 +169,14 @@ class PianoInstance {
 
         this.opening = true;
         try {
+            // Grand pianos use the main panel as the only entry to settings and MIDI.
+            const compact = this.piano?.hasScreen === true && this.player.getDynamicProperty("piano:compact") === true;
+            this.syncingCompact = true;
+            try {
+                this.state.compact.setData(compact);
+            } finally {
+                this.syncingCompact = false;
+            }
             // 重置输入状态
             this.lastLength = 0;
             this.state.input.setData("");

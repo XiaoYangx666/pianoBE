@@ -8,6 +8,7 @@ import type { PianoRuntime } from "@app/PianoRuntime";
 class PianoSettingsForm {
     private readonly form: CustomForm;
     private readonly syncFields: Array<(settings: PianoSettings) => void> = [];
+    private readonly hasScreen = new ObservableBoolean(true);
     private target?: { piano: PianoRuntime; displayId: string };
     private unsubscribe?: () => void;
     private opening = false;
@@ -16,22 +17,25 @@ class PianoSettingsForm {
     constructor(private readonly player: Player) {
         this.form = new CustomForm(player, "钢琴设置").label("下次发声或刷新时应用，关闭表单时保存");
         const writable = { clientWritable: true };
-        const toggle = (label: string, key: "particles" | "textVisible") => {
+        const toggle = (label: string, key: "particles" | "textVisible" | "scoreMounted") => {
             const value = new ObservableBoolean(DEFAULT_PIANO_SETTINGS[key], writable);
             this.bind(key, value);
-            this.form.toggle(label, value);
+            const options = key === "textVisible" ? { visible: this.hasScreen } : key === "scoreMounted"
+                ? { description: "瞄准左页或右页，按一次潜行翻页" } : undefined;
+            this.form.toggle(label, value, options);
         };
         const slider = (label: string, key: keyof typeof PIANO_SETTINGS_LIMITS) => {
             const value = new ObservableNumber(DEFAULT_PIANO_SETTINGS[key], writable);
             const [min, max] = PIANO_SETTINGS_LIMITS[key];
             this.bind(key, value);
-            this.form.slider(label, value, min, max, { step: 1 });
+            this.form.slider(label, value, min, max, { step: 1, visible: key === "volume" ? true : this.hasScreen });
         };
         const color = (label: string, key: "titleColor" | "statusColor") => {
             const value = new ObservableString(DEFAULT_PIANO_SETTINGS[key], writable);
             this.bind(key, value, normalizePianoColor);
-            this.form.textField(label, value, { description: "输入 #RRGGBB，色值有效后生效" });
+            this.form.textField(label, value, { description: "输入 #RRGGBB，色值有效后生效", visible: this.hasScreen });
         };
+        toggle("安装谱架和曲谱", "scoreMounted");
         toggle("显示弹奏粒子", "particles");
         const particleStyle = new ObservableNumber(DEFAULT_PIANO_SETTINGS.particleStyle, writable);
         this.bind("particleStyle", particleStyle);
@@ -53,7 +57,7 @@ class PianoSettingsForm {
         });
         this.form.dropdown("手动弹奏音长", soundLayer,
             soundTypes.map(({ name }, value) => ({ label: name, value })));
-        this.form.divider();
+        this.form.divider({ visible: this.hasScreen });
         toggle("显示琴面文字", "textVisible");
         color("标题颜色", "titleColor");
         color("状态颜色", "statusColor");
@@ -119,6 +123,7 @@ class PianoSettingsForm {
 
         this.opening = true;
         try {
+            this.hasScreen.setData(piano.hasScreen);
             this.sync(settings);
             this.target = { piano, displayId };
             this.unsubscribe = piano.disposedSignal.subscribe(() => this.close());

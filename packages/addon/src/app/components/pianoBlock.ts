@@ -40,10 +40,6 @@ export const PianoBlockComponent: BlockCustomComponent = {
         const piano = pianoWorld.get(location);
         if (!piano) return;
         const hit = pianoWorld.interactFromView(e.player, piano);
-        // Keys play; buttons open their own UI; the body behind the keyboard or
-        // a tap that misses the model opens the panel, while the apron under
-        // the keys and the side cheeks stay inert. "menu" is the dedicated
-        // panel button and lands on the same form as "panel".
         if (hit === "midi") void openMidiPlayer(e.player, e.block);
         else if (hit === "settings") void openPianoSettings(e.player, piano);
         else if (hit === "menu" || hit === "panel") void openPiano(e.player, e.block);

@@ -19,7 +19,6 @@ PALETTE = {
     "keys": (232, 227, 214),
     "black": (31, 34, 41),
     "brass": (177, 132, 62),
-    "paper": (232, 224, 203),
     "felt": (122, 33, 43),
 }
 
@@ -32,8 +31,6 @@ def colour(element):
         return PALETTE["keys"]
     if "cast plate" in name or "string" in name.lower():
         return PALETTE["brass"]
-    if "score band" in name:
-        return PALETTE["paper"]
     if "music desk" in name:
         return PALETTE["body_hi"]
     if "pedal" in name.lower() and "brass" not in name.lower():

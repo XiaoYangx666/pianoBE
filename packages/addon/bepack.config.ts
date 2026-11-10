@@ -3,6 +3,8 @@ import { cp } from "fs/promises";
 import { join } from "path";
 import { platform } from "process";
 
+const resourcePackUuid = "efbe8777-707f-42de-a238-97b05684685e";
+
 export default defineConfig({
     root: ".",
     target: "latest",
@@ -23,6 +25,7 @@ export default defineConfig({
                 // @minecraft/server-admin/server-net 等 catalog 依赖自动 external
                 define: {
                     __PIANO_TARGET__: JSON.stringify("client"),
+                    __PIANO_SCORE_RESOURCE_PACK__: JSON.stringify(resourcePackUuid),
                 },
             },
             // clean 模式：manifest 从配置全量重建，双配置交替构建互不污染
@@ -41,7 +44,7 @@ export default defineConfig({
         },
         rp: {
             root: "rp",
-            uuid: "efbe8777-707f-42de-a238-97b05684685e",
+            uuid: resourcePackUuid,
             moduleUuid: "36d4f042-edf0-4be3-8d48-8165de3057ad",
             manifest: {
                 merge: "clean",

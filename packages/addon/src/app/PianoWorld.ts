@@ -1,14 +1,14 @@
 import { hostScope } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
-import { Player, Vector3, system, world } from "@minecraft/server";
-import type { EntityLoadAfterEvent } from "@minecraft/server";
+import { ButtonState, InputButton, Player, Vector3, system, world } from "@minecraft/server";
+import type { EntityLoadAfterEvent, PlayerButtonInputAfterEvent } from "@minecraft/server";
 import { grandDefinition } from "@domain/instrument/definition";
 import {
     destroyInstrument, inspectInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced,
     type InstrumentLocation, resolveInstrument,
 } from "@platform/assembly";
-import { displayAnchor, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, removePianoDisplay } from "@platform/display";
-import { pickPianoKey, pickPianoMenu, pickPianoPanel, pianoRay } from "@domain/geometry/keyRay";
+import { displayAnchor, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, removePianoDisplay, SCORE_MOUNTED, SCORE_STAND_ENTITY } from "@platform/display";
+import { hitsGrandPanel, pickScorePage, pickPianoKey, pickPianoMenu, pickPianoPanel, pianoEye, pianoRay } from "@domain/geometry/keyRay";
 import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
 import { playerSoundLayer } from "@app/playerSound";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
@@ -27,16 +27,17 @@ class PianoWorld {
         this.scope.interval(SWEEP_INTERVAL, () => this.sweep());
         this.scope.interval(1, () => this.tick());
         const onEntityLoad = ({ entity }: EntityLoadAfterEvent) => {
-            if (entity.typeId !== PIANO_DISPLAY && entity.typeId !== grandDefinition.displayId) return;
+            const isScore = entity.typeId === SCORE_STAND_ENTITY;
+            if (!isScore && entity.typeId !== PIANO_DISPLAY && entity.typeId !== grandDefinition.displayId) return;
             system.run(() => {
                 if (!entity.isValid) return;
                 const pos = displayAnchor(entity);
-                if (!pos) { removePianoDisplay(entity); return; }
+                if (!pos || (isScore && entity.getProperty(SCORE_MOUNTED) !== true)) { removePianoDisplay(entity); return; }
                 const dimension = entity.dimension;
                 if (!dimension.isChunkLoaded(pos)) return;
                 const block = dimension.getBlock(pos);
                 const location = block && resolveInstrument(block);
-                if (!location || pianoDisplayType(location) !== entity.typeId ||
+                if (!location || (!isScore && pianoDisplayType(location) !== entity.typeId) ||
                     location.pos.x !== pos.x || location.pos.y !== pos.y || location.pos.z !== pos.z) {
                     removePianoDisplay(entity);
                     return;
@@ -45,11 +46,18 @@ class PianoWorld {
                 if (integrity === "incomplete") { removePianoDisplay(entity); return; }
                 if (integrity === "unloaded" || !this.isNear(location)) return;
                 const current = this.get(location);
-                if (current?.displayId && current.displayId !== entity.id && entity.isValid) removePianoDisplay(entity);
+                const activeId = isScore ? current?.scoreId : current?.displayId;
+                if ((activeId || (isScore && current?.settings?.scoreMounted === false)) &&
+                    activeId !== entity.id && entity.isValid) removePianoDisplay(entity);
             });
         };
         world.afterEvents.entityLoad.subscribe(onEntityLoad);
         this.scope.own("entityLoad", () => world.afterEvents.entityLoad.unsubscribe(onEntityLoad));
+        const onScoreInput = ({ player, button, newButtonState }: PlayerButtonInputAfterEvent) => {
+            if (button === InputButton.Sneak && newButtonState === ButtonState.Pressed) this.turnScoreFromView(player);
+        };
+        world.afterEvents.playerButtonInput.subscribe(onScoreInput);
+        this.scope.own("scoreInput", () => world.afterEvents.playerButtonInput.unsubscribe(onScoreInput));
     }
 
     get(location: InstrumentLocation): PianoRuntime | undefined {
@@ -100,10 +108,41 @@ class PianoWorld {
             piano.playKey(midi, playerSoundLayer(player, piano));
             return "key";
         }
+        const grand = !piano.hasScreen;
+        const page = piano.scoreId ? pickScorePage(ray, grand) : undefined;
+        if (page) {
+            piano.turnScore(page.spread);
+            return "score";
+        }
+        if (grand) return hitsGrandPanel(ray) ? "panel" : undefined;
         const button = pickPianoMenu(ray, 4, piano.hitModel);
         if (button) return button;
         // 触屏玩家常点在模型空档上，完全没命中琴体盒时也开面板。
         return pickPianoPanel(ray, 4, piano.hitModel) === "case" ? undefined : "panel";
+    }
+
+    private turnScoreFromView(player: Player) {
+        const dimension = player.dimension;
+        const head = player.getHeadLocation();
+        const view = player.getViewDirection();
+        let target: { piano: PianoRuntime; spread: 0 | 1; distance: number } | undefined;
+        for (const piano of this.pianos.values()) {
+            if (piano.location.dimension.id !== dimension.id || Math.abs(head.x - piano.center.x) > 5 ||
+                Math.abs(head.z - piano.center.z) > 5 || !piano.scoreId) continue;
+            const ray = pianoRay(piano.center, piano.right, head, view);
+            const page = pickScorePage(ray, !piano.hasScreen, target?.distance ?? 4);
+            if (page) target = { piano, ...page };
+        }
+        if (!target || target.piano.verify(system.currentTick) !== "complete") return;
+        // The zero-hitbox stand can be read against open air. Check world
+        // occlusion independently of the cabinet's precise boxes above.
+        const obstacle = dimension.getBlockFromRay(pianoEye(head), view, { maxDistance: target.distance });
+        if (obstacle) {
+            const owner = resolveInstrument(obstacle.block);
+            const { location } = target.piano;
+            if (!owner || instrumentKey(owner.dimension, owner.pos) !== instrumentKey(location.dimension, location.pos)) return;
+        }
+        if (this.beginInteraction(player)) target.piano.turnScore(target.spread);
     }
 
     private isNear({ dimension, pos }: InstrumentLocation) {

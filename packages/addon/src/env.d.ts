@@ -7,3 +7,4 @@
  * 因此不会进入 rolldown 模块图、不会被 define 触碰。
  */
 declare const __PIANO_TARGET__: "client" | "server";
+declare const __PIANO_SCORE_RESOURCE_PACK__: string;

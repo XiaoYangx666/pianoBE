@@ -81,6 +81,11 @@ if (fs.existsSync(templatePath)) {
 // --- 实际产物 ---
 check(fs.existsSync(scripts), "bp/scripts exists (run a build first)");
 
+const scorePack = path.join(scripts, "packages/addon/src/data/scorePack.js");
+const resourcePackUuid = JSON.parse(read(path.join(addon, "rp/manifest.json"))).header.uuid;
+check(fs.existsSync(scorePack) && read(scorePack).includes(resourcePackUuid),
+    "DDUI score pack ID matches the resource manifest");
+
 const builtManager = path.join(scripts, "midiManager.js");
 check(fs.existsSync(builtManager), "built midiManager.js exists");
 

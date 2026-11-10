@@ -1,0 +1,70 @@
+{
+  "format_version": "1.10.0",
+  "particle_effect": {
+    "description": {
+      "identifier": "xypiano:stardust",
+      "basic_render_parameters": {
+        "material": "particles_add",
+        "texture": "textures/particle/piano_fx"
+      }
+    },
+    "components": {
+      "minecraft:emitter_rate_instant": {
+        "num_particles": 4
+      },
+      "minecraft:emitter_lifetime_once": {
+        "active_time": 0.75
+      },
+      "minecraft:emitter_shape_point": {
+        "direction": [
+          "math.random(-0.32, 0.32)",
+          1,
+          "math.random(-0.3, 0.3)"
+        ]
+      },
+      "minecraft:particle_lifetime_expression": {
+        "max_lifetime": "math.random(0.36, 0.69)"
+      },
+      "minecraft:particle_appearance_billboard": {
+        "size": [
+          "(0.022 + 0.043 * variable.particle_random_2) * (1 - 0.5 * (math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1)))",
+          "(0.022 + 0.043 * variable.particle_random_2) * (1 - 0.5 * (math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1)))"
+        ],
+        "facing_camera_mode": "lookat_xyz",
+        "uv": {
+          "texture_width": 256,
+          "texture_height": 128,
+          "uv": [
+            128,
+            64
+          ],
+          "uv_size": [
+            64,
+            64
+          ]
+        }
+      },
+      "minecraft:particle_appearance_tinting": {
+        "color": [
+          "variable.piano_red ?? 0.39",
+          "variable.piano_green ?? 0.86",
+          "variable.piano_blue ?? 0.95",
+          "(1 - (math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1))) * (0.58 + 0.42 * math.sin(160 + 450 * (math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1)) + 180 * variable.particle_random_3))"
+        ]
+      },
+      "minecraft:particle_initial_speed": "math.random(0.85, 1.65)",
+      "minecraft:particle_motion_dynamic": {
+        "linear_acceleration": [
+          0,
+          0.26,
+          0
+        ],
+        "linear_drag_coefficient": 1.6
+      },
+      "minecraft:particle_initial_spin": {
+        "rotation": "math.random(0, 90)",
+        "rotation_rate": "math.random(-80, 80)"
+      }
+    }
+  }
+}

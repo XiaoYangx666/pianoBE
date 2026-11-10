@@ -1,0 +1,1 @@
+{"format_version":"1.8.0","animations":{"animation.xypiano.grand_score":{"loop":true,"bones":{"score_leaf":{"rotation":[0,"-180*v.score_turn",0]}}}}}

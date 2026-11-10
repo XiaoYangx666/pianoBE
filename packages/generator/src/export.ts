@@ -35,7 +35,7 @@ export async function generateAddonZip(
 ): Promise<Blob> {
     const { addon, bpPath, rpPath } = info;
 
-    addon.updateIdentity(
+    const { identity } = addon.updateIdentity(
         {
             name: opts.name,
             description: opts.desc,
@@ -44,6 +44,11 @@ export async function generateAddonZip(
         },
         { indent: 4 }
     );
+    const scorePackModule = `${bpPath}scripts/packages/addon/src/data/scorePack.js`;
+    if (identity.resourcePack && addon.has(scorePackModule)) {
+        addon.writeText(scorePackModule,
+            `export const SCORE_RESOURCE_PACK_ID = ${JSON.stringify(identity.resourcePack.headerUuid)};\n`);
+    }
 
     // ---- 重写 scripts/midis ----
     const midisDir = `${bpPath}scripts/midis/`.replace(/\/+/g, "/");

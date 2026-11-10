@@ -1,5 +1,7 @@
 import { Block, Player } from "@minecraft/server";
-import { CustomForm } from "@minecraft/server-ui";
+import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
+import { SCORE_UI_PAGES } from "@data/grand.generated";
+import { SCORE_RESOURCE_PACK_ID } from "@data/scorePack";
 import { NoteInfo } from "@domain/types";
 import { soundTypes, FOLLOW_PIANO_LAYER } from "@domain/piano/soundTypes";
 import { keyMaps } from "@domain/piano/keymap";
@@ -27,6 +29,36 @@ function switchSoundType(state: PianoState, p: Player) {
     p.setDynamicProperty("piano:sound", idx);
 }
 
+function addScoreControls(form: CustomForm, controlsVisible: ObservableBoolean) {
+    // Earlier DDUI versions still need to be able to open the piano panel.
+    if (typeof form.image !== "function") return;
+    const showScore = new ObservableBoolean(false, { clientWritable: true });
+    const visible = new ObservableBoolean(false);
+    const source = new ObservableString(SCORE_UI_PAGES[0]);
+    const atStart = new ObservableBoolean(true);
+    const atEnd = new ObservableBoolean(false);
+    let page = 0;
+
+    const updateVisibility = () => visible.setData(controlsVisible.getData() && showScore.getData());
+    showScore.subscribe(updateVisibility);
+    controlsVisible.subscribe(updateVisibility);
+
+    const turnPage = (step: number) => {
+        if (!visible.getData()) return;
+        const next = page + step;
+        if (next < 0 || next >= SCORE_UI_PAGES.length) return;
+        page = next;
+        source.setData(SCORE_UI_PAGES[page]);
+        atStart.setData(page === 0);
+        atEnd.setData(page === SCORE_UI_PAGES.length - 1);
+    };
+
+    form.toggle("显示《小星星》简谱", showScore, { visible: controlsVisible })
+        .image(source, SCORE_RESOURCE_PACK_ID, { visible, width: .96 })
+        .button("上一页", () => turnPage(-1), { visible, disabled: atStart })
+        .button("下一页", () => turnPage(1), { visible, disabled: atEnd });
+}
+
 export interface PianoUIActions {
     openMidi(): void;
     openSettings(): void;
@@ -48,8 +80,9 @@ export function createPianoUI(
     ui.rows.forEach((row) => form.label(row, options));
 
     form.label("   ", options)
-        .textField("在此处快速打字...", state.input)
-        .toggle("升8度 (高音模式)", state.octave)
+        .textField("在此处快速打字...", state.input);
+    addScoreControls(form, state.controlsVisible);
+    form.toggle("升8度 (高音模式)", state.octave)
         .button(
             ui.keyMapLabel,
             () => {

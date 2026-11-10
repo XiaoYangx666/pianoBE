@@ -1,5 +1,5 @@
 import type { Vec3 } from "./offsets";
-import { GRAND_BUTTONS, GRAND_CASE_HITBOXES, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PARTICLE_LINE } from "@data/grand.generated";
+import { GRAND_CASE_HITBOXES, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PANEL_BOXES, GRAND_PARTICLE_LINE, SCORE_STAND } from "@data/grand.generated";
 import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "@data/hitboxes.generated";
 
 type Vec = readonly [number, number, number];
@@ -33,20 +33,28 @@ function hitModel(keyboard: Box, keys: readonly KeyBox[], caseBoxes: readonly Bo
 
 export const digitalPianoHitModel = hitModel(KEYBOARD_HITBOX, KEY_HITBOXES, CASE_HITBOXES,
     [["menu", MENU_HITBOX], ["midi", MIDI_MENU_HITBOX], ["settings", SETTINGS_HITBOX]], PIANO_PARTICLE_LINE);
-export const grandPianoHitModel = hitModel(GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_CASE_HITBOXES,
-    GRAND_BUTTONS, { y: GRAND_PARTICLE_LINE[1], z: GRAND_PARTICLE_LINE[2] });
+export const grandPianoHitModel = hitModel(GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_CASE_HITBOXES, [], GRAND_PARTICLE_LINE);
+const grandPanelBoxes = new Set<number>(GRAND_PANEL_BOXES);
+const scoreAngle = SCORE_STAND.lean * Math.PI / 180;
+const scoreSin = Math.sin(scoreAngle);
+const scoreCos = Math.cos(scoreAngle);
 
 export interface PianoRay {
     origin: Vec;
     direction: Vec;
 }
 
+export function pianoEye(head: Vec3): Vec3 {
+    return { ...head, y: head.y + HEAD_TO_EYE_Y };
+}
+
 /** Model-space ray with t still measured in blocks. */
 export function pianoRay(center: Vec3, right: Vec3, head: Vec3, view: Vec3): PianoRay {
+    const eye = pianoEye(head);
     const toModel = (x: number, y: number, z: number): Vec =>
         [-16 * (right.x * x + right.z * z), 16 * y, 16 * (right.z * x - right.x * z)];
     return {
-        origin: toModel(head.x - center.x, head.y + HEAD_TO_EYE_Y - center.y, head.z - center.z),
+        origin: toModel(eye.x - center.x, eye.y - center.y, eye.z - center.z),
         direction: toModel(view.x, view.y, view.z),
     };
 }
@@ -64,9 +72,8 @@ export function pianoParticleOrigin(center: Vec3, right: Vec3, midi: number, onK
     const key = model.keyCenters.get(midi);
     if (!key) return;
     const [x, y, z] = key;
-    const offset = onKey
-        ? pianoModelOffset(right, x, y + .4, z)
-        : pianoModelOffset(right, x, model.particleLine.y, model.particleLine.z);
+    const line = onKey ? undefined : model.particleLine;
+    const offset = pianoModelOffset(right, x, line?.y ?? y + .4, line?.z ?? z);
     return { x: center.x + offset.x, y: center.y + offset.y, z: center.z + offset.z };
 }
 
@@ -153,6 +160,42 @@ export function pickPianoMenu(ray: PianoRay, range = 4, model = digitalPianoHitM
 
 export function hitsPianoMenu(ray: PianoRay, range = 4): boolean {
     return pickPianoMenu(ray, range) === "menu";
+}
+
+export function scoreStandOffset(right: Vec3, grand: boolean): Vec3 {
+    return pianoModelOffset(right, 0, SCORE_STAND.heights[grand ? "grand" : "digital"], SCORE_STAND.z);
+}
+
+/** Left page returns to the first spread. Right page advances to the second. */
+export function pickScorePage(ray: PianoRay, grand: boolean, range = 4): { spread: 0 | 1; distance: number } | undefined {
+    const [, py, pz] = SCORE_STAND.pivot;
+    const [x, y, z] = ray.origin;
+    const [dx, dy, dz] = ray.direction;
+    const oy = y - SCORE_STAND.heights[grand ? "grand" : "digital"] - py;
+    const oz = z - SCORE_STAND.z - pz;
+    const local: PianoRay = {
+        origin: [x, scoreCos * oy + scoreSin * oz, scoreCos * oz - scoreSin * oy],
+        direction: [dx, scoreCos * dy + scoreSin * dz, scoreCos * dz - scoreSin * dy],
+    };
+    const hit = intersect(local, SCORE_STAND.face, 0, range);
+    if (!hit || hit.face !== 2 || hit.sign !== -1) return;
+    const { caseBoxes } = grand ? grandPianoHitModel : digitalPianoHitModel;
+    if (caseBoxes.some(box =>
+        (intersect(ray, box, 0, hit.enter)?.enter ?? Infinity) < hit.enter - 1e-6)) return;
+    return { spread: x + dx * hit.enter >= 0 ? 0 : 1, distance: hit.enter };
+}
+
+export function hitsGrandPanel(ray: PianoRay, range = 4): boolean {
+    let nearest: { index: number; hit: NonNullable<ReturnType<typeof intersect>> } | undefined;
+    GRAND_CASE_HITBOXES.forEach((box, index) => {
+        const hit = intersect(ray, box, 0, nearest?.hit.enter ?? range);
+        if (hit && (!nearest || hit.enter < nearest.hit.enter)) nearest = { index, hit };
+    });
+    if (!nearest || !grandPanelBoxes.has(nearest.index)) return false;
+    const { enter, face, sign } = nearest.hit;
+    const x = ray.origin[0] + ray.direction[0] * enter;
+    return x >= GRAND_KEYBOARD_HITBOX[0] && x <= GRAND_KEYBOARD_HITBOX[3] &&
+        ((face === 1 && sign === 1) || (face === 2 && sign === -1));
 }
 
 export type PianoPanelHit = "panel" | "case" | "miss";

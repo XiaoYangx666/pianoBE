@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { SCORE_STAND, SCORE_UI_PAGES } from "../src/data/grand.generated";
 
 const rp = new URL("../rp/", import.meta.url);
 const bp = new URL("../bp/", import.meta.url);
@@ -52,4 +53,46 @@ test("grand item attachable uses the shared item renderer and a bindable bone", 
     expect(animations["animation.xypiano.grand_piano_item.first_person"].bones.piano).toBeDefined();
     expect(animations["animation.xypiano.grand_piano_item.third_person"].bones.piano).toBeDefined();
     expect(existsSync(new URL("textures/items/grand_piano_item.png", rp))).toBe(true);
+});
+
+test("the score uses an entity and atlas separate from the keyboard", () => {
+    const keys = read("entity/grand_display.entity.json")["minecraft:client_entity"].description;
+    const score = read("entity/grand_score.entity.json")["minecraft:client_entity"].description;
+    expect(keys.textures.default).toBe("textures/blocks/grand");
+    expect(score.identifier).toBe("xypiano:grand_score");
+    expect(score.textures.default).toBe("textures/entity/grand_score");
+    expect(score.geometry.default).toBe("geometry.grand_score");
+    expect(existsSync(new URL(`${score.textures.default}.png`, rp))).toBe(true);
+
+    const keyGeometry = read("models/entity/grand_display.geo.json")["minecraft:geometry"][0];
+    expect(keyGeometry.description.texture_width).toBe(512);
+    expect(keyGeometry.bones).toHaveLength(88);
+    expect(keyGeometry.bones.every((bone: { name: string }) => bone.name.startsWith("key_"))).toBe(true);
+    const scoreGeometry = read("models/entity/grand_score.geo.json")["minecraft:geometry"][0];
+    const leaf = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "score_leaf");
+    const board = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "score_lean");
+    expect(leaf.cubes[0].uv.south).toBeDefined();
+    const { size, uv } = leaf.cubes[0];
+    expect(size[0] * 2).toBeGreaterThan(.8 * 16);
+    expect(size[1]).toBeGreaterThan(.5 * 16);
+    expect(size[0] / size[1]).toBeCloseTo(uv.north.uv_size[0] / uv.north.uv_size[1], 2);
+    expect(leaf.parent).toBe(board.name);
+    expect(board.rotation).toEqual([-SCORE_STAND.lean, 0, 0]);
+    const grandBoard = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "grand_board");
+    const digitalBoard = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "digital_board");
+    expect(grandBoard.cubes[0].size[0]).toBeGreaterThan(digitalBoard.cubes[0].size[0]);
+    const behavior = JSON.parse(readFileSync(new URL("entities/grand_score.json", bp), "utf8"))["minecraft:entity"];
+    expect(behavior.description.properties["xypiano:score_mounted"].default).toBe(false);
+    expect(behavior.components["minecraft:collision_box"]).toEqual({ width: 0, height: 0 });
+    expect(behavior.components["minecraft:interact"]).toBeUndefined();
+});
+
+test("the DDUI score uses four standalone landscape PNG pages", () => {
+    expect(new Set(SCORE_UI_PAGES).size).toBe(4);
+    for (const path of SCORE_UI_PAGES) {
+        const image = readFileSync(new URL(path, rp));
+        expect(image.toString("ascii", 12, 16)).toBe("IHDR");
+        expect(image.readUInt32BE(16)).toBe(768);
+        expect(image.readUInt32BE(20)).toBe(432);
+    }
 });

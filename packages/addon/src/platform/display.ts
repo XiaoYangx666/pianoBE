@@ -1,11 +1,18 @@
-import { releaseVisual } from "@begame/tabletop/minecraft";
+import { reconcileEntityTransform, releaseVisual } from "@begame/tabletop/minecraft";
 import { Entity, Vector3, system } from "@minecraft/server";
 import type { InstrumentLocation } from "@platform/assembly";
 import type { Cardinal_Direction } from "@domain/types";
 import { readPlaybackRecord, type PlaybackRecord } from "@domain/playback/playbackRecord";
 import { readPianoSettings, type PianoSettings } from "@domain/piano/settings";
+import { grandDefinition } from "@domain/instrument/definition";
+import { RightOffsets } from "@domain/geometry/offsets";
+import { scoreStandOffset } from "@domain/geometry/keyRay";
 
 export const PIANO_DISPLAY = "xypiano:piano_display";
+export const SCORE_STAND_ENTITY = "xypiano:grand_score";
+export const SCORE_SPREAD = "xypiano:score_spread";
+export const SCORE_MOUNTED = "xypiano:score_mounted";
+const SCORE_GRAND = "xypiano:score_grand";
 export function pianoDisplayType(location: InstrumentLocation) {
     return location.definition?.displayId ?? PIANO_DISPLAY;
 }
@@ -29,9 +36,9 @@ export function displayAnchor(entity: Entity): Vector3 | undefined {
     return typeof anchor === "object" ? anchor : undefined;
 }
 
-function ownedDisplays(location: InstrumentLocation, point: Vector3) {
+function ownedDisplays(location: InstrumentLocation, point: Vector3, type = pianoDisplayType(location), maxDistance = .25) {
     const { dimension, pos } = location;
-    return dimension.getEntities({ type: pianoDisplayType(location), location: point, maxDistance: .25 })
+    return dimension.getEntities({ type, location: point, maxDistance })
         .filter(candidate => {
             const anchor = displayAnchor(candidate);
             return anchor?.x === pos.x && anchor.y === pos.y && anchor.z === pos.z;
@@ -40,7 +47,43 @@ function ownedDisplays(location: InstrumentLocation, point: Vector3) {
 
 export function removeDormantDisplay(location: InstrumentLocation, point: Vector3) {
     if (!location.dimension.isChunkLoaded(point)) return;
-    for (const entity of ownedDisplays(location, point)) removePianoDisplay(entity);
+    try {
+        for (const entity of ownedDisplays(location, point)) removePianoDisplay(entity);
+    } finally {
+        removeScoreStand(location, point);
+    }
+}
+
+export function removeScoreStand(location: InstrumentLocation, point: Vector3) {
+    if (!location.dimension.isChunkLoaded(point)) return;
+    for (const entity of ownedDisplays(location, point, SCORE_STAND_ENTITY, 2)) releaseVisual(entity);
+}
+
+export function recoverScoreStand(location: InstrumentLocation, center: Vector3) {
+    const { dimension, pos, direction } = location;
+    const candidates = ownedDisplays(location, center, SCORE_STAND_ENTITY, 2);
+    const grand = location.definition === grandDefinition;
+    const offset = scoreStandOffset(RightOffsets[direction], grand);
+    const point = { x: center.x + offset.x, y: center.y + offset.y, z: center.z + offset.z };
+    const existing = candidates[0];
+    if (existing) {
+        reconcileEntityTransform(existing, point, YAW[direction]);
+        if (existing.getProperty(SCORE_GRAND) !== grand) existing.setProperty(SCORE_GRAND, grand);
+        if (existing.getProperty(SCORE_MOUNTED) !== true) existing.setProperty(SCORE_MOUNTED, true);
+        for (const duplicate of candidates.slice(1)) releaseVisual(duplicate);
+        return existing;
+    }
+    const identifier = SCORE_STAND_ENTITY as Parameters<typeof dimension.spawnEntity>[0];
+    const entity = dimension.spawnEntity(identifier, point, { initialRotation: YAW[direction] });
+    try {
+        entity.setDynamicProperty(ANCHOR, pos);
+        entity.setProperty(SCORE_GRAND, grand);
+        entity.setProperty(SCORE_MOUNTED, true);
+        return entity;
+    } catch (error) {
+        releaseVisual(entity);
+        throw error;
+    }
 }
 
 export function removePianoDisplay(entity: Entity) {

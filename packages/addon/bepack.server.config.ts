@@ -1,6 +1,8 @@
 import { defineConfig, sapiPro } from "@bepack/cli";
 import { platform } from "process";
 
+const resourcePackUuid = "d891a694-3ffd-4773-b629-21698dcb6884";
+
 /**
  * 服务器专用构建配置（BDS + 后端远程曲库）。
  * - 与 client 配置共用同一 bp/rp 目录：每次构建清空重建 scripts、重写 manifest，
@@ -29,6 +31,7 @@ export default defineConfig({
                 // 条件编译注入：保留 server 分支（clean 模式同下）
                 define: {
                     __PIANO_TARGET__: JSON.stringify("server"),
+                    __PIANO_SCORE_RESOURCE_PACK__: JSON.stringify(resourcePackUuid),
                 },
             },
             manifest: {
@@ -48,7 +51,7 @@ export default defineConfig({
         },
         rp: {
             root: "rp",
-            uuid: "d891a694-3ffd-4773-b629-21698dcb6884",
+            uuid: resourcePackUuid,
             moduleUuid: "a51c41cc-6b76-4364-a372-381b4bdf0ee7",
             manifest: {
                 merge: "clean",

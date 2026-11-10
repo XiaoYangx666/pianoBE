@@ -2,8 +2,7 @@ import { NativeTextSurface, textRotationForHeading } from "@begame/tabletop/mine
 import { hostScope, textPort } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
-import { GRAND_TEXT } from "@data/grand.generated";
-import { Vector3, system } from "@minecraft/server";
+import { type Entity, Vector3, system } from "@minecraft/server";
 import { grandDefinition } from "@domain/instrument/definition";
 import { inspectInstrument, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
@@ -13,8 +12,8 @@ import { RightOffsets } from "@domain/geometry/offsets";
 import { processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
-import { PianoDisplay } from "@platform/display";
-import { digitalPianoHitModel, grandPianoHitModel, pickPianoMenu, pianoModelOffset, pianoRay, pickPianoKey } from "@domain/geometry/keyRay";
+import { PianoDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD } from "@platform/display";
+import { digitalPianoHitModel, grandPianoHitModel, pianoModelOffset } from "@domain/geometry/keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@domain/piano/settings";
 import { midiManager } from "@app/midiManager";
 import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL } from "@app/pianoConfig";
@@ -49,6 +48,7 @@ export class PianoRuntime {
     readonly hitModel;
     readonly disposedSignal = new Signal<void>();
     private display?: PianoDisplay;
+    private score?: Entity;
     private readonly scope: PianoScope;
     private visualScope?: PianoScope;
     private text?: NativeTextSurface;
@@ -57,6 +57,9 @@ export class PianoRuntime {
     private verifiedAt = -Infinity;
     private integrity: ReturnType<typeof inspectInstrument> = "unloaded";
     private visualRetryAt = 0;
+    private scoreRetryAt = 0;
+    private scoreUnmounted = false;
+    private nextScoreTurn = 0;
     private removeVisualOnDispose = false;
     private disposed = false;
     lastNearby = system.currentTick;
@@ -68,6 +71,9 @@ export class PianoRuntime {
         this.scope = new PianoScope(hostScope, "piano");
         this.scope.own("midi", () => this.midi?.end());
         this.scope.own("display", () => this.display?.dispose(this.removeVisualOnDispose));
+        this.scope.own("score", () => {
+            if (this.removeVisualOnDispose) removeScoreStand(this.location, this.center);
+        });
     }
 
     isAlive() { return !this.disposed; }
@@ -81,12 +87,18 @@ export class PianoRuntime {
     }
 
     get displayId() { return this.display?.entity.id; }
+    get scoreId() { return this.settings?.scoreMounted && this.score?.isValid ? this.score.id : undefined; }
+    get hasScreen() { return this.location.definition !== grandDefinition; }
     get settings() { return this.display?.entity.isValid ? this.display.settings : undefined; }
 
     updateSettings(previous: PianoSettings, next: PianoSettings) {
         if (this.disposed || !this.display || this.settings !== previous) return false;
         this.display.updateSettings(next);
         if (TEXT_SETTINGS.some(key => previous[key] !== next[key])) this.textValue = undefined;
+        if (previous.scoreMounted !== next.scoreMounted) {
+            this.scoreRetryAt = 0;
+            this.syncScore(system.currentTick);
+        }
         return true;
     }
 
@@ -96,8 +108,10 @@ export class PianoRuntime {
 
     ensureVisual(tick: number) {
         if (this.disposed || tick < this.visualRetryAt) return;
-        // A valid display without text is still unhealthy: retry the whole visual.
-        if (this.display?.entity.isValid && this.text) return;
+        if (this.display?.entity.isValid && (!this.hasScreen || this.text)) {
+            this.syncScore(tick);
+            return;
+        }
         try {
             this.visualScope?.dispose();
             this.visualScope = undefined;
@@ -106,16 +120,19 @@ export class PianoRuntime {
             this.display?.detachSettings();
             this.display = PianoDisplay.recover(this.location, this.center);
             this.display.retrySettingsSave();
-            this.visualScope = this.scope.child("visual");
-            this.text = new NativeTextSurface(this.display.entity, this.visualScope.raw,
-                { distance: 12, background: { red: 0, green: 0, blue: 0, alpha: 0 } },
-                error => console.warn("[piano] 屏幕文字失败", error), textPort);
-            this.refreshText();
-            this.visualScope.schedule(10, () => {
-                this.text?.invalidate();
-                this.textValue = undefined;
+            this.syncScore(tick);
+            if (this.hasScreen) {
+                this.visualScope = this.scope.child("visual");
+                this.text = new NativeTextSurface(this.display.entity, this.visualScope.raw,
+                    { distance: 12, background: { red: 0, green: 0, blue: 0, alpha: 0 } },
+                    error => console.warn("[piano] 屏幕文字失败", error), textPort);
                 this.refreshText();
-            });
+                this.visualScope.schedule(10, () => {
+                    this.text?.invalidate();
+                    this.textValue = undefined;
+                    this.refreshText();
+                });
+            }
             const record = this.display.playback;
             if (!this.midi && record?.songs.length) {
                 void this.getMidiPlayer().restore(record).catch(error => console.warn("[piano] 恢复播放失败", error));
@@ -123,6 +140,24 @@ export class PianoRuntime {
         } catch (error) {
             this.visualRetryAt = tick + SWEEP_INTERVAL;
             console.warn("[piano] 显示实体初始化失败", error);
+        }
+    }
+
+    private syncScore(tick: number) {
+        const settings = this.settings;
+        if (!settings || tick < this.scoreRetryAt) return;
+        try {
+            if (settings.scoreMounted && !this.score?.isValid) {
+                this.scoreUnmounted = false;
+                this.score = recoverScoreStand(this.location, this.center);
+            } else if (!settings.scoreMounted && !this.scoreUnmounted) {
+                removeScoreStand(this.location, this.center);
+                this.score = undefined;
+                this.scoreUnmounted = true;
+            }
+        } catch (error) {
+            this.scoreRetryAt = tick + SWEEP_INTERVAL;
+            console.warn("[piano] 同步谱架失败", error);
         }
     }
 
@@ -140,6 +175,15 @@ export class PianoRuntime {
 
     playKey(midi: number, layer: PianoSoundLayer = "short") {
         this.playNote(processNote(midi, false), layer, .15);
+    }
+
+    turnScore(spread: 0 | 1) {
+        const entity = this.score;
+        const tick = system.currentTick;
+        if (this.disposed || !entity?.isValid || !this.settings?.scoreMounted || tick < this.nextScoreTurn) return;
+        if (entity.getProperty(SCORE_SPREAD) === spread) return;
+        entity.setProperty(SCORE_SPREAD, spread);
+        this.nextScoreTurn = tick + 8;
     }
 
     isKeyDown(midi: number) {
@@ -170,9 +214,8 @@ export class PianoRuntime {
         }
         const info = this.midi?.getInfo();
         const hasSong = info && info.queueIndex >= 0 && info.queueIndex < info.queueLength;
-        const grand = this.location.definition === grandDefinition;
-        const screen = grand ? GRAND_TEXT : PIANO_SCREEN;
-        const { title, columns } = lcdTitle(hasSong ? info.midiName : grand ? "Nocturne" : "P-88");
+        const screen = PIANO_SCREEN;
+        const { title, columns } = lcdTitle(hasSong ? info.midiName : "P-88");
         const state = info?.state === "playing" ? "播放" : info?.state === "paused" ? "暂停" : "就绪";
         const status = hasSong
             ? `${state} ${lcdTime(info.currentTime)} / ${lcdTime(info.durationMs / 1000)}  ${info.queueIndex + 1}/${info.queueLength}`
@@ -238,6 +281,7 @@ export class PianoRuntime {
         this.text = undefined;
         this.midi = undefined;
         this.display = undefined;
+        this.score = undefined;
     }
 
     describe() {

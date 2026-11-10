@@ -1,6 +1,7 @@
 """Generate the piano's particle definitions and original RGBA sprite atlas."""
 
 import json
+from math import cos, pi, sin
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
@@ -66,8 +67,35 @@ def draw_bubbles(draw):
         draw.ellipse((x - radius, y - radius, x, y), fill=brightness)
 
 
+def sakura_petal():
+    sprite = Image.new("RGBA", (128, 128))
+    draw = ImageDraw.Draw(sprite)
+    outline = [(25, 104), (33, 76), (46, 46), (62, 27), (83, 17), (101, 21),
+               (109, 31), (100, 43), (114, 42), (119, 53), (112, 67),
+               (95, 83), (69, 96), (44, 105)]
+    draw.polygon(outline, fill=(241, 145, 183, 244))
+    draw.polygon([(33, 100), (48, 68), (73, 36), (98, 25), (101, 31), (90, 53),
+                  (72, 71), (53, 84)], fill=(255, 213, 231, 249))
+    draw.line([(32, 100), (55, 81), (72, 66), (90, 53)], fill=(232, 109, 157, 230), width=3)
+    return sprite.resize((TILE, TILE), Image.Resampling.LANCZOS)
+
+
+def draw_star(draw):
+    draw.polygon([(64, 9), (72, 51), (112, 64), (72, 73), (64, 119), (54, 73),
+                  (13, 64), (54, 51)], fill=255)
+    draw.ellipse((55, 55, 73, 73), fill=255)
+
+
+def draw_prism(draw):
+    points = [(64 + (20 if i % 2 else 42) * cos(i * pi / 3),
+               64 + (29 if i % 2 else 53) * sin(i * pi / 3)) for i in range(6)]
+    draw.polygon(points, fill=92, outline=235, width=4)
+    for i in (0, 2, 4):
+        draw.line([points[i], (64, 64)], fill=230, width=3)
+
+
 def effect(name, tile, *, count, lifetime, active_time, direction, size, tint,
-           alpha, facing="lookat_xyz", speed=None, motion=None, spin=None):
+           alpha, facing="lookat_xyz", material="particles_add", speed=None, motion=None, spin=None):
     components = {
         "minecraft:emitter_rate_instant": {"num_particles": count},
         "minecraft:emitter_lifetime_once": {"active_time": active_time},
@@ -92,7 +120,7 @@ def effect(name, tile, *, count, lifetime, active_time, direction, size, tint,
         "particle_effect": {
             "description": {
                 "identifier": f"xypiano:{name}",
-                "basic_render_parameters": {"material": "particles_add", "texture": TEXTURE},
+                "basic_render_parameters": {"material": material, "texture": TEXTURE},
             },
             "components": components,
         },
@@ -101,9 +129,11 @@ def effect(name, tile, *, count, lifetime, active_time, direction, size, tint,
 
 def main():
     atlas = Image.new("RGBA", ATLAS_SIZE)
-    for tile, (draw_core, halo) in enumerate(((draw_note, 8), (draw_ring, 5), (draw_trail, 8),
-                                              (draw_glimmer, 5), (draw_bubbles, 5))):
+    for tile, (draw_core, halo) in ((0, (draw_note, 8)), (1, (draw_ring, 5)), (2, (draw_trail, 8)),
+                                    (3, (draw_glimmer, 5)), (4, (draw_bubbles, 5)),
+                                    (6, (draw_star, 10)), (7, (draw_prism, 4))):
         atlas.paste(glowing_sprite(draw_core, halo), (tile % 4 * TILE, tile // 4 * TILE))
+    atlas.paste(sakura_petal(), (TILE, TILE))
     texture = RP / (TEXTURE + ".png")
     texture.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(texture)
@@ -151,6 +181,30 @@ def main():
                motion={"linear_acceleration": [0, 0.34, 0], "linear_drag_coefficient": 0.95,
                        "rotation_drag_coefficient": 1.1},
                spin={"rotation": "math.random(0, 180)", "rotation_rate": "math.random(-36, 36)"}),
+        effect("sakura_drift", 5, count=3, lifetime="math.random(0.68, 1.0)", active_time=1.05,
+               direction=["math.random(-0.23, 0.23)", 1, "math.random(-0.17, 0.17)"],
+               size=[f"(0.039 + 0.031 * variable.particle_random_2) * (0.76 + 0.24 * math.sin(100 + 230 * ({AGE}) + 90 * variable.particle_random_3))",
+                     "0.04 + 0.032 * variable.particle_random_2"],
+               tint=[1, 1, 1], alpha=f"0.94 * (1 - math.pow(({AGE}), 2.4))", material="particles_blend",
+               speed="math.random(0.64, 1.12)",
+               motion={"linear_acceleration": ["0.65*math.sin(460*variable.particle_age+360*variable.particle_random_4)",
+                                                .12, "0.27*math.cos(390*variable.particle_age+360*variable.particle_random_3)"],
+                       "linear_drag_coefficient": 1.25},
+               spin={"rotation": "math.random(0, 360)", "rotation_rate": "math.random(-135, 135)"}),
+        effect("stardust", 6, count=4, lifetime="math.random(0.36, 0.69)", active_time=.75,
+               direction=["math.random(-0.32, 0.32)", 1, "math.random(-0.3, 0.3)"],
+               size=[f"(0.022 + 0.043 * variable.particle_random_2) * (1 - 0.5 * ({AGE}))"] * 2,
+               tint=TINT, alpha=f"(1 - ({AGE})) * (0.58 + 0.42 * math.sin(160 + 450 * ({AGE}) + 180 * variable.particle_random_3))",
+               speed="math.random(0.85, 1.65)", motion={"linear_acceleration": [0, .26, 0], "linear_drag_coefficient": 1.6},
+               spin={"rotation": "math.random(0, 90)", "rotation_rate": "math.random(-80, 80)"}),
+        effect("prism_shards", 7, count=3, lifetime="math.random(0.45, 0.71)", active_time=.77,
+               direction=["math.random(-0.26, 0.26)", 1, "math.random(-0.26, 0.26)"],
+               size=[f"(0.025 + 0.026 * variable.particle_random_2) * (1 - 0.55 * ({AGE}))",
+                     f"(0.06 + 0.046 * variable.particle_random_2) * (1 - 0.55 * ({AGE}))"],
+               tint=[f"0.52 + 0.45 * math.sin(360 * variable.particle_random_3 + {phase})" for phase in (0, 120, 240)],
+               alpha=f"0.85 * (1 - ({AGE}))", speed="math.random(1.2, 2.0)",
+               motion={"linear_acceleration": [0, .28, 0], "linear_drag_coefficient": 1.9},
+               spin={"rotation": "math.random(-35, 35)", "rotation_rate": "math.random(-180, 180)"}),
     ]
     directory = RP / "particles"
     directory.mkdir(exist_ok=True)

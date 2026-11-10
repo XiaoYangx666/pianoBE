@@ -17,6 +17,9 @@ export const PIANO_PARTICLE_STYLES = [
     { value: 4, label: "蓝眼泪 · 发光气泡", effect: "xypiano:blue_tears" },
     { value: 0, label: "霓虹音符", effect: "xypiano:neon_note" },
     { value: 2, label: "电光涟漪", effect: "xypiano:pulse_ring" },
+    { value: 5, label: "樱吹雪 · 粉色花瓣", effect: "xypiano:sakura_drift" },
+    { value: 6, label: "星火 · 闪烁星芒", effect: "xypiano:stardust" },
+    { value: 7, label: "棱光 · 彩色晶片", effect: "xypiano:prism_shards" },
 ] as const;
 
 export const PIANO_PARTICLE_PALETTES = [
@@ -31,6 +34,7 @@ export const PIANO_PARTICLE_PALETTES = [
 
 export const DEFAULT_PIANO_SETTINGS = {
     particles: true,
+    scoreMounted: false,
     particleStyle: PIANO_PARTICLE_STYLES[0].value as number,
     particlePalette: 0,
     volume: 100,
@@ -94,6 +98,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
     };
     return {
         particles: typeof saved.particles === "boolean" ? saved.particles : defaults.particles,
+        scoreMounted: typeof saved.scoreMounted === "boolean" ? saved.scoreMounted : defaults.scoreMounted,
         particleStyle: PIANO_PARTICLE_STYLES.find(style => style.value === saved.particleStyle)?.value
             ?? defaults.particleStyle,
         particlePalette: PIANO_PARTICLE_PALETTES.find(palette => palette.value === saved.particlePalette)?.value

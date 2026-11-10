@@ -1,22 +1,74 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/data/hitboxes.generated";
-import { GRAND_BUTTONS, GRAND_KEY_HITBOXES } from "../src/data/grand.generated";
-import { grandPianoHitModel, hitsPianoMenu, pickPianoMenu, pickPianoPanel, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/domain/geometry/keyRay";
+import { GRAND_INTERACTION_CELLS, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PARTICLE_LINE, GRAND_PARTS, SCORE_STAND } from "../src/data/grand.generated";
+import { grandPianoHitModel, hitsGrandPanel, hitsPianoMenu, pickScorePage, pickPianoMenu, pickPianoPanel, pianoModelOffset, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/domain/geometry/keyRay";
 
-test("grand keys resolve all 88 pitches and the three controls can be reached from the bench", () => {
+test("all grand keys play from the bench and keep the two emitters separate in every rotation", () => {
+    expect(GRAND_PARTICLE_LINE).toEqual({ y: 16.466049, z: -2.507613 });
     const seen = new Set<number>();
-    for (const [midi, x, , z, X, , Z] of GRAND_KEY_HITBOXES) {
+    for (const [midi, x, , z, X, Y, Z] of GRAND_KEY_HITBOXES) {
         if (seen.has(midi)) continue;
         seen.add(midi);
-        const ray = { origin: [(x + X) / 2, 27, (z + Z) / 2], direction: [0, -16, 0] } as const;
-        expect(pickPianoKey(ray, 4, undefined, grandPianoHitModel)).toBe(midi);
+        const center = { x: 0, y: 0, z: 0 };
+        for (const [rx, rz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const right = { x: rx, y: 0, z: rz };
+            const key = pianoModelOffset(right, (x + X) / 2, Y, (z + Z) / 2);
+            const head = pianoModelOffset(right, (x + X) / 2, 25.92 - 1.6, -24);
+            const ray = pianoRay(center, right, head, { x: key.x - head.x, y: key.y - head.y - .1, z: key.z - head.z });
+            expect(pickPianoKey(ray, 4, undefined, grandPianoHitModel)).toBe(midi);
+            expect(pickPianoKey(ray, 4, pitch => pitch === midi, grandPianoHitModel)).toBe(midi);
+            const effect = pianoParticleOrigin(center, right, midi, false, grandPianoHitModel);
+            expect(effect).toEqual(pianoModelOffset(right, (x + X) / 2, GRAND_PARTICLE_LINE.y, GRAND_PARTICLE_LINE.z));
+            const glimmer = pianoParticleOrigin(center, right, midi, true, grandPianoHitModel);
+            expect(glimmer).toEqual({ ...key, y: (Y + .4) / 16 });
+        }
     }
     expect(seen.size).toBe(88);
-    for (const [action, [x, , z, X, Y, Z]] of GRAND_BUTTONS) {
-        const ray = { origin: [(x + X) / 2, 28, -20], direction: [0, Y - 28, (z + Z) / 2 + 20] } as const;
-        expect(pickPianoMenu(ray, 4, grandPianoHitModel)).toBe(action);
+});
+
+test("grand upper front selection boxes leave the entire key surface clear", () => {
+    const front = GRAND_PARTS.filter(part => part.forward === 0 && part.up <= 1);
+    expect(GRAND_INTERACTION_CELLS).toEqual(front.map(part => part.typeId));
+    expect(front).toHaveLength(6);
+    for (const { typeId, up } of front) {
+        const path = `../bp/blocks/grand/${typeId.split(":")[1]}.json`;
+        const components = JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8"))["minecraft:block"].components;
+        const box = components["minecraft:selection_box"];
+        if (up === 1) expect(box.origin[2]).toBeGreaterThan(GRAND_KEYBOARD_HITBOX[5]);
+        else expect(box.origin[1] + box.size[1]).toBeGreaterThanOrEqual(GRAND_KEYBOARD_HITBOX[4] - .001);
     }
+});
+
+test("each inclined score accepts front clicks on both pages and rejects the back", () => {
+    const theta = SCORE_STAND.lean * Math.PI / 180;
+    const [, py, pz] = SCORE_STAND.pivot;
+    const mid = SCORE_STAND.face[4] / 2;
+    for (const grand of [false, true]) {
+        const y = SCORE_STAND.heights[grand ? "grand" : "digital"] + py + Math.cos(theta) * mid;
+        const z = SCORE_STAND.z + pz + Math.sin(theta) * mid;
+        for (const [x, spread] of [[4, 0], [-4, 1]] as const) {
+            const front = { origin: [0, 27, -24], direction: [x, y - 27, z + 24] } as const;
+            expect(pickScorePage(front, grand)?.spread).toBe(spread);
+            expect(pickScorePage(front, grand)?.distance).toBeCloseTo(1, 2);
+            expect(pickScorePage(front, grand, .5)).toBeUndefined();
+        }
+        expect(pickScorePage({ origin: [4, y, z + 5], direction: [0, 0, -16] }, grand)).toBeUndefined();
+        expect(pickScorePage({ origin: [8, y, -24], direction: [0, 0, 16] }, grand)).toBeUndefined();
+    }
+});
+
+test("the grand fallboard opens the panel but the sides, cheeks, bottom and gaps do not", () => {
+    expect(hitsGrandPanel({ origin: [0, 25, -22], direction: [0, -7.5, 22] })).toBe(true);
+    expect(hitsGrandPanel({ origin: [0, 29, 1.3], direction: [0, -16, 0] })).toBe(true);
+    for (const x of [-18, 18]) {
+        expect(hitsGrandPanel({ origin: [x, 24, -20], direction: [0, -8, 16] })).toBe(false);
+        expect(hitsGrandPanel({ origin: [x, 29, -3], direction: [0, -16, 0] })).toBe(false);
+    }
+    expect(hitsGrandPanel({ origin: [0, 13.4, -20], direction: [0, 0, 16] })).toBe(false);
+    expect(hitsGrandPanel({ origin: [0, 7, -4], direction: [0, 16, 0] })).toBe(false);
+    expect(hitsGrandPanel({ origin: [0, 10, -20], direction: [0, 0, 16] })).toBe(false);
+    expect(hitsGrandPanel({ origin: [0, 17.5, 16], direction: [0, 0, -16] })).toBe(false);
 });
 
 describe("direct piano key ray", () => {
@@ -115,12 +167,6 @@ describe("direct piano key ray", () => {
         // frame in front of the body without touching any case box.
         expect(pickPianoPanel({ origin: [0, 20, -4], direction: [0, -16, 0] })).toBe("miss");
         expect(pickPianoPanel({ origin: [0, 5, -4.2], direction: [0, 0, 16] })).toBe("miss");
-    });
-
-    test("the grand piano keeps its own body region", () => {
-        expect(pickPianoPanel({ origin: [0, 30, 1.5], direction: [0, -16, 0] }, 4, grandPianoHitModel)).toBe("panel");
-        // Front apron below the grand keyboard.
-        expect(pickPianoPanel({ origin: [0, 30, -6.6], direction: [0, -16, 0] }, 4, grandPianoHitModel)).toBe("case");
     });
 
     test("distinct menu caps resolve to their own actions and miss outside", () => {

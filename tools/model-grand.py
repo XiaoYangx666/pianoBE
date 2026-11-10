@@ -12,7 +12,7 @@ from random import Random
 from runpy import run_path
 from uuid import NAMESPACE_URL, uuid5
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets/grand"
@@ -37,11 +37,7 @@ HINGE_X = WIDTH / 2 - .44
 LID_SPAN = .70
 LID_RISE = .64
 CASE_BOTTOM = 22.2
-CONTROLS = (
-    ("menu", "KEYS", 6.7, (43, 83, 70)),
-    ("midi", "MIDI", 0, (45, 71, 110)),
-    ("settings", "SET", -6.7, (116, 74, 35)),
-)
+FALLBOARD_FRONT = -.26
 PALETTE = {
     "ebony": (26, 29, 35),
     "lacquer": (38, 43, 50),
@@ -57,7 +53,6 @@ PALETTE = {
     "black_key": (54, 55, 63),
     "felt": (107, 28, 37),
     "badge": (29, 32, 38),
-    "paper": (244, 234, 209),
 }
 TILES = {name: (i % 4 * 64, i // 4 * 32) for i, name in enumerate(PALETTE)}
 
@@ -129,19 +124,6 @@ def make_atlas():
     u, v = TILES["badge"]
     draw.text((u + 32, v + 15), "NOCTURNE", anchor="mm", fill=(222, 177, 94))
     draw.line((u + 17, v + 22, u + 47, v + 22), fill=(173, 124, 55))
-    u, v = TILES["paper"]
-    for row in (6, 14, 22):
-        for y in range(row, row + 5):
-            draw.line((u + 7, v + y, u + 56, v + y), fill=(142, 132, 113))
-        for i in range(5):
-            x, y = u + 12 + i * 9, v + row + rng.randrange(1, 6)
-            draw.ellipse((x, y - 1, x + 2, y + 1), fill=(67, 59, 53))
-            draw.line((x + 2, y, x + 2, y - 4), fill=(67, 59, 53))
-    font = ImageFont.load_default(size=19)
-    for i, (_, label, _, color) in enumerate(CONTROLS):
-        u, v = 64 * i, 136
-        draw.rectangle((u + 1, v + 1, u + 62, v + 30), fill=color, outline=(231, 187, 109), width=2)
-        draw.text((u + 32, v + 16), label, fill=(255, 244, 217), font=font, anchor="mm")
 
     # Painted mechanical detail is world-projected so the string fan remains
     # aligned across the soundboard strips and across Bedrock cell boundaries.
@@ -216,12 +198,12 @@ class Grand:
 
 def case(grand):
     box = grand.box
-    count = ceil((TAIL - RIM_FRONT) / .57)
+    count = ceil((TAIL - RIM_FRONT) / .95)
     bounds = [RIM_FRONT + (TAIL - RIM_FRONT) * i / count for i in range(count + 1)]
 
     def strips(z, Z):
         # Keep adjacent walls overlapping even at the tight bend around the tail.
-        if max(abs(contour(Z, side) - contour(z, side)) for side in (1, 2)) <= .31:
+        if max(abs(contour(Z, side) - contour(z, side)) for side in (1, 2)) <= .52:
             yield z, Z
         else:
             mid = (z + Z) / 2
@@ -240,9 +222,6 @@ def case(grand):
             U, V = plate_uv(left - .84, Z)
             box("Cast plate and strings", f"plate field {i}", (right + .84, 24.02, z),
                 (left - .84, 26.55, Z), "plate", projected={"up": (u, v, U, V)})
-            for side, x, X in (("bass", left - 1.25, left - .82), ("treble", right + .82, right + 1.25)):
-                box("Cast plate and strings", f"{side} flange {i}", (x, 26.55, z), (X, 26.88, Z),
-                    "plate", up="gold")
             walls = (("bass", left - .82, left), ("treble", right, right + .82))
         else:
             walls = (("tail", right, left),)
@@ -267,7 +246,7 @@ def lid(grand):
     samples = [6.52 + (TAIL - 6.52) * i / 1024 for i in range(1025)]
     outline = [(z, contour(z, 2), contour(z, 1)) for z in samples]
     width = WIDTH
-    count = ceil(width / .29)
+    count = ceil(width / .47)
     for i in range(count):
         a, b = (-width / 2 + width * k / count for k in (i, i + 1))
         x = (a + b) / 2
@@ -307,17 +286,20 @@ def lid(grand):
 
 def keyboard(grand):
     box = grand.box
+    crossblock_front = RIM_FRONT - .45
     box("Keyboard", "apron", (-WIDTH / 2, 18.1, FRONT), (WIDTH / 2, 20.3, 4.2), "lacquer")
     box("Keyboard", "apron lip", (-22.05, 18.1, FRONT - .12), (22.05, 18.56, FRONT), "edge")
-    box("Keyboard", "action frame", (-20.52, 20.3, -7.45), (20.52, 20.64, 3.0), "shadow")
-    box("Keyboard", "fallboard", (-20.61, 20.3, -.26), (20.61, 24.78, 3.2), "lacquer", up="edge")
-    box("Keyboard", "folded fallboard cap", (-20.53, 24.78, .36), (20.53, 25.25, 3.2), "ebony", up="lacquer")
-    box("Keyboard", "nameplate", (-4.1, 25.18, .35), (4.1, 26.45, .58), "ebony", north="badge")
-    box("Keyboard", "red key felt", (-18.57, 20.61, -.39), (18.57, 22.4, -.26), "felt")
+    box("Keyboard", "action frame", (-18.57, 20.3, -7.45), (18.57, 20.64, FALLBOARD_FRONT), "shadow")
+    box("Keyboard", "fallboard", (-18.57, 20.3, FALLBOARD_FRONT),
+        (18.57, 24.78, crossblock_front), "lacquer", up="edge")
+    box("Keyboard", "folded fallboard cap", (-18.57, 24.78, .36),
+        (18.57, 25.25, crossblock_front), "ebony", up="lacquer")
+    box("Keyboard", "nameplate", (-4.1, 25.25, .35), (4.1, 26.45, .58), "ebony", north="badge")
+    box("Keyboard", "red key felt", (-18.57, 20.64, -.39), (18.57, 22.4, FALLBOARD_FRONT), "felt")
     for sign in (-1, 1):
         x, X = sorted((18.57 * sign, WIDTH / 2 * sign))
-        box("Keyboard", f"cheek {sign}", (x, 20.3, -7.48), (X, 23.1, 4.2), "lacquer", up="edge")
-        box("Keyboard", f"side return {sign}", (x, 23.1, -.42), (X, 24.95, RIM_FRONT - .45), "ebony", up="lacquer")
+        box("Keyboard", f"cheek {sign}", (x, 20.3, -7.48), (X, 23.1, RIM_FRONT), "lacquer", up="edge")
+        box("Keyboard", f"side return {sign}", (x, 23.1, -.42), (X, 24.95, crossblock_front), "ebony", up="lacquer")
         box("Keyboard", f"fallboard hinge {sign}", (x + .52, 24.95, .18), (X - .52, 25.15, 1.55), "brass")
 
     step = 37.14 / 52
@@ -337,27 +319,6 @@ def keyboard(grand):
                 "ivory_side", up="ivory")
             white += 1
     assert white == 52
-
-    for i, (name, _, x, _) in enumerate(CONTROLS):
-        u, v = 64 * i, 136
-        box("Controls", name, (x - 2.18, 22.66, -1.19), (x + 2.18, 24.68, -.26),
-            "gold", projected={"north": (u + 1, v + 1, u + 62, v + 30)})
-
-    box("Music desk", "support foot", (-10, 25.2, 1.1), (10, 27.5, 2.3), "ebony")
-    box("Music desk", "music shelf", (-11.1, 27.35, .13), (11.1, 28.03, 2.85), "lacquer", up="edge")
-    box("Music desk", "sheet stop", (-10.85, 28.03, .13), (10.85, 28.24, .41), "edge")
-    for i in range(18):
-        y, Y = (27.98 + k * .315 for k in (i, i + 1))
-        z = 1.46 + .145 * i
-        half = 10.55 - max(0, i - 14) * .39
-        box("Music desk", f"desk band {i}", (-half, y, z), (half, Y, z + .54), "lacquer", up="edge")
-        if i in range(1, 17):
-            u, v = TILES["paper"]
-            v0, v1 = v + 1 + (17 - i) * 30 / 16, v + 1 + (16 - i) * 30 / 16
-            for x, X in ((-7.75, -.11), (.11, 7.75)):
-                label = "left" if x > 0 else "right"
-                box("Music desk", f"{label} score band {i}", (x, y, z - .12), (X, Y, z),
-                    "paper", projected={"north": (u + 1, v1, u + 63, v0)})
 
 
 def undercarriage(grand):
