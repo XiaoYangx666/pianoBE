@@ -85,6 +85,8 @@ const scorePack = path.join(scripts, "packages/addon/src/data/scorePack.js");
 const resourcePackUuid = JSON.parse(read(path.join(addon, "rp/manifest.json"))).header.uuid;
 check(fs.existsSync(scorePack) && read(scorePack).includes(resourcePackUuid),
     "DDUI score pack ID matches the resource manifest");
+check(fs.existsSync(scorePack) && read(scorePack).includes("PIANO_SCORES"),
+    "score pack exports the published PIANO_SCORES list");
 
 const builtManager = path.join(scripts, "midiManager.js");
 check(fs.existsSync(builtManager), "built midiManager.js exists");

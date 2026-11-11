@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { SCORE_STAND, SCORE_UI_PAGES } from "../src/data/grand.generated";
+import { SCORE_STAND } from "../src/data/grand.generated";
+import { PIANO_SCORES } from "../src/data/scorePack";
 
 const rp = new URL("../rp/", import.meta.url);
 const bp = new URL("../bp/", import.meta.url);
@@ -60,9 +61,22 @@ test("the score uses an entity and atlas separate from the keyboard", () => {
     const score = read("entity/grand_score.entity.json")["minecraft:client_entity"].description;
     expect(keys.textures.default).toBe("textures/blocks/grand");
     expect(score.identifier).toBe("xypiano:grand_score");
-    expect(score.textures.default).toBe("textures/entity/grand_score");
+    const first = PIANO_SCORES[0];
+    const firstTexture = first
+        ? `textures/entity/piano_score/${first.id}`
+        : "textures/entity/piano_score/blank";
+    expect(score.textures.default).toBe(firstTexture);
     expect(score.geometry.default).toBe("geometry.grand_score");
-    expect(existsSync(new URL(`${score.textures.default}.png`, rp))).toBe(true);
+    expect(score.textures.score_0).toBe(firstTexture);
+    expect(existsSync(new URL(`${firstTexture}.png`, rp))).toBe(true);
+    const controller = read("render_controllers/grand_score.render_controllers.json")["render_controllers"]
+        ["controller.render.xypiano.grand_score"];
+    expect(controller.arrays.textures["Array.scores"])
+        .toHaveLength(Math.max(1, PIANO_SCORES.length));
+    expect(controller.textures).toEqual(["Array.scores[q.property('xypiano:score_variant')]"]);
+    const behavior = JSON.parse(readFileSync(new URL("entities/grand_score.json", bp), "utf8"))["minecraft:entity"];
+    expect(behavior.description.properties["xypiano:score_variant"].range)
+        .toEqual([0, Math.max(1, PIANO_SCORES.length - 1)]);
 
     const keyGeometry = read("models/entity/grand_display.geo.json")["minecraft:geometry"][0];
     expect(keyGeometry.description.texture_width).toBe(512);
@@ -81,18 +95,28 @@ test("the score uses an entity and atlas separate from the keyboard", () => {
     const grandBoard = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "grand_board");
     const digitalBoard = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "digital_board");
     expect(grandBoard.cubes[0].size[0]).toBeGreaterThan(digitalBoard.cubes[0].size[0]);
-    const behavior = JSON.parse(readFileSync(new URL("entities/grand_score.json", bp), "utf8"))["minecraft:entity"];
     expect(behavior.description.properties["xypiano:score_mounted"].default).toBe(false);
     expect(behavior.components["minecraft:collision_box"]).toEqual({ width: 0, height: 0 });
     expect(behavior.components["minecraft:interact"]).toBeUndefined();
 });
 
-test("the DDUI score uses four standalone landscape PNG pages", () => {
-    expect(new Set(SCORE_UI_PAGES).size).toBe(4);
-    for (const path of SCORE_UI_PAGES) {
-        const image = readFileSync(new URL(path, rp));
-        expect(image.toString("ascii", 12, 16)).toBe("IHDR");
-        expect(image.readUInt32BE(16)).toBe(768);
-        expect(image.readUInt32BE(20)).toBe(432);
+test("published scores use one tall page image per source page", () => {
+    for (const score of PIANO_SCORES) {
+        expect(score.pageCount).toBe(score.pages.length);
+        for (const path of score.pages) {
+            const image = readFileSync(new URL(path, rp));
+            expect(image.toString("ascii", 12, 16)).toBe("IHDR");
+            expect(image.readUInt32BE(16)).toBe(1280);
+            expect(image.readUInt32BE(20)).toBe(1810);
+        }
+        const atlas = readFileSync(new URL(`textures/entity/piano_score/${score.id}.png`, rp));
+        expect(atlas.toString("ascii", 12, 16)).toBe("IHDR");
+        expect(atlas.readUInt32BE(16)).toBe(1024);
+        expect(atlas.readUInt32BE(20)).toBe(1024);
     }
+    // 模板始终带一张空白谱架图，没有曲谱时实体仍然可以渲染。
+    const blank = readFileSync(new URL("textures/entity/piano_score/blank.png", rp));
+    expect(blank.toString("ascii", 12, 16)).toBe("IHDR");
+    expect(blank.readUInt32BE(16)).toBe(1024);
+    expect(blank.readUInt32BE(20)).toBe(1024);
 });

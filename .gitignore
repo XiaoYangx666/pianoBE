@@ -19,3 +19,8 @@ packages/generator/public/timbres
 *.mcaddon
 # 私有依赖 @begame/tabletop，构建前用 npm run vendor:tabletop 生成（见 vendor/README.md）
 vendor/*.tgz
+# 本地测试曲谱（正式版由玩家在生成器里导入，不随模板发布）
+assets/scores/
+packages/addon/rp/textures/ui/piano_score/
+packages/addon/rp/textures/entity/piano_score/*.png
+!packages/addon/rp/textures/entity/piano_score/blank.png

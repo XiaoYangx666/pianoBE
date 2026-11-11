@@ -12,6 +12,7 @@ export const PIANO_DISPLAY = "xypiano:piano_display";
 export const SCORE_STAND_ENTITY = "xypiano:grand_score";
 export const SCORE_SPREAD = "xypiano:score_spread";
 export const SCORE_MOUNTED = "xypiano:score_mounted";
+export const SCORE_VARIANT = "xypiano:score_variant";
 const SCORE_GRAND = "xypiano:score_grand";
 export function pianoDisplayType(location: InstrumentLocation) {
     return location.definition?.displayId ?? PIANO_DISPLAY;
@@ -59,7 +60,7 @@ export function removeScoreStand(location: InstrumentLocation, point: Vector3) {
     for (const entity of ownedDisplays(location, point, SCORE_STAND_ENTITY, 2)) releaseVisual(entity);
 }
 
-export function recoverScoreStand(location: InstrumentLocation, center: Vector3) {
+export function recoverScoreStand(location: InstrumentLocation, center: Vector3, variant = 0) {
     const { dimension, pos, direction } = location;
     const candidates = ownedDisplays(location, center, SCORE_STAND_ENTITY, 2);
     const grand = location.definition === grandDefinition;
@@ -70,6 +71,7 @@ export function recoverScoreStand(location: InstrumentLocation, center: Vector3)
         reconcileEntityTransform(existing, point, YAW[direction]);
         if (existing.getProperty(SCORE_GRAND) !== grand) existing.setProperty(SCORE_GRAND, grand);
         if (existing.getProperty(SCORE_MOUNTED) !== true) existing.setProperty(SCORE_MOUNTED, true);
+        if (existing.getProperty(SCORE_VARIANT) !== variant) existing.setProperty(SCORE_VARIANT, variant);
         for (const duplicate of candidates.slice(1)) releaseVisual(duplicate);
         return existing;
     }
@@ -79,6 +81,7 @@ export function recoverScoreStand(location: InstrumentLocation, center: Vector3)
         entity.setDynamicProperty(ANCHOR, pos);
         entity.setProperty(SCORE_GRAND, grand);
         entity.setProperty(SCORE_MOUNTED, true);
+        entity.setProperty(SCORE_VARIANT, variant);
         return entity;
     } catch (error) {
         releaseVisual(entity);

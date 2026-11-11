@@ -1,4 +1,5 @@
 import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES, type PianoSoundLayer } from "@piano/core";
+import { DEFAULT_SCORE_ID, isValidScoreId } from "@domain/score/score";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
 import { isSoundLayer, soundLayerAt } from "./soundTypes";
 
@@ -35,6 +36,8 @@ export const PIANO_PARTICLE_PALETTES = [
 export const DEFAULT_PIANO_SETTINGS = {
     particles: true,
     scoreMounted: false,
+    /** 谱架与面板同时显示的曲谱 id；生成器可替换可用曲谱列表 */
+    scoreId: DEFAULT_SCORE_ID,
     particleStyle: PIANO_PARTICLE_STYLES[0].value as number,
     particlePalette: 0,
     volume: 100,
@@ -99,6 +102,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
     return {
         particles: typeof saved.particles === "boolean" ? saved.particles : defaults.particles,
         scoreMounted: typeof saved.scoreMounted === "boolean" ? saved.scoreMounted : defaults.scoreMounted,
+        scoreId: isValidScoreId(saved.scoreId) ? saved.scoreId : defaults.scoreId,
         particleStyle: PIANO_PARTICLE_STYLES.find(style => style.value === saved.particleStyle)?.value
             ?? defaults.particleStyle,
         particlePalette: PIANO_PARTICLE_PALETTES.find(palette => palette.value === saved.particlePalette)?.value

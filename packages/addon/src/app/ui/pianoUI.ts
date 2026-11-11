@@ -1,7 +1,7 @@
 import { Block, Player } from "@minecraft/server";
 import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
-import { SCORE_UI_PAGES } from "@data/grand.generated";
 import { SCORE_RESOURCE_PACK_ID } from "@data/scorePack";
+import { AVAILABLE_SCORES, scoreAt } from "@domain/score/score";
 import { NoteInfo } from "@domain/types";
 import { soundTypes, FOLLOW_PIANO_LAYER } from "@domain/piano/soundTypes";
 import { keyMaps } from "@domain/piano/keymap";
@@ -15,46 +15,69 @@ function switchKeyMap(state: PianoState, p: Player) {
     p.setDynamicProperty("piano:keyMap", idx);
 }
 
-function switchComMode(state: PianoState, p: Player) {
+export function switchComMode(state: PianoState, p: Player) {
     const newMode = !state.mode.getData();
     state.mode.setData(newMode);
     p.setDynamicProperty("piano:comMode", newMode);
 }
 
 /** 面板里的音长按钮：跟随钢琴 → 长音 → 标准音 → 短音 → 跟随钢琴 */
-function switchSoundType(state: PianoState, p: Player) {
+export function switchSoundType(state: PianoState, p: Player) {
     const next = state.sound.getData() + 1;
     const idx = next >= soundTypes.length ? FOLLOW_PIANO_LAYER : next;
     state.sound.setData(idx);
     p.setDynamicProperty("piano:sound", idx);
 }
 
-function addScoreControls(form: CustomForm, controlsVisible: ObservableBoolean) {
+function addScoreControls(
+    form: CustomForm,
+    state: PianoState,
+    controlsVisible: ObservableBoolean
+) {
     // Earlier DDUI versions still need to be able to open the piano panel.
-    if (typeof form.image !== "function") return;
-    const showScore = new ObservableBoolean(false, { clientWritable: true });
+    if (typeof form.image !== "function" || AVAILABLE_SCORES.length === 0) return;
+    const showScore = state.showScore;
     const visible = new ObservableBoolean(false);
-    const source = new ObservableString(SCORE_UI_PAGES[0]);
+    const source = new ObservableString("");
     const atStart = new ObservableBoolean(true);
-    const atEnd = new ObservableBoolean(false);
-    let page = 0;
+    const atEnd = new ObservableBoolean(true);
+
+    const pages = () => scoreAt(state.score.getData())?.pages ?? [];
 
     const updateVisibility = () => visible.setData(controlsVisible.getData() && showScore.getData());
     showScore.subscribe(updateVisibility);
     controlsVisible.subscribe(updateVisibility);
+    updateVisibility();
+
+    const syncPage = () => {
+        const list = pages();
+        const page = Math.max(0, Math.min(state.scorePage.getData(), list.length - 1));
+        if (page !== state.scorePage.getData()) {
+            // 越界时先纠正下标，订阅会再同步一次。
+            state.scorePage.setData(page);
+            return;
+        }
+        source.setData(list[page] ?? "");
+        atStart.setData(page === 0);
+        atEnd.setData(page >= list.length - 1);
+    };
+    state.scorePage.subscribe(syncPage);
+
+    // 曲谱选择在独立的曲谱配置表单里完成；本表单只预览当前选中的曲谱。
+    state.score.subscribe(() => {
+        state.scorePage.setData(0);
+        syncPage();
+    });
+    syncPage();
 
     const turnPage = (step: number) => {
-        if (!visible.getData()) return;
-        const next = page + step;
-        if (next < 0 || next >= SCORE_UI_PAGES.length) return;
-        page = next;
-        source.setData(SCORE_UI_PAGES[page]);
-        atStart.setData(page === 0);
-        atEnd.setData(page === SCORE_UI_PAGES.length - 1);
+        const next = state.scorePage.getData() + step;
+        if (!visible.getData() || next < 0 || next >= pages().length) return;
+        state.scorePage.setData(next);
     };
 
-    form.toggle("显示《小星星》简谱", showScore, { visible: controlsVisible })
-        .image(source, SCORE_RESOURCE_PACK_ID, { visible, width: .96 })
+    form.toggle("在面板中显示曲谱", showScore, { visible: controlsVisible });
+    form.image(source, SCORE_RESOURCE_PACK_ID, { visible, width: .96 })
         .button("上一页", () => turnPage(-1), { visible, disabled: atStart })
         .button("下一页", () => turnPage(1), { visible, disabled: atEnd });
 }
@@ -62,6 +85,8 @@ function addScoreControls(form: CustomForm, controlsVisible: ObservableBoolean) 
 export interface PianoUIActions {
     openMidi(): void;
     openSettings(): void;
+    openScores(): void;
+    openShortcuts(): void;
 }
 
 export function createPianoUI(
@@ -81,7 +106,7 @@ export function createPianoUI(
 
     form.label("   ", options)
         .textField("在此处快速打字...", state.input);
-    addScoreControls(form, state.controlsVisible);
+    addScoreControls(form, state, state.controlsVisible);
     form.toggle("升8度 (高音模式)", state.octave)
         .button(
             ui.keyMapLabel,
@@ -109,6 +134,8 @@ export function createPianoUI(
         )
         .button("♪ MIDI 播放器", () => actions.openMidi(), options)
         .button("钢琴设置", () => actions.openSettings(), options)
+        .button("曲谱配置", () => actions.openScores(), options)
+        .button("快捷键设置", () => actions.openShortcuts(), options)
         .toggle("简洁模式", state.compact);
 
     return form;
@@ -134,10 +161,6 @@ export function updatePianoUI(
     const keyMap = keyMaps[state.keyMap.getData()].value;
 
     const info = last ?? emptyInfo;
-    // 当前方案中未绑定音高的按键（黑键方案里钢琴没有黑键的空位）
-    const unmapped = keys.filter(
-        (k) => k.trim() !== "" && keyMap[k] === undefined
-    );
 
     ui.keyMapLabel.setData(`当前方案: ${keyMaps[state.keyMap.getData()].name}`);
     //更新模式
@@ -156,11 +179,6 @@ export function updatePianoUI(
         ui.status.setData(
             `§l§f音符: §a${info.name}\n§7音高: §e${info.pitch.toFixed(3)} §7采样: ${info.sample}`
         );
-    } else if (unmapped.length > 0) {
-        // 未绑定的按键不再显示"采样: 无"，改为明确提示，避免误以为采样缺失
-        ui.status.setData(
-            `§c「${unmapped.join(" ")}」在当前方案中没有对应琴键\n§7这些位置在钢琴上没有黑键，可切换「不带黑键方案」使用全部按键`
-        );
     } else {
         const hasGaps = PIANO_LAYOUT.some((row) =>
             row.some((k) => k.trim() !== "" && keyMap[k] === undefined)
@@ -177,7 +195,7 @@ export function updatePianoUI(
         for (const k of row) {
             const bound = keyMap[k] !== undefined;
             if (keys.includes(k)) {
-                rowStr += bound ? ` §a§l${k}§r ` : ` §c§l${k}§r `;
+                rowStr += bound ? ` §a§l${k}§r ` : ` §8§l${k}§r `;
             } else {
                 rowStr += bound
                     ? ` ${baseColor}${k}§r `

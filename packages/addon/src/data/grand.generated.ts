@@ -185,5 +185,3 @@ export const GRAND_PANEL_BOXES = [0, 4, 5, 6] as const;
 export const GRAND_PARTICLE_LINE = {"y": 16.466049, "z": -2.507613} as const;
 
 export const SCORE_STAND = {"heights": {"grand": 21.61098, "digital": 16.83335}, "z": 2.91, "pivot": [0, 0.48, 0], "lean": 24, "face": [-6.8, 0, -0.045, 6.8, 8.8, 0.025]} as const;
-
-export const SCORE_UI_PAGES = ["textures/ui/piano_score/page_1.png", "textures/ui/piano_score/page_2.png", "textures/ui/piano_score/page_3.png", "textures/ui/piano_score/page_4.png"] as const;

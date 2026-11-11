@@ -2,6 +2,7 @@ import { blockPlacerComponent } from "@app/components/blockPlacer";
 import { PianoBlockComponent, regEvents } from "@app/components/pianoBlock";
 import { midiUIManager } from "@app/ui/midi/playerUIManager";
 import { pianoManager } from "@app/ui/piano";
+import { pianoScoreManager } from "@app/ui/scoreUI";
 import { pianoSettingsManager } from "@app/ui/settingsUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { system, world } from "@minecraft/server";
@@ -28,6 +29,7 @@ world.afterEvents.playerLeave.subscribe((e) => {
     pianoManager.invalidate(e.playerId);
     midiUIManager.invalidate(e.playerId);
     pianoSettingsManager.invalidate(e.playerId);
+    pianoScoreManager.invalidate(e.playerId);
 });
 
 // 启动标记：确认行为包脚本已加载及其构建目标（模板包=client / 服务器专用包=server）

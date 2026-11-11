@@ -1,5 +1,6 @@
 import { readAddon, type AddonTemplate, type Manifest } from "@bepack/addon";
 import type { SongEntry } from "./types";
+import { parseTemplateScores, type ScoreEntry } from "./scores";
 
 export interface TemplateInfo {
     addon: AddonTemplate;
@@ -9,6 +10,8 @@ export interface TemplateInfo {
     rpManifest: Manifest;
     /** 模板内已内嵌的曲目（从 scripts/midis 解析） */
     songs: SongEntry[];
+    /** 模板内已内嵌的曲谱（从 scorePack.js 解析，旧模板为空数组） */
+    scores: ScoreEntry[];
 }
 
 /**
@@ -24,6 +27,7 @@ export async function loadTemplate(fileOrBlob: Blob | Uint8Array): Promise<Templ
     const bpPath = bp.root;
     const rpPath = rp.root;
     const songs = parseExistingMidis(addon, `${bpPath}scripts/midis/`);
+    const scores = parseTemplateScores(addon, bpPath);
 
     return {
         addon,
@@ -32,6 +36,7 @@ export async function loadTemplate(fileOrBlob: Blob | Uint8Array): Promise<Templ
         bpManifest: bp.manifest,
         rpManifest: rp.manifest,
         songs,
+        scores,
     };
 }
 

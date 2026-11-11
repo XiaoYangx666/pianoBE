@@ -12,9 +12,10 @@ import { RightOffsets } from "@domain/geometry/offsets";
 import { processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
-import { PianoDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD } from "@platform/display";
+import { PianoDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD, SCORE_VARIANT } from "@platform/display";
 import { digitalPianoHitModel, grandPianoHitModel, pianoModelOffset } from "@domain/geometry/keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@domain/piano/settings";
+import { AVAILABLE_SCORES, scoreIndexOf, scorePages } from "@domain/score/score";
 import { midiManager } from "@app/midiManager";
 import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL } from "@app/pianoConfig";
 
@@ -95,7 +96,7 @@ export class PianoRuntime {
         if (this.disposed || !this.display || this.settings !== previous) return false;
         this.display.updateSettings(next);
         if (TEXT_SETTINGS.some(key => previous[key] !== next[key])) this.textValue = undefined;
-        if (previous.scoreMounted !== next.scoreMounted) {
+        if (previous.scoreMounted !== next.scoreMounted || previous.scoreId !== next.scoreId) {
             this.scoreRetryAt = 0;
             this.syncScore(system.currentTick);
         }
@@ -146,14 +147,29 @@ export class PianoRuntime {
     private syncScore(tick: number) {
         const settings = this.settings;
         if (!settings || tick < this.scoreRetryAt) return;
+        // 没有导入曲谱时不挂空谱架；换到带曲谱的包后按原设置恢复。
+        if (AVAILABLE_SCORES.length === 0) {
+            if (this.score?.isValid) removeScoreStand(this.location, this.center);
+            this.score = undefined;
+            this.scoreUnmounted = true;
+            return;
+        }
+        const variant = scoreIndexOf(settings.scoreId);
         try {
             if (settings.scoreMounted && !this.score?.isValid) {
                 this.scoreUnmounted = false;
-                this.score = recoverScoreStand(this.location, this.center);
+                this.score = recoverScoreStand(this.location, this.center, variant);
             } else if (!settings.scoreMounted && !this.scoreUnmounted) {
                 removeScoreStand(this.location, this.center);
                 this.score = undefined;
                 this.scoreUnmounted = true;
+                return;
+            }
+            const entity = this.score;
+            if (settings.scoreMounted && entity?.isValid && entity.getProperty(SCORE_VARIANT) !== variant) {
+                entity.setProperty(SCORE_VARIANT, variant);
+                // 换曲谱后回到第一跨页，避免把上一张谱的翻页状态带过去。
+                entity.setProperty(SCORE_SPREAD, 0);
             }
         } catch (error) {
             this.scoreRetryAt = tick + SWEEP_INTERVAL;
@@ -181,6 +197,9 @@ export class PianoRuntime {
         const entity = this.score;
         const tick = system.currentTick;
         if (this.disposed || !entity?.isValid || !this.settings?.scoreMounted || tick < this.nextScoreTurn) return;
+        // 谱架只有两个跨页（前 2 页 / 后 2 页）。pages 现在是每页一张图，
+        // 少于 3 页时没有第二个跨页可翻。
+        if (spread === 1 && scorePages(this.settings.scoreId).length <= 2) return;
         if (entity.getProperty(SCORE_SPREAD) === spread) return;
         entity.setProperty(SCORE_SPREAD, spread);
         this.nextScoreTurn = tick + 8;

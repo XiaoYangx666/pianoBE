@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
 import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, readPianoSettings } from "../src/domain/piano/settings";
+import { AVAILABLE_SCORES, DEFAULT_SCORE_ID } from "../src/domain/score/score";
 import { FOLLOW_PIANO_LAYER, resolveSoundLayer, soundLayerAt, soundLayerIndexOf, soundTypes } from "../src/domain/piano/soundTypes";
 
 test("old pianos start with the score off and the former peach selection becomes sakura", () => {
@@ -8,6 +9,15 @@ test("old pianos start with the score off and the former peach selection becomes
     expect(old.scoreMounted).toBe(false);
     expect(PIANO_PARTICLE_STYLES.find(style => style.value === old.particleStyle)?.effect).toBe("xypiano:sakura_drift");
     expect(readPianoSettings(JSON.stringify({ ...old, scoreMounted: true })).scoreMounted).toBe(true);
+});
+
+test("score selection keeps a published score and ignores unknown ids", () => {
+    expect(readPianoSettings("{}").scoreId).toBe(DEFAULT_SCORE_ID);
+    expect(readPianoSettings('{"scoreId":"missing"}').scoreId).toBe(DEFAULT_SCORE_ID);
+    const first = AVAILABLE_SCORES[0];
+    if (first) {
+        expect(readPianoSettings(JSON.stringify({ scoreId: first.id })).scoreId).toBe(first.id);
+    }
 });
 
 describe("piano timbre settings", () => {

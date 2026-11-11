@@ -2,13 +2,17 @@ import { resolveInstrument } from "@platform/assembly";
 import { Block, Player, system } from "@minecraft/server";
 import { DDUIManager } from "@app/ui/ddui";
 import { Vector3Utils } from "sapi-pro";
-import { handleInput } from "@app/inputHandler";
+import { handleInput, handleShortcuts } from "@app/inputHandler";
 import { pianoWorld } from "@app/PianoWorld";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { createPianoUI, updatePianoUI } from "@app/ui/pianoUI";
 import { FOLLOW_PIANO_LAYER, soundTypes } from "@domain/piano/soundTypes";
+import { scoreIndexOf } from "@domain/score/score";
 import { openMidiPlayer } from "@app/ui/midi/playerUIManager";
 import { openPianoSettings } from "@app/ui/settingsUI";
+import { openScoreConfig } from "@app/ui/scoreUI";
+import { loadShortcuts, openShortcutSettings } from "@app/ui/shortcutUI";
+import type { ShortcutBindings } from "@domain/piano/shortcuts";
 import type { PianoState, PianoUIRefs } from "@app/ui/pianoState";
 import {
     ObservableBoolean,
@@ -27,6 +31,7 @@ class PianoInstance {
     private leftBlock: Block | null = null;
     private inited = false;
     private lastLength = 0;
+    private shortcuts!: ShortcutBindings;
     /** 防止同一帧内连续交互导致 show() 并发调用（两次 show 会刷新表单实例，客户端写入被拒） */
     private opening = false;
     private syncingCompact = false;
@@ -72,6 +77,7 @@ class PianoInstance {
             ? storedSound
             : FOLLOW_PIANO_LAYER;
         const compact = this.player.getDynamicProperty("piano:compact") === true;
+        const showScore = this.player.getDynamicProperty("piano:scorePreview") === true;
 
         this.state = {
             keyMap: new ObservableNumber(keyMapIdx),
@@ -82,11 +88,16 @@ class PianoInstance {
             compact: new ObservableBoolean(compact, {
                 clientWritable: true,
             }),
+            showScore: new ObservableBoolean(showScore, {
+                clientWritable: true,
+            }),
             controlsVisible: new ObservableBoolean(!compact),
             input: new ObservableString("", {
                 clientWritable: true,
             }),
             sound: new ObservableNumber(sound),
+            score: new ObservableNumber(0),
+            scorePage: new ObservableNumber(0),
         };
 
         // === UI ===
@@ -112,10 +123,14 @@ class PianoInstance {
             {
                 openMidi: () => this.openMidi(),
                 openSettings: () => this.openSettings(),
+                openScores: () => this.openScores(),
+                openShortcuts: () => this.openShortcuts(),
             }
         );
 
         // === 订阅（只注册一次）===
+
+        this.shortcuts = loadShortcuts(this.player);
 
         // 输入
         this.state.input.subscribe((val) => {
@@ -131,7 +146,13 @@ class PianoInstance {
                 return;
             }
 
+            const added = val.slice(this.lastLength);
             this.lastLength = val.length;
+
+            // 先处理本次新输入的快捷键，再按普通音符处理
+            if (handleShortcuts(added, this.state, this.player, this.shortcuts)) {
+                updatePianoUI(this.state, this.ui, []);
+            }
 
             // 处理输入
             const result = handleInput(val, this.state, this.piano!, this.player);
@@ -157,6 +178,11 @@ class PianoInstance {
             this.state.controlsVisible.setData(!compact);
             updatePianoUI(this.state, this.ui, []);
         });
+
+        // 曲谱预览开关同样按玩家保存，快捷键与面板开关共用这一份状态
+        this.state.showScore.subscribe((show) => {
+            if (this.player.isValid) this.player.setDynamicProperty("piano:scorePreview", show);
+        });
     }
 
     /** 打开 UI */
@@ -177,6 +203,10 @@ class PianoInstance {
             } finally {
                 this.syncingCompact = false;
             }
+            // 同步当前钢琴的曲谱选择；首次打开或换了一架琴时更新面板预览
+            this.state.score.setData(this.currentScoreIndex());
+            this.shortcuts = loadShortcuts(this.player);
+
             // 重置输入状态
             this.lastLength = 0;
             this.state.input.setData("");
@@ -257,6 +287,10 @@ class PianoInstance {
         }, 2);
     }
 
+    private currentScoreIndex() {
+        return scoreIndexOf(this.piano?.settings?.scoreId);
+    }
+
     /** 「MIDI 播放器」入口 */
     private openMidi() {
         const block = this.leftBlock;
@@ -272,6 +306,29 @@ class PianoInstance {
         if (!piano || !this.player.isValid) return;
         this.reopen(() => {
             if (piano.isAlive()) void openPianoSettings(this.player, piano);
+        });
+    }
+
+    /** 「曲谱配置」入口 */
+    private openScores() {
+        const piano = this.piano;
+        if (!piano || !this.player.isValid) return;
+        this.reopen(() => {
+            if (piano.isAlive()) void openScoreConfig(this.player, piano);
+        });
+    }
+
+    /** 「快捷键设置」入口：使用 sapi-pro 的 ConfigForm */
+    private openShortcuts() {
+        if (!this.player.isValid) return;
+        this.reopen(() => {
+            if (!this.player.isValid) return;
+            try {
+                openShortcutSettings(this.player);
+            } catch (error) {
+                console.warn("[piano] 打开快捷键设置失败", error);
+                if (this.player.isValid) this.player.sendMessage("§e无法打开快捷键设置。");
+            }
         });
     }
 

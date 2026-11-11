@@ -17,12 +17,10 @@ class PianoSettingsForm {
     constructor(private readonly player: Player) {
         this.form = new CustomForm(player, "钢琴设置").label("下次发声或刷新时应用，关闭表单时保存");
         const writable = { clientWritable: true };
-        const toggle = (label: string, key: "particles" | "textVisible" | "scoreMounted") => {
+        const toggle = (label: string, key: "particles" | "textVisible") => {
             const value = new ObservableBoolean(DEFAULT_PIANO_SETTINGS[key], writable);
             this.bind(key, value);
-            const options = key === "textVisible" ? { visible: this.hasScreen } : key === "scoreMounted"
-                ? { description: "瞄准左页或右页，按一次潜行翻页" } : undefined;
-            this.form.toggle(label, value, options);
+            this.form.toggle(label, value, { visible: key === "textVisible" ? this.hasScreen : true });
         };
         const slider = (label: string, key: keyof typeof PIANO_SETTINGS_LIMITS) => {
             const value = new ObservableNumber(DEFAULT_PIANO_SETTINGS[key], writable);
@@ -35,7 +33,6 @@ class PianoSettingsForm {
             this.bind(key, value, normalizePianoColor);
             this.form.textField(label, value, { description: "输入 #RRGGBB，色值有效后生效", visible: this.hasScreen });
         };
-        toggle("安装谱架和曲谱", "scoreMounted");
         toggle("显示弹奏粒子", "particles");
         const particleStyle = new ObservableNumber(DEFAULT_PIANO_SETTINGS.particleStyle, writable);
         this.bind("particleStyle", particleStyle);
@@ -67,7 +64,12 @@ class PianoSettingsForm {
         slider("文字前后偏移（1/16 格，朝演奏者为正）", "textForward");
         slider("文字可见距离（格）", "textDistance");
         this.form.button("恢复默认设置", () => {
-            const settings = this.apply(DEFAULT_PIANO_SETTINGS);
+            // 曲谱安装/选择属于独立的曲谱配置，不随显示设置一起重置。
+            const current = this.target?.piano.settings;
+            const defaults = current
+                ? { ...DEFAULT_PIANO_SETTINGS, scoreMounted: current.scoreMounted, scoreId: current.scoreId }
+                : DEFAULT_PIANO_SETTINGS;
+            const settings = this.apply(defaults);
             if (settings) this.sync(settings);
         }).closeButton();
     }

@@ -50,6 +50,29 @@
                     <p class="timbre-hint">经典 P-88 始终包含；试听会按需加载单个音色，只有勾选的音色才会打进导出包。</p>
                 </details>
 
+                <details class="timbre-section score-section" open>
+                    <summary>
+                        <span class="timbre-title">曲谱</span>
+                        <span class="timbre-summary">
+                            <span>共 <b id="scoreCount">0</b> 张</span>
+                        </span>
+                    </summary>
+                    <div id="scoreList" class="score-list">
+                        <div class="score-empty">模板加载中...</div>
+                    </div>
+                    <div class="score-actions">
+                        <label class="file-btn score-import">
+                            导入图片/PDF
+                            <input type="file" id="scorePagesInput" accept=".png,.jpg,.jpeg,.webp,.pdf" multiple hidden />
+                        </label>
+                        <label class="file-btn score-import">
+                            导入曲谱包 (.zip)
+                            <input type="file" id="scoreInput" accept=".zip" multiple hidden />
+                        </label>
+                    </div>
+                    <p class="timbre-hint">图片按选择顺序合并为同一张曲谱，每个 PDF 各自一张；面板每次显示一页 A4 竖版图，谱架只展示前 4 页。整个 addon 最多 16 张曲谱，单张最多 64 页。</p>
+                </details>
+
                 <h3>模板底包状态</h3>
                 <div class="tpl-box">
                     <div>
@@ -108,6 +131,24 @@
                 </div>
                 <div id="libList" class="midi-list lib-list"></div>
                 <p class="lib-notice">曲库内歌曲仅供学习交流使用，版权归原著作权人所有；如涉及侵权，请联系我们删除。</p>
+            </div>
+        </div>
+
+        <!-- 曲谱标题弹窗 -->
+        <div id="scoreTitleModal" class="modal-overlay" hidden>
+            <div class="modal modal-narrow">
+                <div class="modal-head">
+                    <h3>确认曲谱标题</h3>
+                </div>
+                <label class="score-title-field">
+                    标题（最多 24 个字符）
+                    <input type="text" id="scoreTitleInput" maxlength="24" />
+                </label>
+                <p id="scoreTitleHint" class="timbre-hint"></p>
+                <div class="modal-actions">
+                    <button id="scoreTitleCancel" class="file-btn">跳过</button>
+                    <button id="scoreTitleOk" class="file-btn primary">确定</button>
+                </div>
             </div>
         </div>
 

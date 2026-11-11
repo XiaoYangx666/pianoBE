@@ -14,7 +14,8 @@
     },
     "dependencies": {
         "@bepack/addon": "^0.1.0-beta.9",
-        "@piano/core": "file:../core"
+        "@piano/core": "file:../core",
+        "pdfjs-dist": "^6.5.438"
     },
     "devDependencies": {
         "typescript": "^5.5.0",

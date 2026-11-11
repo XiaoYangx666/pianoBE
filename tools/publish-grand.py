@@ -7,9 +7,11 @@ from math import cos, radians, sin
 from pathlib import Path
 from runpy import run_path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
-from grand_score import PAGE_HEIGHT, PAGE_WIDTH, PAPER, UI_SCORE_PATHS, engrave_page, publish_ui_pages
+from grand_score import (SCORES, STAND_HARDWARE_TOP, STAND_HARDWARE_UV_SIZE, STAND_PAGE_HEIGHT,
+                         STAND_PAGE_WIDTH, STAND_TEXTURE_SIZE, blank_texture,
+                         publish_score_assets, stand_texture, ui_pages)
 
 
 MODEL = run_path(str(Path(__file__).with_name("model-grand.py")))
@@ -25,6 +27,7 @@ SCORE_DISPLAY = "xypiano:grand_score"
 SCORE_PROPERTY = "xypiano:score_spread"
 SCORE_MOUNTED = "xypiano:score_mounted"
 SCORE_GRAND = "xypiano:score_grand"
+SCORE_VARIANT = "xypiano:score_variant"
 # Stand origin sits on the front crossblock or rear deck. The large-print
 # two-page spread is intentionally wider and taller than the earlier A4 demo.
 SCORE_ORIGIN_Z = 2.91
@@ -108,15 +111,14 @@ def publish_cell(project, part_id, *, front_layer=None):
     write(BP / f"blocks/grand/{path}.json", template)
 
 
-def score_bones(texture):
+def score_bones():
     x, y, z, X, Y, Z = SCORE_FACE
     _, py, pz = SCORE_PIVOT
     uv = []
     for page in range(4):
-        u = page % 2 * PAGE_WIDTH
-        v = page // 2 * PAGE_HEIGHT
-        engrave_page(texture, u, v, page)
-        uv.append({"uv": [u + 2, v + 2], "uv_size": [PAGE_WIDTH - 4, PAGE_HEIGHT - 4]})
+        u = page % 2 * STAND_PAGE_WIDTH
+        v = page // 2 * STAND_PAGE_HEIGHT
+        uv.append({"uv": [u + 1, v + 1], "uv_size": [STAND_PAGE_WIDTH - 2, STAND_PAGE_HEIGHT - 2]})
 
     def leaf(name, start, end, front, *, back=None, depth=0):
         faces = {"north": uv[front]}
@@ -128,8 +130,9 @@ def score_bones(texture):
         ]}
 
     def hardware(origin, size, finish):
+        u = round(finish * STAND_TEXTURE_SIZE / 2048)
         return {"origin": origin, "size": size, "uv": {
-            face: {"uv": [finish, 1920], "uv_size": [48, 48]}
+            face: {"uv": [u, STAND_HARDWARE_TOP], "uv_size": [STAND_HARDWARE_UV_SIZE, STAND_HARDWARE_UV_SIZE]}
             for face in MODEL["FACE_PLANES"]
         }}
 
@@ -192,19 +195,10 @@ def publish_display(full, key_parts):
 
 
 def publish_score():
-    texture = Image.new("RGB", (2048, 2048), PAPER)
-    draw = ImageDraw.Draw(texture)
-    for u, top, bottom in ((0, (49, 54, 60), (25, 28, 34)), (128, (60, 64, 69), (36, 38, 42))):
-        for row in range(52):
-            color = tuple(round(a + (b - a) * row / 51) for a, b in zip(top, bottom))
-            draw.line((u, 1918 + row, u + 51, 1918 + row), fill=color)
-    bones = score_bones(texture)
-    atlas = RP / "textures/entity/grand_score.png"
-    atlas.parent.mkdir(parents=True, exist_ok=True)
-    texture.save(atlas)
+    bones = score_bones()
     write(RP / "models/entity/grand_score.geo.json", {"format_version": "1.16.0", "minecraft:geometry": [{
-        "description": {"identifier": "geometry.grand_score", "texture_width": texture.width,
-                        "texture_height": texture.height, "visible_bounds_width": 2,
+        "description": {"identifier": "geometry.grand_score", "texture_width": STAND_TEXTURE_SIZE,
+                        "texture_height": STAND_TEXTURE_SIZE, "visible_bounds_width": 2,
                         "visible_bounds_height": 1.2, "visible_bounds_offset": [0, .28, 0]},
         "bones": bones,
     }]})
@@ -213,11 +207,21 @@ def publish_score():
         SCORE_PROPERTY: {"type": "int", "range": [0, 1], "default": 0, "client_sync": True},
         SCORE_MOUNTED: {"type": "bool", "default": False, "client_sync": True},
         SCORE_GRAND: {"type": "bool", "default": True, "client_sync": True},
+        # Bedrock rejects an int property whose range min equals max; keep one
+        # spare slot even when there is only one score.
+        SCORE_VARIANT: {"type": "int",
+                        "range": [0, max(1, len(SCORES) - 1)], "default": 0, "client_sync": True},
     })
     write(BP / "entities/grand_score.json", server)
+    if SCORES:
+        textures = {"default": stand_texture(SCORES[0])}
+        textures.update({f"score_{index}": stand_texture(score)
+                         for index, score in enumerate(SCORES)})
+    else:
+        textures = {"default": blank_texture(), "score_0": blank_texture()}
     write(RP / "entity/grand_score.entity.json", {"format_version": "1.10.0", "minecraft:client_entity": {
         "description": {"identifier": SCORE_DISPLAY, "materials": {"default": "entity_alphatest"},
-                        "textures": {"default": "textures/entity/grand_score"},
+                        "textures": textures,
                         "geometry": {"default": "geometry.grand_score"},
                         "animations": {"score": "animation.xypiano.grand_score"},
                         "scripts": {"pre_animation": [
@@ -230,12 +234,15 @@ def publish_score():
     }})
     write(RP / "animations/grand_score.animation.json", {"format_version": "1.8.0", "animations": {
         "animation.xypiano.grand_score": {"loop": True, "bones": {
-            "score_leaf": {"rotation": [0, "-180*v.score_turn", 0]},
+            "score_leaf": {"rotation": [0, "180*v.score_turn", 0]},
         }},
     }})
     write(RP / "render_controllers/grand_score.render_controllers.json", {"format_version": "1.8.0",
         "render_controllers": {"controller.render.xypiano.grand_score": {
-            "geometry": "Geometry.default", "materials": [{"*": "Material.default"}], "textures": ["Texture.default"],
+            "arrays": {"textures": {"Array.scores": [
+                f"Texture.score_{index}" for index in range(max(1, len(SCORES)))]}},
+            "geometry": "Geometry.default", "materials": [{"*": "Material.default"}],
+            "textures": [f"Array.scores[q.property('{SCORE_VARIANT}')]"],
             "part_visibility": [{"grand_*": f"q.property('{SCORE_GRAND}')"}, {"digital_*": f"!q.property('{SCORE_GRAND}')"},
                                 {"score_left_first": "v.score_turn<1"}, {"score_left_second": "v.score_turn>=1"},
                                 {"score_right_first": "v.score_turn<=0"}, {"score_right_second": "v.score_turn>0"},
@@ -295,12 +302,23 @@ def write_runtime(parts, interaction_cells, full, keys):
         "GRAND_PARTICLE_LINE": {"y": MODEL["model_point"]((0, 22.7, -2.9))[1], "z": MODEL["model_point"]((0, 22.7, -2.9))[2]},
         "SCORE_STAND": {"heights": SCORE_HEIGHTS, "z": SCORE_ORIGIN_Z, "pivot": SCORE_PIVOT,
                         "lean": SCORE_LEAN, "face": SCORE_FACE},
-        "SCORE_UI_PAGES": UI_SCORE_PATHS,
     }
     path = ADDON / "src/data/grand.generated.ts"
     path.write_text("// Generated by tools/publish-grand.py.\n" + "\n\n".join(
         f"export const {name} = {json.dumps(value, indent=4) if name == 'GRAND_PARTS' else json.dumps(value)} as const;"
         for name, value in data.items()) + "\n", encoding="utf-8")
+
+
+def write_score_pack():
+    # 预制曲谱使用 assets/scores 下的真实谱面图片；生成器可以继续追加/替换。
+    scores = [{"id": score["id"], "title": score["title"],
+               "pageCount": len(score["source_pages"]),
+               "pages": list(ui_pages(score))}
+              for score in SCORES]
+    text = ("// Generated by tools/publish-grand.py.\n"
+            "export const SCORE_RESOURCE_PACK_ID = __PIANO_SCORE_RESOURCE_PACK__;\n\n"
+            f"export const PIANO_SCORES = {json.dumps(scores, ensure_ascii=False, indent=4)} as const;\n")
+    (ADDON / "src/data/scorePack.ts").write_text(text, encoding="utf-8")
 
 
 def main():
@@ -325,10 +343,11 @@ def main():
         publish_cell({**full, "model_identifier": name, "elements": []}, "xypiano:" + name)
     keys = publish_display(full, [e for e in full["elements"] if key_name(e)])
     publish_score()
-    publish_ui_pages(RP)
+    publish_score_assets(RP)
     publish_item(full)
     texture.save(RP / "textures/blocks/grand.png")
     write_runtime(parts, interaction_cells, full, keys)
+    write_score_pack()
 
 
 if __name__ == "__main__":

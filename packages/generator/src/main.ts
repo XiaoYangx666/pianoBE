@@ -6,6 +6,8 @@ import { midiFileToEntry } from "./convert";
 import { loadLibraryIndex, loadLibrarySong, libraryMetaToEntry, recordLibraryAdd, recordLibraryPlay, type LibraryMeta } from "./library";
 import { previewPlayer } from "./player";
 import { loadTimbreIndex, loadTimbrePack, type LoadedTimbrePack, type TimbreIndexEntry } from "./timbres";
+import { importScorePack, MAX_TITLE_CHARS, type ScoreEntry } from "./scores";
+import { importScorePages } from "./importPages";
 import type { SongEntry } from "./types";
 
 const TIME_SCALE = 40;
@@ -27,6 +29,8 @@ const SPINNER = '<span class="mini-spinner"></span>';
 
 let template: TemplateInfo | null = null;
 let songs: SongEntry[] = [];
+/** 当前曲谱列表：模板曲谱 + 用户导入的自定义曲谱 */
+let scores: ScoreEntry[] = [];
 let library: LibraryMeta[] | null = null;
 let libFilter = "";
 
@@ -74,6 +78,10 @@ const timbreList = $<HTMLDivElement>("timbreList");
 const timbreCount = $<HTMLElement>("timbreCount");
 const timbreSize = $<HTMLElement>("timbreSize");
 const previewTimbreSelect = $<HTMLSelectElement>("previewTimbre");
+const scoreList = $<HTMLDivElement>("scoreList");
+const scoreCount = $<HTMLElement>("scoreCount");
+const scoreInput = $<HTMLInputElement>("scoreInput");
+const scorePagesInput = $<HTMLInputElement>("scorePagesInput");
 
 const showLoading = (text: string) => {
     loadingText.innerText = text;
@@ -237,6 +245,139 @@ async function applyPreviewTimbre(id: string) {
     previewPlayer.warmup().catch(() => {});
 }
 
+// ---------- 曲谱 ----------
+// 曲谱标题弹窗：直接导入图片/PDF 时逐张确认标题
+const titleModal = $<HTMLDivElement>("scoreTitleModal");
+const titleInput = $<HTMLInputElement>("scoreTitleInput");
+const titleHint = $<HTMLParagraphElement>("scoreTitleHint");
+const titleOk = $<HTMLButtonElement>("scoreTitleOk");
+const titleCancel = $<HTMLButtonElement>("scoreTitleCancel");
+
+let pendingTitleResolve: ((value: string | null) => void) | null = null;
+
+/** 让用户确认/编辑曲谱标题；返回 null 表示跳过这张曲谱。 */
+function promptScoreTitle(defaultTitle: string, hint: string): Promise<string | null> {
+    pendingTitleResolve?.(null);
+    // 弹窗本身需要交互，先收起全屏 loading（导入流程随后会重新显示进度）
+    hideLoading();
+    titleInput.value = defaultTitle;
+    titleHint.textContent = hint;
+    titleModal.hidden = false;
+    titleInput.focus();
+    titleInput.select();
+    return new Promise((resolve) => {
+        pendingTitleResolve = resolve;
+    });
+}
+
+function closeTitlePrompt(value: string | null) {
+    if (titleModal.hidden) return;
+    titleModal.hidden = true;
+    const resolve = pendingTitleResolve;
+    pendingTitleResolve = null;
+    resolve?.(value);
+}
+
+titleOk.onclick = () => {
+    const value = titleInput.value.trim();
+    if (!value) {
+        alert("曲谱标题不能为空");
+        titleInput.focus();
+        return;
+    }
+    if (Array.from(value).length > MAX_TITLE_CHARS) {
+        alert(`曲谱标题最多 ${MAX_TITLE_CHARS} 个字符`);
+        titleInput.focus();
+        return;
+    }
+    closeTitlePrompt(value);
+};
+titleCancel.onclick = () => closeTitlePrompt(null);
+titleInput.onkeydown = (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        titleOk.click();
+    }
+};
+titleModal.onclick = (e) => {
+    if (e.target === titleModal) closeTitlePrompt(null);
+};
+
+function renderScores() {
+    scoreCount.textContent = String(scores.length);
+    if (scores.length === 0) {
+        scoreList.innerHTML = '<div class="score-empty">模板未包含曲谱，可导入曲谱包或直接导入图片/PDF</div>';
+        return;
+    }
+    scoreList.innerHTML = scores
+        .map((score, index) => {
+            // 直接导入的曲谱记录原始页数；旧曲谱包与模板回退为面板页数
+            const pageCount = score.pageCount ?? score.pages.length;
+            return `<div class="score-item">
+            <div class="score-copy">
+                <div class="score-name">
+                    ${escapeHtml(score.title)}
+                    <span class="tag">${pageCount} 页</span>
+                    <span class="tag ${score.source === "template" ? "orig" : "new"}">${score.source === "template" ? "模板" : "自定义"}</span>
+                </div>
+                <div class="score-id">${escapeHtml(score.id)}</div>
+            </div>
+            <button class="score-remove" data-score-idx="${index}" title="移除">${ICON_X}</button>
+        </div>`;
+        })
+        .join("");
+}
+
+async function handleScoreUpload(files: FileList | null) {
+    if (!files?.length) return;
+    if (!template) return alert("请先等待模板加载完成！");
+
+    showLoading("解析曲谱包...");
+    const added: ScoreEntry[] = [];
+    const errors: string[] = [];
+    for (const file of Array.from(files)) {
+        try {
+            const entries = await importScorePack(file, [...scores, ...added]);
+            added.push(...entries);
+        } catch (e) {
+            console.error(`[generator] 曲谱包导入失败（${file.name}）：`, e);
+            errors.push(`${file.name}：${(e as Error).message}`);
+        }
+    }
+    if (added.length > 0) {
+        scores.push(...added);
+        renderScores();
+    }
+    hideLoading();
+    if (errors.length > 0) alert(`曲谱包导入失败：\n${errors.join("\n")}`);
+}
+
+/** 直接导入图片/PDF：图片合并为一张曲谱，每个 PDF 各自一张。 */
+async function handleScorePagesUpload(files: FileList | null) {
+    if (!files?.length) return;
+    if (!template) return alert("请先等待模板加载完成！");
+
+    showLoading("正在导入曲谱...");
+    try {
+        const result = await importScorePages(Array.from(files), scores, {
+            requestTitle: promptScoreTitle,
+            onProgress: showLoading,
+        });
+        if (result.scores.length > 0) {
+            scores.push(...result.scores);
+            renderScores();
+        }
+        if (result.errors.length > 0) {
+            alert(`曲谱导入失败：\n${result.errors.join("\n")}`);
+        }
+    } catch (e) {
+        console.error("[generator] 曲谱导入失败：", e);
+        alert("曲谱导入失败: " + (e as Error).message);
+    } finally {
+        hideLoading();
+    }
+}
+
 // ---------- 预览 ----------
 /** 正在加载采样/启动播放的曲目（按钮显示 ⏳，避免全屏遮罩闪烁） */
 let pendingPreviewId: string | null = null;
@@ -300,7 +441,9 @@ async function applyTemplate(fileOrBlob: Blob) {
         tplVersion.innerText = Array.isArray(ver) ? ver.join(".") : typeof ver === "string" ? ver : "Unknown";
         tplDesc.innerText = template.bpManifest.header?.description ?? "无原始描述";
         songs = template.songs;
+        scores = template.scores;
         renderList();
+        renderScores();
         renderLibrary();
     } catch (e) {
         console.error("[generator] 模板加载失败：", e);
@@ -524,6 +667,7 @@ async function generateAddon() {
                     .filter((meta) => selectedTimbres.has(meta.id))
                     .map((meta) => meta.id),
             },
+            scores,
         });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
@@ -686,11 +830,29 @@ libModal.onclick = (e) => {
 };
 window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (!titleModal.hidden) {
+        closeTitlePrompt(null);
+        return;
+    }
     if (!libModal.hidden) libModal.hidden = true;
     if (!logModal.hidden) logModal.hidden = true;
 });
 
 midiInput.onchange = (e) => handleMidiUpload((e.target as HTMLInputElement).files);
+scoreInput.onchange = (e) => {
+    const input = e.target as HTMLInputElement;
+    void handleScoreUpload(input.files).finally(() => {
+        // 允许再次选择同一个文件
+        input.value = "";
+    });
+};
+scorePagesInput.onchange = (e) => {
+    const input = e.target as HTMLInputElement;
+    void handleScorePagesUpload(input.files).finally(() => {
+        // 允许再次选择同一批文件
+        input.value = "";
+    });
+};
 templateInput.onchange = (e) => {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (f) applyTemplate(f);
@@ -734,6 +896,16 @@ midiList.onclick = (e) => {
         renderList();
         renderLibrary();
     }
+};
+
+// 曲谱列表：移除（至少保留一张）
+scoreList.onclick = (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button.score-remove");
+    if (!btn || btn.disabled) return;
+    const idx = Number(btn.dataset.scoreIdx);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= scores.length) return;
+    scores.splice(idx, 1);
+    renderScores();
 };
 
 // 曲库：试听 / 添加（事件委托，搜索过滤后重渲染不丢绑定）
