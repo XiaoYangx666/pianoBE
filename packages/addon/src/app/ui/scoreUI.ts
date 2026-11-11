@@ -44,13 +44,6 @@ class PianoScoreForm {
         this.status = new ObservableString("当前曲谱：无");
         this.pageLabel = new ObservableString("第 1 / 1 页");
 
-        if (this.empty) {
-            this.form = new CustomForm(player, "曲谱配置")
-                .label("当前资源包没有曲谱\n请通过生成器导入真实谱面图片或 PDF")
-                .closeButton();
-            return;
-        }
-
         this.mount.subscribe(value => {
             if (this.syncing || !this.target) return;
             this.apply({ scoreMounted: value });
@@ -64,7 +57,11 @@ class PianoScoreForm {
 
         this.form = new CustomForm(player, "曲谱配置")
             .label(this.status)
-            .toggle("安装谱架", this.mount)
+            .toggle("安装谱架", this.mount);
+        if (this.empty) {
+            this.form.label("§7当前资源包没有曲谱\n请通过生成器导入真实谱面图片或 PDF\n仍可先安装空白谱架");
+        }
+        this.form
             .label("   ")
             .textField("搜索曲谱标题或 id", this.search)
             .label(this.pageLabel);
@@ -107,10 +104,10 @@ class PianoScoreForm {
         }
 
         const current = scoreAt(scoreIndexOf(selected));
-        this.status.setData(
-            `当前曲谱：${current?.title ?? "无"}\n§7共 ${AVAILABLE_SCORES.length} 张，匹配 ${this.items.length} 张`
-        );
-        this.pageLabel.setData(`第 ${this.page + 1} / ${pages} 页`);
+        this.status.setData(this.empty
+            ? "当前曲谱：无\n§7资源包内没有曲谱，请通过生成器导入"
+            : `当前曲谱：${current?.title ?? "无"}\n§7共 ${AVAILABLE_SCORES.length} 张，匹配 ${this.items.length} 张`);
+        this.pageLabel.setData(this.empty ? "没有曲谱" : `第 ${this.page + 1} / ${pages} 页`);
         this.prevDisabled.setData(this.page <= 0);
         this.nextDisabled.setData(this.page >= pages - 1);
     }
@@ -153,15 +150,6 @@ class PianoScoreForm {
 
     async show(piano: PianoRuntime) {
         if (this.opening || this.form.isShowing()) return;
-        if (this.empty) {
-            this.opening = true;
-            try {
-                await this.form.show();
-            } finally {
-                this.opening = false;
-            }
-            return;
-        }
         const settings = piano.settings;
         const displayId = piano.displayId;
         if (!settings || !displayId) {

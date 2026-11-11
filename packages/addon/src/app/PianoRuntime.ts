@@ -147,11 +147,21 @@ export class PianoRuntime {
     private syncScore(tick: number) {
         const settings = this.settings;
         if (!settings || tick < this.scoreRetryAt) return;
-        // 没有导入曲谱时不挂空谱架；换到带曲谱的包后按原设置恢复。
+        // 没有导入曲谱时也允许安装空白谱架；导入曲谱后按原设置自动换成真实谱面。
         if (AVAILABLE_SCORES.length === 0) {
-            if (this.score?.isValid) removeScoreStand(this.location, this.center);
-            this.score = undefined;
-            this.scoreUnmounted = true;
+            try {
+                if (settings.scoreMounted && !this.score?.isValid) {
+                    this.scoreUnmounted = false;
+                    this.score = recoverScoreStand(this.location, this.center, 0);
+                } else if (!settings.scoreMounted && !this.scoreUnmounted) {
+                    removeScoreStand(this.location, this.center);
+                    this.score = undefined;
+                    this.scoreUnmounted = true;
+                }
+            } catch (error) {
+                this.scoreRetryAt = tick + SWEEP_INTERVAL;
+                console.warn("[piano] 同步空白谱架失败", error);
+            }
             return;
         }
         const variant = scoreIndexOf(settings.scoreId);
