@@ -12,6 +12,12 @@ mock.module("@app/midi", () => ({
         infoOf: async () => undefined,
         getInfo: () => undefined,
     },
+    importedMidiManager: {
+        page,
+        metaAll: async () => [],
+        infoOf: async () => undefined,
+        getInfo: () => undefined,
+    },
     playlist: { getContent, setContent },
 }));
 
@@ -47,7 +53,23 @@ const TRACK = {
 
 function makeMidi() {
     return new MidiPlayer(
-        { load: async (info) => ({ ...info, tracks: [TRACK] }) },
+        { acquire: async (info: { id: string; name: string; duration: number }) => {
+            const { buildSeekIndex, encodePbe2, readPbe2Events } = await import("@piano/core");
+            const pbe2 = encodePbe2({
+                ...info,
+                tracks: [TRACK],
+            });
+            const { header, events } = readPbe2Events(pbe2);
+            return {
+                song: {
+                    id: header.id, name: header.name, duration: header.duration,
+                    noteCount: header.noteCount, header, events,
+                    index: buildSeekIndex(events, header.hasVelocity),
+                    refCount: 1, lastAccess: 0, byteSize: events.length,
+                },
+                release() {},
+            };
+        } },
         { note() {}, playing() {} }
     );
 }

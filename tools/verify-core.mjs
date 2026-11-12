@@ -2,10 +2,12 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 import {
     crc32Hex,
-    packNotes,
-    unpackNotes,
-    songToAddonModule,
+    encodePbe2,
     metasToAddonIndex,
+    pbe2ToAddonModule,
+    readPbe2Header,
+    readPbe2Events,
+    readAllPbe2Notes,
     PlaylistStore,
     MemorySongPort,
     MemoryPlaylistPort,
@@ -15,14 +17,7 @@ import {
 const buf = fs.readFileSync("midis/files/Beyond - 海阔天空.mid");
 assert.equal(crc32Hex(new Uint8Array(buf)), "4beea226", "crc32 id 不匹配历史产物");
 
-// 2. 打包/解包往返
-const quads = [41, 0, 293, 75, 82, 29, 73, 75];
-const packed = packNotes(quads);
-assert.ok(packed instanceof Uint16Array);
-assert.deepEqual([...packed], quads);
-assert.deepEqual(unpackNotes(packed), quads);
-
-// 3. 端到端：真实 .mid 经 core 转换 → addon 模块文本，与现有产物逐字节一致
+// 2. 端到端：真实 .mid 经 core 转换 → PBE2 → addon 模块文本，与现有产物一致
 import { midiBufferToSong } from "@piano/core/convert";
 {
     const existing = fs.readFileSync("midis/js/4beea226.js", "utf-8");
@@ -30,10 +25,16 @@ import { midiBufferToSong } from "@piano/core/convert";
         new Uint8Array(fs.readFileSync("midis/files/Beyond - 海阔天空.mid")),
         "Beyond - 海阔天空"
     );
-    assert.equal(songToAddonModule(song), existing);
+    const pbe2 = encodePbe2(song);
+    const header = readPbe2Header(pbe2);
+    assert.equal(header.id, song.id);
+    assert.equal(header.noteCount, song.tracks.reduce((s, t) => s + t.notes.length / 4, 0));
+    const notes = readAllPbe2Notes(readPbe2Events(pbe2).events);
+    assert.equal(notes.length, header.noteCount);
+    assert.equal(pbe2ToAddonModule(pbe2), existing);
 }
 
-// 4. 曲库：内容寻址幂等 + 过滤缺失
+// 3. 曲库：内容寻址幂等 + 过滤缺失
 const songPort = new MemorySongPort();
 songPort.add({ id: "aaa", name: "A", duration: 100, tracks: [] });
 songPort.add({ id: "aaa", name: "A2", duration: 200, tracks: [] }); // 同 id 覆盖（幂等语义：内容寻址下同 id 应同内容）
@@ -47,7 +48,7 @@ assert.deepEqual(
     ["aaa"]
 );
 
-// 5. 播放列表：创建/视图/删除/播放计数
+// 4. 播放列表：创建/视图/删除/播放计数
 const plPort = new MemoryPlaylistPort();
 const plStore = new PlaylistStore(plPort);
 
@@ -72,7 +73,7 @@ plStore.incPlayCount(l3.id, "player1");
 plStore.incPlayCount(l3.id, "player1"); // 同日重复不计
 assert.equal(plStore.getMeta(l3.id)?.playCount, 1);
 
-// 6. 崩溃残留自愈：模拟 create 中途崩溃（content 写了但 meta 未写/丢失）
+// 5. 崩溃残留自愈：模拟 create 中途崩溃（content 写了但 meta 未写/丢失）
 const orphanContent = { id: 99, items: ["aaa"] };
 plPort.setContent(99, orphanContent.items); // 手动注入孤儿 content
 assert.equal(plStore.getMeta(99), undefined, "孤儿 content 不应出现在任何视图");
@@ -82,11 +83,11 @@ assert.equal(plPort.getContent(99).length, 1, "孤儿 content 仍在底层存储
 plStore.delete(99); // 删除幂等，不抛错
 assert.equal(plPort.getContent(99).length, 0);
 
-// 7. 删除后 nextId 可复用
+// 6. 删除后 nextId 可复用
 plStore.delete(l3.id);
 assert.equal(plStore.create("player2", "新的").id, 3, "删除后 max(id)+1 复用 id 属预期");
 
-// 8. 索引文本
+// 7. 索引文本
 assert.ok(metasToAddonIndex([{ id: "aaa", name: "A", duration: 100 }]).startsWith("export const midis=["));
 
-console.log("✅ core 冒烟验证全部通过（crc32/编码/模块文本/曲库/播放列表/崩溃自愈）");
+console.log("✅ core 冒烟验证全部通过（crc32/PBE2/模块文本/曲库/播放列表/崩溃自愈）");

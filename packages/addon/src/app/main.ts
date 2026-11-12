@@ -3,8 +3,11 @@ import { PianoBlockComponent, regEvents } from "@app/components/pianoBlock";
 import { midiUIManager } from "@app/ui/midi/playerUIManager";
 import { pianoManager } from "@app/ui/piano";
 import { pianoScoreManager } from "@app/ui/scoreUI";
+import { midiImportManager } from "@app/ui/midi/importUI";
 import { pianoSettingsManager } from "@app/ui/settingsUI";
 import { pianoWorld } from "@app/PianoWorld";
+import { openPbeSettings } from "@app/ui/adminSettingsUI";
+import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
 import { system, world } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
 
@@ -22,6 +25,17 @@ system.beforeEvents.startup.subscribe((e) => {
 
 regEvents();
 
+// 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻扫描导入曲库。
+system.run(() => {
+    try {
+        importedSongs.reload();
+        midiManager.addSource(importedSongs);
+        void importedMidiManager.refresh();
+    } catch (error) {
+        console.warn("[piano] 扫描本地导入曲库失败", error);
+    }
+});
+
 // 玩家离开后旧 DDUI 表单的客户端写权限立即失效。
 // 及时丢弃实例（并解绑 MIDI 信号订阅），重进时由 DDUIManager 重建表单，
 // 避免复用失效表单调按钮时报 "does not have access"。
@@ -30,6 +44,7 @@ world.afterEvents.playerLeave.subscribe((e) => {
     midiUIManager.invalidate(e.playerId);
     pianoSettingsManager.invalidate(e.playerId);
     pianoScoreManager.invalidate(e.playerId);
+    midiImportManager.invalidate(e.playerId);
 });
 
 // 启动标记：确认行为包脚本已加载及其构建目标（模板包=client / 服务器专用包=server）
@@ -40,13 +55,25 @@ initSAPIPro({
     version: "**VERSION**",
     description: "**DESCRIPTION**",
     author: "XiaoYangx666",
-    nameSpace: "xypiano",
+    nameSpace: "pbe",
     uuid: "ee4ee253-b1c5-4447-9e52-356f5e6ed11b",
 });
 
 pcommand.registerCommand(
     new Command("midilist", "查看midi播放器列表", true, (player) => {
+        const stats = midiManager.cacheStats();
+        player.sendMessage(
+            `[SongCache] ${stats.songs} 首 / ${(stats.bytes / 1048576).toFixed(2)} MB ` +
+                `(预算 ${(stats.maxBytes / 1048576).toFixed(0)} MB, 加载中 ${stats.loading})`
+        );
         player.sendMessage(pianoWorld.debugDump());
+    })
+);
+
+// 管理员设置：/pbe:pbe_setting（原生命令 + 管理员权限）
+pcommand.registerNative(
+    new Command("pbe_setting", "PianoBE 管理员设置", true, (player) => {
+        openPbeSettings(player);
     })
 );
 

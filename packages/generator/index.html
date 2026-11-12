@@ -152,6 +152,21 @@
             </div>
         </div>
 
+        <!-- 游戏内导入码弹窗 -->
+        <div id="importModal" class="modal-overlay" hidden>
+            <div class="modal">
+                <div class="modal-head">
+                    <h3>游戏内导入码 <span class="lib-sub" id="importSub"></span></h3>
+                    <button id="importClose" class="modal-close" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                </div>
+                <p class="timbre-hint">在游戏内打开「导入 MIDI」，把下面每一段逐段粘贴到输入框（可乱序）。单段不超过 4800 字符。</p>
+                <div class="import-code-actions">
+                    <button id="importCopyAll" class="file-btn primary">复制全部分段</button>
+                </div>
+                <div id="importList" class="import-code-list"></div>
+            </div>
+        </div>
+
         <!-- 更新日志弹窗 -->
         <div id="logModal" class="modal-overlay" hidden>
             <div class="modal">

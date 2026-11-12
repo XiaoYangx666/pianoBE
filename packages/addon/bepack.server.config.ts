@@ -36,15 +36,15 @@ export default defineConfig({
             },
             manifest: {
                 merge: "clean",
-                minEngineVersion: "1.26.30",
+                minEngineVersion: "1.26.50",
             },
             name: "钢琴(服务器版)",
             description: "钢琴行为包（服务器专用）",
             dependencies: {
                 "@minecraft/server": "beta",
                 "@minecraft/server-ui": "beta",
-                "sapi-pro": "beta",
-                "@minecraft/vanilla-data": "stable",
+                "sapi-pro": "0.4.3-stable",
+                "@minecraft/vanilla-data": "1.26.50",
                 "@minecraft/server-net": "beta",
                 "@minecraft/server-admin": "beta",
             },
@@ -55,7 +55,7 @@ export default defineConfig({
             moduleUuid: "a51c41cc-6b76-4364-a372-381b4bdf0ee7",
             manifest: {
                 merge: "clean",
-                minEngineVersion: "1.26.30",
+                minEngineVersion: "1.26.50",
             },
             name: "钢琴资源包(服务器版)",
             description: "钢琴资源包",

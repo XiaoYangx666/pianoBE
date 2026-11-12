@@ -1,4 +1,6 @@
 import { readAddon, type AddonTemplate, type Manifest } from "@bepack/addon";
+import { decodeBase64Url, readPbe2Header } from "@piano/core";
+import { pbe2ToEntry } from "./convert";
 import type { SongEntry } from "./types";
 import { parseTemplateScores, type ScoreEntry } from "./scores";
 
@@ -42,9 +44,9 @@ export async function loadTemplate(fileOrBlob: Blob | Uint8Array): Promise<Templ
 
 /**
  * 解析模板内嵌曲目。文件格式由 @piano/core 的 metasToAddonIndex /
- * songToAddonModule 生成：
+ * pbe2ToAddonModule 生成：
  *   index.js: export const midis=[{id,name,duration,value:async()=> (await import("./<id>.js")).default},];
- *   <id>.js:  export default {id,name,duration,tracks:[{instrument,notes:new Uint16Array([...])}]};
+ *   <id>.js:  export default "<Base64URL(PBE2)>";
  */
 export function parseExistingMidis(
     addon: AddonTemplate,
@@ -60,33 +62,25 @@ export function parseExistingMidis(
     let match;
     while ((match = regex.exec(content)) !== null) {
         const id = JSON.parse(match[1]);
-        const name = JSON.parse(match[2]);
-        const duration = parseFloat(match[3]);
         const fileId = match[4];
 
         const jsContent = addon.readTextSync(`${midisDir}${fileId}.js`);
         if (!jsContent) continue;
-        const tracksMatch = jsContent.match(/tracks:(\[.*\])\};/);
-        if (!tracksMatch) continue;
-
-        // 估算音符数：统计 Uint16Array/Float32Array 内数字个数 ÷ 4
-        const noteMatches = jsContent.match(/(Float32Array|Uint16Array)\(\[(.*?)\]\)/g);
-        let noteCount = 0;
-        if (noteMatches) {
-            for (const m of noteMatches) {
-                const nums = m.match(/[\d.]+/g);
-                if (nums) noteCount += nums.length / 4;
-            }
+        const encoded = /export\s+default\s+"([^"]+)"\s*;?/.exec(jsContent)?.[1];
+        if (!encoded) continue;
+        try {
+            const data = decodeBase64Url(encoded);
+            const header = readPbe2Header(data);
+            if (header.id !== id) continue;
+            items.push(
+                pbe2ToEntry(data, {
+                    isOriginal: true,
+                    moduleText: jsContent,
+                })
+            );
+        } catch (error) {
+            console.warn(`[generator] 模板曲目 ${id} 解析失败`, error);
         }
-
-        items.push({
-            id,
-            name,
-            duration,
-            noteCount: Math.floor(noteCount),
-            isOriginal: true,
-            moduleText: jsContent,
-        });
     }
     return items;
 }

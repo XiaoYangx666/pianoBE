@@ -24,3 +24,4 @@ assets/scores/
 packages/addon/rp/textures/ui/piano_score/
 packages/addon/rp/textures/entity/piano_score/*.png
 !packages/addon/rp/textures/entity/piano_score/blank.png
+*.dev.log

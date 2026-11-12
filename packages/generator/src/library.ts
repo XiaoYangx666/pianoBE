@@ -1,9 +1,8 @@
-import { decodeSongFromBinary } from "@piano/core";
-import type { MidiSong } from "@piano/core";
+import { pbe2ToEntry } from "./convert";
 import type { SongEntry } from "./types";
 
 /**
- * MIDI 曲库：只含转换后的二进制曲目（midis/library → public/library），
+ * MIDI 曲库：只含 PBE2 曲目二进制（midis/library → public/library），
  * 不含原始 .mid。目录 index.json（元信息）随页面加载，单曲二进制按需拉取。
  *
  * 播放量来自同源 Worker 的 D1 API；统计不可用时自动退化为 0，
@@ -26,7 +25,7 @@ interface StatsResponse {
 }
 
 let cachedIndex: LibraryMeta[] | null = null;
-const songCache = new Map<string, MidiSong>();
+const songCache = new Map<string, Uint8Array>();
 
 async function loadStats(): Promise<Required<StatsResponse>> {
     try {
@@ -97,25 +96,17 @@ export async function recordLibraryAdd(id: string): Promise<boolean> {
     }
 }
 
-export async function loadLibrarySong(meta: LibraryMeta): Promise<MidiSong> {
+export async function loadLibrarySong(meta: LibraryMeta): Promise<Uint8Array> {
     const hit = songCache.get(meta.id);
     if (hit) return hit;
     const res = await fetch(`./library/${meta.id}.bin`);
     if (!res.ok) throw new Error(`曲目二进制加载失败: HTTP ${res.status}`);
-    const song = decodeSongFromBinary(new Uint8Array(await res.arrayBuffer()));
-    songCache.set(meta.id, song);
-    return song;
+    const data = new Uint8Array(await res.arrayBuffer());
+    songCache.set(meta.id, data);
+    return data;
 }
 
-/** 曲库条目 → 生成器列表条目（二进制解码，导出时由 core 重新生成模块文本） */
-export function libraryMetaToEntry(meta: LibraryMeta, song: MidiSong): SongEntry {
-    return {
-        id: meta.id,
-        name: meta.name,
-        duration: meta.duration,
-        noteCount: meta.noteCount,
-        isOriginal: false,
-        fromLibrary: true,
-        song,
-    };
+/** 曲库条目 → 生成器列表条目（PBE2 数据原样携带） */
+export function libraryMetaToEntry(meta: LibraryMeta, data: Uint8Array): SongEntry {
+    return pbe2ToEntry(data, { fromLibrary: true });
 }

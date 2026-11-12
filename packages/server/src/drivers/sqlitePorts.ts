@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { MidiSong, MidiSongMeta, PlaylistMeta, PlaylistPort, SongPort } from "@piano/core";
+import { encodePbe2, readPbe2Header } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 
 /**
@@ -9,11 +10,9 @@ import { midiBufferToSong } from "@piano/core/convert";
  * 单记录 = 单行原子读写（sqlite 单语句自带原子性），无显式事务；
  * 播放列表 meta 与 items 同记录（JSON 列），天然消除孤儿残留。
  *
- * 曲目内容策略（v2）：完整曲目不落库，存为磁盘文件：
- *   data/midis/{id}.mid   —— 原始 .mid 源文件（内容寻址，上传主路径）
- *   data/midis/{id}.json  —— 契约兜底（core SongPort.add 传入已解析 MidiSong 时）
- * SQLite songs 表仅存 meta（id/name/duration/noteCount/dataSize），列表/搜索/统计。
- * getSong 优先读 .mid 按需转换，回退 .json；避免重复存同一曲目的两份内容。
+ * 曲目内容策略（v3）：SQLite 仅存元数据，完整曲目以 `.mid` 源文件保存；
+ * 对游戏播放器统一按需编码为 PBE2（内存 LRU 缓存最近使用的曲目），
+ * 管理页拉原始 `.mid` 走 /raw，不受影响。
  */
 
 interface SongRow {
@@ -40,6 +39,10 @@ interface PlaylistRow {
  * 导致删除数据库目录时 EBUSY；query 的缓存在 close() 时统一释放。
  */
 export class SqliteSongPort implements SongPort {
+    /** PBE2 编码缓存（内容不变时避免重复解析/压缩） */
+    private readonly pbe2Cache = new Map<string, Uint8Array>();
+    private static readonly MAX_PBE2_CACHE = 32;
+
     constructor(
         private readonly db: Database,
         private readonly contentDir = "./data/midis"
@@ -58,6 +61,7 @@ export class SqliteSongPort implements SongPort {
     saveMidiFile(buffer: Uint8Array, name: string): MidiSongMeta {
         const song = midiBufferToSong(buffer, name);
         writeFileSync(this.midiPath(song.id), buffer);
+        this.pbe2Cache.delete(song.id);
         this.upsertMeta(song.id, name || song.id, song.duration, song, buffer.byteLength);
         return { id: song.id, name: name || song.id, duration: song.duration };
     }
@@ -66,6 +70,7 @@ export class SqliteSongPort implements SongPort {
     add(song: MidiSong): void {
         const data = JSON.stringify(song);
         writeFileSync(this.jsonPath(song.id), data);
+        this.pbe2Cache.delete(song.id);
         this.upsertMeta(
             song.id,
             song.name,
@@ -108,6 +113,7 @@ export class SqliteSongPort implements SongPort {
             .query(`UPDATE songs SET name=? WHERE id=?`)
             .run(clean, id);
         if (res.changes === 0) return undefined;
+        this.pbe2Cache.delete(id);
         return this.getMeta(id);
     }
 
@@ -115,7 +121,68 @@ export class SqliteSongPort implements SongPort {
     getRaw(id: string): Uint8Array<ArrayBuffer> | undefined {
         const p = this.midiPath(id);
         if (!existsSync(p)) return undefined;
-        return new Uint8Array(readFileSync(p).buffer);
+        return Uint8Array.from(readFileSync(p));
+    }
+
+    /**
+     * 游戏播放器使用的 PBE2 数据。
+     * 优先 `.mid` 源文件按需转换；兼容历史上通过 SongPort.add() 写入的 `.json`。
+     */
+    getPbe2(id: string): Uint8Array | undefined {
+        const cached = this.pbe2Cache.get(id);
+        if (cached) {
+            // LRU：命中移到末尾
+            this.pbe2Cache.delete(id);
+            this.pbe2Cache.set(id, cached);
+            return cached;
+        }
+        const raw = this.getRaw(id);
+        const meta = this.getMeta(id);
+        let song: MidiSong | undefined;
+        if (raw) {
+            try {
+                song = midiBufferToSong(raw, meta?.name ?? id);
+            } catch {
+                song = undefined;
+            }
+        }
+        if (!song) {
+            const json = this.jsonPath(id);
+            if (!existsSync(json)) return undefined;
+            try {
+                song = JSON.parse(readFileSync(json, "utf8")) as MidiSong;
+            } catch {
+                return undefined;
+            }
+        }
+        try {
+            const pbe2 = encodePbe2(song);
+            this.cachePbe2(id, pbe2);
+            return pbe2;
+        } catch {
+            return undefined;
+        }
+    }
+
+    /** 校验 PBE2 头部（供路由直接读取元信息） */
+    getPbe2Meta(id: string): { id: string; name: string; duration: number } | undefined {
+        const pbe2 = this.getPbe2(id);
+        if (!pbe2) return undefined;
+        try {
+            const header = readPbe2Header(pbe2);
+            return { id: header.id, name: header.name, duration: header.duration };
+        } catch {
+            return undefined;
+        }
+    }
+
+    private cachePbe2(id: string, pbe2: Uint8Array) {
+        this.pbe2Cache.delete(id);
+        this.pbe2Cache.set(id, pbe2);
+        if (this.pbe2Cache.size > SqliteSongPort.MAX_PBE2_CACHE) {
+            const oldest = this.pbe2Cache.keys().next().value as string | undefined;
+            if (oldest !== undefined) this.pbe2Cache.delete(oldest);
+        }
     }
 
     getSong(id: string): MidiSong | undefined {
@@ -162,6 +229,7 @@ export class SqliteSongPort implements SongPort {
 
     remove(id: string): void {
         this.db.query(`DELETE FROM songs WHERE id=?`).run(id);
+        this.pbe2Cache.delete(id);
         for (const p of [this.midiPath(id), this.jsonPath(id)]) {
             if (existsSync(p)) rmSync(p);
         }

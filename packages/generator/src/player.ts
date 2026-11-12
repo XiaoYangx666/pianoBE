@@ -1,5 +1,5 @@
 import { SampledMidiPlayer, type NoteEvent } from "@piano/core/player";
-import { TIME_SCALE, OTHER_SCALE } from "@piano/core";
+import { TIME_SCALE, pbe2ToNoteEvents } from "@piano/core";
 import type { TemplateInfo } from "./template";
 import type { SongEntry } from "./types";
 
@@ -9,41 +9,13 @@ export type { NoteEvent } from "@piano/core/player";
  * 生成器预览播放器（薄壳）：WebAudio 采样播放引擎在 core（@piano/core/player，
  * 与管理端 web 共用同一引擎），这里只负责：
  * - 采样源：从已加载模板 mcaddon 的 rp/sounds 提取（不重复存放音效文件）
- * - 事件来源：SongEntry（曲库二进制/上传 midi/模板内嵌模块文本）
+ * - 事件来源：SongEntry 中的 PBE2 事件流
  * 播放行为（调度/变调/包络/兜底）与游戏一致，由 core 引擎保证。
  */
 
-/** 各类 SongEntry → 音符事件（兼容 song 对象与模板 moduleText） */
+/** SongEntry → 音符事件（PBE2 事件流解码） */
 export function songEntryToEvents(entry: SongEntry): NoteEvent[] {
-    const events: NoteEvent[] = [];
-    if (entry.song) {
-        for (const track of entry.song.tracks) {
-            pushQuads(events, track.notes);
-        }
-    } else if (entry.moduleText) {
-        // 注意：不能用 /[\d,]+/ 从整段匹配里取数字——会命中 "Uint16Array" 里的 "16"！
-        // 必须用捕获组精确取中括号内的音符数组
-        const noteArrays = entry.moduleText.match(/notes:new Uint16Array\(\[([\d,]+)\]\)/g) ?? [];
-        for (const m of noteArrays) {
-            const nums = m.match(/\[([\d,]+)\]/)![1].split(",").map(Number);
-            pushQuads(events, nums);
-        }
-    }
-    events.sort((a, b) => a.time - b.time);
-    return events;
-}
-
-function pushQuads(events: NoteEvent[], nums: number[]) {
-    for (let i = 0; i + 3 < nums.length; i += 4) {
-        const velocity = nums[i + 3] / OTHER_SCALE;
-        if (velocity <= 0) continue;
-        events.push({
-            midi: nums[i],
-            time: nums[i + 1] / TIME_SCALE,
-            duration: nums[i + 2] / OTHER_SCALE,
-            velocity,
-        });
-    }
+    return entry.data ? pbe2ToNoteEvents(entry.data) : [];
 }
 
 export class PreviewPlayer extends SampledMidiPlayer {

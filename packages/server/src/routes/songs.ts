@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { encodeBase64Url } from "@piano/core";
 import type { AppDeps } from "../app.js";
 import { requireRole, type AppVariables } from "../auth.js";
 
@@ -31,11 +32,19 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         return c.body(raw, 200, { "content-type": "audio/midi" });
     });
 
-    // GET /api/songs/:id —— 完整曲目 JSON（server-net 拉取用，按需从 .mid 转换）
+    // GET /api/songs/:id —— 游戏播放器曲目（统一 PBE2，Base64URL 传输）
     app.get("/:id", readRole(), (c) => {
-        const song = deps.songPort.getSong(c.req.param("id") ?? "");
-        if (!song) return c.json({ error: "曲目不存在" }, 404);
-        return c.json(song);
+        const id = c.req.param("id") ?? "";
+        const pbe2 = deps.songPort.getPbe2(id);
+        if (!pbe2) return c.json({ error: "曲目不存在" }, 404);
+        const meta = deps.songPort.getMeta(id);
+        return c.json({
+            id,
+            name: meta?.name ?? id,
+            duration: meta?.duration ?? 0,
+            /** Base64URL(PBE2)：BDS 的 server-net 响应体为字符串，二进制统一走 Base64URL */
+            data: encodeBase64Url(pbe2),
+        });
     });
 
     // POST /api/songs —— 上传 .mid（原始字节存 data/midis/{id}.mid；文件名走 X-File-Name 头）

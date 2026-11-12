@@ -1,4 +1,4 @@
-import { midiManager, playlist } from "@app/midi";
+import { midiManager, importedMidiManager, playlist } from "@app/midi";
 import type { MidiPlayer } from "@domain/playback/player";
 import type { MidiSongMeta } from "@piano/core";
 import { CommonForm, NumberField, TextField, Validators } from "sapi-pro";
@@ -11,6 +11,8 @@ export interface MidiListArgs {
     filter?: string;
     notice?: string;
     onBack?: () => void;
+    /** 曲目来源：内置/远程曲库（默认）或本地导入曲库 */
+    source?: "library" | "imported";
     /** 内部：从歌曲列表打开搜索时，用 offUntil 替换旧列表，避免页面栈重复。 */
     replaceList?: boolean;
     /** 当前页歌曲（服务端分页返回） */
@@ -66,13 +68,14 @@ export const MidiListForm = CommonForm.ButtonForm<
     // 不下载全量列表、不缓存
     async generator(form, ctx, args) {
         if (args.p < 1) args.p = 1;
-        let { items, total } = await midiManager.page(args.p, PAGE_SIZE, args.filter);
+        const manager = args.source === "imported" ? importedMidiManager : midiManager;
+        let { items, total } = await manager.page(args.p, PAGE_SIZE, args.filter);
         let maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
         // 数据源收缩时（远程库删除/筛选变化）把页码拉回最后一页。
         if (args.p > maxPage) {
             args.p = maxPage;
-            ({ items, total } = await midiManager.page(args.p, PAGE_SIZE, args.filter));
+            ({ items, total } = await manager.page(args.p, PAGE_SIZE, args.filter));
             maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
         }
 

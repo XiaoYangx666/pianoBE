@@ -1,6 +1,4 @@
-import type { MidiSong } from "@piano/core";
-
-/** 生成器列表条目：模板已有曲目（moduleText 原样保留）或新导入曲目（song） */
+/** 生成器列表条目：模板已有曲目（保留模块原文）或新导入曲目（PBE2） */
 export interface SongEntry {
     id: string;
     name: string;
@@ -10,10 +8,10 @@ export interface SongEntry {
     isOriginal: boolean;
     /** 来自内置曲库（仅作标签展示，导出逻辑不变） */
     fromLibrary?: boolean;
-    /** 模板中已存在的模块原文（导出时字节保真保留） */
+    /** 模板中已存在的模块原文（导出时仍会从 PBE2 确定性重建） */
     moduleText?: string;
-    /** 新导入曲目（导出时由 core 生成模块文本） */
-    song?: MidiSong;
+    /** PBE2 二进制（所有新导入/曲库/模板曲目统一携带） */
+    data?: Uint8Array;
 }
 
 export function toMeta(entry: SongEntry) {

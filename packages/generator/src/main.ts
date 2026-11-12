@@ -1,5 +1,5 @@
 import "./styles.css";
-import { PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
+import { PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId, planImportChunks } from "@piano/core";
 import { loadTemplate, type TemplateInfo } from "./template";
 import { generateAddonZip } from "./export";
 import { midiFileToEntry } from "./convert";
@@ -82,6 +82,11 @@ const scoreList = $<HTMLDivElement>("scoreList");
 const scoreCount = $<HTMLElement>("scoreCount");
 const scoreInput = $<HTMLInputElement>("scoreInput");
 const scorePagesInput = $<HTMLInputElement>("scorePagesInput");
+const importModal = $<HTMLDivElement>("importModal");
+const importSub = $<HTMLSpanElement>("importSub");
+const importList = $<HTMLDivElement>("importList");
+const importClose = $<HTMLButtonElement>("importClose");
+const importCopyAll = $<HTMLButtonElement>("importCopyAll");
 
 const showLoading = (text: string) => {
     loadingText.innerText = text;
@@ -585,6 +590,7 @@ function renderLibrary() {
                     <span class="id">${m.id}</span>
                 </div>
             </div>
+            <button class="btn-code" data-share-code="${m.id}" title="复制导入码">码</button>
             <button class="btn-add" data-add="${m.id}" ${inList || pendingAddId ? "disabled" : ""} title="${inList ? "已在列表中" : "添加到列表"}">${inList ? ICON_CHECK : pendingAddId === m.id ? SPINNER : ICON_PLUS}</button>
         </div>`;
         })
@@ -623,6 +629,7 @@ function renderList() {
                 </div>
             </div>
             <button class="btn-play ${playing ? "on" : ""}" data-play="main:${i}" ${previewPlayer.available ? "" : "disabled"} title="${previewPlayer.available ? "试听" : "需先加载底包模板"}">${playing ? (pendingPreviewId === item.id ? SPINNER : ICON_STOP) : ICON_PLAY}</button>
+            <button class="btn-code" data-code="main:${i}" title="导出游戏内导入码">码</button>
             <button class="remove" data-idx="${i}" title="移除">${ICON_X}</button>
         </div>`;
         })
@@ -641,6 +648,79 @@ function escapeHtml(s: string): string {
         return map[ch];
     });
 }
+
+// ---------- 游戏内导入码 ----------
+let currentImportChunks: string[] = [];
+
+function copyText(text: string): Promise<void> {
+    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+    return Promise.resolve();
+}
+
+function renderImportChunks(entry: SongEntry) {
+    importSub.textContent = `（${entry.name} · ${currentImportChunks.length} 段）`;
+    importList.innerHTML = currentImportChunks
+        .map(
+            (chunk, index) => `<div class="import-code-item">
+                <span>第 ${index + 1}/${currentImportChunks.length} 段 · ${chunk.length} 字符</span>
+                <code>${escapeHtml(chunk.slice(0, 96))}…</code>
+                <button class="file-btn" data-copy-chunk="${index}">复制</button>
+            </div>`
+        )
+        .join("");
+}
+
+function openImportCode(entry: SongEntry) {
+    if (!entry.data) {
+        alert("该曲目还没有可导出的 PBE2 数据");
+        return;
+    }
+    try {
+        currentImportChunks = planImportChunks(entry.data);
+    } catch (e) {
+        alert("生成导入码失败: " + (e as Error).message);
+        return;
+    }
+    renderImportChunks(entry);
+    importModal.hidden = false;
+}
+
+importClose.onclick = () => (importModal.hidden = true);
+importModal.onclick = (e) => {
+    if (e.target === importModal) importModal.hidden = true;
+};
+importCopyAll.onclick = async () => {
+    if (currentImportChunks.length === 0) return;
+    try {
+        await copyText(currentImportChunks.join("\n"));
+        importCopyAll.textContent = "已复制全部分段";
+        setTimeout(() => (importCopyAll.textContent = "复制全部分段"), 1500);
+    } catch {
+        alert("复制失败，请逐段复制");
+    }
+};
+importList.onclick = async (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-copy-chunk]");
+    if (!btn) return;
+    const index = Number(btn.dataset.copyChunk);
+    const chunk = currentImportChunks[index];
+    if (!chunk) return;
+    try {
+        await copyText(chunk);
+        btn.textContent = "已复制";
+        setTimeout(() => (btn.textContent = "复制"), 1200);
+    } catch {
+        alert("复制失败，请手动选择文本");
+    }
+};
 
 // ---------- 导出 ----------
 async function generateAddon() {
@@ -835,6 +915,7 @@ window.addEventListener("keydown", (e) => {
         return;
     }
     if (!libModal.hidden) libModal.hidden = true;
+    if (!importModal.hidden) importModal.hidden = true;
     if (!logModal.hidden) logModal.hidden = true;
 });
 
@@ -888,6 +969,13 @@ midiList.onclick = (e) => {
         if (entry) togglePreview(entry);
         return;
     }
+    const codeBtn = target.closest<HTMLButtonElement>("button.btn-code[data-code]");
+    if (codeBtn) {
+        const idx = Number((codeBtn.dataset.code ?? "").replace("main:", ""));
+        const entry = songs[idx];
+        if (entry) openImportCode(entry);
+        return;
+    }
     const btn = target.closest<HTMLButtonElement>("button.remove");
     if (btn) {
         const idx = Number(btn.dataset.idx);
@@ -922,6 +1010,17 @@ libList.onclick = (e) => {
     if (addBtn) {
         const id = addBtn.dataset.add ?? "";
         if (id) addFromLibrary(id);
+        return;
+    }
+    const codeBtn = target.closest<HTMLButtonElement>("button.btn-code[data-share-code]");
+    if (codeBtn) {
+        const id = codeBtn.dataset.shareCode ?? "";
+        const meta = (library ?? []).find((m) => m.id === id);
+        if (meta) {
+            void awaitLibrarySong(meta).then(openImportCode).catch((e) => {
+                alert("生成导入码失败: " + (e as Error).message);
+            });
+        }
     }
 };
 

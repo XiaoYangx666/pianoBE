@@ -9,6 +9,7 @@ import { createPianoUI, updatePianoUI } from "@app/ui/pianoUI";
 import { FOLLOW_PIANO_LAYER, soundTypes } from "@domain/piano/soundTypes";
 import { scoreIndexOf } from "@domain/score/score";
 import { openMidiPlayer } from "@app/ui/midi/playerUIManager";
+import { openMidiImport } from "@app/ui/midi/importUI";
 import { openPianoSettings } from "@app/ui/settingsUI";
 import { openScoreConfig } from "@app/ui/scoreUI";
 import { loadShortcuts, openShortcutSettings } from "@app/ui/shortcutUI";
@@ -125,6 +126,7 @@ class PianoInstance {
                 openSettings: () => this.openSettings(),
                 openScores: () => this.openScores(),
                 openShortcuts: () => this.openShortcuts(),
+                openImport: () => this.openImport(),
             }
         );
 
@@ -329,6 +331,14 @@ class PianoInstance {
                 console.warn("[piano] 打开快捷键设置失败", error);
                 if (this.player.isValid) this.player.sendMessage("§e无法打开快捷键设置。");
             }
+        });
+    }
+
+    /** 「导入 MIDI」入口（DDUI 分段粘贴） */
+    private openImport() {
+        if (!this.player.isValid) return;
+        this.reopen(() => {
+            if (this.player.isValid) void openMidiImport(this.player);
         });
     }
 

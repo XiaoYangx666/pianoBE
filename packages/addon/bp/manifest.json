@@ -5,7 +5,7 @@
         "description": "钢琴行为包",
         "uuid": "04f4bc5e-60a2-49f6-840c-5a22dbb19bf7",
         "version": "1.3.0",
-        "min_engine_version": "1.26.30"
+        "min_engine_version": "1.26.50"
     },
     "modules": [
         {
@@ -19,15 +19,18 @@
     "dependencies": [
         {
             "module_name": "@minecraft/server",
-            "version": "beta"
+            "version": "2.10.0"
         },
         {
             "module_name": "@minecraft/server-ui",
-            "version": "beta"
+            "version": "2.2.0"
         },
         {
             "uuid": "efbe8777-707f-42de-a238-97b05684685e",
             "version": "1.3.0"
         }
-    ]
+    ],
+    "metadata": {
+        "product_type": "addon"
+    }
 }

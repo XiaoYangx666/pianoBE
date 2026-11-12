@@ -1,8 +1,9 @@
-import type { MidiSong, MidiSongMeta } from "@piano/core";
+import type { MidiSongMeta } from "@piano/core";
 
-/** 内嵌曲目元信息 + 懒加载内容，由 midis/js/index.js 生成。 */
+/** 内嵌曲目元信息 + PBE2 模块懒加载，由 midis/js/index.js 生成。 */
 export interface MidiInfo extends MidiSongMeta {
-    value: () => Promise<MidiSong>;
+    /** 返回 PBE2 的 Base64URL 文本（模块默认导出） */
+    value: () => Promise<string>;
 }
 
 export type MidiListType = MidiInfo[];

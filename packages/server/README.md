@@ -39,7 +39,7 @@ docker compose -f docker-compose.dev.yml up
 
 - **SQLite**（`DB_PATH`）：仅存曲目 **meta**（id/name/duration/noteCount/dataSize）、播放列表、令牌
 - **文件**（`MIDIS_DIR`，默认 `./data/midis/`）：曲目完整内容存为 `{id}.mid` 原始源文件
-- 需要 JSON 时（server-net 拉取）从 `.mid` 按需转换；前端直接拉 `.mid` 字节解析播放，不走 JSON
+- 游戏播放器需要曲目时从 `.mid` 按需编码为 **PBE2**（Raw DEFLATE，内存 LRU 最近 32 首）；管理页前端直接拉 `.mid` 字节解析播放
 - 曲目 `id = crc32(.mid 内容)` 内容寻址，重复上传幂等
 
 ## 环境变量
@@ -66,7 +66,7 @@ docker compose -f docker-compose.dev.yml up
 GET    /api/health                    健康检查（公开）
 GET    /api/songs?q=&page=&pageSize=  曲目列表（meta）
 GET    /api/songs/:id/raw             原始 .mid 字节（前端解析播放）
-GET    /api/songs/:id                 完整曲目 JSON（server-net 拉取，按需转换）
+GET    /api/songs/:id                 游戏播放数据（PBE2，Base64URL 字段 data）
 POST   /api/songs                     上传 .mid（原始字节存 data/midis/，X-File-Name 头给文件名）
 PATCH  /api/songs/:id                 改曲名 { name }
 DELETE /api/songs/:id                 删除曲目（含 .mid 文件）

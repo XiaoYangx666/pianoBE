@@ -2,9 +2,8 @@ import {
     createLocalPlaylistFacade,
     type PlaylistFacade,
 } from "@platform/storage/playlistFacade";
-import { midiManager } from "./midiManager";
 
-export { midiManager } from "./midiManager";
+export { midiManager, importedMidiManager, importedSongs } from "./midiManager";
 
 /**
  * 播放列表门面（UI 唯一入口）：

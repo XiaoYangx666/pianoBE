@@ -1,5 +1,5 @@
 import type { AddonTemplate } from "@bepack/addon";
-import { metasToAddonIndex, songToAddonModule } from "@piano/core";
+import { metasToAddonIndex, pbe2ToAddonModule } from "@piano/core";
 import type { SongEntry } from "./types";
 import type { TemplateInfo } from "./template";
 import type { LoadedTimbrePack, TimbreIndexEntry } from "./timbres";
@@ -71,8 +71,8 @@ export async function generateAddonZip(
     addon.removeTree(midisDir);
 
     for (const entry of songs) {
-        const content = entry.song
-            ? songToAddonModule(entry.song)
+        const content = entry.data
+            ? pbe2ToAddonModule(entry.data)
             : (entry.moduleText ?? "");
         addon.writeText(`${midisDir}${entry.id}.js`, content);
     }

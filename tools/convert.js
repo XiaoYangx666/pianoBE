@@ -1,10 +1,10 @@
 import fs from "fs";
 import path from "path";
 import {
-    countNotes,
-    encodeSongToBinary,
+    collectNoteCount,
+    encodePbe2,
     metasToAddonIndex,
-    songToAddonModule,
+    pbe2ToAddonModule,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 
@@ -61,8 +61,8 @@ fs.mkdirSync(libDir, { recursive: true });
 
 // ===== 3. 转换（解析逻辑统一在 @piano/core） =====
 // 每首同时产出：
-//   midis/js/<id>.js        addon 运行时模块文本（构建期拷入 bp/scripts/midis，不入库）
-//   midis/library/<id>.bin  曲库二进制（入库；生成器按需加载，只含转换后数据）
+//   midis/js/<id>.js        addon 运行时模块（PBE2 的 Base64URL 文本，构建期拷入，不入库）
+//   midis/library/<id>.bin  PBE2 曲库二进制（入库；生成器按需加载）
 const metas = [];
 let notes = 0;
 let jsBytes = 0;
@@ -71,19 +71,21 @@ let binBytes = 0;
 for (const file of files) {
     const buffer = fs.readFileSync(path.join(inputDir, file));
     const song = midiBufferToSong(buffer, file.replace(/\.midi?$/i, ""));
+    const pbe2 = encodePbe2(song);
+    const moduleText = pbe2ToAddonModule(pbe2);
 
-    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), songToAddonModule(song), "utf-8");
-    fs.writeFileSync(path.join(libDir, `${song.id}.bin`), encodeSongToBinary(song));
+    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), moduleText, "utf-8");
+    fs.writeFileSync(path.join(libDir, `${song.id}.bin`), pbe2);
 
     metas.push({
         id: song.id,
         name: song.name,
         duration: song.duration,
-        noteCount: countNotes(song),
+        noteCount: collectNoteCount(song),
     });
-    notes += countNotes(song);
-    jsBytes += songToAddonModule(song).length;
-    binBytes += encodeSongToBinary(song).length;
+    notes += collectNoteCount(song);
+    jsBytes += moduleText.length;
+    binBytes += pbe2.length;
 }
 
 // ===== 4. index.js（addon 运行时）+ index.json（生成器曲库目录） =====

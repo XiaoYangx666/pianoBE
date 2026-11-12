@@ -1,7 +1,9 @@
 import type { MidiPlayer } from "@domain/playback/player";
+import { Player, system } from "@minecraft/server";
 import { CommonForm } from "sapi-pro";
 import { QueueListForm } from "./queueUI";
 import { PlayListMainForm } from "./playListUI";
+import { MidiListForm } from "./midiList";
 
 export interface LibraryArgs {
     midiPlayer: MidiPlayer;
@@ -30,6 +32,29 @@ export const LibraryForm = CommonForm.ButtonForm<LibraryArgs>({
                 ctx.push(PlayListMainForm, {
                     midiPlayer: ctx.args.midiPlayer,
                 });
+            },
+        },
+        {
+            label: "本地导入曲库",
+            func(ctx) {
+                ctx.push(MidiListForm, {
+                    midiPlayer: ctx.args.midiPlayer,
+                    source: "imported",
+                    p: 1,
+                });
+            },
+        },
+        {
+            label: "导入 MIDI（粘贴导入码）",
+            func(ctx) {
+                const player: Player = ctx.player;
+                ctx.close();
+                system.runTimeout(() => {
+                    if (!player.isValid) return;
+                    void import("./importUI")
+                        .then((module) => module.openMidiImport(player))
+                        .catch((error) => console.warn("[midi] 打开导入界面失败", error));
+                }, 20);
             },
         },
         {

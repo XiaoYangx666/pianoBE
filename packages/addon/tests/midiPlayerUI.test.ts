@@ -143,6 +143,12 @@ mock.module("@app/midi", () => ({
         infoOf: async () => undefined,
         getInfo: () => undefined,
     },
+    importedMidiManager: {
+        page: async () => ({ items: [], total: 0 }),
+        metaAll: async () => [],
+        infoOf: async () => undefined,
+        getInfo: () => undefined,
+    },
     playlist: {
         getContent: async () => [],
         setContent: async () => {},
@@ -159,7 +165,23 @@ const SONG = { id: "sample", name: "Sample", duration: 400 };
 
 function makeMidi() {
     return new MidiPlayer(
-        { load: async () => ({ ...SONG, tracks: [] }) },
+        { acquire: async () => {
+            const { buildSeekIndex, encodePbe2, readPbe2Events } = await import("@piano/core");
+            const pbe2 = encodePbe2({
+                ...SONG,
+                tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 40, 90] }],
+            });
+            const { header, events } = readPbe2Events(pbe2);
+            return {
+                song: {
+                    id: header.id, name: header.name, duration: header.duration,
+                    noteCount: header.noteCount, header, events,
+                    index: buildSeekIndex(events, header.hasVelocity),
+                    refCount: 1, lastAccess: 0, byteSize: events.length,
+                },
+                release() {},
+            };
+        } },
         { note() {}, playing() {} }
     );
 }
@@ -262,7 +284,7 @@ describe("MIDI 播放器返回路径", () => {
         const form = lastForm();
         const library = openLibraryFromPlayer(form);
         await flush();
-        expect((library.form as any).buttons.length).toBe(3);
+        expect((library.form as any).buttons.length).toBe(5);
         expect(midi.signal.listenerCount()).toBe(0);
         expect(form.isShowing()).toBe(false);
 

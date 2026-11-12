@@ -1,6 +1,6 @@
 import { midiManager, useRemotePlaylist } from "@app/midi";
 import { getNetFetch } from "@platform/server/net";
-import { CachedRemoteSource } from "@platform/server/admin/netSource";
+import { RemoteMidiSource } from "@platform/server/admin/netSource";
 import { RemotePlaylistFacade } from "@platform/server/admin/remotePlaylist";
 import { world } from "@minecraft/server";
 import { secrets, variables } from "@minecraft/server-admin";
@@ -75,7 +75,7 @@ export async function initServerAdmin(): Promise<boolean> {
 
     console.log(`[serverAdmin] step4 切换到远程曲库: ${url}`);
     midiManager.setSource(
-        new CachedRemoteSource({
+        new RemoteMidiSource({
             baseUrl: url,
             fetch,
             extraHeaders,

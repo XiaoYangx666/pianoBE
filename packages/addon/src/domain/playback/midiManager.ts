@@ -1,24 +1,47 @@
-import type { MidiSong, MidiSongMeta, MidiSource } from "@piano/core";
+import type { MidiSongMeta } from "@piano/core";
+import { SongCache, type SongHandle } from "@piano/core";
 
 /**
- * 曲库管理器：元信息注册表（同步可查）+ 内容懒加载。
- * 元信息在构造时从来源同步填充（内嵌源）；远程源可在之后异步 refresh。
+ * 曲库管理器：
+ * - 元信息注册表（同步可查，列表/搜索不加载单曲模块）；
+ * - 主来源（内嵌 / 远程）+ 附加来源（本地导入）统一路由；
+ * - 所有来源的 PBE2 数据进入同一个 SongCache（引用计数 + LRU + 内存预算）。
  */
 export class MidiManager {
     private metas: MidiSongMeta[] = [];
     private readonly metaMap = new Map<string, MidiSongMeta>();
+    private readonly extraSources: MidiSourceLike[] = [];
+    private readonly cache: SongCache;
 
-    constructor(private source: MidiSource) {
+    constructor(private source: MidiSourceLike, maxCacheBytes?: number) {
+        this.cache = new SongCache((id) => this.load(id), { maxBytes: maxCacheBytes });
         this.refreshSync();
     }
 
-    /** 切换曲库来源（如内嵌 → 远程），并异步刷新元信息；失败保持现有列表 */
-    setSource(source: MidiSource): void {
+    /** 切换主曲库来源（如内嵌 → 远程），释放无引用的旧缓存并异步刷新元信息 */
+    setSource(source: MidiSourceLike): void {
         this.source = source;
+        this.cache.clearUnused();
         void this.refresh();
     }
 
-    /** 同步填充（内嵌源直接返回；远程源在 refresh 前为空列表） */
+    /** 注册附加来源（本地导入曲库）；元信息并入查找表，但不混入主曲库列表 */
+    addSource(source: MidiSourceLike): void {
+        if (!this.extraSources.includes(source)) this.extraSources.push(source);
+        const list = source.list();
+        if (Array.isArray(list)) this.registerAll(list, false);
+        else list.then((items) => this.registerAll(items, false)).catch(() => {});
+    }
+
+    /** 获取曲目引用（播放器按 id 获取，持有期间不会被 LRU 淘汰） */
+    acquire(id: string): Promise<SongHandle | undefined> {
+        return this.cache.acquire(id);
+    }
+
+    cacheStats() {
+        return this.cache.stats();
+    }
+
     private refreshSync() {
         const list = this.source.list();
         this.reset(Array.isArray(list) ? list : []);
@@ -35,10 +58,12 @@ export class MidiManager {
     }
 
     private reset(metas: MidiSongMeta[]) {
-        this.metas = metas;
+        this.metas = [];
         this.metaMap.clear();
-        for (const m of metas) {
-            this.metaMap.set(m.id, m);
+        this.registerAll(metas, true);
+        for (const source of this.extraSources) {
+            const list = source.list();
+            if (Array.isArray(list)) this.registerAll(list, false);
         }
     }
 
@@ -53,34 +78,57 @@ export class MidiManager {
     }
 
     /**
-     * 按需解析单曲元信息：内存已登记直接返回；未命中时经 source 拉取
-     * （远程源会请求单曲接口）并登记，供播放列表按 id 显示歌名等场景。
+     * 按需解析单曲元信息：内存已登记直接返回；未命中时经来源加载 PBE2
+     * 并读取文件头，供播放列表按 id 显示歌名等场景。
      */
     async infoOf(id: string): Promise<MidiSongMeta | undefined> {
         const known = this.getInfo(id);
         if (known) return known;
-        const song = await this.source.get(id).catch(() => undefined);
-        if (!song) return undefined;
+        const handle = await this.cache.acquire(id);
+        if (!handle) return undefined;
         const meta: MidiSongMeta = {
-            id: song.id,
-            name: song.name,
-            duration: song.duration,
+            id: handle.song.id,
+            name: handle.song.name,
+            duration: handle.song.duration,
         };
-        this.register(meta);
+        handle.release();
+        this.register(meta, false);
         return meta;
     }
 
-    /** 登记单条元信息（已存在则跳过） */
-    private register(meta: MidiSongMeta): void {
-        if (!this.metaMap.has(meta.id)) {
-            this.metas.push(meta);
-            this.metaMap.set(meta.id, meta);
+    /** 登记单条元信息（已存在则更新名称/时长；includeInList 控制是否进入主列表） */
+    private register(meta: MidiSongMeta, includeInList = false): void {
+        const current = this.metaMap.get(meta.id);
+        if (current) {
+            current.name = meta.name;
+            current.duration = meta.duration;
+            return;
         }
+        this.metaMap.set(meta.id, meta);
+        if (includeInList) this.metas.push(meta);
     }
 
-    /** 加载曲目内容（懒加载；未找到返回 undefined） */
-    async load(meta: MidiSongMeta): Promise<MidiSong | undefined> {
-        return this.source.get(meta.id);
+    private registerAll(metas: MidiSongMeta[], includeInList = false): void {
+        for (const meta of metas) this.register(meta, includeInList);
+    }
+
+    /** 加载 PBE2 数据：主来源优先，附加来源兜底（未找到返回 undefined） */
+    private async load(id: string): Promise<Uint8Array | undefined> {
+        try {
+            const primary = await this.source.get(id);
+            if (primary) return primary;
+        } catch {
+            // 主来源网络失败时继续尝试本地导入来源
+        }
+        for (const source of this.extraSources) {
+            try {
+                const data = await source.get(id);
+                if (data) return data;
+            } catch {
+                // 继续下一个来源
+            }
+        }
+        return undefined;
     }
 
     /** 根据 midiId 列表获取元信息列表，去除无法找到的 */
@@ -123,4 +171,16 @@ export class MidiManager {
             ? list.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()))
             : list;
     }
+}
+
+/** MidiSource 的最小结构（domain 层不依赖具体实现） */
+export interface MidiSourceLike {
+    list(): MidiSongMeta[] | Promise<MidiSongMeta[]>;
+    get(id: string): Promise<Uint8Array | undefined>;
+    page?(
+        page: number,
+        pageSize: number,
+        q?: string
+    ): Promise<{ items: MidiSongMeta[]; total: number }>;
+    metaAll?(q?: string): Promise<MidiSongMeta[]>;
 }

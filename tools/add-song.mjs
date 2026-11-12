@@ -8,7 +8,12 @@
 // 防重复: id = crc32(midi 内容)，内容相同自动幂等；同名不同内容会警告。
 import fs from "node:fs";
 import path from "node:path";
-import { countNotes, encodeSongToBinary, metasToAddonIndex, songToAddonModule } from "@piano/core";
+import {
+    collectNoteCount,
+    encodePbe2,
+    metasToAddonIndex,
+    pbe2ToAddonModule,
+} from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 
 const libDir = path.resolve("./midis/library");
@@ -58,7 +63,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         new Uint8Array(fs.readFileSync(file)),
         path.basename(file).replace(/\.midi?$/i, "")
     );
-    const entry = { id: song.id, name: song.name, duration: song.duration, noteCount: countNotes(song) };
+    const entry = { id: song.id, name: song.name, duration: song.duration, noteCount: collectNoteCount(song) };
     const pos = index.findIndex((m) => m.id === song.id);
     let status;
     const sameName = index.some((m) => m.name === song.name && m.id !== song.id);
@@ -79,8 +84,9 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         status = "新增";
         added++;
     }
-    fs.writeFileSync(path.join(libDir, `${song.id}.bin`), encodeSongToBinary(song));
-    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), songToAddonModule(song), "utf-8");
+    const pbe2 = encodePbe2(song);
+    fs.writeFileSync(path.join(libDir, `${song.id}.bin`), pbe2);
+    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), pbe2ToAddonModule(pbe2), "utf-8");
     console.log(`  [${status}] ${song.name} (${song.id})`);
 }
 

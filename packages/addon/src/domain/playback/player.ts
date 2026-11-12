@@ -1,7 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { packNotes } from "@piano/core";
-import type { MidiSong, MidiSongMeta } from "@piano/core";
+import { EventCursor, OTHER_SCALE, TIME_SCALE, type MidiSongMeta, type SongHandle } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -13,13 +12,15 @@ interface MidiOutput {
     playing(value: boolean): void;
 }
 
+/** 播放器只需要“按 id 获取共享曲目引用”，缓存策略由 SongCache 统一负责。 */
 export interface MidiLoader {
-    load(info: MidiSongMeta): Promise<MidiSong | undefined>;
+    acquire(id: string): Promise<SongHandle | undefined>;
 }
 
 export class MidiPlayer {
-    private tracks: Uint16Array[] = [];
-    private indices: number[] = [];
+    /** 当前曲目引用（持有期间 SongCache 不会淘汰事件流） */
+    private song?: SongHandle;
+    private cursor?: EventCursor;
     private totalNotes = 0;
     private currentTime = 0;
 
@@ -44,7 +45,7 @@ export class MidiPlayer {
     /* ================== 工具 ================== */
 
     private hasContent() {
-        return this.tracks.length > 0;
+        return this.cursor !== undefined;
     }
 
     checkpoint(): PlaybackRecord | undefined {
@@ -122,26 +123,16 @@ export class MidiPlayer {
     /**
      * 快进/回退：跳转到指定秒数（0 ≤ t ≤ 曲目时长），从该位置继续。
      * 不改变播放/暂停状态；idle/stopped 时恢复为播放。
-     * 打包音符时间单位 = 1/40 秒（processPlayback 中 currentTime*40 对照）。
+     * 使用共享稀疏索引定位，再在索引间隔内顺序解码。
      */
     seek(positionSec: number) {
-        if (!this.hasContent()) return;
+        if (!this.cursor || !this.song) return;
 
-        const meta = this.queue.current();
-        // duration 为内部 tick 单位（TIME_SCALE=40，40 tick = 1 秒）
-        const durationSec = (meta?.duration ?? 0) / 40;
+        const durationSec = this.song.song.duration / TIME_SCALE;
         const target = Math.max(0, Math.min(positionSec, durationSec || positionSec));
 
         this.currentTime = target;
-        const targetTicks = target * 40;
-
-        // 各轨道跳到第一条 time ≥ 目标刻的音符（略过的音符不再播放）
-        for (let t = 0; t < this.tracks.length; t++) {
-            const arr = this.tracks[t];
-            let idx = 0;
-            while (idx + 1 < arr.length && arr[idx + 1] < targetTicks) idx += 4;
-            this.indices[t] = idx;
-        }
+        this.cursor.seek(target * TIME_SCALE);
 
         if (this.state === "idle" || this.state === "stopped") {
             this.state = "playing";
@@ -156,8 +147,7 @@ export class MidiPlayer {
         this.generation++;
         this.state = "stopped";
         this.output.playing(false);
-        this.tracks = [];
-        this.indices = [];
+        this.releaseSong();
         this.currentTime = 0;
         this.isLoading = false;
         this.queue.clear();
@@ -205,12 +195,7 @@ export class MidiPlayer {
     /* ================== 内部逻辑 ================== */
 
     private isAllTracksFinished(): boolean {
-        for (let i = 0; i < this.tracks.length; i++) {
-            if (this.indices[i] < this.tracks[i].length) {
-                return false;
-            }
-        }
-        return true;
+        return !this.cursor || this.cursor.done;
     }
 
     private async prepareNext() {
@@ -219,9 +204,8 @@ export class MidiPlayer {
         this.isLoading = true;
         const generation = ++this.generation;
 
-        // ✅ 清空当前数据
-        this.tracks = [];
-        this.indices = [];
+        // 释放当前曲目引用，再从队列取下一首
+        this.releaseSong();
         this.totalNotes = 0;
 
         const limit = this.queue.getLength();
@@ -245,85 +229,51 @@ export class MidiPlayer {
     }
 
     private processPlayback() {
-        const tracks = this.tracks;
-        const indices = this.indices;
-        const currentTime = this.currentTime * 40;
+        const cursor = this.cursor;
+        if (!cursor) return;
+        const ticks = this.currentTime * TIME_SCALE;
 
         while (true) {
-            let minTime = Infinity;
-            let minTrack = -1;
-
-            for (let t = 0; t < tracks.length; t++) {
-                const idx = indices[t];
-                const arr = tracks[t];
-
-                if (idx >= arr.length) continue;
-
-                const time = arr[idx + 1];
-
-                if (time < minTime) {
-                    minTime = time;
-                    minTrack = t;
-                }
-            }
-
-            if (minTrack === -1) break;
-
-            if (minTime > currentTime) break;
-
-            const arr = tracks[minTrack];
-            const i = indices[minTrack];
-
-            const midi = arr[i];
-
-            // duration 只在用的时候除
-            const duration = arr[i + 2] / 100;
-
-            const info = processNote(midi, false);
-
-            this.playNote(info, duration);
-
-            indices[minTrack] += 4;
+            const time = cursor.peekTime();
+            if (time > ticks || time === Infinity) break;
+            const note = cursor.next();
+            if (!note) break;
+            this.playNote(processNote(note.midi, false), note.duration / OTHER_SCALE);
         }
     }
 
     private async loadMidi(info: MidiSongMeta, generation: number) {
         try {
-            const midi = await this.loader.load(info);
-            if (generation !== this.generation) return;
-            if (!midi) throw new Error(`曲目内容不存在: ${info.id}`);
+            const song = await this.loader.acquire(info.id);
+            if (generation !== this.generation) {
+                song?.release();
+                return;
+            }
+            if (!song) throw new Error(`曲目内容不存在: ${info.id}`);
 
-            this.tracks = this.extractTracks(midi);
-
-            // 初始化每个轨道 idx
-            this.indices = new Array(this.tracks.length).fill(0);
-
-            // 总 note 数（用于 UI）
-            this.totalNotes = this.tracks.reduce(
-                (sum, t) => sum + t.length / 4,
-                0
+            this.releaseSong();
+            this.song = song;
+            this.cursor = new EventCursor(
+                song.song.events,
+                song.song.index,
+                song.song.header.hasVelocity
             );
+            this.totalNotes = song.song.noteCount;
         } catch (e) {
             if (generation !== this.generation) return;
             console.error(`加载 MIDI 失败: ${info.name}`, e);
-            this.tracks = [];
-            this.indices = [];
+            this.releaseSong();
             this.totalNotes = 0;
         }
 
         this.currentTime = 0;
     }
 
-    private extractTracks(midi: MidiSong): Uint16Array[] {
-        const result: Uint16Array[] = [];
-
-        for (const track of midi.tracks) {
-            if (track.notes && track.notes.length > 0) {
-                result.push(packNotes(track.notes));
-            }
-        }
-
-        return result;
+    private releaseSong() {
+        this.cursor = undefined;
+        const song = this.song;
+        this.song = undefined;
+        song?.release();
     }
 
     private playNote(info: NoteInfo, duration: number) {
@@ -347,15 +297,14 @@ export class MidiPlayer {
     }
 
     getInfo() {
-        const currentNoteIndex =
-            this.indices.reduce((sum, i) => sum + i, 0) / 4;
+        const currentNoteIndex = this.cursor?.noteIndex ?? 0;
 
-        const durationMs = (this.queue.current()?.duration ?? 0) * 25; // 1 tick = 25ms（40 tick/s）
+        const durationMs = (this.song?.song.duration ?? this.queue.current()?.duration ?? 0) * 25;
         const durationSec = durationMs / 1000;
 
         return {
             state: this.state,
-            midiName: this.queue.current()?.name ?? "unknown",
+            midiName: this.queue.current()?.name ?? this.song?.song.name ?? "unknown",
 
             totalNotes: this.totalNotes,
 
@@ -369,7 +318,7 @@ export class MidiPlayer {
 
             currentTime: this.currentTime,
 
-            /** 曲目总时长（ms；meta.duration 为内部 tick，1 tick = 25ms） */
+            /** 曲目总时长（ms；内部 tick 1/40 秒，1 tick = 25ms） */
             durationMs,
 
             queueIndex: this.queue.getIndex(),

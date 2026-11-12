@@ -24,6 +24,10 @@
         "./note": {
             "types": "./dist/midi/note.d.ts",
             "import": "./dist/midi/note.js"
+        },
+        "./pbe2": {
+            "types": "./dist/pbe2/index.d.ts",
+            "import": "./dist/pbe2/index.js"
         }
     },
     "files": [
@@ -34,7 +38,8 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@tonejs/midi": "^2.0.28"
+        "@tonejs/midi": "^2.0.28",
+        "fflate": "^0.8.2"
     },
     "devDependencies": {
         "@types/node": "^26.2.0",

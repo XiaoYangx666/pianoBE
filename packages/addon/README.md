@@ -15,7 +15,7 @@
 | 来源 | 启用条件 | 说明 |
 |---|---|---|
 | 内嵌曲库 | 默认（所有环境） | 构建时打入包的 `scripts/midis/`，懒加载播放 |
-| 远程曲库 | BDS 专用服务器 + 配置文件 | 经 `@minecraft/server-admin` 读配置、`@minecraft/server-net` 从后端拉取曲目 JSON |
+| 远程曲库 | BDS 专用服务器 + 配置文件 | 经 `@minecraft/server-admin` 读配置、`@minecraft/server-net` 从后端拉取 PBE2 曲目 |
 
 两个模块均为**动态导入 + try/catch 探测**（`manifest` 不声明依赖）：
 - 客户端/普通世界 → import 失败 → 静默使用内嵌曲库，不受影响
@@ -36,7 +36,8 @@ config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
 ### 远程模式行为
 
 - 曲目列表：每次打开**现拉**（`GET /api/songs` 分页取全），游戏内不持久化完整列表，后端新上传的曲目即时可见
-- 单曲：播放时按 id 拉取 `GET /api/songs/:id`，**仅内存 LRU 缓存最近 10 首**（不落动态属性/存档，重启即空），已缓存歌曲断网可播
+- 单曲：播放时按 id 拉取 `GET /api/songs/:id`，后端返回 **PBE2（Base64URL）**；缓存与淘汰统一由 `SongCache` 负责（不再有来源私有的 LRU）
+- 已加载曲目在引用期间断网仍可播放；无活跃引用时按内存预算 LRU 淘汰，下次播放重新拉取
 - 后端 API 鉴权与部署见 `packages/server/README.md`（Hono + bun:sqlite + Docker）
 
 ### 故障排查（BDS 控制台日志）
@@ -64,6 +65,13 @@ server 构建会在控制台输出逐步诊断（不打印令牌）：
 | `step3 未读取到 secrets 令牌` | `secrets.json` 缺失或键名不对（`pianoBackendToken` 需含完整 `Bearer ` 前缀） |
 | `[netSource] ... 拉取失败: ... 网络/超时/连接被拒` | 后端不可达：确认 URL 端口、BDS 与后端网络互通（容器内 BDS 需用宿主 IP） |
 | `响应状态: 401/403` | 令牌错误或后端 `ALLOW_PUBLIC_READ=false` 下未带有效令牌 |
+
+## 游戏内 MIDI 导入
+
+- 入口：钢琴面板「导入 MIDI」或播放器「歌单 → 导入 MIDI」。
+- 生成器曲目条目上的「码」按钮把 PBE2 切成 ≤4800 字符的分段；在游戏内逐段粘贴即可，支持乱序、去重、断点续传。
+- 提交时重新校验权限、频率、PBE2 完整性（版本/CRC32/解压长度/音符数/时长）和世界容量；数据以分片 + 提交索引写入世界动态属性，中断不会留下半成品曲目。
+- 管理员设置：`/pbe:pbe_setting`（SAPI-Pro ConfigForm）。`allowPlayerImport` 默认 `false`；关闭后普通玩家不能创建或提交导入任务，已导入曲目仍可播放。
 
 ## 开发
 

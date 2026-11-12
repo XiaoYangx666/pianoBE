@@ -87,6 +87,7 @@ export interface PianoUIActions {
     openSettings(): void;
     openScores(): void;
     openShortcuts(): void;
+    openImport(): void;
 }
 
 export function createPianoUI(
@@ -136,6 +137,7 @@ export function createPianoUI(
         .button("钢琴设置", () => actions.openSettings(), options)
         .button("曲谱配置", () => actions.openScores(), options)
         .button("快捷键设置", () => actions.openShortcuts(), options)
+        .button("导入 MIDI", () => actions.openImport(), options)
         .toggle("简洁模式", state.compact);
 
     return form;

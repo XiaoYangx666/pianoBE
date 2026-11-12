@@ -1,4 +1,4 @@
-import type { MidiSong, MidiSongMeta, MidiSource } from "@piano/core";
+import { decodeBase64Url, type MidiSongMeta } from "@piano/core";
 import type { HttpRequestMethod } from "@platform/server/net/httpMethod";
 
 /** 网络响应（适配 server-net HttpResponse / 测试 mock） */
@@ -30,20 +30,24 @@ export interface RemoteSourceOptions {
     extraHeaders?: () => Record<string, unknown>;
 }
 
-/** 内存单曲缓存上限（LRU，超出淘汰最久未使用） */
-const MAX_SONG_CACHE = 10;
+/** 后端单曲 PBE2 响应 */
+interface RemoteSongPayload {
+    id?: string;
+    name?: string;
+    duration?: number;
+    /** Base64URL(PBE2) */
+    data?: string;
+}
 
 /**
- * 远程曲库来源：通过 server-net 从后端 API 拉取曲目。
+ * 远程曲库来源：通过 server-net 从后端 API 拉取 PBE2 曲目。
  * - 列表 UI：page() 服务端分页按需取页（q 走服务端搜索），不下载全量
  * - 批量操作（一键添加）：metaAll(q) 分页取全
- * - 单曲/歌名：get() 按需拉取（内存 LRU 缓存最近 10 首），播放列表歌名经此解析
+ * - 单曲：get() 每次返回 PBE2 数据；缓存与淘汰统一由 SongCache 负责
  * - list()：远程源不提供全量列表，返回空数组
  * - 网络错误：列表返回空数组并告警；单曲返回 undefined
  */
-export class CachedRemoteSource implements MidiSource {
-    /** 迭代序 = 最近使用序（get 命中会移到末尾） */
-    private readonly songCache = new Map<string, MidiSong>();
+export class RemoteMidiSource {
     private readonly opts: RemoteSourceOptions;
 
     constructor(options: RemoteSourceOptions) {
@@ -104,41 +108,22 @@ export class CachedRemoteSource implements MidiSource {
         return all;
     }
 
-    async get(id: string): Promise<MidiSong | undefined> {
-        // 内存 LRU 命中：移到队尾（标记为最近使用）
-        const mem = this.songCache.get(id);
-        if (mem) {
-            this.songCache.delete(id);
-            this.songCache.set(id, mem);
-            return mem;
-        }
-
+    /** 获取 PBE2 数据；远程源不做单曲缓存，交给统一 SongCache */
+    async get(id: string): Promise<Uint8Array | undefined> {
         try {
             const url = this.base(`/api/songs/${encodeURIComponent(id)}`);
             console.log(`[netSource] 拉取单曲: GET ${url}`);
             const res = await this.opts.fetch(url, { headers: this.headers() });
             console.log(`[netSource] 单曲 ${id} 响应状态: ${res.status}`);
             if (res.status !== 200) return undefined;
-            const song = (await res.json()) as MidiSong;
-            this.cacheSong(id, song);
-            console.log(`[netSource] 单曲 ${id} 拉取成功（${song.name}）`);
-            return song;
+            const payload = (await res.json()) as RemoteSongPayload;
+            if (!payload.data) return undefined;
+            const bytes = decodeBase64Url(payload.data);
+            console.log(`[netSource] 单曲 ${id} 拉取成功（${payload.name ?? ""}，${bytes.length}B）`);
+            return bytes;
         } catch (e) {
             console.warn(`[netSource] 单曲 ${id} 拉取失败: ${(e as Error)?.message ?? e}`);
             return undefined;
-        }
-    }
-
-    /** 写入内存缓存；超过上限淘汰最久未使用的一首 */
-    private cacheSong(id: string, song: MidiSong): void {
-        this.songCache.delete(id);
-        this.songCache.set(id, song);
-        if (this.songCache.size > MAX_SONG_CACHE) {
-            const oldest = this.songCache.keys().next().value as string | undefined;
-            if (oldest !== undefined) {
-                this.songCache.delete(oldest);
-                console.log(`[netSource] 单曲缓存达上限 ${MAX_SONG_CACHE} 首，淘汰 ${oldest}`);
-            }
         }
     }
 }

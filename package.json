@@ -7,10 +7,10 @@
         "packages/*"
     ],
     "overrides": {
-        "@minecraft/server": "2.10.0-beta.1.26.44-stable",
-        "@minecraft/server-ui": "2.2.0-beta.1.26.44-stable",
-        "@minecraft/server-net": "1.0.0-beta.1.26.44-stable",
-        "@minecraft/server-admin": "1.0.0-beta.1.26.44-stable"
+        "@minecraft/server": "2.10.0",
+        "@minecraft/server-ui": "2.2.0",
+        "@minecraft/server-net": "1.0.0-beta.1.26.50-stable",
+        "@minecraft/server-admin": "1.0.0-beta.1.26.50-stable"
     },
     "scripts": {
         "pack": "npm run pack -w @piano/addon",
@@ -24,6 +24,8 @@
         "add-song": "node tools/add-song.mjs",
         "show-song": "node tools/show-song.mjs",
         "import:midis": "node tools/import-midis.mjs",
+        "migrate:library": "node tools/migrate-legacy-library.mjs",
+        "bench:pbe2": "node tools/bench-pbe2.mjs",
         "build:core": "npm run build -w @piano/core",
         "build:ci": "npm run build:core && npm run build:template && npm run build:generator",
         "build:all": "npm run build:core && npm run build:template && npm run build:generator && npm run build:web && npm run build:server && npm run build && node tools/verify-addon-build.mjs client",
@@ -42,6 +44,8 @@
         "vendor:tabletop": "node tools/pack-tabletop.mjs"
     },
     "devDependencies": {
+        "@minecraft/server": "2.10.0",
+        "@minecraft/server-ui": "2.2.0",
         "typescript": "^5.5.0"
     },
     "allowScripts": {

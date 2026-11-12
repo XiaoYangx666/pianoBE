@@ -1,12 +1,44 @@
 import { expect, mock, test } from "bun:test";
+import {
+    buildSeekIndex,
+    encodePbe2,
+    readPbe2Events,
+    type MidiSongMeta,
+    type SongHandle,
+} from "@piano/core";
 import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
 
 const song = { id: "sample", name: "Sample", duration: 400 };
-let loadSong = async () => ({
-    ...song,
-    tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 15, 90, 62, 80, 15, 90, 64, 240, 15, 90] }],
-});
-const loader = { load: () => loadSong() };
+
+function handleFor(info: MidiSongMeta): SongHandle {
+    const pbe2 = encodePbe2({
+        id: info.id,
+        name: info.name,
+        duration: info.duration,
+        tracks: [{
+            instrument: { family: "", number: 0, name: "" },
+            notes: [60, 0, 15, 90, 62, 80, 15, 90, 64, 240, 15, 90],
+        }],
+    });
+    const { header, events } = readPbe2Events(pbe2);
+    return {
+        song: {
+            id: header.id,
+            name: header.name,
+            duration: header.duration,
+            noteCount: header.noteCount,
+            header,
+            events,
+            index: buildSeekIndex(events, header.hasVelocity),
+            refCount: 1,
+            lastAccess: 0,
+            byteSize: events.length,
+        },
+        release() {},
+    };
+}
+
+const loader = { acquire: async (info: MidiSongMeta) => handleFor(info) };
 const { MidiPlayer } = await import("../src/domain/playback/player");
 
 const record = readPlaybackRecord(JSON.stringify({

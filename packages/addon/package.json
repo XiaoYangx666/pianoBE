@@ -17,13 +17,13 @@
     },
     "dependencies": {
         "@begame/tabletop": "file:../../vendor/begame-tabletop-0.1.16.tgz",
-        "@minecraft/server": "2.10.0-beta.1.26.44-stable",
-        "@minecraft/server-admin": "1.0.0-beta.1.26.44-stable",
-        "@minecraft/server-net": "1.0.0-beta.1.26.44-stable",
-        "@minecraft/server-ui": "2.2.0-beta.1.26.44-stable",
-        "@minecraft/vanilla-data": "1.26.44",
+        "@minecraft/server": "2.10.0",
+        "@minecraft/server-admin": "1.0.0-beta.1.26.50-stable",
+        "@minecraft/server-net": "1.0.0-beta.1.26.50-stable",
+        "@minecraft/server-ui": "2.2.0",
+        "@minecraft/vanilla-data": "1.26.50",
         "@piano/core": "file:../core",
-        "sapi-pro": "^0.4.1"
+        "sapi-pro": "0.4.3-stable"
     },
     "devDependencies": {
         "@bepack/cli": "^0.1.0-beta.9"
