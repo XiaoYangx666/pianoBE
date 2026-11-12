@@ -36,6 +36,10 @@ class FakeObservable<T> {
         this.subscribers.add(callback);
         return () => this.subscribers.delete(callback);
     }
+
+    unsubscribe(callback: (value: T) => void) {
+        return this.subscribers.delete(callback);
+    }
 }
 
 type ButtonHandler = () => void;
@@ -159,7 +163,7 @@ mock.module(path.join(midiDir, "playListUI.ts"), () => ({
     PlayListMainForm: { name: "PlayListMainForm" },
 }));
 
-const { openMidiPlayer, midiUIManager } = await import("../src/app/ui/midi/playerUIManager");
+const { openMidiPlayer } = await import("../src/app/ui/midi/playerUIManager");
 
 const SONG = { id: "sample", name: "Sample", duration: 400 };
 
@@ -231,8 +235,10 @@ function observableWrites() {
     return FakeObservable.all.reduce((total, observable) => total + observable.writes, 0);
 }
 
-beforeEach(() => {
-    midiUIManager.clear();
+beforeEach(async () => {
+    // 每个用例结束后关闭遗留表单，让 openMidiPlayer 的 finally 清理活动标记。
+    for (const form of FakeCustomForm.forms) form.close();
+    await flush();
     FakeCustomForm.forms.length = 0;
     FakeObservable.all.length = 0;
     openedForms.length = 0;
@@ -264,7 +270,9 @@ describe("MIDI 播放器返回路径", () => {
         backFromSongPicker(queue);
         await flush();
 
-        expect(form.isShowing()).toBe(true);
+        const reopened = lastForm();
+        expect(reopened).not.toBe(form);
+        expect(reopened.isShowing()).toBe(true);
         expect(midi.signal.listenerCount()).toBe(1);
 
         const before = observableWrites();
@@ -294,7 +302,9 @@ describe("MIDI 播放器返回路径", () => {
         });
         await flush();
 
-        expect(form.isShowing()).toBe(true);
+        const reopened = lastForm();
+        expect(reopened).not.toBe(form);
+        expect(reopened.isShowing()).toBe(true);
         expect(midi.signal.listenerCount()).toBe(1);
     });
 
@@ -340,9 +350,10 @@ describe("MIDI 播放器返回路径", () => {
 
         void openMidiPlayer(player, block);
         await flush();
-        const form = lastForm();
 
+        let form = lastForm();
         for (let i = 0; i < 3; i++) {
+            const previous = form;
             const queue = openSongPickerFromPlayer(form);
             await flush();
             expect(midi.signal.listenerCount()).toBe(0);
@@ -350,6 +361,8 @@ describe("MIDI 播放器返回路径", () => {
             backFromSongPicker(queue);
             await flush();
             expect(midi.signal.listenerCount()).toBe(1);
+            form = lastForm();
+            expect(form).not.toBe(previous);
             expect(form.isShowing()).toBe(true);
         }
     });
@@ -364,7 +377,8 @@ describe("MIDI 播放器返回路径", () => {
         await flush();
         expect(midi.signal.listenerCount()).toBe(1);
 
-        midiUIManager.invalidate(player.id);
+        lastForm().close();
+        await flush();
         expect(midi.signal.listenerCount()).toBe(0);
     });
 
@@ -408,7 +422,9 @@ describe("MIDI 播放器返回路径", () => {
         backFromSongPicker(queue);
         await flush();
 
-        expect(form.isShowing()).toBe(true);
+        const reopened = lastForm();
+        expect(reopened).not.toBe(form);
+        expect(reopened.isShowing()).toBe(true);
         expect(oldMidi.signal.listenerCount()).toBe(0);
         expect(newMidi.signal.listenerCount()).toBe(1);
 
@@ -435,6 +451,7 @@ describe("MIDI 播放器返回路径", () => {
 
         expect(form.isShowing()).toBe(false);
         expect(midi.signal.listenerCount()).toBe(0);
+        expect(FakeCustomForm.forms.length).toBe(1);
     });
 
     test("重复打开不会产生重复订阅", async () => {

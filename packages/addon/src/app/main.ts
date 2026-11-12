@@ -1,10 +1,6 @@
 import { blockPlacerComponent } from "@app/components/blockPlacer";
 import { PianoBlockComponent, regEvents } from "@app/components/pianoBlock";
-import { midiUIManager } from "@app/ui/midi/playerUIManager";
-import { pianoManager } from "@app/ui/piano";
-import { pianoScoreManager } from "@app/ui/scoreUI";
-import { midiImportManager } from "@app/ui/midi/importUI";
-import { pianoSettingsManager } from "@app/ui/settingsUI";
+import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
@@ -36,15 +32,9 @@ system.run(() => {
     }
 });
 
-// 玩家离开后旧 DDUI 表单的客户端写权限立即失效。
-// 及时丢弃实例（并解绑 MIDI 信号订阅），重进时由 DDUIManager 重建表单，
-// 避免复用失效表单调按钮时报 "does not have access"。
+// 玩家离开时清空 MIDI 导入进度；其它表单实例会随各自 show() 结束自动释放。
 world.afterEvents.playerLeave.subscribe((e) => {
-    pianoManager.invalidate(e.playerId);
-    midiUIManager.invalidate(e.playerId);
-    pianoSettingsManager.invalidate(e.playerId);
-    pianoScoreManager.invalidate(e.playerId);
-    midiImportManager.invalidate(e.playerId);
+    invalidateMidiImport(e.playerId);
 });
 
 // 启动标记：确认行为包脚本已加载及其构建目标（模板包=client / 服务器专用包=server）

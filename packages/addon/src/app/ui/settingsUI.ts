@@ -1,6 +1,5 @@
 import { Player, system } from "@minecraft/server";
 import { CustomForm, DataDrivenScreenClosedReason, ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui";
-import { DDUIManager } from "@app/ui/ddui";
 import { AVAILABLE_PIANO_TIMBRES, DEFAULT_PIANO_SETTINGS, normalizePianoColor, normalizePianoSettings, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, type PianoSettings } from "@domain/piano/settings";
 import { soundLayerAt, soundLayerIndexOf, soundTypes } from "@domain/piano/soundTypes";
 import type { PianoRuntime } from "@app/PianoRuntime";
@@ -8,6 +7,8 @@ import type { PianoRuntime } from "@app/PianoRuntime";
 class PianoSettingsForm {
     private readonly form: CustomForm;
     private readonly syncFields: Array<(settings: PianoSettings) => void> = [];
+    /** Observable 订阅；关闭表单时显式解绑，避免回调闭包拖住设置表单。 */
+    private readonly cleanups: Array<() => void> = [];
     private readonly hasScreen = new ObservableBoolean(true);
     private target?: { piano: PianoRuntime; displayId: string };
     private unsubscribe?: () => void;
@@ -47,11 +48,13 @@ class PianoSettingsForm {
             AVAILABLE_PIANO_TIMBRES.map(({ label, value, description }) => ({ label, value, description })));
         const soundLayer = new ObservableNumber(soundLayerIndexOf(DEFAULT_PIANO_SETTINGS.soundLayer), writable);
         this.syncFields.push(settings => soundLayer.setData(soundLayerIndexOf(settings.soundLayer)));
-        soundLayer.subscribe(index => {
+        const onSoundLayer = (index: number) => {
             if (this.syncing || !this.target) return;
             const layer = soundLayerAt(index);
             if (layer) this.apply({ soundLayer: layer });
-        });
+        };
+        soundLayer.subscribe(onSoundLayer);
+        this.cleanups.push(() => soundLayer.unsubscribe(onSoundLayer));
         this.form.dropdown("手动弹奏音长", soundLayer,
             soundTypes.map(({ name }, value) => ({ label: name, value })));
         this.form.divider({ visible: this.hasScreen });
@@ -76,14 +79,17 @@ class PianoSettingsForm {
 
     private bind<K extends keyof PianoSettings>(key: K, value: {
         setData(value: PianoSettings[K]): void;
-        subscribe(callback: (value: PianoSettings[K]) => void): unknown;
+        subscribe(callback: (value: PianoSettings[K]) => void): (value: PianoSettings[K]) => void;
+        unsubscribe(callback: (value: PianoSettings[K]) => void): boolean;
     }, parse: (value: PianoSettings[K]) => PianoSettings[K] | undefined = value => value) {
         this.syncFields.push(settings => value.setData(settings[key]));
-        value.subscribe(input => {
+        const callback = (input: PianoSettings[K]) => {
             if (this.syncing || !this.target) return;
             const parsed = parse(input);
             if (parsed !== undefined) this.apply({ [key]: parsed });
-        });
+        };
+        value.subscribe(callback);
+        this.cleanups.push(() => value.unsubscribe(callback));
     }
 
     private sync(settings: PianoSettings) {
@@ -144,24 +150,34 @@ class PianoSettingsForm {
         this.target = undefined;
         this.unsubscribe?.();
         this.unsubscribe = undefined;
+        for (const cleanup of this.cleanups.splice(0)) {
+            try {
+                cleanup();
+            } catch {
+                // Observable 可能已随旧会话失效
+            }
+        }
+        this.syncFields.length = 0;
         if (target) target.piano.flushSettings(target.displayId);
         if (this.player.isValid && this.form.isShowing()) this.form.close();
     }
 }
 
-class PianoSettingsManager extends DDUIManager<PianoSettingsForm> {
-    protected create(player: Player) { return new PianoSettingsForm(player); }
-    protected discard(form: PianoSettingsForm) { form.close(); }
-}
-
-export const pianoSettingsManager = new PianoSettingsManager();
+/** 同一玩家同时只允许一个设置表单；关闭后实例直接丢弃。 */
+const activePlayers = new Set<string>();
 
 export async function openPianoSettings(player: Player, piano: PianoRuntime) {
-    if (!player.isValid) return;
+    if (!player.isValid || activePlayers.has(player.id)) return;
+
+    activePlayers.add(player.id);
+    const form = new PianoSettingsForm(player);
     try {
-        await pianoSettingsManager.get(player).show(piano);
+        await form.show(piano);
     } catch (error) {
         console.warn("[piano] 打开钢琴设置失败", error);
         if (player.isValid) player.sendMessage("§e无法打开钢琴设置。");
+    } finally {
+        activePlayers.delete(player.id);
+        form.close();
     }
 }

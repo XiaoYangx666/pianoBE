@@ -48,6 +48,8 @@ export class PianoRuntime {
     readonly right: Vector3;
     readonly hitModel;
     readonly disposedSignal = new Signal<void>();
+    /** 每次真正发声时发布；per-piano 键位视图用它聚合所有来源的按键。 */
+    readonly noteSignal = new Signal<{ midi: number; duration: number }>();
     private display?: PianoDisplay;
     private score?: Entity;
     private readonly scope: PianoScope;
@@ -227,6 +229,7 @@ export class PianoRuntime {
         const volume = 2 * settings.volume / 100;
         if (volume > 0) dimension.playSound(`${pianoSoundId(settings.timbre, layer)}.${note.sample}`, this.center, { pitch: note.pitch, volume });
         this.display?.strike(note.midi, duration);
+        this.noteSignal.publish({ midi: note.midi, duration });
         this.activate();
         if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);
     }
@@ -296,6 +299,7 @@ export class PianoRuntime {
         this.removeVisualOnDispose = removeVisual;
         this.disposedSignal.publish();
         this.disposedSignal.dispose();
+        this.noteSignal.dispose();
         if (!removeVisual) {
             try {
                 this.checkpoint();

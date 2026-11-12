@@ -3,6 +3,7 @@ import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/serv
 import { SCORE_RESOURCE_PACK_ID } from "@data/scorePack";
 import { AVAILABLE_SCORES, scoreAt } from "@domain/score/score";
 import { NoteInfo } from "@domain/types";
+import { processNote } from "@domain/util/note";
 import { soundTypes, FOLLOW_PIANO_LAYER } from "@domain/piano/soundTypes";
 import { keyMaps } from "@domain/piano/keymap";
 import { PIANO_LAYOUT } from "@domain/piano/layout";
@@ -113,7 +114,7 @@ export function createPianoUI(
             ui.keyMapLabel,
             () => {
                 switchKeyMap(state, p);
-                updatePianoUI(state, ui, []);
+                updatePianoUI(state, ui);
             },
             options
         )
@@ -121,7 +122,7 @@ export function createPianoUI(
             ui.modeLabel,
             () => {
                 switchComMode(state, p);
-                updatePianoUI(state, ui, []);
+                updatePianoUI(state, ui);
             },
             options
         )
@@ -129,7 +130,7 @@ export function createPianoUI(
             ui.soundLabel,
             () => {
                 switchSoundType(state, p);
-                updatePianoUI(state, ui, []);
+                updatePianoUI(state, ui);
             },
             options
         )
@@ -153,13 +154,10 @@ const emptyInfo: NoteInfo = {
 export function updatePianoUI(
     state: PianoState,
     ui: PianoUIRefs,
-    keys: string[],
     last?: NoteInfo
 ) {
     if (!state.controlsVisible.getData()) return;
 
-    const isHigh = state.octave.getData();
-    const baseColor = isHigh ? "§b" : "§7";
     const keyMap = keyMaps[state.keyMap.getData()].value;
 
     const info = last ?? emptyInfo;
@@ -192,12 +190,28 @@ export function updatePianoUI(
         );
     }
 
+    // 键位行来自 per-piano active keys，由会话用当前 keyMap/octave 渲染。
+    ui.renderRows?.();
+}
+
+/** 用一架钢琴的 active MIDI notes 渲染当前玩家视角的键位行。 */
+export function updatePianoRows(
+    state: PianoState,
+    ui: PianoUIRefs,
+    activeNotes: ReadonlySet<number>
+) {
+    const isHigh = state.octave.getData();
+    const baseColor = isHigh ? "§b" : "§7";
+    const keyMap = keyMaps[state.keyMap.getData()].value;
+
     PIANO_LAYOUT.forEach((row, i) => {
         let rowStr = "  ";
         for (const k of row) {
-            const bound = keyMap[k] !== undefined;
-            if (keys.includes(k)) {
-                rowStr += bound ? ` §a§l${k}§r ` : ` §8§l${k}§r `;
+            const key = keyMap[k];
+            const bound = key !== undefined;
+            const active = key !== undefined && activeNotes.has(processNote(key, isHigh).midi);
+            if (active) {
+                rowStr += ` §a§l${k}§r `;
             } else {
                 rowStr += bound
                     ? ` ${baseColor}${k}§r `

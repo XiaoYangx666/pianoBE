@@ -24,4 +24,6 @@ export interface PianoUIRefs {
     keyMapLabel: ObservableString;
     modeLabel: ObservableString;
     soundLabel: ObservableString;
+    /** 使用 per-piano active keys + 当前玩家的 keyMap/octave 重绘键位行。 */
+    renderRows?: () => void;
 }

@@ -1,6 +1,5 @@
 import { Player, system } from "@minecraft/server";
 import { CustomForm, DataDrivenScreenClosedReason, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
-import { DDUIManager } from "@app/ui/ddui";
 import { normalizePianoSettings, type PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreAt, scoreIndexOf, type PianoScore } from "@domain/score/score";
 import type { PianoRuntime } from "@app/PianoRuntime";
@@ -190,19 +189,21 @@ class PianoScoreForm {
     }
 }
 
-class PianoScoreManager extends DDUIManager<PianoScoreForm> {
-    protected create(player: Player) { return new PianoScoreForm(player); }
-    protected discard(form: PianoScoreForm) { form.close(); }
-}
-
-export const pianoScoreManager = new PianoScoreManager();
+/** 同一玩家同时只允许一个曲谱配置表单；关闭后实例直接丢弃。 */
+const activePlayers = new Set<string>();
 
 export async function openScoreConfig(player: Player, piano: PianoRuntime) {
-    if (!player.isValid) return;
+    if (!player.isValid || activePlayers.has(player.id)) return;
+
+    activePlayers.add(player.id);
+    const form = new PianoScoreForm(player);
     try {
-        await pianoScoreManager.get(player).show(piano);
+        await form.show(piano);
     } catch (error) {
         console.warn("[piano] 打开曲谱配置失败", error);
         if (player.isValid) player.sendMessage("§e无法打开曲谱配置。");
+    } finally {
+        activePlayers.delete(player.id);
+        form.close();
     }
 }

@@ -1,6 +1,5 @@
 import { Player, system } from "@minecraft/server";
 import { CustomForm, DataDrivenScreenClosedReason, ObservableString } from "@minecraft/server-ui";
-import { DDUIManager } from "@app/ui/ddui";
 import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
 import { ImportAssembler, parseImportChunk, type ImportProgress } from "@piano/core";
@@ -34,6 +33,36 @@ function recordSubmit(playerId: string) {
     );
 }
 
+/** 跨表单保留的导入进度：关闭表单后重新打开仍可继续粘贴剩余分段。 */
+interface ImportSession {
+    assembler: ImportAssembler;
+    /** 当前正在导入的曲目（songId:checksum）；切换曲目时丢弃上一首未完成分片 */
+    activeTaskId?: string;
+    /** 已完整接收但暂时无法入库的数据（权限/频率/容量失败后可重试） */
+    pendingPayload?: Uint8Array;
+}
+
+const sessions = new Map<string, ImportSession>();
+/** 同一玩家同时只允许一个导入表单。 */
+const activePlayers = new Set<string>();
+
+function sessionOf(playerId: string): ImportSession {
+    let session = sessions.get(playerId);
+    if (!session) {
+        session = { assembler: new ImportAssembler() };
+        sessions.set(playerId, session);
+    }
+    return session;
+}
+
+/** 玩家离开时清空导入进度与频率记录。 */
+export function invalidateMidiImport(playerId: string) {
+    sessions.delete(playerId);
+    activePlayers.delete(playerId);
+    lastSubmit.delete(playerId);
+    submitHistory.delete(playerId);
+}
+
 function progressText(progress: ImportProgress): string {
     if (progress.total === 0) return "尚未接收任何分段";
     const missing = progress.missing.length
@@ -53,15 +82,13 @@ class MidiImportForm {
     private readonly status = new ObservableString("§7请粘贴第一段导入码");
     private readonly progress = new ObservableString("尚未接收任何分段");
     private readonly input: ObservableString;
-    private readonly assembler = new ImportAssembler();
-    /** 当前正在导入的曲目（songId:checksum）；切换曲目时丢弃上一首未完成分片 */
-    private activeTaskId?: string;
-    /** 已完整接收但暂时无法入库的数据（权限/频率/容量失败后可重试） */
-    private pendingPayload?: Uint8Array;
     private opening = false;
     private clearing = false;
 
-    constructor(private readonly player: Player) {
+    constructor(
+        private readonly player: Player,
+        private readonly session: ImportSession
+    ) {
         const writable = { clientWritable: true };
         this.input = new ObservableString("", writable);
 
@@ -84,6 +111,26 @@ class MidiImportForm {
             .closeButton();
 
         this.input.subscribe((value) => this.onInput(value));
+    }
+
+    private get assembler() {
+        return this.session.assembler;
+    }
+
+    private get activeTaskId() {
+        return this.session.activeTaskId;
+    }
+
+    private set activeTaskId(value: string | undefined) {
+        this.session.activeTaskId = value;
+    }
+
+    private get pendingPayload() {
+        return this.session.pendingPayload;
+    }
+
+    private set pendingPayload(value: Uint8Array | undefined) {
+        this.session.pendingPayload = value;
     }
 
     private onInput(value: string) {
@@ -186,12 +233,17 @@ class MidiImportForm {
                 this.player.sendMessage("§e管理员未开放玩家导入 MIDI。");
                 return;
             }
-            if (isPbeAdmin(this.player)) {
+            const progress = this.assembler.progress();
+            if (this.pendingPayload) {
+                this.status.setData("§e有已接收但未保存的曲目，可点击重试保存");
+            } else if (progress.received > 0) {
+                this.status.setData("§e已恢复上次未完成的分段，请继续粘贴");
+            } else if (isPbeAdmin(this.player)) {
                 this.status.setData("§7管理员导入：粘贴分段即可");
             } else {
                 this.status.setData("§7请粘贴第一段导入码");
             }
-            this.progress.setData(progressText(this.assembler.progress()));
+            this.progress.setData(progressText(progress));
             for (let attempt = 0; attempt < 4 && this.player.isValid; attempt++) {
                 if ((await this.form.show()) !== DataDrivenScreenClosedReason.UserBusy) return;
                 await system.waitTicks(2);
@@ -206,27 +258,23 @@ class MidiImportForm {
     }
 }
 
-class MidiImportManager extends DDUIManager<MidiImportForm> {
-    protected create(player: Player) {
-        return new MidiImportForm(player);
-    }
-    protected discard(form: MidiImportForm) {
-        form.close();
-    }
-}
-
-export const midiImportManager = new MidiImportManager();
-
+/** 同一玩家同时只允许一个导入表单；关闭后实例直接丢弃，进度留在 session 里。 */
 export async function openMidiImport(player: Player) {
-    if (!player.isValid) return;
+    if (!player.isValid || activePlayers.has(player.id)) return;
     if (!canImportMidi(player)) {
         player.sendMessage("§e管理员未开放玩家导入 MIDI。");
         return;
     }
+
+    activePlayers.add(player.id);
+    const form = new MidiImportForm(player, sessionOf(player.id));
     try {
-        await midiImportManager.get(player).show();
+        await form.show();
     } catch (error) {
         console.warn("[midiImport] 打开导入界面失败", error);
         if (player.isValid) player.sendMessage("§e无法打开 MIDI 导入界面。");
+    } finally {
+        activePlayers.delete(player.id);
+        form.close();
     }
 }

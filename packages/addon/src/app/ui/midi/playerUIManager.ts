@@ -1,20 +1,49 @@
 import { resolveInstrument } from "@platform/assembly";
 import { Block, Player, system } from "@minecraft/server";
-import { CustomForm, DataDrivenScreenClosedReason, ObservableNumber, ObservableString } from "@minecraft/server-ui";
-import { DDUIManager } from "@app/ui/ddui";
+import { CustomForm, DataDrivenScreenClosedReason, ObservableNumber } from "@minecraft/server-ui";
 import { pianoWorld } from "@app/PianoWorld";
 import { MidiPlayer } from "@domain/playback/player";
 import { formManager } from "sapi-pro";
-import { createMidiPlayerUI, MidiPlayerUIContext, updateUI } from "./playerUI";
+import { createMidiPlayerUI, MidiPlayerUIContext } from "./playerUI";
+import { MidiPlayerViewModel, midiViewModel } from "./playerViewModel";
 import { MidiListForm } from "./midiList";
 import { LibraryForm } from "./libraryUI";
 
-class MidiPlayerInstance {
+/** 从点子页面返回播放器：只捕获 player/block，避免子页面闭包拖住整个旧 UI 会话。 */
+function reopenPlayer(player: Player, block: Block | null) {
+    if (!player.isValid || !block?.isValid) return;
+    void openMidiPlayer(player, block)
+        .catch(error => console.error("[midi] 返回播放器失败", error));
+}
+
+function openSongPicker(player: Player, block: Block, midi: MidiPlayer) {
+    if (!player.isValid || !block.isValid || !midi.isAlive()) return;
+    formManager.open(player, MidiListForm, {
+        midiPlayer: midi,
+        p: 1,
+        onBack: () => reopenPlayer(player, block),
+    });
+}
+
+function openLibrary(player: Player, block: Block, midi: MidiPlayer) {
+    if (!player.isValid || !block.isValid || !midi.isAlive()) return;
+    formManager.open(player, LibraryForm, {
+        midiPlayer: midi,
+        onBack: () => reopenPlayer(player, block),
+    });
+}
+
+/** 单个玩家的 MIDI 播放器 UI 会话；MidiPlayer 本身属于 PianoRuntime。 */
+class MidiPlayerPanelSession {
     private form: CustomForm | undefined;
     private ctx!: MidiPlayerUIContext;
 
     private playerInst?: MidiPlayer;
     private leftBlock: Block | null = null;
+    /** 这架钢琴共享的只读 MIDI 视图。 */
+    private viewModel?: MidiPlayerViewModel;
+    private progressUnsub?: () => void;
+    private invalidUnsub?: () => void;
 
     /** 进度滑块：每 tick 同步播放进度；玩家拖动（值明显偏离）→ seek */
     private sliderObs?: ObservableNumber;
@@ -22,7 +51,9 @@ class MidiPlayerInstance {
     private lastSyncedSlider = -1;
 
     private inited = false;
-    private unsub?: () => void;
+    /** 滑块 Observable 的订阅，关闭时显式解绑。 */
+    private sliderUnsub?: () => void;
+    private disposed = false;
     /** 防止连续交互导致 show() 并发调用 */
     private opening = false;
     /** 上一次表单关闭的 tick，用于避免“刚关闭就重开”的 DDUI 竞态 */
@@ -36,24 +67,21 @@ class MidiPlayerInstance {
         const anchor = location.dimension.getBlock(location.pos);
         const piano = pianoWorld.get(location);
         if (!anchor || !piano) return false;
+
+        this.releaseBindings();
         this.leftBlock = anchor;
-        const newPlayer = piano.getMidiPlayer();
+        this.playerInst = piano.getMidiPlayer();
 
-        if (this.unsub) {
-            try {
-                this.unsub();
-            } catch {}
-            this.unsub = undefined;
-        }
-        this.playerInst = newPlayer;
+        const viewModel = midiViewModel(this.playerInst);
+        this.viewModel = viewModel;
 
-        this.unsub = this.playerInst.signal.subscribe(() => {
-            if (!this.form?.isShowing?.() || !this.playerInst?.isAlive()) {
-                return this.close();
-            }
-            updateUI(this.ctx, this.playerInst);
-            this.syncSlider();
-        });
+        const progressHandle = viewModel.progress.subscribe(pct => this.syncSlider(pct));
+        this.progressUnsub = () => viewModel.progress.unsubscribe(progressHandle);
+
+        const invalidHandle = viewModel.invalid.subscribe(() => this.close());
+        this.invalidUnsub = () => viewModel.invalid.unsubscribe(invalidHandle);
+
+        viewModel.retain();
 
         // 同步上下文
         if (this.ctx) {
@@ -62,8 +90,19 @@ class MidiPlayerInstance {
         return true;
     }
 
+    private releaseBindings() {
+        this.progressUnsub?.();
+        this.progressUnsub = undefined;
+        this.invalidUnsub?.();
+        this.invalidUnsub = undefined;
+        this.sliderUnsub?.();
+        this.sliderUnsub = undefined;
+        this.viewModel?.release();
+        this.viewModel = undefined;
+    }
+
     /** 进度滑块同步：把滑块设为当前播放进度（0~100，时间制） */
-    private syncSlider() {
+    private syncSlider(pct: number) {
         if (
             !this.sliderObs ||
             !this.form?.isShowing?.() ||
@@ -71,8 +110,6 @@ class MidiPlayerInstance {
         ) {
             return;
         }
-        const info = this.playerInst.getInfo();
-        const pct = Math.round(info.progress * 100);
         if (pct === this.lastSyncedSlider) return;
         this.lastSyncedSlider = pct;
         this.sliderObs.setData(pct);
@@ -85,7 +122,7 @@ class MidiPlayerInstance {
      * 这样慢速拖动（±1%）也不会被服务器回写拽回。
      */
     private wireSlider(obs: ObservableNumber) {
-        obs.subscribe((v: number) => {
+        const callback = (v: number) => {
             if (v === this.lastSyncedSlider) return; // 服务器回写
             this.lastSyncedSlider = v;
 
@@ -94,88 +131,68 @@ class MidiPlayerInstance {
             const info = inst.getInfo();
             const durSec = (info.durationMs ?? 0) / 1000;
             if (durSec > 0) inst.seek((v / 100) * durSec);
-        });
+        };
+        obs.subscribe(callback);
+        this.sliderUnsub = () => obs.unsubscribe(callback);
     }
 
     private init() {
         if (this.inited || !this.leftBlock || !this.player.isValid) return;
+        const viewModel = this.viewModel;
+        if (!viewModel) return;
         this.inited = true;
 
-        // === Observable（只创建一次）===
+        // === 共享只读状态 + 玩家私有滑块 ===
         this.ctx = {
-            state: new ObservableString("§7加载中..."),
-            midiName: new ObservableString(""),
-            queue: new ObservableString(""),
-
-            progressText: new ObservableString(""),
+            state: viewModel.state,
+            midiName: viewModel.midiName,
+            queue: viewModel.queue,
+            progressText: viewModel.progressText,
+            progress: viewModel.progress,
+            buttonText: viewModel.buttonText,
+            playMode: viewModel.playMode,
 
             // clientWritable：允许玩家拖动写值（双向绑定）
             progressSlider: new ObservableNumber(0, { clientWritable: true }),
 
-            buttonText: new ObservableString("▶ 播放"),
-            playMode: new ObservableString(""),
-
-            block: this.leftBlock!,
+            block: this.leftBlock,
         };
 
         this.sliderObs = this.ctx.progressSlider;
         this.wireSlider(this.sliderObs);
+        const pct = viewModel.progress.getData();
+        this.lastSyncedSlider = pct;
+        this.sliderObs.setData(pct);
 
-        // === form（只创建一次）===
+        // === form（每个玩家会话一份）===
         this.form = createMidiPlayerUI(
             this.player,
             this.ctx,
             () => this.playerInst!,
             () => this.close(),
             {
-                openSongPicker: () => this.openSongPicker(),
-                openLibrary: () => this.openLibrary(),
+                openSongPicker,
+                openLibrary,
             }
         );
-    }
-
-    private openSongPicker() {
-        if (!this.player.isValid || !this.playerInst?.isAlive()) return;
-        formManager.open(this.player, MidiListForm, {
-            midiPlayer: this.playerInst,
-            p: 1,
-            onBack: () => this.reopen(),
-        });
-    }
-
-    private openLibrary() {
-        if (!this.player.isValid || !this.playerInst?.isAlive()) return;
-        formManager.open(this.player, LibraryForm, {
-            midiPlayer: this.playerInst,
-            onBack: () => this.reopen(),
-        });
-    }
-
-    /**
-     * 从队列等子页面返回播放器：重新走一次打开入口，
-     * 重新解析钢琴/运行时并恢复 MIDI 信号订阅。
-     *
-     * 不能直接调用 show()：close() 会取消订阅，而 show() 不负责重新订阅；
-     * 同时旧运行时可能已被卸载或替换，必须重新获取 MidiPlayer。
-     */
-    private reopen() {
-        if (!this.player.isValid || !this.leftBlock) return;
-        void midiUIManager.open(this.player, this.leftBlock)
-            .catch(error => console.error("[midi] 返回播放器失败", error));
     }
 
     async show() {
         if (!this.player.isValid) return;
         this.init();
-        if (!this.form || !this.playerInst) return;
+        if (!this.form || !this.playerInst || !this.viewModel) return;
 
         // 已在显示 / 正在打开时不要重复 show
         if (this.opening || this.form.isShowing()) return;
 
         this.opening = true;
         try {
-            // 每次打开刷新 UI
-            updateUI(this.ctx, this.playerInst);
+            // 每次打开刷新共享状态与玩家滑块
+            this.viewModel.sync();
+            if (!this.viewModel || !this.form || !this.playerInst) return;
+            const pct = this.viewModel.progress.getData();
+            this.lastSyncedSlider = pct;
+            this.sliderObs?.setData(pct);
 
             await this.showForm();
         } catch (e) {
@@ -228,47 +245,40 @@ class MidiPlayerInstance {
         } catch {
             // 旧会话的 Player 已失效
         }
-        this.unsub?.();
-        this.unsub = undefined;
+        this.releaseBindings();
     }
 
-    /** 实例被新会话替换时清理订阅与旧表单 */
+    /** 表单关闭后清理会话；子页面返回只捕获 player/block，不依赖本对象。 */
     dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
         this.close();
-        this.inited = false;
+        this.form = undefined;
+        this.ctx = undefined as never;
+        this.playerInst = undefined;
+        this.leftBlock = null;
         this.sliderObs = undefined;
-    }
-
-    isShowing() {
-        return this.form?.isShowing?.() ?? false;
-    }
-}
-
-class MidiPlayerUIManager extends DDUIManager<MidiPlayerInstance> {
-    protected create(player: Player): MidiPlayerInstance {
-        return new MidiPlayerInstance(player);
-    }
-
-    protected discard(inst: MidiPlayerInstance): void {
-        inst.dispose();
-    }
-
-    async open(player: Player, block: Block) {
-        if (!player.isValid) return;
-
-        const inst = this.get(player);
-
-        const result = inst.setBlock(block);
-        if (!result) return;
-
-        if (inst.isShowing()) return;
-
-        await inst.show();
+        this.player = undefined as never;
+        this.inited = false;
+        this.lastSyncedSlider = -1;
+        this.opening = false;
     }
 }
 
-export const midiUIManager = new MidiPlayerUIManager();
+/** 同一玩家同时只允许一个播放器表单；关闭后实例直接丢弃。 */
+const activePlayers = new Set<string>();
 
+/** 新建的只是 UI 包装；MidiPlayer 由 PianoRuntime.getMidiPlayer() 缓存复用。 */
 export async function openMidiPlayer(p: Player, block: Block) {
-    await midiUIManager.open(p, block);
+    if (!p.isValid || activePlayers.has(p.id)) return;
+
+    activePlayers.add(p.id);
+    const session = new MidiPlayerPanelSession(p);
+    try {
+        if (!session.setBlock(block)) return;
+        await session.show();
+    } finally {
+        activePlayers.delete(p.id);
+        session.dispose();
+    }
 }

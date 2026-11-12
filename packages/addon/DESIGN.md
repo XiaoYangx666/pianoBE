@@ -41,7 +41,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 | `MidiPlayer` | `domain/playback/player.ts` | 播放状态机、队列推进、暂停/恢复/seek/结束；通过注入的 `MidiLoader` 加载曲目。 |
 | `MidiManager` | `domain/playback/midiManager.ts` | 曲目元信息注册、分页查询、按 id 加载。 |
 | `midiManager` 单例 | `app/midiManager.ts`（由 `app/midi.ts` re-export） | 组合内嵌/远程 MIDI 源；只在 app 层初始化。 |
-| UI 管理器 | `app/ui/**` | 玩家级 DDUI 表单、失效检测、异步交互保护；可直接依赖 `PianoWorld`/`PianoRuntime`。 |
+| UI 表单 | `app/ui/**` | 玩家级 DDUI 表单按需创建、活动表单防重入、异步交互保护；可直接依赖 `PianoWorld`/`PianoRuntime`。 |
 | 存储驱动 | `platform/storage/**` | 动态属性播放列表存储；不依赖 UI。 |
 | 服务器适配 | `platform/server/**` | `server-net` 传输、远程 MIDI/播放列表读取；不依赖 app。 |
 | 服务器初始化 | `app/serverAdmin.ts` | 读取 secrets/variables，切换 `midiManager` 与播放列表 facade；属于组装逻辑。 |
@@ -55,6 +55,20 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 1. 方块组件解析乐器装配，发布 `instrumentPlaced`。
 2. `PianoWorld.get()` 创建或复用 `PianoRuntime`。
 3. `PianoRuntime.ensureVisual()` 恢复或创建持久显示实体，并创建临时文字资源。
+
+### 创建 / 销毁
+
+| 对象 | 创建 | 销毁 |
+| --- | --- | --- |
+| `PianoRuntime` | `PianoWorld.get()`：放置、附近方块 tick、实体恢复、玩家交互时按坐标懒创建 | `PianoWorld.unload()`：乐器拆除、结构不完整、区块卸载、离开视野 200 tick、朝向/类型变化、运行时异常 |
+| `MidiPlayer` | `PianoRuntime.getMidiPlayer()` 首次访问时懒创建，归 `PianoRuntime` 的 `PianoScope` 所有 | `PianoRuntime.dispose()` 时由 scope 调用 `midi.end()`；`dispose(false)` 会先 checkpoint，重载后从显示实体恢复 |
+| 钢琴 UI 包装（`PianoPanelSession`） | 每次打开面板时新建，关闭后释放 | 表单关闭或 `PianoRuntime.disposedSignal` 触发时 `dispose()` |
+| MIDI UI 包装（`MidiPlayerPanelSession`） | 每次打开播放器时新建，只引用运行时已有的 `MidiPlayer` | 表单关闭后 `dispose()`，解绑 MIDI 信号 |
+| `PianoViewModel` | 首次打开面板时按钢琴创建，生命周期跟随 `PianoRuntime` | 汇总 `noteSignal` 的 active MIDI notes，共享 `activeKeys`；钢琴销毁时释放 |
+| `MidiPlayerViewModel` | 首次打开 MIDI 面板时按 `MidiPlayer` 创建，生命周期跟随播放器 | 共享只读 MIDI 文本/进度；播放器 `end()` 时释放 |
+
+`PianoRuntime` 是唯一持有实际钢琴状态的运行时；UI 包装每次打开重建，不会创建第二架钢琴、显示实体或 `MidiPlayer`。
+共享的只读 UI 状态（键位、MIDI 文本/进度）由 `PianoViewModel` / `MidiPlayerViewModel` 持有，关闭表单只解绑显示。
 
 ### 运行
 
@@ -110,6 +124,19 @@ Minecraft playSound / 粒子 / 显示
 - `__PIANO_TARGET__` 双构建语义保持不变：client 构建通过 `compile.define` 折叠并裁剪 server 分支；server 构建保留 `server-admin`/`server-net` 动态加载。
 - 内嵌 MIDI 由构建钩子从仓库根目录 `midis/js/` 拷贝到 preserve-modules 输出中的 `packages/addon/src/midis/`，与 `app/midiManager.ts` 的 `../midis/index.js` 相对导入一致；远程曲库仍通过 `midiManager.setSource()` 切换。server 构建跳过该拷贝，使用远程源/空内嵌源。
 
+### Observable 归属
+
+| 归属 | 创建时机 | 销毁时机 | 内容 |
+| --- | --- | --- | --- |
+| `PianoViewModel`（per-piano） | 第一次打开钢琴面板 | `PianoRuntime.disposedSignal` | `activeKeys`；订阅 `PianoRuntime.noteSignal` |
+| `MidiPlayerViewModel`（per-piano） | 第一次打开 MIDI 面板 | `MidiPlayer.disposedSignal`（`end()`） | 只读 MIDI 文本/进度/播放模式 + `invalid` |
+| `PianoPanelSession`（per-player） | 每次打开钢琴面板 | 表单关闭 / `dispose()` | 输入、键位映射、八度、音色、曲谱页、状态与文字行 |
+| `MidiPlayerPanelSession`（per-player） | 每次打开 MIDI 面板 | 表单关闭 / `dispose()` | 玩家自己的 `progressSlider`；只读字段引用共享 view model |
+| `PianoSettingsForm` | 每次打开设置 | `close()` 并显式解绑字段订阅 | 设置字段与 `hasScreen` |
+| `PianoScoreForm` / `MidiImportForm` | 每次打开对应表单 | 表单关闭 | 搜索/分页/导入进度等玩家会话状态 |
+
+共享只读 Observable 在表单关闭后保留，表单只增减绑定；不要把它们重新挪回玩家会话。`retain()` / `release()` 只控制播放状态刷新订阅，不销毁 view model。
+
 ## 7. 有意保留的保护措施
 
 以下机制不要因为“看起来多余”而删除：
@@ -119,8 +146,8 @@ Minecraft playSound / 粒子 / 显示
 - `unloadedSettings` 的暂存与重试保存。
 - `PianoWorld` 的 sweep、verify、距离卸载宽限。
 - MIDI 异步加载的 generation 校验。
-- UI 的失效检测、异步打开保护和 `Doudizhu` 式“表单不可释放”处理。
-- 从队列等子页面返回 MIDI 播放器时必须重新走 `openMidiPlayer()`/`setBlock()`，不能只调用 `show()`：`close()` 会解除 MIDI 信号订阅，旧运行时也可能已被卸载或替换。
+- UI 的失效检测、异步打开保护和活动表单防重入；不再依赖实例复用规避内存泄漏。
+- 从队列等子页面返回 MIDI 播放器时必须重新走 `openMidiPlayer()`/`setBlock()`，不能只调用 `show()`：`close()` 会释放本会话的 view model 引用，旧运行时也可能已被卸载或替换；子页面 `onBack` 只捕获 player/block。
 - 装配完整性三态（`complete` / `incomplete` / `unloaded`）、放置回滚、精准采集掉落抑制。
 - 方块事件、爆炸聚合、显示实体去重。
 
@@ -154,7 +181,6 @@ cd packages/addon && node ../../tools/verify-addon-build.mjs server
 - `tests/pianoScope.test.ts`：清理失败不阻断其它清理、子作用域级联、幂等销毁。
 - `tests/pianoPlayback.test.ts`：MIDI 恢复、暂停/恢复、销毁后旧加载不复活、销毁后不再发声、多台钢琴状态隔离。
 - `tests/pianoDisplayLifecycle.test.ts`：运行时释放保留显示实体、真正拆除删除实体、重复实体恢复。
-- `tests/ddui.test.ts`：实例复用、失效、陈旧 owner、清空。
 - `tests/instrument.test.ts`：装配完整性、放置/销毁、回滚。
 - `tests/pianoDisplay.test.ts`、`pianoRay.test.ts`、`pianoSettings.test.ts`、`pianoTimbres.test.ts`、`netSource.test.ts`、`remotePlaylist.test.ts`。
 

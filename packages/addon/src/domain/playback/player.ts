@@ -33,6 +33,8 @@ export class MidiPlayer {
 
     readonly queue = new PlayQueue();
     readonly signal: Signal<void>;
+    /** 播放器真正结束（runtime 销毁/换琴）时触发；UI view model 用它解绑。 */
+    readonly disposedSignal: Signal<void>;
 
     lastActiveTime = Date.now();
 
@@ -40,6 +42,7 @@ export class MidiPlayer {
 
     constructor(private readonly loader: MidiLoader, private readonly output: MidiOutput) {
         this.signal = new Signal();
+        this.disposedSignal = new Signal();
     }
 
     /* ================== 工具 ================== */
@@ -153,6 +156,8 @@ export class MidiPlayer {
         this.queue.clear();
         this.signal.publish();
         this.signal.dispose();
+        this.disposedSignal.publish();
+        this.disposedSignal.dispose();
     }
 
     /* ================== 调度 ================== */

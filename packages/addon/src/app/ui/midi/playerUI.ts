@@ -2,30 +2,13 @@ import { getPlayModeName, PlayMode } from "@domain/playback/queue";
 import { Block, Player, system } from "@minecraft/server";
 import { CustomForm, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import { MidiPlayer } from "@domain/playback/player";
+import { MidiPlayerReadonlyContext, writeMidiReadonly } from "./playerViewModel";
 
-export interface MidiPlayerUIContext {
-    state: ObservableString;
-    midiName: ObservableString;
-    queue: ObservableString;
-
-    /** 文本进度：只显示时长（当前 / 总时长） */
-    progressText: ObservableString;
-
+export interface MidiPlayerUIContext extends MidiPlayerReadonlyContext {
     /** 进度拖动条：值与播放进度同步；玩家拖动即 seek（clientWritable） */
     progressSlider: ObservableNumber;
 
-    buttonText: ObservableString;
-    playMode: ObservableString;
-
     block: Block;
-}
-
-/** 秒 → mm:ss */
-function formatTime(sec: number): string {
-    const s = Math.max(0, Math.floor(sec));
-    const mm = String(Math.floor(s / 60)).padStart(2, "0");
-    const ss = String(s % 60).padStart(2, "0");
-    return `${mm}:${ss}`;
 }
 
 const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
@@ -39,8 +22,8 @@ function switchPlayMode(player: MidiPlayer, label: ObservableString) {
 }
 
 export interface MidiPlayerUIActions {
-    openSongPicker(): void;
-    openLibrary(): void;
+    openSongPicker(player: Player, block: Block, midi: MidiPlayer): void;
+    openLibrary(player: Player, block: Block, midi: MidiPlayer): void;
 }
 
 export function createMidiPlayerUI(
@@ -79,11 +62,13 @@ export function createMidiPlayerUI(
         })
 
         .button("♪ 点歌", () => {
+            const midi = getPlayer();
+            const block = ctx.block;
             close();
-            if (!getPlayer().isAlive()) {
+            if (!midi.isAlive() || !block.isValid) {
                 return;
             }
-            system.runTimeout(() => actions.openSongPicker(), 20);
+            system.runTimeout(() => actions.openSongPicker(p, block, midi), 20);
         })
 
         .button("⏮ 上一首", () => {
@@ -111,35 +96,18 @@ export function createMidiPlayerUI(
             switchPlayMode(getPlayer(), ctx.playMode);
         })
         .button("歌单", () => {
+            const midi = getPlayer();
+            const block = ctx.block;
             close();
-            if (!getPlayer().isAlive()) {
+            if (!midi.isAlive() || !block.isValid) {
                 return;
             }
-            system.runTimeout(() => actions.openLibrary(), 20);
+            system.runTimeout(() => actions.openLibrary(p, block, midi), 20);
         });
 
     return form;
 }
 
 export function updateUI(ctx: MidiPlayerUIContext, player: MidiPlayer) {
-    const info = player.getInfo();
-
-    const stateMap: Record<string, string> = {
-        idle: "§7空闲",
-        playing: "§a播放中",
-        paused: "§e已暂停",
-    };
-
-    const stateText = stateMap[info.state] ?? info.state;
-
-    ctx.state.setData(`§l§f状态: ${stateText}`);
-    ctx.midiName.setData(`§7当前: §b${info.midiName}`);
-    ctx.queue.setData(`§7队列长度: §e${info.queueLength}`);
-
-    // 文本进度只显示时长（当前 / 总时长）；进度条交给滑块
-    ctx.progressText.setData(
-        `§7${formatTime(info.currentTime)} / ${formatTime((info.durationMs ?? 0) / 1000)}`
-    );
-
-    ctx.buttonText.setData(info.state === "playing" ? "⏸ 暂停" : "▶ 播放");
+    writeMidiReadonly(ctx, player);
 }
