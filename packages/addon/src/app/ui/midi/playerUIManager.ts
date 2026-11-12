@@ -1,6 +1,6 @@
 import { resolveInstrument } from "@platform/assembly";
-import { Block, Player, system } from "@minecraft/server";
-import { CustomForm, DataDrivenScreenClosedReason, ObservableNumber } from "@minecraft/server-ui";
+import { Block, Player } from "@minecraft/server";
+import { CustomForm, ObservableNumber } from "@minecraft/server-ui";
 import { pianoWorld } from "@app/PianoWorld";
 import { MidiPlayer } from "@domain/playback/player";
 import { formManager } from "sapi-pro";
@@ -56,8 +56,6 @@ class MidiPlayerPanelSession {
     private disposed = false;
     /** 防止连续交互导致 show() 并发调用 */
     private opening = false;
-    /** 上一次表单关闭的 tick，用于避免“刚关闭就重开”的 DDUI 竞态 */
-    private lastClosedTick = -1;
 
     constructor(private player: Player) {}
 
@@ -200,41 +198,16 @@ class MidiPlayerPanelSession {
             this.close();
         } finally {
             this.opening = false;
-            this.lastClosedTick = system.currentTick;
         }
     }
 
-    /** 显示表单；UserBusy 时稍等重试，避免留下“看似打开但无写权限”的旧界面 */
+    /** 显示表单。每个会话只打开一次；UserBusy 时直接放弃本次打开。 */
     private async showForm() {
-        // 避免 hide→show 竞态
-        if (this.lastClosedTick >= 0) {
-            const wait = 2 - (system.currentTick - this.lastClosedTick);
-            if (wait > 0) {
-                await new Promise<void>((resolve) =>
-                    system.runTimeout(() => resolve(), wait)
-                );
-            }
+        try {
+            await this.form!.show();
+        } catch (e) {
+            if ((e as { reason?: string })?.reason !== "AlreadyShowing") throw e;
         }
-
-        for (let attempt = 0; attempt < 10; attempt++) {
-            let reason: DataDrivenScreenClosedReason;
-            try {
-                reason = await this.form!.show();
-            } catch (e) {
-                if ((e as { reason?: string })?.reason === "AlreadyShowing") {
-                    return;
-                }
-                throw e;
-            }
-
-            if (reason !== DataDrivenScreenClosedReason.UserBusy) return;
-
-            if (!this.player.isValid) return;
-            await new Promise<void>((resolve) =>
-                system.runTimeout(() => resolve(), 2)
-            );
-        }
-        console.warn("[midi] 表单打开失败：玩家界面持续处于忙碌状态");
     }
 
     close() {

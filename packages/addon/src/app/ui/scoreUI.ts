@@ -1,5 +1,5 @@
 import { Player, system } from "@minecraft/server";
-import { CustomForm, DataDrivenScreenClosedReason, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
+import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
 import { normalizePianoSettings, type PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreAt, scoreIndexOf, type PianoScore } from "@domain/score/score";
 import type { PianoRuntime } from "@app/PianoRuntime";
@@ -173,10 +173,7 @@ class PianoScoreForm {
             this.target = { piano, displayId };
             this.unsubscribe = piano.disposedSignal.subscribe(() => this.close());
             this.render();
-            for (let attempt = 0; attempt < 4 && this.target && this.player.isValid; attempt++) {
-                if (await this.form.show() !== DataDrivenScreenClosedReason.UserBusy) return;
-                await system.waitTicks(2);
-            }
+            await this.form.show();
         } finally {
             this.opening = false;
             this.close();

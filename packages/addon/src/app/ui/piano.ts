@@ -47,8 +47,6 @@ class PianoPanelSession {
     private syncingCompact = false;
     /** 输入框清空定时器是否已排队，避免每个字符都挂一条 runTimeout。 */
     private clearScheduled = false;
-    /** 上一次表单关闭的 tick，用于避免“刚关闭就重开”的 DDUI 竞态 */
-    private lastClosedTick = -1;
 
     constructor(private player: Player) {}
 
@@ -284,47 +282,20 @@ class PianoPanelSession {
             this.close();
         } finally {
             this.opening = false;
-            this.lastClosedTick = system.currentTick;
         }
     }
 
     /**
-     * 显示表单。
-     * 1.26.40 在旧表单还没完全关闭时再次 show 会返回 UserBusy（表单没有真正显示），
-     * 此时客户端看到的可能仍是旧界面，但写权限已不在旧表单上，交互就会报
-     * "does not have access"。这里等待界面空闲后重试，避免留下这种半打开状态。
+     * 显示表单。每个会话只打开一次；返回 UserBusy 时说明玩家正占用其它 UI，
+     * 直接放弃本次打开即可（reopen 已在关闭后等待 2 tick）。
      */
     private async showForm() {
-        // 刚关闭就重开：等一两个 tick 让客户端完成关闭，避免 hide→show 竞态
-        if (this.lastClosedTick >= 0) {
-            const wait = 2 - (system.currentTick - this.lastClosedTick);
-            if (wait > 0) {
-                await new Promise<void>((resolve) =>
-                    system.runTimeout(() => resolve(), wait)
-                );
-            }
+        try {
+            await this.form.show();
+        } catch (e) {
+            // 已经在显示：视为成功
+            if ((e as { reason?: string })?.reason !== "AlreadyShowing") throw e;
         }
-
-        for (let attempt = 0; attempt < 10; attempt++) {
-            let reason: string;
-            try {
-                reason = await this.form.show();
-            } catch (e) {
-                // 已经在显示：视为成功
-                if ((e as { reason?: string })?.reason === "AlreadyShowing") {
-                    return;
-                }
-                throw e;
-            }
-
-            if (reason !== "UserBusy") return;
-
-            if (!this.player.isValid) return;
-            await new Promise<void>((resolve) =>
-                system.runTimeout(() => resolve(), 2)
-            );
-        }
-        console.warn("[piano] 表单打开失败：玩家界面持续处于忙碌状态");
     }
 
     close() {
@@ -346,7 +317,6 @@ class PianoPanelSession {
         const player = this.player;
         if (!player.isValid) return;
         this.close();
-        this.lastClosedTick = system.currentTick;
         system.runTimeout(() => {
             if (player.isValid) open();
         }, 2);

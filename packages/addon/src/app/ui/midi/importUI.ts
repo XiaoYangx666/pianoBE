@@ -1,5 +1,5 @@
 import { Player, system } from "@minecraft/server";
-import { CustomForm, DataDrivenScreenClosedReason, ObservableString } from "@minecraft/server-ui";
+import { CustomForm, ObservableString } from "@minecraft/server-ui";
 import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
 import { ImportAssembler, parseImportChunk, type ImportProgress } from "@piano/core";
@@ -253,10 +253,7 @@ class MidiImportForm {
                 this.status.setData("§7请粘贴第一段导入码");
             }
             this.progress.setData(progressText(progress));
-            for (let attempt = 0; attempt < 4 && this.player.isValid; attempt++) {
-                if ((await this.form.show()) !== DataDrivenScreenClosedReason.UserBusy) return;
-                await system.waitTicks(2);
-            }
+            await this.form.show();
         } finally {
             this.opening = false;
         }

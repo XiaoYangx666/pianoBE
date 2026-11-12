@@ -1,5 +1,5 @@
 import { Player, system } from "@minecraft/server";
-import { CustomForm, DataDrivenScreenClosedReason, ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui";
+import { CustomForm, ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import { AVAILABLE_PIANO_TIMBRES, DEFAULT_PIANO_SETTINGS, normalizePianoColor, normalizePianoSettings, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, type PianoSettings } from "@domain/piano/settings";
 import { soundLayerAt, soundLayerIndexOf, soundTypes } from "@domain/piano/soundTypes";
 import type { PianoRuntime } from "@app/PianoRuntime";
@@ -135,10 +135,7 @@ class PianoSettingsForm {
             this.sync(settings);
             this.target = { piano, displayId };
             this.unsubscribe = piano.disposedSignal.subscribe(() => this.close());
-            for (let attempt = 0; attempt < 4 && this.target && this.player.isValid; attempt++) {
-                if (await this.form.show() !== DataDrivenScreenClosedReason.UserBusy) return;
-                await system.waitTicks(2);
-            }
+            await this.form.show();
         } finally {
             this.opening = false;
             this.close();
