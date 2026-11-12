@@ -17,12 +17,15 @@ export class PianoViewModel {
 
     private readonly active = new Map<number, number>();
     private unsubscribe?: () => void;
+    private unsubscribeTick?: () => void;
     private disposed = false;
 
     constructor(piano: PianoRuntime) {
         this.unsubscribe = piano.noteSignal.subscribe(({ midi, duration }) =>
             this.strike(midi, duration)
         );
+        // 复用运行时的每 tick 循环做到期清理，不再给每个音符挂 runTimeout。
+        this.unsubscribeTick = piano.tickSignal.subscribe((tick) => this.sweep(tick));
     }
 
     private strike(midi: number, duration: number) {
@@ -31,23 +34,21 @@ export class PianoViewModel {
             MIN_HOLD_TICKS,
             Math.min(MAX_HOLD_TICKS, Math.ceil((Number.isFinite(duration) ? duration : 0) * 20))
         );
-        const expiry = system.currentTick + hold;
         const previous = this.active.get(midi);
-        this.active.set(midi, expiry);
+        this.active.set(midi, system.currentTick + hold);
         if (previous === undefined) this.publish();
+    }
 
-        const expire = () => {
-            if (this.disposed) return;
-            if (this.active.get(midi) !== expiry) return;
-            const remaining = expiry - system.currentTick;
-            if (remaining > 0) {
-                system.runTimeout(expire, remaining);
-                return;
+    private sweep(tick: number) {
+        if (this.disposed || this.active.size === 0) return;
+        let changed = false;
+        for (const [midi, expiry] of this.active) {
+            if (expiry <= tick) {
+                this.active.delete(midi);
+                changed = true;
             }
-            this.active.delete(midi);
-            this.publish();
-        };
-        system.runTimeout(expire, hold + 1);
+        }
+        if (changed) this.publish();
     }
 
     /** 当前仍在发声的音符；按当前 tick 过滤，避免定时器未执行时读到过期键。 */
@@ -70,6 +71,8 @@ export class PianoViewModel {
         this.disposed = true;
         this.unsubscribe?.();
         this.unsubscribe = undefined;
+        this.unsubscribeTick?.();
+        this.unsubscribeTick = undefined;
         this.active.clear();
         this.activeKeys.setData("");
     }

@@ -50,6 +50,8 @@ export class PianoRuntime {
     readonly disposedSignal = new Signal<void>();
     /** 每次真正发声时发布；per-piano 键位视图用它聚合所有来源的按键。 */
     readonly noteSignal = new Signal<{ midi: number; duration: number }>();
+    /** 运行时每 tick 发布，UI 等订阅者用来做到期清理，避免自己挂定时器。 */
+    readonly tickSignal = new Signal<number>();
     private display?: PianoDisplay;
     private score?: Entity;
     private readonly scope: PianoScope;
@@ -120,9 +122,7 @@ export class PianoRuntime {
             this.visualScope = undefined;
             this.text = undefined;
             this.textValue = undefined;
-            this.display?.detachSettings();
             this.display = PianoDisplay.recover(this.location, this.center);
-            this.display.retrySettingsSave();
             this.syncScore(tick);
             if (this.hasScreen) {
                 this.visualScope = this.scope.child("visual");
@@ -276,6 +276,7 @@ export class PianoRuntime {
     }
 
     tick(tick: number, now: number) {
+        this.tickSignal.publish(tick);
         this.midi?.tick(now);
         const playing = this.midi?.isPlaying() === true;
         if (!this.display?.entity.isValid) return playing;
@@ -287,7 +288,6 @@ export class PianoRuntime {
 
     checkpoint() {
         if (!this.display?.entity.isValid) return;
-        this.display.retrySettingsSave();
         const record = this.midi?.checkpoint();
         if (!record) return;
         try { this.display.checkpoint(record); }
@@ -301,6 +301,7 @@ export class PianoRuntime {
         this.disposedSignal.publish();
         this.disposedSignal.dispose();
         this.noteSignal.dispose();
+        this.tickSignal.dispose();
         if (!removeVisual) {
             try {
                 this.checkpoint();

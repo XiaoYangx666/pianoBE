@@ -30,7 +30,7 @@ export class Signal<T = any> {
      * @param data 传递的数据
      */
     publish(data?: T): void {
-        if (!this.isActive) return;
+        if (!this.isActive || this.callbacks.size === 0) return;
         // 遍历时使用副本，避免回调中修改 callbacks 导致问题
         const callbacks = Array.from(this.callbacks);
         callbacks.forEach((callback) => {

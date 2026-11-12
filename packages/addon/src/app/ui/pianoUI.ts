@@ -30,10 +30,25 @@ export function switchSoundType(state: PianoState, p: Player) {
     p.setDynamicProperty("piano:sound", idx);
 }
 
+type Cleanup = () => void;
+
+function trackObservable<T>(
+    observable: {
+        subscribe(callback: (value: T) => void): (value: T) => void;
+        unsubscribe(callback: (value: T) => void): boolean;
+    },
+    callback: (value: T) => void,
+    cleanups: Cleanup[]
+) {
+    const handle = observable.subscribe(callback);
+    cleanups.push(() => observable.unsubscribe(handle));
+}
+
 function addScoreControls(
     form: CustomForm,
     state: PianoState,
-    controlsVisible: ObservableBoolean
+    controlsVisible: ObservableBoolean,
+    cleanups: Cleanup[]
 ) {
     // Earlier DDUI versions still need to be able to open the piano panel.
     if (typeof form.image !== "function" || AVAILABLE_SCORES.length === 0) return;
@@ -46,8 +61,8 @@ function addScoreControls(
     const pages = () => scoreAt(state.score.getData())?.pages ?? [];
 
     const updateVisibility = () => visible.setData(controlsVisible.getData() && showScore.getData());
-    showScore.subscribe(updateVisibility);
-    controlsVisible.subscribe(updateVisibility);
+    trackObservable(showScore, updateVisibility, cleanups);
+    trackObservable(controlsVisible, updateVisibility, cleanups);
     updateVisibility();
 
     const syncPage = () => {
@@ -62,13 +77,14 @@ function addScoreControls(
         atStart.setData(page === 0);
         atEnd.setData(page >= list.length - 1);
     };
-    state.scorePage.subscribe(syncPage);
+    trackObservable(state.scorePage, syncPage, cleanups);
 
     // 曲谱选择在独立的曲谱配置表单里完成；本表单只预览当前选中的曲谱。
-    state.score.subscribe(() => {
+    const onScoreChange = () => {
         state.scorePage.setData(0);
         syncPage();
-    });
+    };
+    trackObservable(state.score, onScoreChange, cleanups);
     syncPage();
 
     const turnPage = (step: number) => {
@@ -96,7 +112,8 @@ export function createPianoUI(
     state: PianoState,
     ui: PianoUIRefs,
     _getBlock: () => Block | null,
-    actions: PianoUIActions
+    actions: PianoUIActions,
+    cleanups: Cleanup[] = []
 ) {
     const options = { visible: state.controlsVisible };
 
@@ -108,7 +125,7 @@ export function createPianoUI(
 
     form.label("   ", options)
         .textField("在此处快速打字...", state.input);
-    addScoreControls(form, state, state.controlsVisible);
+    addScoreControls(form, state, state.controlsVisible, cleanups);
     form.toggle("升8度 (高音模式)", state.octave)
         .button(
             ui.keyMapLabel,
@@ -151,6 +168,11 @@ const emptyInfo: NoteInfo = {
     midi: -1,
 };
 
+/** 值没变就不写 Observable，减少每键一次的客户端同步与字符串分配。 */
+function setIfChanged(observable: ObservableString, value: string) {
+    if (observable.getData() !== value) observable.setData(value);
+}
+
 export function updatePianoUI(
     state: PianoState,
     ui: PianoUIRefs,
@@ -162,28 +184,32 @@ export function updatePianoUI(
 
     const info = last ?? emptyInfo;
 
-    ui.keyMapLabel.setData(`当前方案: ${keyMaps[state.keyMap.getData()].name}`);
+    setIfChanged(ui.keyMapLabel, `当前方案: ${keyMaps[state.keyMap.getData()].name}`);
     //更新模式
-    ui.modeLabel.setData(
+    setIfChanged(
+        ui.modeLabel,
         state.mode.getData() ? "模式: 单音模式" : "模式: 连音模式"
     );
     //更新sound类型
     const sound = state.sound.getData();
-    ui.soundLabel.setData(
+    setIfChanged(
+        ui.soundLabel,
         sound < 0
             ? "音长: 跟随钢琴"
             : `音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`
     );
 
     if (last) {
-        ui.status.setData(
+        setIfChanged(
+            ui.status,
             `§l§f音符: §a${info.name}\n§7音高: §e${info.pitch.toFixed(3)} §7采样: ${info.sample}`
         );
     } else {
         const hasGaps = PIANO_LAYOUT.some((row) =>
             row.some((k) => k.trim() !== "" && keyMap[k] === undefined)
         );
-        ui.status.setData(
+        setIfChanged(
+            ui.status,
             hasGaps
                 ? `§b钢琴已就绪\n§7深灰色按键为当前方案的空位`
                 : `§b钢琴已就绪`
@@ -218,6 +244,6 @@ export function updatePianoRows(
                     : ` §8${k}§r `;
             }
         }
-        ui.rows[i].setData(rowStr);
+        setIfChanged(ui.rows[i], rowStr);
     });
 }

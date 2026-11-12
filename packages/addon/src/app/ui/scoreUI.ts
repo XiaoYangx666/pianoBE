@@ -32,6 +32,8 @@ class PianoScoreForm {
     private page = 0;
     private target?: ScoreTarget;
     private unsubscribe?: () => void;
+    /** 表单内 Observable 的订阅，关闭时解绑。 */
+    private readonly cleanups: Array<() => void> = [];
     private opening = false;
     private syncing = false;
     private readonly empty = AVAILABLE_SCORES.length === 0;
@@ -43,16 +45,18 @@ class PianoScoreForm {
         this.status = new ObservableString("当前曲谱：无");
         this.pageLabel = new ObservableString("第 1 / 1 页");
 
-        this.mount.subscribe(value => {
+        const mountHandle = this.mount.subscribe(value => {
             if (this.syncing || !this.target) return;
             this.apply({ scoreMounted: value });
             this.render();
         });
-        this.search.subscribe(() => {
+        this.cleanups.push(() => this.mount.unsubscribe(mountHandle));
+        const searchHandle = this.search.subscribe(() => {
             if (this.syncing) return;
             this.page = 0;
             this.render();
         });
+        this.cleanups.push(() => this.search.unsubscribe(searchHandle));
 
         this.form = new CustomForm(player, "曲谱配置")
             .label(this.status)
@@ -184,6 +188,19 @@ class PianoScoreForm {
         this.target = undefined;
         this.unsubscribe?.();
         this.unsubscribe = undefined;
+        for (const cleanup of this.cleanups.splice(0)) {
+            try {
+                cleanup();
+            } catch {
+                // Observable 可能已随旧会话失效
+            }
+        }
+        // 关闭后不再需要保留搜索串/按钮文本，避免原生表单持有大对象。
+        try {
+            this.search?.setData("");
+        } catch {
+            // 表单已关闭
+        }
         if (target) target.piano.flushSettings(target.displayId);
         if (this.player.isValid && this.form.isShowing()) this.form.close();
     }

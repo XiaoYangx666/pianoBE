@@ -84,6 +84,8 @@ class MidiImportForm {
     private readonly input: ObservableString;
     private opening = false;
     private clearing = false;
+    private closed = false;
+    private inputUnsub?: () => void;
 
     constructor(
         private readonly player: Player,
@@ -110,7 +112,8 @@ class MidiImportForm {
             })
             .closeButton();
 
-        this.input.subscribe((value) => this.onInput(value));
+        const inputHandle = this.input.subscribe((value) => this.onInput(value));
+        this.inputUnsub = () => this.input.unsubscribe(inputHandle);
     }
 
     private get assembler() {
@@ -220,7 +223,13 @@ class MidiImportForm {
     private clearInput() {
         this.clearing = true;
         system.runTimeout(() => {
-            if (this.player.isValid) this.input.setData("");
+            if (!this.closed && this.player.isValid) {
+                try {
+                    this.input.setData("");
+                } catch {
+                    // 表单已关闭或 Observable 已失效
+                }
+            }
             this.clearing = false;
         }, 1);
     }
@@ -254,6 +263,14 @@ class MidiImportForm {
     }
 
     close() {
+        this.closed = true;
+        this.inputUnsub?.();
+        this.inputUnsub = undefined;
+        try {
+            this.input.setData("");
+        } catch {
+            // 表单已关闭
+        }
         if (this.player.isValid && this.form.isShowing()) this.form.close();
     }
 }

@@ -21,6 +21,9 @@ import {
     ObservableString,
 } from "@minecraft/server-ui";
 
+/** 连音模式下保留的输入尾部长度；parseInput 只读最后 1~3 个字符。 */
+const MAX_INPUT_LENGTH = 32;
+
 /** 单个玩家的钢琴面板 UI 会话；真正的钢琴状态在 PianoRuntime。 */
 class PianoPanelSession {
     private form: any;
@@ -42,6 +45,8 @@ class PianoPanelSession {
     /** 防止同一帧内连续交互导致 show() 并发调用（两次 show 会刷新表单实例，客户端写入被拒） */
     private opening = false;
     private syncingCompact = false;
+    /** 输入框清空定时器是否已排队，避免每个字符都挂一条 runTimeout。 */
+    private clearScheduled = false;
     /** 上一次表单关闭的 tick，用于避免“刚关闭就重开”的 DDUI 竞态 */
     private lastClosedTick = -1;
 
@@ -155,7 +160,7 @@ class PianoPanelSession {
             renderRows: () => this.renderRows(),
         };
 
-        // === form（只创建一次）===
+        // === form（每个会话创建一次）===
         this.form = createPianoUI(
             this.player,
             this.state,
@@ -167,7 +172,8 @@ class PianoPanelSession {
                 openScores: () => this.openScores(),
                 openShortcuts: () => this.openShortcuts(),
                 openImport: () => this.openImport(),
-            }
+            },
+            this.cleanups
         );
 
         // === 订阅（只注册一次）===
@@ -202,10 +208,25 @@ class PianoPanelSession {
             // 更新 UI
             updatePianoUI(this.state, this.ui, result.last);
 
+            // 连音模式不会清空输入框，长期打字会把整串文本留在 Observable 里；
+            // parseInput 只看最后 1~3 个字符，保留一小段尾部即可。
+            if (!result.shouldClear && val.length > MAX_INPUT_LENGTH) {
+                const trimmed = val.slice(-MAX_INPUT_LENGTH);
+                this.lastLength = trimmed.length;
+                this.state.input.setData(trimmed);
+            }
+
             // 清空输入
-            if (result.shouldClear) {
+            if (result.shouldClear && !this.clearScheduled) {
+                this.clearScheduled = true;
                 system.runTimeout(() => {
-                    if (!this.disposed) this.state.input.setData("");
+                    this.clearScheduled = false;
+                    if (this.disposed) return;
+                    try {
+                        this.state.input.setData("");
+                    } catch {
+                        // 表单已关闭或 Observable 已失效
+                    }
                 }, 1);
             }
         });
@@ -393,6 +414,12 @@ class PianoPanelSession {
     dispose() {
         if (this.disposed) return;
         this.disposed = true;
+        // 表单在原生层可能仍被保留；先关表单前清掉输入框里可能很长的一串文本。
+        try {
+            this.state?.input?.setData("");
+        } catch {
+            // Observable 已失效
+        }
         this.close();
         this.releaseViewModel();
         for (const cleanup of this.cleanups.splice(0)) {
@@ -411,6 +438,7 @@ class PianoPanelSession {
         this.player = undefined as never;
         this.inited = false;
         this.lastLength = 0;
+        this.clearScheduled = false;
         this.opening = false;
     }
 
