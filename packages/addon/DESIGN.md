@@ -137,13 +137,16 @@ Minecraft playSound / 粒子 / 显示
 
 共享只读 Observable 在表单关闭后保留，表单只增减绑定；不要把它们重新挪回玩家会话。`retain()` / `release()` 只控制播放状态刷新订阅，不销毁 view model。
 
+DDUI 表单在 `1.26.50` + `@minecraft/server-ui 2.2.0` 下已验证关闭即释放，不需要也不应再缓存实例。表单关闭时仍要显式解绑 Observable 监听，并在关闭前清空可能很长的文本字段（例如连音模式的输入串），避免会话数据在表单被回收前继续被持有；新增表单时请沿用 `cleanups`/`trackObservable` 模式，不要在构造函数里裸 `subscribe`。
+
+按键释放等每 tick 状态由 `PianoRuntime.tickSignal`（`PianoWorld` 的 1 tick 循环）驱动，不要为每个音符单独 `system.runTimeout`。
+
 ## 7. 有意保留的保护措施
 
 以下机制不要因为“看起来多余”而删除：
 
 - `PianoDisplay.recover()` 的锚点、朝向、重复实体、数据迁移逻辑。
 - `PianoRuntime.dispose(false)` 与 `dispose(true)` 的区分。
-- `unloadedSettings` 的暂存与重试保存。
 - `PianoWorld` 的 sweep、verify、距离卸载宽限。
 - MIDI 异步加载的 generation 校验。
 - UI 的失效检测、异步打开保护和活动表单防重入；不再依赖实例复用规避内存泄漏。

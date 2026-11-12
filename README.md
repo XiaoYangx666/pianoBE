@@ -253,10 +253,6 @@ git push origin <分支>    # 提交 Pull Request
 
 ---
 
-## 已知问题
-
-- **DDUI 内存**：`1.26.50` + `@minecraft/server-ui 2.2.0` 下已验证表单关闭即释放，不再缓存实例规避泄漏。
-
 ## 分支
 
 架构重构工作在 `refactor/monorepo-arch` 分支：五大阶段（core 抽取 → addon 接入 → 后端+管理页 → 生成器重构 → server-net 联调）+ 双目标构建。
