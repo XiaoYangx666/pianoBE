@@ -56,6 +56,7 @@ export const DEFAULT_PIANO_SETTINGS = {
 export type PianoSettings = Readonly<typeof DEFAULT_PIANO_SETTINGS>;
 
 export const PIANO_SETTINGS_LIMITS = {
+    // 100% 对应 playSound 的 volume 1.0（满响度）；200% 对应 2.0，可听距离也拉到上限。
     volume: [0, 200],
     textScale: [25, 250],
     textRight: [-16, 16],

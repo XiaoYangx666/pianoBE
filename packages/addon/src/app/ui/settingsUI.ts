@@ -41,7 +41,7 @@ class PianoSettingsForm {
         const particlePalette = new ObservableNumber(DEFAULT_PIANO_SETTINGS.particlePalette, writable);
         this.bind("particlePalette", particlePalette);
         this.form.dropdown("粒子配色", particlePalette, PIANO_PARTICLE_PALETTES.map(({ label, value }) => ({ label, value })));
-        slider("钢琴音量（%，0 为静音）", "volume");
+        slider("钢琴音量（%，100 为正常，200 为最大）", "volume");
         const timbre = new ObservableNumber(DEFAULT_PIANO_SETTINGS.timbre, writable);
         this.bind("timbre", timbre);
         this.form.dropdown("钢琴音色", timbre,

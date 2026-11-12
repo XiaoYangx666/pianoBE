@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
-import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, readPianoSettings } from "../src/domain/piano/settings";
+import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, readPianoSettings } from "../src/domain/piano/settings";
 import { AVAILABLE_SCORES, DEFAULT_SCORE_ID } from "../src/domain/score/score";
 import { FOLLOW_PIANO_LAYER, resolveSoundLayer, soundLayerAt, soundLayerIndexOf, soundTypes } from "../src/domain/piano/soundTypes";
 
@@ -55,6 +55,14 @@ describe("piano timbre settings", () => {
         const migrated = readPianoSettings(JSON.stringify({ volume: 80, particles: false }));
         expect(migrated.timbre).toBe(DEFAULT_PIANO_SETTINGS.timbre);
         expect(migrated.volume).toBe(80);
+    });
+
+    test("音量上限为 200%，100% 对应 playSound 的 1.0", () => {
+        expect(PIANO_SETTINGS_LIMITS.volume).toEqual([0, 200]);
+        expect(readPianoSettings(JSON.stringify({ volume: 150 })).volume).toBe(150);
+        expect(readPianoSettings(JSON.stringify({ volume: 200 })).volume).toBe(200);
+        expect(readPianoSettings(JSON.stringify({ volume: 250 })).volume).toBe(200);
+        expect(readPianoSettings(JSON.stringify({ volume: 37 })).volume).toBe(37);
     });
 });
 
