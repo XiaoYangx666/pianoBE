@@ -26,8 +26,6 @@ const KEYS_PER_MASK = 11;
 const MASK_COUNT = KEY_COUNT / KEYS_PER_MASK;
 const STRIKE_SHIFT = KEYS_PER_MASK;
 const DOWN_MASK = (1 << KEYS_PER_MASK) - 1;
-// An unloaded entity may reject writes. Retry against the same entity when it returns.
-const unloadedSettings = new Map<string, PianoSettings>();
 
 // Entity yaw 0 points south. The north block permutation faces north.
 const YAW: Record<Cardinal_Direction, number> = { north: 180, west: 90, south: 0, east: -90 };
@@ -90,7 +88,6 @@ export function recoverScoreStand(location: InstrumentLocation, center: Vector3,
 }
 
 export function removePianoDisplay(entity: Entity) {
-    unloadedSettings.delete(entity.id);
     releaseVisual(entity);
 }
 
@@ -101,14 +98,13 @@ export class PianoDisplay {
     private light = 1;
     private saved: unknown;
     private config: PianoSettings;
-    private persistedConfig: PianoSettings;
-    private settingsSavePending = false;
+    /** 最近一次成功写入动态属性的 JSON，避免重复写。 */
+    private savedSettings: string;
 
     private constructor(readonly entity: Entity) {
         this.saved = entity.getDynamicProperty(PLAYBACK);
-        this.persistedConfig = readPianoSettings(entity.getDynamicProperty(SETTINGS));
-        this.config = unloadedSettings.get(entity.id) ?? this.persistedConfig;
-        this.settingsSavePending = this.config !== this.persistedConfig;
+        this.config = readPianoSettings(entity.getDynamicProperty(SETTINGS));
+        this.savedSettings = JSON.stringify(this.config);
         // Clear pressed keys and strike bits left in a persisted display.
         for (let group = 0; group < MASK_COUNT; group++) {
             entity.setProperty(`xypiano:keys_${group}`, 1);
@@ -150,28 +146,19 @@ export class PianoDisplay {
 
     updateSettings(settings: PianoSettings) {
         this.config = settings;
+        // 设置表单打开时实体一定在加载区块内，直接落盘，避免卸载后再补写。
+        this.flushSettings();
     }
 
     flushSettings() {
-        this.settingsSavePending = this.config !== this.persistedConfig;
-        this.retrySettingsSave();
-    }
-
-    retrySettingsSave() {
-        if (!this.settingsSavePending || !this.entity.isValid) return;
+        const raw = JSON.stringify(this.config);
+        if (raw === this.savedSettings || !this.entity.isValid) return;
         try {
-            this.entity.setDynamicProperty(SETTINGS, JSON.stringify(this.config));
-            this.persistedConfig = this.config;
-            this.settingsSavePending = false;
-            unloadedSettings.delete(this.entity.id);
+            this.entity.setDynamicProperty(SETTINGS, raw);
+            this.savedSettings = raw;
         } catch (error) {
             console.warn("[piano] 保存钢琴设置失败", error);
         }
-    }
-
-    detachSettings() {
-        this.flushSettings();
-        if (this.settingsSavePending) unloadedSettings.set(this.entity.id, this.config);
     }
 
     checkpoint(record: PlaybackRecord) {
@@ -229,7 +216,7 @@ export class PianoDisplay {
             removePianoDisplay(this.entity);
             return;
         }
-        this.detachSettings();
+        this.flushSettings();
         if (!this.entity.isValid) return;
         this.release.clear();
         this.pendingStrikes.fill(0);
