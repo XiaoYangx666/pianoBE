@@ -44,7 +44,9 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 2. 设置包名与描述，导出 `.mcaddon`
 3. 将包导入世界（需开启"测试版 API"），放置钢琴方块即可弹奏/播放内嵌曲目
 
-试听音色直接取自模板底包内的真实钢琴采样，无需额外音效文件。
+试听音色直接取自模板底包内的真实钢琴采样，无需额外音效文件。经典 P-88 采样来自
+Salamander Grand Piano V3（Alexander Holm，CC BY 3.0），各音色的来源与授权见
+`packages/addon/rp/THIRD_PARTY_NOTICES.md`。
 
 ### 2. BDS 服务器 + 自托管后端（远程曲库）
 

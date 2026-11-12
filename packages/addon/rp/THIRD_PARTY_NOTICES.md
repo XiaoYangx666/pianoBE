@@ -1,6 +1,6 @@
 # 第三方钢琴采样声明
 
-本资源包可能包含以下免费钢琴采样；实际包含的音色以包内 `sounds/` 目录为准。除默认 P-88 采样外，新增音色均为本站点重新裁剪、淡出并转码为 OGG Vorbis，未改变原始音高与音色特征。
+本资源包包含以下免费钢琴采样；实际包含的音色以包内 `sounds/` 目录为准。各音色均由本站点重新裁剪、淡出并转码为 OGG Vorbis，未改变原始音高与音色特征。
 
 ## Meta Piano
 
@@ -35,4 +35,9 @@
 ## 默认 P-88 采样
 
 - 音色目录：`sounds/piano*`
-- 沿用项目原有采样，未在本声明中重新授权。
+- 来源：Salamander Grand Piano V3 — Alexander Holm
+  https://archive.org/details/SalamanderGrandPianoV3
+- 授权：Creative Commons Attribution 3.0（CC BY 3.0）
+  https://creativecommons.org/licenses/by/3.0/
+- 署名：Salamander Grand Piano V3 by Alexander Holm. Modifications: selected
+  pitches, trimmed, faded, and converted to OGG Vorbis for Minecraft Bedrock.
