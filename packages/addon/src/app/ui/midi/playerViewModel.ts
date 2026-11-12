@@ -104,12 +104,10 @@ export class MidiPlayerViewModel implements MidiPlayerReadonlyContext {
 
 const viewModels = new Map<MidiPlayer, MidiPlayerViewModel>();
 
-/** 获取/创建一架钢琴的 MIDI 只读视图；生命周期跟随 MidiPlayer。 */
+/** 获取/创建一架钢琴的 MIDI 只读视图；调用方保证 player 存活。 */
 export function midiViewModel(player: MidiPlayer): MidiPlayerViewModel {
     let viewModel = viewModels.get(player);
     if (viewModel) return viewModel;
-
-    if (!player.isAlive()) return new MidiPlayerViewModel(player);
 
     viewModel = new MidiPlayerViewModel(player);
     viewModels.set(player, viewModel);

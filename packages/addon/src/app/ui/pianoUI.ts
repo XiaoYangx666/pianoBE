@@ -50,8 +50,8 @@ function addScoreControls(
     controlsVisible: ObservableBoolean,
     cleanups: Cleanup[]
 ) {
-    // Earlier DDUI versions still need to be able to open the piano panel.
-    if (typeof form.image !== "function" || AVAILABLE_SCORES.length === 0) return;
+    // 目标版本固定为 1.26.50 + server-ui 2.2.0，form.image 是标准方法。
+    if (AVAILABLE_SCORES.length === 0) return;
     const showScore = state.showScore;
     const visible = new ObservableBoolean(false);
     const source = new ObservableString("");

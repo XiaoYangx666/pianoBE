@@ -80,12 +80,10 @@ export class PianoViewModel {
 
 const viewModels = new Map<PianoRuntime, PianoViewModel>();
 
-/** 获取/创建一架钢琴的按键视图；生命周期跟随 PianoRuntime。 */
+/** 获取/创建一架钢琴的按键视图；调用方保证 piano 存活。 */
 export function pianoViewModel(piano: PianoRuntime): PianoViewModel {
     let viewModel = viewModels.get(piano);
     if (viewModel) return viewModel;
-
-    if (!piano.isAlive()) return new PianoViewModel(piano);
 
     viewModel = new PianoViewModel(piano);
     viewModels.set(piano, viewModel);
