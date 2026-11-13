@@ -33,6 +33,8 @@ export const PIANO_PARTICLE_PALETTES = [
     { value: 6, label: "深海 · 深蓝到亮青", colors: ["#176FFF", "#29B6FF", "#4DE8FF"] },
 ] as const;
 
+export type PianoSoundMode = "stereo" | "3d";
+
 export const DEFAULT_PIANO_SETTINGS = {
     particles: true,
     scoreMounted: false,
@@ -43,6 +45,8 @@ export const DEFAULT_PIANO_SETTINGS = {
     volume: 100,
     timbre: DEFAULT_PIANO_TIMBRE as number,
     soundLayer: "standard" as PianoSoundLayer,
+    /** stereo = 立体声（无 3D 定位）；3d = 有距离衰减/定位（单声道） */
+    soundMode: "stereo" as PianoSoundMode,
     textVisible: true,
     titleColor: "#D4FFE8",
     statusColor: "#A6EBCF",
@@ -75,6 +79,11 @@ export function normalizePianoColor(value: unknown) {
 function normalizeSoundLayer(value: unknown): PianoSoundLayer | undefined {
     if (isSoundLayer(value)) return value;
     return typeof value === "number" ? soundLayerAt(value) : undefined;
+}
+
+/** 声音模式只接受两个稳定字符串；旧存档缺字段时回退到默认立体声。 */
+function normalizeSoundMode(value: unknown): PianoSoundMode | undefined {
+    return value === "stereo" || value === "3d" ? value : undefined;
 }
 
 export function pianoTextColor(hex: string) {
@@ -112,6 +121,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         timbre: AVAILABLE_PIANO_TIMBRES.find(timbre => timbre.value === saved.timbre)?.value
             ?? defaults.timbre,
         soundLayer: normalizeSoundLayer(saved.soundLayer) ?? defaults.soundLayer,
+        soundMode: normalizeSoundMode(saved.soundMode) ?? defaults.soundMode,
         textVisible: typeof saved.textVisible === "boolean" ? saved.textVisible : defaults.textVisible,
         titleColor: normalizePianoColor(saved.titleColor) ?? defaults.titleColor,
         statusColor: normalizePianoColor(saved.statusColor) ?? defaults.statusColor,

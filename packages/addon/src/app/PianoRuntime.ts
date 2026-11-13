@@ -228,7 +228,8 @@ export class PianoRuntime {
         const settings = this.settings ?? DEFAULT_PIANO_SETTINGS;
         // 100% → 1.0（正常响度）；200% → 2.0，采样峰值已限制在 -6 dB，正好不削波。
         const volume = settings.volume / 100;
-        if (volume > 0) dimension.playSound(`${pianoSoundId(settings.timbre, layer)}.${note.sample}`, this.center, { pitch: note.pitch, volume });
+        const stereo = settings.soundMode !== "3d";
+        if (volume > 0) dimension.playSound(`${pianoSoundId(settings.timbre, layer, stereo)}.${note.sample}`, this.center, { pitch: note.pitch, volume });
         this.display?.strike(note.midi, duration);
         this.noteSignal.publish({ midi: note.midi, duration });
         this.activate();

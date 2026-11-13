@@ -6,10 +6,15 @@
  *   node tools/build-piano-timbres.mjs --refresh  # 重新下载并覆盖全部音色
  *   node tools/build-piano-timbres.mjs meta_piano upright_kw
  *   node tools/build-piano-timbres.mjs piano      # 从本地母带重建经典 P-88
+ *   node tools/build-piano-timbres.mjs --definitions-only  # 只重建 sound_definitions.json
  *
  * 输出：
  *   packages/addon/rp/sounds/<音色>/{short,standard,long}/*.ogg
  *   packages/addon/rp/sounds/sound_definitions.json
+ *
+ * 每个采样会生成两套音效定义，共用同一批 OGG：
+ *   3D（单声道、有距离衰减）：piano.C4 / piano_short.C4 / meta_piano.C4
+ *   立体声（保留立体声、无定位）：piano_stereo.C4 / piano_short_stereo.C4 / meta_piano_stereo.C4
  *
  * 下载的源采样缓存在 tools/piano_timbres_source/（已 gitignore）。
  * 经典 P-88 的母带不随仓库分发，放在 tools/piano_source/（同样已 gitignore）。
@@ -315,23 +320,37 @@ async function writeSoundDefinitions() {
             if (!existsSync(join(SOUNDS, dir))) {
                 throw new Error(`缺少采样目录 ${dir}，请先完整生成该音色（不带参数运行本脚本）`);
             }
+            const stereoDir = pianoSoundId(timbre.value, layer, true);
             for (const note of BASE_NOTES) {
+                const sound = `sounds/${dir}/${note}`;
+                // 3D：单声道，保留定位与距离衰减。
                 definitions[`${dir}.${note}`] = {
                     category: "record",
-                    sounds: [`sounds/${dir}/${note}`],
+                    sounds: [{ name: sound, is3D: true }],
                     min_distance: 8,
                     max_distance: 32,
+                };
+                // 立体声：保留立体声采样，交给游戏做普通 2D 播放。
+                definitions[`${stereoDir}.${note}`] = {
+                    category: "record",
+                    sounds: [{ name: sound, is3D: false }],
                 };
             }
         }
     }
     const target = join(SOUNDS, "sound_definitions.json");
-    await writeFile(target, `${JSON.stringify({ format_version: "1.26.0", sound_definitions: definitions }, null, 4)}\n`);
-    console.log(`\n音效定义已写入 ${target}（${Object.keys(definitions).length} 条）`);
+    // Bedrock 要求 min_distance / max_distance 是浮点数；JSON.stringify 会把 8.0 写成 8，
+    // 整数会被静默忽略，所以在文本层补上小数点。
+    const json = JSON.stringify({ format_version: "1.26.0", sound_definitions: definitions }, null, 4)
+        .replace(/"min_distance": (-?\d+)(?![\d.])/g, '"min_distance": $1.0')
+        .replace(/"max_distance": (-?\d+)(?![\d.])/g, '"max_distance": $1.0');
+    await writeFile(target, `${json}\n`);
+    console.log(`\n音效定义已写入 ${target}（${Object.keys(definitions).length} 条：3D + 立体声各一套）`);
 }
 
 const args = process.argv.slice(2);
 const refresh = args.includes("--refresh");
+const definitionsOnly = args.includes("--definitions-only");
 const selected = args.filter((arg) => !arg.startsWith("--"));
 let timbreIds = selected.length ? selected : Object.keys(TIMBRES);
 
@@ -364,6 +383,12 @@ if (!selected.length) {
         }
         return missing.length === 0;
     });
+}
+
+// 只重建音效定义时不需要采样源、ffmpeg 或 fluidsynth，直接复用现有目录。
+if (definitionsOnly) {
+    await writeSoundDefinitions();
+    process.exit(0);
 }
 
 await mkdir(CACHE, { recursive: true });

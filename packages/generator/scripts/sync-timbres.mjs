@@ -46,6 +46,7 @@ for (const timbre of PIANO_TIMBRES) {
     const encoder = new TextEncoder();
     for (const layer of PIANO_SOUND_LAYERS) {
         const dir = dirs[layer];
+        const stereoDir = pianoSoundId(timbre.value, layer, true);
         for (const note of PIANO_SAMPLE_KEYS) {
             const file = path.join(soundsRoot, dir, `${note}.ogg`);
             if (!fs.existsSync(file)) {
@@ -53,17 +54,26 @@ for (const timbre of PIANO_TIMBRES) {
             }
             const data = fs.readFileSync(file);
             entries.push({ path: `sounds/${dir}/${note}.ogg`, bytes: data });
+            const sound = `sounds/${dir}/${note}`;
             definitions[`${dir}.${note}`] = {
                 category: "record",
-                sounds: [`sounds/${dir}/${note}`],
+                sounds: [{ name: sound, is3D: true }],
                 min_distance: 8,
                 max_distance: 32,
+            };
+            definitions[`${stereoDir}.${note}`] = {
+                category: "record",
+                sounds: [{ name: sound, is3D: false }],
             };
         }
     }
     entries.push({
         path: "sound_definitions.json",
-        bytes: encoder.encode(JSON.stringify({ sound_definitions: definitions })),
+        // Bedrock 要求 min_distance / max_distance 是浮点数；JSON.stringify 会把 8.0 写成 8，
+        // 整数会被静默忽略，所以在文本层补上小数点。
+        bytes: encoder.encode(JSON.stringify({ sound_definitions: definitions })
+            .replace(/"min_distance": (-?\d+)(?![\d.])/g, '"min_distance": $1.0')
+            .replace(/"max_distance": (-?\d+)(?![\d.])/g, '"max_distance": $1.0')),
     });
     entries.push({
         path: "meta.json",

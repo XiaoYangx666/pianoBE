@@ -60,8 +60,26 @@ describe("note.ts（采样映射，addon/前端共用）", () => {
         expect(getSoundIdByDuration(2, 1)).toBe("meta_piano");
     });
 
+    it("立体声模式使用 _stereo 定义，默认仍为 3D 定义", () => {
+        expect(pianoSoundId(0, "standard")).toBe("piano");
+        expect(pianoSoundId(0, "short")).toBe("piano_short");
+        expect(pianoSoundId(0, "standard", true)).toBe("piano_stereo");
+        expect(pianoSoundId(0, "short", true)).toBe("piano_short_stereo");
+        expect(pianoSoundId(0, "long", true)).toBe("piano_long_stereo");
+        expect(pianoSoundId(1, "standard", true)).toBe("meta_piano_stereo");
+        expect(pianoSoundId(1, "short", true)).toBe("meta_piano_short_stereo");
+    });
+
+    it("getSoundIdByDuration 的立体声参数默认关闭", () => {
+        expect(getSoundIdByDuration(0.5, 0, true)).toBe("piano_short_stereo");
+        expect(getSoundIdByDuration(2, 0, true)).toBe("piano_stereo");
+        expect(getSoundIdByDuration(5, 0, true)).toBe("piano_long_stereo");
+        expect(getSoundIdByDuration(2)).toBe("piano");
+    });
+
     it("未知音色编号回退到默认音色", () => {
         expect(pianoSoundId(999, "short")).toBe("piano_short");
+        expect(pianoSoundId(999, "short", true)).toBe("piano_short_stereo");
     });
 
     it("getSoundLayerByDuration 的边界", () => {

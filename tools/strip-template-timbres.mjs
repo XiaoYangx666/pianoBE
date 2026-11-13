@@ -14,7 +14,10 @@ const templatePath = resolve(root, process.argv[2] ?? "packages/addon/dist/templ
 const optional = PIANO_TIMBRES.filter((timbre) => timbre.id !== "piano");
 const optionalDirs = new Set(
     optional.flatMap((timbre) =>
-        PIANO_SOUND_LAYERS.map((layer) => pianoSoundId(timbre.value, layer))
+        PIANO_SOUND_LAYERS.flatMap((layer) => {
+            const dir = pianoSoundId(timbre.value, layer);
+            return [dir, `${dir}_stereo`];
+        })
     )
 );
 

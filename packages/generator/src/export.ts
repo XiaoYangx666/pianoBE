@@ -111,6 +111,7 @@ function applyTimbres(
         if (timbre.id === "piano") continue;
         for (const dir of Object.values(timbre.dirs)) {
             optionalDirs.add(dir);
+            optionalDirs.add(`${dir}_stereo`);
             addon.removeTree(`${soundRoot}${dir}/`);
         }
     }

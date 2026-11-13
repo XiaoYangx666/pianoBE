@@ -131,16 +131,19 @@ export function getSoundLayerByDuration(duration: number): PianoSoundLayer {
 /**
  * 音色编号 + 采样档位 → rp/sounds 音效 id 前缀。
  * 例如 (0, "short") → "piano_short"，(1, "standard") → "meta_piano"。
+ * stereo=true 时返回立体声定义，例如 "piano_short_stereo" / "meta_piano_stereo"。
  */
-export function pianoSoundId(timbre: number, layer: PianoSoundLayer): string {
+export function pianoSoundId(timbre: number, layer: PianoSoundLayer, stereo = false): string {
     const id = getPianoTimbre(timbre).id;
-    return layer === "standard" ? id : `${id}_${layer}`;
+    const base = layer === "standard" ? id : `${id}_${layer}`;
+    return stereo ? `${base}_stereo` : base;
 }
 
 /** 根据 note 时长获取采样音色档（与 addon 音效 id 一致） */
 export function getSoundIdByDuration(
     duration: number,
-    timbre: number = DEFAULT_PIANO_TIMBRE
+    timbre: number = DEFAULT_PIANO_TIMBRE,
+    stereo = false
 ): string {
-    return pianoSoundId(timbre, getSoundLayerByDuration(duration));
+    return pianoSoundId(timbre, getSoundLayerByDuration(duration), stereo);
 }

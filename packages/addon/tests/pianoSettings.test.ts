@@ -66,6 +66,23 @@ describe("piano timbre settings", () => {
     });
 });
 
+describe("piano sound mode settings", () => {
+    test("默认使用立体声（关闭 3D 定位）", () => {
+        expect(DEFAULT_PIANO_SETTINGS.soundMode).toBe("stereo");
+    });
+
+    test("旧存档缺少 soundMode 时回退到立体声", () => {
+        expect(readPianoSettings(JSON.stringify({ volume: 80 })).soundMode).toBe("stereo");
+    });
+
+    test("合法的 soundMode 原样保留，非法值回退默认", () => {
+        expect(normalizePianoSettings({ soundMode: "3d" }).soundMode).toBe("3d");
+        expect(normalizePianoSettings({ soundMode: "stereo" }).soundMode).toBe("stereo");
+        expect(normalizePianoSettings({ soundMode: "mono" }).soundMode).toBe(DEFAULT_PIANO_SETTINGS.soundMode);
+        expect(normalizePianoSettings({ soundMode: true }).soundMode).toBe(DEFAULT_PIANO_SETTINGS.soundMode);
+    });
+});
+
 describe("piano sound layer settings", () => {
     test("默认音长是标准音", () => {
         expect(DEFAULT_PIANO_SETTINGS.soundLayer).toBe("standard");

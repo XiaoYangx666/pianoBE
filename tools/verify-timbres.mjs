@@ -61,7 +61,7 @@ assert(!hasDir(onlyDefault, "meta_piano"), "仅默认：不包含 Meta 采样");
 assert(!hasDir(onlyDefault, "upright_kw"), "仅默认：不包含 KW 采样");
 assert(!hasDir(onlyDefault, "ydp_grand"), "仅默认：不包含 YDP 采样");
 const defaultDefs = parseDefinitions(onlyDefault);
-assert(Object.keys(defaultDefs).length === 90, `仅默认：音效定义 90 条（实际 ${Object.keys(defaultDefs).length}）`);
+assert(Object.keys(defaultDefs).length === 180, `仅默认：音效定义 180 条（实际 ${Object.keys(defaultDefs).length}）`);
 assert(
     onlyDefault.readTextSync(TIMBRES_MODULE).includes('["piano"]'),
     "仅默认：timbres.js 只启用钢琴"
@@ -72,7 +72,7 @@ assert(hasDir(withMeta, "meta_piano"), "默认 + Meta：包含 Meta 采样");
 assert(!hasDir(withMeta, "upright_kw"), "默认 + Meta：不包含 KW 采样");
 assert(!hasDir(withMeta, "ydp_grand"), "默认 + Meta：不包含 YDP 采样");
 const metaDefs = parseDefinitions(withMeta);
-assert(Object.keys(metaDefs).length === 180, `默认 + Meta：音效定义 180 条（实际 ${Object.keys(metaDefs).length}）`);
+assert(Object.keys(metaDefs).length === 360, `默认 + Meta：音效定义 360 条（实际 ${Object.keys(metaDefs).length}）`);
 assert(
     withMeta.readTextSync(TIMBRES_MODULE).includes('"meta_piano"'),
     "默认 + Meta：timbres.js 启用 Meta"
@@ -82,7 +82,7 @@ const allPacks = await Promise.all(optional.map(loadPack));
 const withAll = await build(allPacks, ["piano", ...optional.map((t) => t.id)]);
 assert(optional.every((t) => hasDir(withAll, t.id)), "全选：包含全部可选音色采样");
 const allDefs = parseDefinitions(withAll);
-assert(Object.keys(allDefs).length === 360, `全选：音效定义 360 条（实际 ${Object.keys(allDefs).length}）`);
+assert(Object.keys(allDefs).length === 720, `全选：音效定义 720 条（实际 ${Object.keys(allDefs).length}）`);
 const allTimbres = withAll.readTextSync(TIMBRES_MODULE);
 assert(optional.every((t) => allTimbres.includes(`"${t.id}"`)), "全选：timbres.js 启用全部音色");
 

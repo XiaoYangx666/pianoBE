@@ -10,6 +10,8 @@ midis/files/*
 midis/js/*
 tools/piano_source/*
 tools/piano_timbres_source/*
+# 本地音频实验环境，不随正式仓库提交
+tools/audio-lab/
 packages/*/dist
 packages/*/data
 packages/generator/public/library

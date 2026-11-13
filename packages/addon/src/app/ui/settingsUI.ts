@@ -46,6 +46,26 @@ class PianoSettingsForm {
         this.bind("timbre", timbre);
         this.form.dropdown("钢琴音色", timbre,
             AVAILABLE_PIANO_TIMBRES.map(({ label, value, description }) => ({ label, value, description })));
+        const spatialAudio = new ObservableBoolean(DEFAULT_PIANO_SETTINGS.soundMode === "3d", writable);
+        const spatialLabel = new ObservableString("");
+        const updateSpatialLabel = (enabled: boolean) => {
+            spatialLabel.setData(enabled ? "3D 定位：开" : "3D 定位：关");
+        };
+        const onSpatialAudio = (enabled: boolean) => {
+            updateSpatialLabel(enabled);
+            if (this.syncing || !this.target) return;
+            this.apply({ soundMode: enabled ? "3d" : "stereo" });
+        };
+        spatialAudio.subscribe(onSpatialAudio);
+        this.cleanups.push(() => spatialAudio.unsubscribe(onSpatialAudio));
+        this.syncFields.push(settings => {
+            const enabled = settings.soundMode === "3d";
+            spatialAudio.setData(enabled);
+            updateSpatialLabel(enabled);
+        });
+        this.form.toggle(spatialLabel, spatialAudio, {
+            description: "开 = 有距离衰减/定位（单声道）；关 = 立体声（无定位）",
+        });
         const soundLayer = new ObservableNumber(soundLayerIndexOf(DEFAULT_PIANO_SETTINGS.soundLayer), writable);
         this.syncFields.push(settings => soundLayer.setData(soundLayerIndexOf(settings.soundLayer)));
         const onSoundLayer = (index: number) => {
