@@ -192,15 +192,23 @@ export class MidiPlayer {
         this.signal.publish();
 
         // ✅ 判断是否全部播放完
-        if (this.isAllTracksFinished()) {
+        if (this.isSongFinished()) {
             this.prepareNext();
         }
     }
 
     /* ================== 内部逻辑 ================== */
 
-    private isAllTracksFinished(): boolean {
-        return !this.cursor || this.cursor.done;
+    /**
+     * 事件流只记录音符起点，最后一个音的长音尾不在游标里；
+     * 文件头时长按音符结束时间编码，所以两者都结束才算播完，
+     * 否则尾音会在切歌瞬间被截断（显示时长也会比实际播放长）。
+     */
+    private isSongFinished(): boolean {
+        if (!this.cursor) return true;
+        if (!this.cursor.done) return false;
+        const durationSec = (this.song?.song.duration ?? 0) / TIME_SCALE;
+        return durationSec <= 0 || this.currentTime >= durationSec;
     }
 
     private async prepareNext() {

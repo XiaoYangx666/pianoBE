@@ -10,14 +10,17 @@ import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
 
 const song = { id: "sample", name: "Sample", duration: 400 };
 
-function handleFor(info: MidiSongMeta): SongHandle {
+function handleFor(
+    info: MidiSongMeta,
+    notes = [60, 0, 15, 90, 62, 80, 15, 90, 64, 240, 15, 90]
+): SongHandle {
     const pbe2 = encodePbe2({
         id: info.id,
         name: info.name,
         duration: info.duration,
         tracks: [{
             instrument: { family: "", number: 0, name: "" },
-            notes: [60, 0, 15, 90, 62, 80, 15, 90, 64, 240, 15, 90],
+            notes,
         }],
     });
     const { header, events } = readPbe2Events(pbe2);
@@ -38,7 +41,7 @@ function handleFor(info: MidiSongMeta): SongHandle {
     };
 }
 
-const loader = { acquire: async (info: MidiSongMeta) => handleFor(info) };
+const loader = { acquire: async () => handleFor(song) };
 const { MidiPlayer } = await import("../src/domain/playback/player");
 
 const record = readPlaybackRecord(JSON.stringify({
@@ -102,4 +105,33 @@ test("two pianos keep independent playback state", async () => {
     expect(b.notes).toEqual([]);
     expect(a.midi.checkpoint()?.state).toBe("playing");
     expect(b.midi.checkpoint()?.state).toBe("paused");
+});
+
+test("plays through the final note tail before switching songs", async () => {
+    // 最后一个音 1s 起、持续 2s；文件头时长 = 3s（与音尾一致）。
+    const tailNotes = [60, 40, 200, 90];
+    const tailMeta = { id: "tail", name: "Tail", duration: 120 };
+    const midi = new MidiPlayer(
+        { acquire: async () => handleFor(tailMeta, tailNotes) },
+        { note: () => {}, playing: () => {} }
+    );
+    midi.queue.enqueue(tailMeta);
+    midi.queue.enqueue({ ...tailMeta, id: "next", name: "Next" });
+    await midi.play();
+
+    let now = Date.now();
+    const advance = (ms: number) => {
+        now += ms;
+        midi.tick(now);
+    };
+
+    // 2.9s：最后一个音已触发（起点 1s），但尾音还没放完，不能切歌。
+    for (let i = 0; i < 29; i++) advance(100);
+    expect(midi.getInfo().currentTime).toBeCloseTo(2.9, 5);
+    expect(midi.getInfo().queueIndex).toBe(0);
+
+    // 3.1s：尾音结束，切到下一首。
+    advance(200);
+    expect(midi.getInfo().queueIndex).toBe(1);
+    expect(midi.getInfo().midiName).toBe("Next");
 });
