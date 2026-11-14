@@ -104,7 +104,7 @@ export class MusicCollection {
             seen.add(id);
             result.push(parsed);
         }
-        return result.sort((a, b) => a.createdAt - b.createdAt || a.name.localeCompare(b.name));
+        return result.sort((a, b) => a.createdAt - b.createdAt || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     }
 
     has(id: string): boolean {
