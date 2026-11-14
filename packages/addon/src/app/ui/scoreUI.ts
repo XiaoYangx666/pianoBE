@@ -1,8 +1,8 @@
-import { Player, system } from "@minecraft/server";
-import { DDUI } from "sapi-pro";
-import { normalizePianoSettings, type PianoSettings } from "@domain/piano/settings";
+import type { PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreAt, scoreIndexOf, type PianoScore } from "@domain/score/score";
 import type { PianoRuntime } from "@app/PianoRuntime";
+import { appPage, backButton } from "./ddui";
+import { settingsEditor } from "./pianoSettings";
 
 /** 每页显示多少个曲谱按钮；超过后通过上一页/下一页浏览。 */
 const PAGE_SIZE = 6;
@@ -15,18 +15,12 @@ const PAGE_SIZE = 6;
  *
  * 页面内所有 Observable 与订阅由 DDUI 作用域托管，关闭/返回后自动释放。
  */
-export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置", (ui, args) => {
+export const PianoScorePage = appPage<{ piano: PianoRuntime }>("曲谱配置", (ui, args) => {
     const piano = args.piano;
-    const settings = piano.settings;
-    const displayId = piano.displayId;
-    if (!settings || !displayId) {
-        ui.player.sendMessage("§e钢琴显示实体暂不可用。");
-        ui.close();
-        return;
-    }
-
-    ui.onClose(() => piano.flushSettings(displayId));
-    ui.subscribe(piano.disposedSignal, () => ui.close());
+    const editor = settingsEditor(ui, piano);
+    if (!editor) return;
+    const settings = editor.current();
+    if (!settings) return;
 
     const empty = AVAILABLE_SCORES.length === 0;
     const mount = ui.boolean(settings.scoreMounted);
@@ -53,29 +47,7 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置",
     };
 
     /** 目标仍有效时保存补丁；失效就关面板 */
-    const apply = (patch: Partial<PianoSettings>): PianoSettings | undefined => {
-        const current = piano.settings;
-        if (
-            !current ||
-            piano.displayId !== displayId ||
-            !ui.player.isValid ||
-            ui.player.dimension.id !== piano.location.dimension.id ||
-            piano.verify(system.currentTick) !== "complete"
-        ) {
-            ui.close();
-            return;
-        }
-        const next = normalizePianoSettings(patch, current);
-        if (
-            Object.keys(next).every(
-                (key) => next[key as keyof PianoSettings] === current[key as keyof PianoSettings]
-            )
-        ) {
-            return current;
-        }
-        if (piano.updateSettings(current, next)) return next;
-        ui.close();
-    };
+    const apply = (patch: Partial<PianoSettings>) => editor.apply(patch);
 
     /** 把过滤结果、分页状态和当前选择写进原生 Observable */
     const render = () => {
@@ -140,16 +112,9 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置",
 
     ui.button("上一页", () => turnPage(-1), { disabled: prevDisabled })
         .button("下一页", () => turnPage(1), { disabled: nextDisabled })
-        .closeButton();
+        .divider();
+    backButton(ui);
+    ui.closeButton();
 
     render();
 });
-
-export function openScoreConfig(player: Player, piano: PianoRuntime) {
-    if (!player.isValid) return;
-    if (!piano.settings || !piano.displayId) {
-        player.sendMessage("§e钢琴显示实体暂不可用。");
-        return;
-    }
-    DDUI.open(player, PianoScorePage, { piano });
-}

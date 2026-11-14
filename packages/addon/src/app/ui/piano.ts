@@ -14,11 +14,9 @@ import {
 } from "@app/ui/pianoUI";
 import { createPianoState, createPianoView } from "@app/ui/pianoState";
 import { scoreIndexOf } from "@domain/score/score";
+import { appPage } from "@app/ui/ddui";
 import { MidiPlayerPage } from "@app/ui/midi/playerUI";
-import { MusicCardPage } from "@app/ui/midi/cardUI";
-import { MidiImportPage } from "@app/ui/midi/importUI";
 import { PianoSettingsPage } from "@app/ui/settingsUI";
-import { PianoScorePage } from "@app/ui/scoreUI";
 import { loadShortcuts, ShortcutSettingsForm } from "@app/ui/shortcutUI";
 
 /** 连音模式下保留的输入尾部长度；parseInput 只读最后 1~3 个字符。 */
@@ -30,7 +28,7 @@ const MAX_INPUT_LENGTH = 32;
  * 业务状态（PianoState）与输入解析留在 PianoBE；页面生命周期、订阅、定时器、
  * 导航与“旧会话失效”由 DDUI 负责。面板关闭/返回时不会重建整张表单以外的任何东西。
  */
-export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
+export const PianoPanelPage = appPage<{ piano: PianoRuntime; block: Block }>(
     "文本钢琴",
     (ui, args) => {
         const player = ui.player;
@@ -166,15 +164,12 @@ export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 options
             )
             .button("♪ MIDI 播放器", () => ui.push(MidiPlayerPage, { piano, block }), options)
-            .button("音乐存储卡", () => ui.push(MusicCardPage, { piano }), options)
             .button("钢琴设置", () => ui.push(PianoSettingsPage, { piano }), options)
-            .button("曲谱配置", () => ui.push(PianoScorePage, { piano }), options)
             .button(
                 "快捷键设置",
                 () => ui.push(ShortcutSettingsForm, { bindings: loadShortcuts(player) }),
                 options
             )
-            .button("导入 MIDI", () => ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" }), options)
             .toggle("简洁模式", state.compact);
     }
 );

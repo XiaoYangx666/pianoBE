@@ -96,7 +96,6 @@ type FakePiano = {
     displayEntity?: unknown;
     refreshCardIndicator?: () => void;
 };
-
 let currentPiano: FakePiano | undefined;
 mock.module("@app/PianoWorld", () => ({
     pianoWorld: { get: () => currentPiano },
@@ -149,11 +148,13 @@ function makePiano(midi: MidiPlayer): FakePiano {
         isAlive: () => true,
         disposedSignal: new Signal<void>(),
         music: { availability: () => "ok" },
+        // 播放器页的“存储卡”入口只在插卡时打开表单
+        cardAccess: { item: {} },
     };
 }
 
 function makePlayer(id = "p1") {
-    return { id, name: id, isValid: true } as any;
+    return { id, name: id, isValid: true, sendMessage: () => {} } as any;
 }
 
 function makeBlock() {

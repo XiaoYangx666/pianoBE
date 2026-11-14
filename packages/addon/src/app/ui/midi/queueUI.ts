@@ -1,15 +1,14 @@
-import { DDUI } from "sapi-pro";
-import type { Player } from "@minecraft/server";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { MusicLibraryPage } from "./libraryUI";
 import { PAGE_SIZE, availabilityMark, pageCount, sourceMark } from "./shared";
+import { appPage, backButton } from "../ddui";
 
 export interface QueueArgs {
     piano: PianoRuntime;
 }
 
 /** 播放队列：只负责顺序，不管理歌单。来源与可用性直接标在条目上。 */
-export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => {
+export const PlayQueuePage = appPage<QueueArgs>("播放队列", (ui, args) => {
     const piano = args.piano;
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
@@ -84,12 +83,13 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
     ui.button("§c清空队列", () => ui.push(ClearQueuePage, { piano }));
     ui.button("刷新", refresh);
+    backButton(ui);
     ui.closeButton();
 
     refresh();
 });
 
-const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列操作", (ui, args) => {
+const QueueItemPage = appPage<{ piano: PianoRuntime; index: number }>("队列操作", (ui, args) => {
     const { piano, index } = args;
     const queue = piano.getMidiPlayer().queue;
     const ref = queue.getRefs()[index];
@@ -110,7 +110,7 @@ const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列�
     ui.button("返回", () => ui.back());
 });
 
-const ClearQueuePage = DDUI.page<QueueArgs>("清空队列", (ui, args) => {
+const ClearQueuePage = appPage<QueueArgs>("清空队列", (ui, args) => {
     const queue = args.piano.getMidiPlayer().queue;
     ui.label(`§e确定清空队列中的 ${queue.getLength()} 首歌曲？`);
     ui.button("§c清空", () => {
@@ -119,8 +119,3 @@ const ClearQueuePage = DDUI.page<QueueArgs>("清空队列", (ui, args) => {
     });
     ui.button("取消", () => ui.back());
 });
-
-export function openPlayQueue(player: Player, piano: PianoRuntime) {
-    if (!player.isValid || !piano.isAlive()) return;
-    DDUI.open(player, PlayQueuePage, { piano });
-}

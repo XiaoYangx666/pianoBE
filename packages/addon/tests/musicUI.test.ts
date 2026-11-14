@@ -142,13 +142,13 @@ function makePiano(overrides: Record<string, unknown> = {}) {
     return { piano, midi, storage };
 }
 
-function makePlayer(id = "p1") {
+function makePlayer(id = "p1", messages: string[] = []) {
     return {
         id,
         name: id,
         isValid: true,
         getComponent: () => undefined,
-        sendMessage: () => {},
+        sendMessage: (message: string) => { messages.push(message); },
     } as any;
 }
 
@@ -244,5 +244,18 @@ describe("播放器页面入口", () => {
         form.click("音乐曲库");
         expect(host.nav.pushed.at(-1)!.form).toBe(MusicLibraryPage);
         expect((host.nav.pushed.at(-1)!.args as any).piano).toBe(piano);
+    });
+
+    test("未插卡时“存储卡”按钮只提示，不打开空表单", () => {
+        const { piano } = makePiano();
+        const block = { isValid: true } as any;
+        const messages: string[] = [];
+        host.DDUI.open(makePlayer("card-guard", messages), MidiPlayerPage, { piano, block });
+        const before = host.nav.pushed.length;
+
+        host.lastForm().click("存储卡");
+
+        expect(host.nav.pushed.length).toBe(before);
+        expect(messages.join("\n")).toContain("卡槽是空的");
     });
 });

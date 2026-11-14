@@ -416,7 +416,12 @@ export function createDDUIHost(): FakeDDUIHost {
     let active: FakeUI | undefined;
 
     const DDUI = {
-        page: (title: string, build: (ui: FakeUI, args: any) => void) => ({ title, build, _ddui: true }),
+        page: (title: string, build: (ui: FakeUI, args: any) => void) => ({
+            title,
+            build,
+            _ddui: true,
+            handler: () => {},
+        }),
         open: (player: any, page: any, args?: any) => {
             active?.close();
             const ui = new FakeUI(player, args, page.title, nav);

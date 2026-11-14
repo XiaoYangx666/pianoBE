@@ -1,9 +1,8 @@
-import { DDUI } from "sapi-pro";
-import type { Player } from "@minecraft/server";
 import { formatBytes, toMusicRef, type MusicRef, type PlaylistMeta } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { midiManager, playlist } from "@app/midi";
 import { PAGE_SIZE, pageCount } from "./shared";
+import { appPage, backButton } from "../ddui";
 
 export interface LegacyPlaylistArgs {
     piano: PianoRuntime;
@@ -15,7 +14,7 @@ export interface LegacyPlaylistArgs {
  * 保留读取/导出/迁移能力，不再提供创建、改名、公开设置等编辑操作；
  * 新设计里“播放顺序”由钢琴自己的队列负责。
  */
-export const LegacyPlaylistPage = DDUI.page<LegacyPlaylistArgs>("旧播放列表（只读）", (ui, args) => {
+export const LegacyPlaylistPage = appPage<LegacyPlaylistArgs>("旧播放列表（只读）", (ui, args) => {
     const piano = args.piano;
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
@@ -64,11 +63,12 @@ export const LegacyPlaylistPage = DDUI.page<LegacyPlaylistArgs>("旧播放列表
     ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
     ui.button("刷新", refresh);
+    backButton(ui);
     ui.closeButton();
     refresh();
 });
 
-const LegacyPlaylistContentPage = DDUI.page<{ piano: PianoRuntime; meta: PlaylistMeta }>("旧列表内容", (ui, args) => {
+const LegacyPlaylistContentPage = appPage<{ piano: PianoRuntime; meta: PlaylistMeta }>("旧列表内容", (ui, args) => {
     const { piano, meta } = args;
     const status = ui.string("§7正在读取…");
     const listText = ui.string("", { clientWritable: false });
@@ -131,8 +131,3 @@ const LegacyPlaylistContentPage = DDUI.page<{ piano: PianoRuntime; meta: Playlis
 
     ui.button("返回", () => ui.back());
 });
-
-export function openLegacyPlaylists(player: Player, piano: PianoRuntime) {
-    if (!player.isValid || !piano.isAlive()) return;
-    DDUI.open(player, LegacyPlaylistPage, { piano });
-}

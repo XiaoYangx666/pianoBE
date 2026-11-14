@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import path from "node:path";
 import { Signal } from "../src/domain/util/signal";
 import { createDDUIHost, createMidiAppMock, createSapiProMock, FakeCustomForm, FakeObservable } from "./support/fakeDDUI";
 
@@ -88,16 +87,9 @@ mock.module("@app/permissions", () => ({
 
 mock.module("@app/midi", () => createMidiAppMock());
 
-// 播放列表页面依赖 @ext / sapi-pro-func，本测试不关心它；只替换掉这个模块
-mock.module(path.resolve(import.meta.dir, "../src/app/ui/midi/playListUI.ts"), () => ({
-    PlayListMainForm: { name: "PlayListMainForm" },
-}));
-
 const { openPiano, PianoPanelPage } = await import("../src/app/ui/piano");
 const { PianoSettingsPage } = await import("../src/app/ui/settingsUI");
-const { PianoScorePage } = await import("../src/app/ui/scoreUI");
 const { MidiPlayerPage } = await import("../src/app/ui/midi/playerUI");
-const { MidiImportPage } = await import("../src/app/ui/midi/importUI");
 
 type PlayedNote = { midi: number; layer: unknown; duration: number };
 
@@ -176,11 +168,12 @@ describe("主钢琴面板", () => {
             expect.arrayContaining([
                 "♪ MIDI 播放器",
                 "钢琴设置",
-                "曲谱配置",
                 "快捷键设置",
-                "导入 MIDI",
             ])
         );
+        expect(form.buttonLabels()).not.toContain("曲谱配置");
+        expect(form.buttonLabels()).not.toContain("导入 MIDI");
+        expect(form.buttonLabels()).not.toContain("音乐存储卡");
     });
 
     test("输入字符会按当前键位发声并更新状态文本，且不重建表单", () => {
@@ -312,25 +305,20 @@ describe("主钢琴面板", () => {
         }
     });
 
-    test("入口按钮把对应页面压入表单栈", () => {
+    test("入口按钮把对应页面压入表单栈，主面板不再放存储卡/导入", () => {
         const { form } = openPanel();
+        expect(form.buttonLabels()).not.toContain("音乐存储卡");
+        expect(form.buttonLabels()).not.toContain("导入 MIDI");
+        expect(form.buttonLabels()).not.toContain("曲谱配置");
 
         form.click("钢琴设置");
         expect(host.nav.pushed.at(-1)!.form).toBe(PianoSettingsPage);
         expect(host.nav.pushed.at(-1)!.args.piano).toBeDefined();
 
-        const second = openPanel();
-        second.form.click("曲谱配置");
-        expect(host.nav.pushed.at(-1)!.form).toBe(PianoScorePage);
-
         const third = openPanel();
         third.form.click("♪ MIDI 播放器");
         expect(host.nav.pushed.at(-1)!.form).toBe(MidiPlayerPage);
         expect(host.nav.pushed.at(-1)!.args.piano).toBe(third.piano);
-
-        const fourth = openPanel();
-        fourth.form.click("导入 MIDI");
-        expect(host.nav.pushed.at(-1)!.form).toBe(MidiImportPage);
     });
 
     test("钢琴销毁时面板自动关闭并释放订阅", () => {

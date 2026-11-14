@@ -1,9 +1,8 @@
-import { DDUI } from "sapi-pro";
-import type { Player } from "@minecraft/server";
 import { formatBytes, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { TrackActionsPage } from "./trackActions";
 import { LegacyPlaylistPage } from "./legacyPlaylistUI";
+import { appPage, backButton } from "../ddui";
 import {
     PAGE_SIZE,
     TAB_LABELS,
@@ -29,7 +28,7 @@ export interface LibraryArgs {
  * DDUI 不支持动态增删控件，因此固定 8 个槽位用 Observable 更新文本与可见性；
  * 换页、搜索、切换来源都只刷新数据，不重建页面。
  */
-export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args) => {
+export const MusicLibraryPage = appPage<LibraryArgs>("音乐曲库", (ui, args) => {
     const piano = args.piano;
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
@@ -144,12 +143,8 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
     }, { visible: nextVisible });
     ui.button("刷新", refresh);
     ui.button("旧播放列表（只读）", () => ui.push(LegacyPlaylistPage, { piano }));
+    backButton(ui);
     ui.closeButton();
 
     refresh();
 });
-
-export function openMusicLibrary(player: Player, piano: PianoRuntime, tab: LibraryTab = "piano", query?: string) {
-    if (!player.isValid || !piano.isAlive()) return;
-    DDUI.open(player, MusicLibraryPage, { piano, tab, query });
-}
