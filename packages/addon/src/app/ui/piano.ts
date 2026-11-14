@@ -13,7 +13,6 @@ import {
     updatePianoUI,
 } from "@app/ui/pianoUI";
 import { createPianoState, createPianoView } from "@app/ui/pianoState";
-import { pianoViewModel } from "@app/ui/pianoViewModel";
 import { scoreIndexOf } from "@domain/score/score";
 import { MidiPlayerPage } from "@app/ui/midi/playerUI";
 import { MidiImportPage } from "@app/ui/midi/importUI";
@@ -44,12 +43,26 @@ export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
         const state = createPianoState(player, ui);
         const view = createPianoView(ui);
         const shortcuts = loadShortcuts(player);
-        /** 这架钢琴共享的按键视图；它的生命周期属于 PianoRuntime，页面只订阅。 */
-        const viewModel = pianoViewModel(piano);
-        const activeNotes = () => viewModel.activeNotes();
-
-        // 共享按键变化只重绘 4 行文本，不重建表单
-        ui.subscribe(viewModel.activeKeys, () => updatePianoRows(state, view, activeNotes()));
+        // 页面自己的按键视图：随表单作用域释放，不再创建/缓存 per-piano view model。
+        const active = new Map<number, number>();
+        const activeNotes = (now = system.currentTick) => {
+            const notes = new Set<number>();
+            for (const [midi, expiry] of active) if (expiry > now) notes.add(midi);
+            return notes;
+        };
+        ui.subscribe(piano.noteSignal, ({ midi, duration }) => {
+            const hold = Math.max(3, Math.min(120, Math.ceil((Number.isFinite(duration) ? duration : 0) * 20)));
+            active.set(midi, system.currentTick + hold);
+            updatePianoRows(state, view, activeNotes());
+        });
+        ui.subscribe(piano.tickSignal, (tick) => {
+            const now = Number.isFinite(tick) ? tick : system.currentTick;
+            let changed = false;
+            for (const [midi, expiry] of active) {
+                if (expiry <= now) { active.delete(midi); changed = true; }
+            }
+            if (changed) updatePianoRows(state, view, activeNotes(now));
+        });
 
         // 玩家级状态持久化；ui.set 的同步不会触发
         ui.onChange(state.octave, (octave) => {

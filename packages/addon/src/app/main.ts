@@ -49,8 +49,9 @@ initSAPIPro({
     uuid: "ee4ee253-b1c5-4447-9e52-356f5e6ed11b",
 });
 
-pcommand.registerCommand(
-    new Command("midilist", "查看midi播放器列表", true, (player) => {
+// stable 版 SAPI 只能注册原生命令；registerCommand 在 stable 下不可调用。
+pcommand.registerNative(
+    new Command("midilist", "查看 MIDI 缓存与钢琴运行时诊断", true, (player) => {
         const stats = midiManager.cacheStats();
         player.sendMessage(
             `[SongCache] ${stats.songs} 首 / ${(stats.bytes / 1048576).toFixed(2)} MB ` +

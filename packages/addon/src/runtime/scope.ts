@@ -23,7 +23,12 @@ export class PianoScope {
         private readonly boundary: string,
         private readonly report: PianoErrorReporter = reportPianoError
     ) {
-        this.raw = parent.child(undefined, error => this.report(this.boundary, error));
+        // 错误回调只捕获 boundary/report 的值，不捕获 PianoScope 自身。
+        // 即便 Tabletop 在 dispose 时已清空 #onError，也避免在存活期间多一条
+        // PianoScope ↔ RuntimeScope 的环（循环 GC 不积极时会造成滞留）。
+        const name = boundary;
+        const reporter = report;
+        this.raw = parent.child(undefined, error => reporter(name, error));
     }
 
     get disposed(): boolean { return this.raw.disposed; }

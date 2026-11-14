@@ -43,6 +43,8 @@ export function pianoCenter(location: InstrumentLocation): Vector3 {
     return { x: pos.x + .5 + right.x * center, y: pos.y, z: pos.z + .5 + right.z * center };
 }
 
+const noop = () => {};
+
 export class PianoRuntime {
     readonly center: Vector3;
     readonly right: Vector3;
@@ -67,9 +69,10 @@ export class PianoRuntime {
     private nextScoreTurn = 0;
     private removeVisualOnDispose = false;
     private disposed = false;
+    private readonly disposeCleanups = new Set<() => void>();
     lastNearby = system.currentTick;
 
-    constructor(readonly location: InstrumentLocation, private readonly activate: () => void) {
+    constructor(readonly location: InstrumentLocation, private activate: () => void) {
         this.right = RightOffsets[location.direction];
         this.center = pianoCenter(location);
         this.hitModel = location.definition === grandDefinition ? grandPianoHitModel : digitalPianoHitModel;
@@ -82,6 +85,16 @@ export class PianoRuntime {
     }
 
     isAlive() { return !this.disposed; }
+
+    /** 供 UI 等外部缓存挂清理；dispose 时无条件执行，不依赖 Signal 是否还能派发。 */
+    onDispose(cleanup: () => void): () => void {
+        if (this.disposed) {
+            try { cleanup(); } catch { /* cleanup is best effort */ }
+            return () => {};
+        }
+        this.disposeCleanups.add(cleanup);
+        return () => this.disposeCleanups.delete(cleanup);
+    }
 
     verify(tick: number) {
         if (tick - this.verifiedAt >= VERIFY_INTERVAL) {
@@ -130,11 +143,8 @@ export class PianoRuntime {
                     { distance: 12, background: { red: 0, green: 0, blue: 0, alpha: 0 } },
                     error => console.warn("[piano] 屏幕文字失败", error), textPort);
                 this.refreshText();
-                this.visualScope.schedule(10, () => {
-                    this.text?.invalidate();
-                    this.textValue = undefined;
-                    this.refreshText();
-                });
+                // 只重试一次同步（不重建 primitive），实体刚加载时首写失败也能补上。
+                this.visualScope.schedule(10, () => this.refreshText());
             }
             const record = this.display.playback;
             if (!this.midi && record?.songs.length) {
@@ -298,6 +308,10 @@ export class PianoRuntime {
     dispose(removeVisual: boolean) {
         if (this.disposed) return;
         this.disposed = true;
+        for (const cleanup of [...this.disposeCleanups]) {
+            try { cleanup(); } catch (error) { console.warn("[piano] 运行时清理回调失败", error); }
+        }
+        this.disposeCleanups.clear();
         this.removeVisualOnDispose = removeVisual;
         this.disposedSignal.publish();
         this.disposedSignal.dispose();
@@ -313,6 +327,8 @@ export class PianoRuntime {
         // Scope owns visual/text, midi and display; one failed cleanup cannot
         // skip the remaining ones.
         this.scope.dispose();
+        // activate 闭包捕获了 runtime 自身；不清理就是一个永久自环。
+        this.activate = noop;
         this.visualScope = undefined;
         this.text = undefined;
         this.midi = undefined;
