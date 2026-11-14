@@ -89,7 +89,7 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲操作", (ui, 
         ui.push(ConfirmDeletePage, { piano, ref });
     });
 
-    ui.button("返回", (() => ui.back()) as () => void);
+    ui.button("返回", () => ui.back());
 });
 
 const ConfirmDeletePage = DDUI.page<TrackActionArgs>("确认删除", (ui, args) => {

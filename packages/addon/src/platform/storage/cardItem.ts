@@ -39,15 +39,19 @@ export function containerItemSlot(container: Container, index: number): ItemSlot
 }
 
 export function equipmentItemSlot(player: Player, slot: EquipmentSlot): ItemSlot | undefined {
-    const equippable = player.getComponent(EntityComponentTypes.Equippable);
-    if (!equippable) return undefined;
-    const containerSlot = equippable.getEquipmentSlot(slot);
-    return {
-        read: () => (player.isValid ? containerSlot.getItem() : undefined),
-        write: (item) => {
-            if (player.isValid) containerSlot.setItem(item);
-        },
-    };
+    try {
+        const equippable = player.getComponent(EntityComponentTypes.Equippable);
+        if (!equippable) return undefined;
+        const containerSlot = equippable.getEquipmentSlot(slot);
+        return {
+            read: () => (player.isValid ? containerSlot.getItem() : undefined),
+            write: (item) => {
+                if (player.isValid) containerSlot.setItem(item);
+            },
+        };
+    } catch {
+        return undefined;
+    }
 }
 
 export function mainhandItemSlot(player: Player): ItemSlot | undefined {

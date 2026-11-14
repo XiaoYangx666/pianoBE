@@ -123,7 +123,7 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
         const slot = mainhandItemSlot(player);
         const card = slot ? CardAccess.open(slot) : undefined;
         if (!card || !isMusicCard(card.item)) return { label: "" };
-        return { storage: card.storage(), label: `手持卡 ${card.item ? "存储卡" : ""}`, refresh: () => card.refreshLore() };
+        return { storage: card.storage(), label: "手持存储卡", refresh: () => card.refreshLore() };
     };
 
     const clearInput = () => ui.timeout(() => ui.set(input, ""), 1);

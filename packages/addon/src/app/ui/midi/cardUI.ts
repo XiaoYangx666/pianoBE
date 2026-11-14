@@ -30,6 +30,8 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
     const labels = Array.from({ length: PAGE_SIZE }, () => ui.string(""));
     const visible = Array.from({ length: PAGE_SIZE }, () => ui.boolean(false, { clientWritable: false }));
     const rename = ui.string("");
+    const existing = piano.cardAccess?.item;
+    if (existing) ui.set(rename, cardName(existing));
     const prevVisible = ui.boolean(false, { clientWritable: false });
     const nextVisible = ui.boolean(false, { clientWritable: false });
 
