@@ -110,19 +110,18 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
             .button("音乐曲库", () => {
                 if (!alive() || !block.isValid) return ui.close();
                 ui.push(MusicLibraryPage, { piano });
-            })
-            .button("存储卡", () => {
-                if (!alive() || !block.isValid) return ui.close();
-                if (!piano.cardAccess) {
-                    ui.player.sendMessage("§e卡槽是空的，先手持音乐存储卡右键钢琴插入。");
-                    return;
-                }
-                ui.push(MusicCardPage, { piano });
-            })
-            .button("导入 MIDI", () => {
-                if (!alive() || !block.isValid) return ui.close();
-                ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" });
             });
+        // 卡槽为空时直接不显示入口，不留一个只会弹提示的按钮。
+        if (piano.cardAccess) {
+            ui.button("存储卡", () => {
+                if (!alive() || !block.isValid) return ui.close();
+                ui.push(MusicCardPage, { piano });
+            });
+        }
+        ui.button("导入 MIDI", () => {
+            if (!alive() || !block.isValid) return ui.close();
+            ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" });
+        });
         ui.closeButton();
     }
 );

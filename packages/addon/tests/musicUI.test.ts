@@ -246,16 +246,14 @@ describe("播放器页面入口", () => {
         expect((host.nav.pushed.at(-1)!.args as any).piano).toBe(piano);
     });
 
-    test("未插卡时“存储卡”按钮只提示，不打开空表单", () => {
-        const { piano } = makePiano();
+    test("未插卡时直接不显示“存储卡”入口", () => {
+        const bare = makePiano();
         const block = { isValid: true } as any;
-        const messages: string[] = [];
-        host.DDUI.open(makePlayer("card-guard", messages), MidiPlayerPage, { piano, block });
-        const before = host.nav.pushed.length;
+        host.DDUI.open(makePlayer("no-card"), MidiPlayerPage, { piano: bare.piano, block });
+        expect(host.lastForm().buttonLabels()).not.toContain("存储卡");
 
-        host.lastForm().click("存储卡");
-
-        expect(host.nav.pushed.length).toBe(before);
-        expect(messages.join("\n")).toContain("卡槽是空的");
+        const withCard = makePiano({ cardAccess: { item: {} } });
+        host.DDUI.open(makePlayer("has-card"), MidiPlayerPage, { piano: withCard.piano, block });
+        expect(host.lastForm().buttonLabels()).toContain("存储卡");
     });
 });
