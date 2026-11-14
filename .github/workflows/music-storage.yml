@@ -25,9 +25,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Run core unit tests (public deps only)
-        working-directory: packages/core
+      - name: Run core unit tests in an isolated copy
+        shell: bash
         run: |
+          set -euo pipefail
+          core_dir="$RUNNER_TEMP/pianobe-core-test"
+          mkdir -p "$core_dir"
+          cp -R packages/core/src packages/core/tests packages/core/package.json packages/core/tsconfig.json "$core_dir/"
+          cd "$core_dir"
           bun install
           bun run test
 
