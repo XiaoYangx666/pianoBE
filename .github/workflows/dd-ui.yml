@@ -30,7 +30,7 @@ jobs:
           core_dir="$RUNNER_TEMP/pianobe-core"
           mkdir -p "$core_dir"
           cp -R packages/core/src packages/core/package.json packages/core/tsconfig.json "$core_dir/"
-          (cd "$core_dir" && bun install && bun run build)
+          (cd "$core_dir" && bun install && bun add --dev typescript@5.9.3 && bun run build)
           mkdir -p packages/addon/node_modules/@piano
           ln -s "$core_dir" packages/addon/node_modules/@piano/core
       - name: Ensure obsolete PianoViewModel is absent
