@@ -86,6 +86,15 @@
           ],
           "default": 1,
           "client_sync": true
+        },
+        "xypiano:card_inserted": {
+          "type": "int",
+          "range": [
+            1,
+            2
+          ],
+          "default": 1,
+          "client_sync": true
         }
       }
     },
@@ -111,7 +120,13 @@
         ]
       },
       "minecraft:fire_immune": {},
-      "minecraft:persistent": {}
+      "minecraft:persistent": {},
+      "minecraft:inventory": {
+        "container_type": "inventory",
+        "inventory_size": 1,
+        "private": true,
+        "can_be_siphoned": false
+      }
     }
   }
 }

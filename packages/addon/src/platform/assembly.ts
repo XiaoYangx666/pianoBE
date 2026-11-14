@@ -2,18 +2,25 @@ import { Block, BlockPermutation, Dimension, ItemStack, Vector3 } from "@minecra
 import { Cardinal_Direction } from "@domain/types";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { Signal } from "@domain/util/signal";
-import { definitionForPart, pianoDefinition, type InstrumentDefinition } from "@domain/instrument/definition";
-export interface InstrumentLocation {
-    dimension: Dimension;
-    pos: Vector3;
-    direction: Cardinal_Direction;
-    definition?: InstrumentDefinition;
-}
+import { definitionForPart, grandDefinition, pianoDefinition, type InstrumentDefinition } from "@domain/instrument/definition";
+import { capturePianoPayload, clearPianoStorage, writePianoPayloadToItem, takeCardFromDisplay } from "@platform/storage/pianoItem";
+import { pianoDisplayEntity } from "@platform/display";
+import type { InstrumentLocation } from "@platform/instrumentLocation";
+
+export type { InstrumentLocation } from "@platform/instrumentLocation";
 export const instrumentPlaced = new Signal<InstrumentLocation>();
 export const instrumentDestroyed = new Signal<InstrumentLocation>();
 
 export function instrumentKey(dimension: Dimension, pos: Vector3): string {
     return `${dimension.id}:${pos.x},${pos.y},${pos.z}`;
+}
+
+/** 乐器中心点（显示实体/声音/粒子共用的基准位置）。 */
+export function instrumentCenter(location: InstrumentLocation): Vector3 {
+    const { pos, direction, definition } = location;
+    const right = RightOffsets[direction];
+    const center = definition === grandDefinition ? 0 : .5;
+    return { x: pos.x + .5 + right.x * center, y: pos.y, z: pos.z + .5 + right.z * center };
 }
 
 export function resolveInstrument(block: Block, definition?: InstrumentDefinition): InstrumentLocation | undefined {
@@ -73,6 +80,20 @@ export function placeInstrument(location: InstrumentLocation, definition = locat
 /** Only clear matching parts, never unrelated or differently oriented neighbors. */
 export function destroyInstrument(location: InstrumentLocation, drop: boolean, definition = location.definition ?? pianoDefinition): boolean {
     if (inspectInstrument(location, definition) === "unloaded") return false;
+    const center = instrumentCenter(location);
+    const display = pianoDisplayEntity(location, center);
+    // 先搬运再拆：内置音乐写进掉落的钢琴物品，卡槽里的实体卡单独退还。
+    // 物品写失败时直接放弃本次拆除，宁可拆不掉也不能丢歌。
+    const payload = display ? capturePianoPayload(location, center) : undefined;
+    const carried = payload && payload.songs > 0 ? new ItemStack(definition.itemId) : undefined;
+    if (carried && !writePianoPayloadToItem(carried, payload!.raw)) {
+        console.warn("[piano] 拆琴前保存内置音乐失败，已取消本次拆除");
+        return false;
+    }
+    const card = display ? takeCardFromDisplay(display) : undefined;
+    // 数据已经安全进入掉落物：清空源实体，后续任何清理都不会再复制一份。
+    if (carried && display) clearPianoStorage(display);
+
     let removed = false;
     for (const part of definition.parts) {
         const block = readPart(location, part);
@@ -83,6 +104,16 @@ export function destroyInstrument(location: InstrumentLocation, drop: boolean, d
     }
     if (!removed) return false;
     instrumentDestroyed.publish({ ...location, definition });
-    if (drop) location.dimension.spawnItem(new ItemStack(definition.itemId), { x: location.pos.x + .5, y: location.pos.y + .5, z: location.pos.z + .5 });
+    const spawn = { x: location.pos.x + .5, y: location.pos.y + .5, z: location.pos.z + .5 };
+    // drop=false（创造模式/活塞）本来不掉落物品；但只要钢琴里有音乐，仍然
+    // 掉落带数据的钢琴物品，保证内容不会凭空消失。卡永远退还。
+    if (drop || carried) location.dimension.spawnItem(carried ?? new ItemStack(definition.itemId), spawn);
+    if (card) {
+        try {
+            location.dimension.spawnItem(card, spawn);
+        } catch (error) {
+            console.warn("[piano] 退还存储卡失败", error);
+        }
+    }
     return true;
 }

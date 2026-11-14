@@ -38,6 +38,11 @@ export class MidiManager {
         return this.cache.acquire(id);
     }
 
+    /** 读取原始 PBE2（不进入共享缓存；跨存储复制/导出用）。 */
+    read(id: string): Promise<Uint8Array | undefined> {
+        return this.load(id);
+    }
+
     cacheStats() {
         return this.cache.stats();
     }

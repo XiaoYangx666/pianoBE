@@ -1,9 +1,11 @@
 import { blockPlacerComponent } from "@app/components/blockPlacer";
 import { PianoBlockComponent, regEvents } from "@app/components/pianoBlock";
+import { MusicCardComponent } from "@app/components/musicCard";
 import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
+import { loadPbeSettings } from "@platform/storage/pbeSettingsStore";
 import { system, world } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
 
@@ -17,12 +19,21 @@ system.beforeEvents.startup.subscribe((e) => {
         "xypiano:piano_block",
         PianoBlockComponent
     );
+    e.itemComponentRegistry.registerCustomComponent(
+        "xypiano:music_card",
+        MusicCardComponent
+    );
 });
 
 regEvents();
 
-// 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻扫描导入曲库。
+// 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻加载配置与扫描导入曲库。
 system.run(() => {
+    try {
+        loadPbeSettings();
+    } catch (error) {
+        console.warn("[piano] 读取管理员设置失败", error);
+    }
     try {
         importedSongs.reload();
         midiManager.addSource(importedSongs);

@@ -1,0 +1,61 @@
+name: Music storage regression
+
+on:
+  push:
+    branches:
+      - feature/addon-overhaul
+    paths:
+      - ".github/workflows/music-storage.yml"
+      - "packages/addon/src/**"
+      - "packages/addon/tests/**"
+      - "packages/core/src/**"
+  pull_request:
+    paths:
+      - ".github/workflows/music-storage.yml"
+      - "packages/addon/src/**"
+      - "packages/addon/tests/**"
+      - "packages/core/src/**"
+  workflow_dispatch:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Run core unit tests (public deps only)
+        working-directory: packages/core
+        run: |
+          bun install
+          bun run test
+
+  addon-music:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Build shared core without private vendor archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          core_dir="$RUNNER_TEMP/pianobe-core"
+          mkdir -p "$core_dir"
+          cp -R packages/core/src packages/core/package.json packages/core/tsconfig.json "$core_dir/"
+          (cd "$core_dir" && bun install && bun add --dev typescript@5.9.3 && bun run build)
+          mkdir -p packages/addon/node_modules/@piano
+          ln -s "$core_dir" packages/addon/node_modules/@piano/core
+      - name: Ensure obsolete PianoViewModel is absent
+        shell: bash
+        run: |
+          if git grep -n -E 'PianoViewModel|pianoViewModel\(' -- packages/addon/src; then
+            echo "Obsolete PianoViewModel reference detected"
+            exit 1
+          fi
+      - name: Music storage / queue / DDUI regression
+        working-directory: packages/addon
+        run: |
+          bun test tests/musicStorage.test.ts tests/cardSlot.test.ts tests/musicRefs.test.ts tests/musicUI.test.ts

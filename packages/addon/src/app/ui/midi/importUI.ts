@@ -1,8 +1,11 @@
 import { Player } from "@minecraft/server";
 import { DDUI } from "sapi-pro";
+import { formatBytes, ImportAssembler, parseImportChunk, type ImportProgress } from "@piano/core";
+import type { MusicStorage } from "@domain/music/storage";
 import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
-import { ImportAssembler, parseImportChunk, type ImportProgress } from "@piano/core";
+import type { PianoRuntime } from "@app/PianoRuntime";
+import { CardAccess, isMusicCard, mainhandItemSlot } from "@platform/storage/cardItem";
 
 /** 同一玩家两次成功入库之间的最小间隔（毫秒） */
 const SUBMIT_COOLDOWN_MS = 5_000;
@@ -32,6 +35,15 @@ function recordSubmit(playerId: string) {
         [...(submitHistory.get(playerId) ?? []).filter((time) => now - time < RATE_WINDOW_MS), now]
     );
 }
+
+type ImportTarget = "piano" | "card" | "held" | "legacy";
+
+const TARGETS: { key: ImportTarget; label: string }[] = [
+    { key: "piano", label: "当前钢琴内置存储" },
+    { key: "card", label: "已插入的存储卡" },
+    { key: "held", label: "手中的存储卡" },
+    { key: "legacy", label: "旧世界导入曲库" },
+];
 
 /** 跨表单保留的导入进度：关闭表单后重新打开仍可继续粘贴剩余分段。 */
 interface ImportSession {
@@ -68,15 +80,18 @@ function progressText(progress: ImportProgress): string {
     return `§7已接收 §a${progress.received}§7/§f${progress.total}§7 段${missing}`;
 }
 
+export interface MidiImportArgs {
+    piano?: PianoRuntime;
+    target?: ImportTarget;
+}
+
 /**
  * DDUI MIDI 导入：
  * - 每段一次粘贴（单段建议 ≤4800 字符）；
  * - ImportAssembler 自动识别任务、支持乱序/重复/中断续传；
- * - 提交前再次校验权限、频率、PBE2 完整性与世界容量。
- *
- * 输入框订阅、清空定时器随页面自动释放；跨表单进度保存在模块级 sessions 里。
+ * - 提交时按选择的真实存储写入（钢琴 / 卡槽卡 / 手持卡 / 旧导入曲库）。
  */
-export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
+export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args) => {
     const player = ui.player;
     if (!canImportMidi(player)) {
         player.sendMessage("§e管理员未开放玩家导入 MIDI。");
@@ -88,8 +103,29 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
     const status = ui.string("§7请粘贴第一段导入码", { clientWritable: false });
     const progress = ui.string("", { clientWritable: false });
     const input = ui.string("");
+    const target = ui.number(Math.max(0, TARGETS.findIndex(item => item.key === (args.target ?? "piano"))));
 
-    const assembler = () => session.assembler;
+    const currentTarget = () => TARGETS[target.getData()]?.key ?? "piano";
+
+    /** 解析目标存储；返回存储或可直接展示的错误。 */
+    const resolveStorage = (): { storage?: MusicStorage; label: string; refresh?: () => void } => {
+        const kind = currentTarget();
+        if (kind === "legacy") return { storage: undefined, label: "旧导入曲库" };
+        if (kind === "piano") {
+            const storage = args.piano?.storage;
+            return storage ? { storage, label: storage.label } : { label: "", };
+        }
+        if (kind === "card") {
+            const card = args.piano?.cardAccess;
+            const storage = card?.storage();
+            return storage ? { storage, label: `存储卡 ${storage.label}`, refresh: () => card?.refreshLore() } : { label: "" };
+        }
+        const slot = mainhandItemSlot(player);
+        const card = slot ? CardAccess.open(slot) : undefined;
+        if (!card || !isMusicCard(card.item)) return { label: "" };
+        return { storage: card.storage(), label: `手持卡 ${card.item ? "存储卡" : ""}`, refresh: () => card.refreshLore() };
+    };
+
     const clearInput = () => ui.timeout(() => ui.set(input, ""), 1);
 
     const commit = (payload: Uint8Array) => {
@@ -104,21 +140,38 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
             return;
         }
 
+        const kind = currentTarget();
         try {
-            const record = importedSongs.save(payload);
+            let message: string;
+            if (kind === "legacy") {
+                const record = importedSongs.save(payload);
+                midiManager.addSource(importedSongs);
+                void importedMidiManager.refresh();
+                message = `§a已存入旧导入曲库：§f${record.name}` +
+                    `\n§7大小 §f${formatBytes(record.bytes)}`;
+            } else {
+                const resolved = resolveStorage();
+                if (!resolved.storage) {
+                    status.setData(kind === "held"
+                        ? "§c手里没有音乐存储卡"
+                        : kind === "card"
+                            ? "§c卡槽为空，请先插入存储卡"
+                            : "§c钢琴存储暂不可用");
+                    return;
+                }
+                const entry = resolved.storage.save(payload);
+                resolved.refresh?.();
+                message = `§a已保存到 §f${resolved.label}§a：§f${entry.name}` +
+                    `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(resolved.storage.usage().usedBytes)}`;
+            }
             session.pendingPayload = undefined;
             session.activeTaskId = undefined;
             recordSubmit(player.id);
-            // 刷新元信息注册表，让本地导入列表立即可见。
-            midiManager.addSource(importedSongs);
-            void importedMidiManager.refresh();
-            status.setData(`§a导入成功：§f${record.name}`);
-            progress.setData(
-                `§7曲目 id §f${record.id}  §7音符 §f${record.noteCount}  §7大小 §f${(record.bytes / 1024).toFixed(1)}KB`
-            );
-            player.sendMessage(`§a[MIDI] 已导入本地曲库：${record.name}`);
+            status.setData(message);
+            progress.setData("");
+            player.sendMessage(`§a[MIDI] 导入成功：${message.replace(/§./g, "").split("\n")[0]}`);
         } catch (error) {
-            status.setData(`§c保存失败：${(error as Error).message}`);
+            status.setData(`§c保存失败：${(error as Error).message ?? error}`);
             console.warn("[midiImport] 保存失败", error);
         }
     };
@@ -132,18 +185,17 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
             return;
         }
 
-        // 同一时间只保留一首曲目的导入任务：检测到不同曲目时丢弃上一首未完成分片。
         const chunk = parseImportChunk(value);
         const nextTaskId = chunk ? `${chunk.songId}:${chunk.checksum}` : undefined;
         let switched = false;
         if (nextTaskId && session.activeTaskId && nextTaskId !== session.activeTaskId) {
-            assembler().reset();
+            session.assembler.reset();
             session.pendingPayload = undefined;
             switched = true;
         }
         if (nextTaskId) session.activeTaskId = nextTaskId;
 
-        const result = assembler().add(value);
+        const result = session.assembler.add(value);
         switch (result.status) {
             case "complete":
                 status.setData("§a分段接收完成，正在校验并保存…");
@@ -173,8 +225,18 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
         clearInput();
     };
 
+    const targetLabel = ui.computed([target], () => {
+        const kind = currentTarget();
+        if (kind === "piano") return args.piano?.storage
+            ? `§7目标：§f${args.piano.storage.label}`
+            : "§e目标：钢琴存储不可用";
+        if (kind === "card") return args.piano?.cardStorage ? "§7目标：§f已插入的存储卡" : "§e目标：卡槽为空";
+        if (kind === "held") return isMusicCard(mainhandItemSlot(player)?.read()) ? "§7目标：§f手中的存储卡" : "§e目标：手里没有存储卡";
+        return "§7目标：§f旧世界导入曲库（兼容入口）";
+    });
+
     // 恢复上次未完成的进度
-    const received = assembler().progress();
+    const received = session.assembler.progress();
     if (session.pendingPayload) {
         status.setData("§e有已接收但未保存的曲目，可点击重试保存");
     } else if (received.received > 0) {
@@ -186,6 +248,8 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
 
     ui.onChange(input, onInput);
 
+    ui.dropdown("保存到", target, TARGETS.map((item, index) => ({ label: item.label, value: index })));
+    ui.label(targetLabel);
     ui.label(status)
         .label(progress)
         .label("§7把生成器导出的分段逐段粘贴到下面（可乱序，重复段会自动忽略）")
@@ -195,7 +259,7 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
             else status.setData("§7没有待保存的数据");
         })
         .button("清空本次导入进度", () => {
-            assembler().reset();
+            session.assembler.reset();
             session.pendingPayload = undefined;
             session.activeTaskId = undefined;
             status.setData("§7已清空未完成的分段");
@@ -205,11 +269,11 @@ export const MidiImportPage = DDUI.page("导入 MIDI", (ui) => {
 });
 
 /** 打开导入页面；权限、会话进度与频率限制继续由本模块负责。 */
-export function openMidiImport(player: Player) {
+export function openMidiImport(player: Player, piano?: PianoRuntime, target?: ImportTarget) {
     if (!player.isValid) return;
     if (!canImportMidi(player)) {
         player.sendMessage("§e管理员未开放玩家导入 MIDI。");
         return;
     }
-    DDUI.open(player, MidiImportPage);
+    DDUI.open(player, MidiImportPage, { piano, target });
 }

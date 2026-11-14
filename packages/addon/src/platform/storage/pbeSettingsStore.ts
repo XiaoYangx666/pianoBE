@@ -1,6 +1,7 @@
 import { world } from "@minecraft/server";
 import { Configdb } from "sapi-pro";
 import { normalizePbeSettings, type PbeSettings } from "@domain/settings/pbeSettings";
+import { setCurrentPbeSettings } from "@platform/storage/settingsProvider";
 
 /** Configdb 中的键（实际世界动态属性名为 Config.pbe.settings） */
 export const PBE_SETTINGS_KEY = "pbe.settings";
@@ -18,7 +19,10 @@ function readStored(value: unknown): PbeSettings | undefined {
 
 export function loadPbeSettings(): PbeSettings {
     const current = readStored(Configdb.get(PBE_SETTINGS_KEY));
-    if (current) return current;
+    if (current) {
+        setCurrentPbeSettings(current);
+        return current;
+    }
 
     // 旧版直接写入 pbe.settings 的配置：一次性迁移到 Configdb。
     const legacy = readStored(world.getDynamicProperty(LEGACY_WORLD_KEY));
@@ -27,9 +31,11 @@ export function loadPbeSettings(): PbeSettings {
         world.setDynamicProperty(LEGACY_WORLD_KEY); // 置 undefined 即删除
         return legacy;
     }
-    return normalizePbeSettings(undefined);
+    return setCurrentPbeSettings(undefined);
 }
 
 export function savePbeSettings(settings: PbeSettings): void {
-    Configdb.set(PBE_SETTINGS_KEY, JSON.stringify(normalizePbeSettings(settings)));
+    const normalized = normalizePbeSettings(settings);
+    Configdb.set(PBE_SETTINGS_KEY, JSON.stringify(normalized));
+    setCurrentPbeSettings(normalized);
 }

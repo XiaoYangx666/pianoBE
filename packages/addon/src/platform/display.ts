@@ -1,18 +1,22 @@
 import { reconcileEntityTransform, releaseVisual } from "@begame/tabletop/minecraft";
-import { Entity, Vector3, system } from "@minecraft/server";
-import type { InstrumentLocation } from "@platform/assembly";
+import { Entity, EntityComponentTypes, Vector3, system } from "@minecraft/server";
+import type { InstrumentLocation } from "@platform/instrumentLocation";
 import type { Cardinal_Direction } from "@domain/types";
 import { readPlaybackRecord, type PlaybackRecord } from "@domain/playback/playbackRecord";
 import { readPianoSettings, type PianoSettings } from "@domain/piano/settings";
 import { grandDefinition } from "@domain/instrument/definition";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { scoreStandOffset } from "@domain/geometry/keyRay";
+import { isMusicCard, type ItemSlot, containerItemSlot } from "@platform/storage/cardItem";
+import { PIANO_STORAGE_PREFIX } from "@platform/storage/musicStorage";
+import { CARD_SLOT_INDEX } from "@platform/storage/cardSlot";
 
 export const PIANO_DISPLAY = "xypiano:piano_display";
 export const SCORE_STAND_ENTITY = "xypiano:grand_score";
 export const SCORE_SPREAD = "xypiano:score_spread";
 export const SCORE_MOUNTED = "xypiano:score_mounted";
 export const SCORE_VARIANT = "xypiano:score_variant";
+export const CARD_INSERTED = "xypiano:card_inserted";
 const SCORE_GRAND = "xypiano:score_grand";
 export function pianoDisplayType(location: InstrumentLocation) {
     return location.definition?.displayId ?? PIANO_DISPLAY;
@@ -42,6 +46,39 @@ function ownedDisplays(location: InstrumentLocation, point: Vector3, type = pian
             const anchor = displayAnchor(candidate);
             return anchor?.x === pos.x && anchor.y === pos.y && anchor.z === pos.z;
         });
+}
+
+/** 找到这架钢琴当前的显示实体（未加载返回 undefined）。 */
+export function pianoDisplayEntity(location: InstrumentLocation, point: Vector3): Entity | undefined {
+    try {
+        return ownedDisplays(location, point)[0];
+    } catch {
+        return undefined;
+    }
+}
+
+/** 显示实体上的卡槽槽位（真实 ItemStack 容器）。 */
+export function cardSlotOf(entity: Entity): ItemSlot | undefined {
+    try {
+        const container = entity.getComponent(EntityComponentTypes.Inventory)?.container;
+        return container ? containerItemSlot(container, CARD_SLOT_INDEX) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+export function readCardFromDisplay(entity: Entity) {
+    const item = cardSlotOf(entity)?.read();
+    return isMusicCard(item) ? item : undefined;
+}
+
+/** 插卡视觉反馈：实体属性驱动客户端表现。 */
+export function setCardInserted(entity: Entity, inserted: boolean) {
+    try {
+        entity.setProperty(CARD_INSERTED, inserted ? 2 : 1);
+    } catch {
+        // 旧资源包没有该属性时忽略。
+    }
 }
 
 export function removeDormantDisplay(location: InstrumentLocation, point: Vector3) {
@@ -110,6 +147,7 @@ export class PianoDisplay {
             entity.setProperty(`xypiano:keys_${group}`, 1);
         }
         entity.setProperty("xypiano:playback_light", 1);
+        setCardInserted(entity, readCardFromDisplay(entity) !== undefined);
     }
 
     static recover(location: InstrumentLocation, point: Vector3) {
@@ -129,6 +167,29 @@ export class PianoDisplay {
                 const migrated = candidates.map(candidate => candidate.getDynamicProperty(property))
                     .find(saved => typeof saved === "string");
                 if (migrated !== undefined) entity.setDynamicProperty(property, migrated);
+            }
+            // 内置音乐同样属于这架钢琴：重建实体时把旧实体上的整份存储迁过来，
+            // 否则“删掉并重建显示实体”会静默丢歌。
+            for (const candidate of candidates) {
+                if (candidate.id === entity.id) continue;
+                const ids = typeof candidate.getDynamicPropertyIds === "function"
+                    ? candidate.getDynamicPropertyIds()
+                    : [];
+                for (const key of ids) {
+                    if (!key.startsWith(PIANO_STORAGE_PREFIX) || entity.getDynamicProperty(key) !== undefined) continue;
+                    const value = candidate.getDynamicProperty(key);
+                    if (typeof value === "string") entity.setDynamicProperty(key, value);
+                }
+            }
+            // 卡槽里的实际物品也要跟着走，不能只迁移数据。
+            if (!match) {
+                const target = cardSlotOf(entity);
+                for (const candidate of candidates) {
+                    const card = readCardFromDisplay(candidate);
+                    if (!card || !target || target.read() !== undefined) continue;
+                    target.write(card);
+                    cardSlotOf(candidate)?.write(undefined);
+                }
             }
             const display = new PianoDisplay(entity);
             for (const candidate of candidates) {

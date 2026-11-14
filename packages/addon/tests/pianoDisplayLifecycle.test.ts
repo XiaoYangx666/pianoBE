@@ -2,8 +2,16 @@ import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@minecraft/server", () => ({
     system: { currentTick: 0 },
+    MolangVariableMap: class {
+        setVector3() {}
+        setFloat() {}
+    },
+    TextPrimitive: class {
+    },
     BlockPermutation: { resolve: (typeId: string, states: Record<string, string>) => ({ type: { id: typeId }, getState: (key: string) => states[key] }) },
     ItemStack: class { constructor(public typeId: string) {} },
+    EntityComponentTypes: { Inventory: "minecraft:inventory", Equippable: "minecraft:equippable" },
+    EquipmentSlot: { Mainhand: "Mainhand" },
 }));
 
 const { SCORE_STAND_ENTITY, SCORE_MOUNTED, SCORE_SPREAD, PianoDisplay, PIANO_DISPLAY, pianoDisplayType,

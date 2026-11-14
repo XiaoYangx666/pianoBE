@@ -4,20 +4,26 @@ import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
 import { type Entity, Vector3, system } from "@minecraft/server";
 import { grandDefinition } from "@domain/instrument/definition";
-import { inspectInstrument, instrumentKey, type InstrumentLocation } from "@platform/assembly";
+import { inspectInstrument, instrumentCenter, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
-import { pianoSoundId, getSoundLayerByDuration, type PianoSoundLayer } from "@piano/core";
+import { pianoSoundId, getSoundLayerByDuration, formatBytes, type MusicRef, type SongHandle, type PianoSoundLayer } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
-import { PianoDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD, SCORE_VARIANT } from "@platform/display";
+import { PianoDisplay, readCardFromDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD, SCORE_VARIANT, setCardInserted } from "@platform/display";
 import { digitalPianoHitModel, grandPianoHitModel, pianoModelOffset } from "@domain/geometry/keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreIndexOf, scorePages } from "@domain/score/score";
-import { midiManager } from "@app/midiManager";
 import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL } from "@app/pianoConfig";
+import { PianoMusic } from "@app/music/pianoMusic";
+import { DynamicPropertyKv } from "@platform/storage/dynamicKv";
+import { DynamicMusicStorage, PIANO_STORAGE_PREFIX } from "@platform/storage/musicStorage";
+import { CardSlot } from "@platform/storage/cardSlot";
+import { CardAccess } from "@platform/storage/cardItem";
+import { currentPbeSettings } from "@platform/storage/settingsProvider";
+import type { MusicStorage } from "@domain/music/storage";
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -37,10 +43,7 @@ function lcdTitle(name: string) {
 }
 
 export function pianoCenter(location: InstrumentLocation): Vector3 {
-    const { pos, direction } = location;
-    const right = RightOffsets[direction];
-    const center = location.definition === grandDefinition ? 0 : .5;
-    return { x: pos.x + .5 + right.x * center, y: pos.y, z: pos.z + .5 + right.z * center };
+    return instrumentCenter(location);
 }
 
 const noop = () => {};
@@ -70,6 +73,10 @@ export class PianoRuntime {
     private removeVisualOnDispose = false;
     private disposed = false;
     private readonly disposeCleanups = new Set<() => void>();
+    private storageBinding?: { entityId: string; storage: DynamicMusicStorage };
+    private cardSlotBinding?: { entityId: string; slot: CardSlot };
+    /** 钢琴内置 + 存储卡的统一读取入口（每架钢琴一个，缓存按内容指纹隔离）。 */
+    readonly music = new PianoMusic(() => this.storage, () => this.cardStorage);
     lastNearby = system.currentTick;
 
     constructor(readonly location: InstrumentLocation, private activate: () => void) {
@@ -105,9 +112,66 @@ export class PianoRuntime {
     }
 
     get displayId() { return this.display?.entity.id; }
+    get displayEntity(): Entity | undefined { return this.display?.entity.isValid ? this.display.entity : undefined; }
     get scoreId() { return this.settings?.scoreMounted && this.score?.isValid ? this.score.id : undefined; }
     get hasScreen() { return this.location.definition !== grandDefinition; }
     get settings() { return this.display?.entity.isValid ? this.display.settings : undefined; }
+
+    /** 这架钢琴的内置音乐存储（挂在显示实体上，随区块保存）。 */
+    get storage(): DynamicMusicStorage | undefined {
+        const entity = this.displayEntity;
+        if (!entity) return undefined;
+        if (this.storageBinding?.entityId !== entity.id) {
+            const label = this.location.definition === grandDefinition ? "三角钢琴" : "电子钢琴";
+            this.storageBinding = {
+                entityId: entity.id,
+                storage: new DynamicMusicStorage(
+                    new DynamicPropertyKv(() => (this.display?.entity.isValid ? this.display.entity : undefined), PIANO_STORAGE_PREFIX),
+                    PIANO_STORAGE_PREFIX,
+                    "piano",
+                    () => currentPbeSettings().pianoStorageBytes,
+                    () => label
+                ),
+            };
+        }
+        return this.storageBinding.storage;
+    }
+
+    /** 真实卡槽（显示实体容器）；未加载时 undefined。 */
+    get cardSlot(): CardSlot | undefined {
+        const entity = this.displayEntity;
+        if (!entity) return undefined;
+        if (this.cardSlotBinding?.entityId !== entity.id) {
+            this.cardSlotBinding = { entityId: entity.id, slot: new CardSlot(entity) };
+        }
+        return this.cardSlotBinding.slot;
+    }
+
+    get cardAccess(): CardAccess | undefined {
+        return this.cardSlot?.access();
+    }
+
+    /** 插卡里的音乐（未插卡返回 undefined）。 */
+    get cardStorage(): MusicStorage | undefined {
+        return this.cardAccess?.storage();
+    }
+
+    /** 读取原始 PBE2（跨存储复制/导出用；曲库来源会走远端/内嵌）。 */
+    readBytes(ref: MusicRef): Promise<Uint8Array | undefined> | Uint8Array | undefined {
+        if (ref.source === "library") return this.music.readLibrary(ref.id);
+        const storage = ref.source === "piano" ? this.storage : this.cardStorage;
+        return storage?.get(ref.id);
+    }
+
+    /** 队列条目 → 可播放的共享曲目引用。 */
+    acquire(ref: MusicRef): Promise<SongHandle | undefined> {
+        return this.music.acquire(ref);
+    }
+
+    refreshCardIndicator() {
+        const entity = this.displayEntity;
+        if (entity) setCardInserted(entity, readCardFromDisplay(entity) !== undefined);
+    }
 
     updateSettings(previous: PianoSettings, next: PianoSettings) {
         if (this.disposed || !this.display || this.settings !== previous) return false;
@@ -201,14 +265,17 @@ export class PianoRuntime {
 
     getMidiPlayer() {
         if (this.disposed) throw new Error("Piano runtime disposed");
-        return this.midi ??= new MidiPlayer(midiManager, {
-            note: (note, duration) => this.playNote(note, getSoundLayerByDuration(duration), duration),
-            playing: value => {
-                if (value) this.activate();
-                this.checkpoint();
-                this.refreshText();
-            },
-        });
+        return this.midi ??= new MidiPlayer(
+            { acquire: (ref: MusicRef) => this.music.acquire(ref) },
+            {
+                note: (note, duration) => this.playNote(note, getSoundLayerByDuration(duration), duration),
+                playing: value => {
+                    if (value) this.activate();
+                    this.checkpoint();
+                    this.refreshText();
+                },
+            }
+        );
     }
 
     playKey(midi: number, layer: PianoSoundLayer = "short") {
@@ -327,6 +394,13 @@ export class PianoRuntime {
         // Scope owns visual/text, midi and display; one failed cleanup cannot
         // skip the remaining ones.
         this.scope.dispose();
+        try {
+            this.music.dispose();
+        } catch (error) {
+            console.warn("[piano] 释放音乐缓存失败", error);
+        }
+        this.storageBinding = undefined;
+        this.cardSlotBinding = undefined;
         // activate 闭包捕获了 runtime 自身；不清理就是一个永久自环。
         this.activate = noop;
         this.visualScope = undefined;
@@ -340,7 +414,10 @@ export class PianoRuntime {
         const info = this.midi?.getInfo();
         const { dimension, pos } = this.location;
         const stats = this.scope.stats;
+        const usage = this.storage?.usage();
+        const card = this.cardSlot?.occupied ? "inserted" : "empty";
         return `[${info?.state ?? "ready"}] ${instrumentKey(dimension, pos)} ${info?.midiName ?? ""} ` +
+            `store=${usage?.songs ?? 0}/${formatBytes(usage?.usedBytes ?? 0)} card=${card} ` +
             `scope(s=${stats.scopes} sub=${stats.subscriptions} t=${stats.timers} j=${stats.jobs} d=${stats.disposables} pending=${this.scope.pending})`;
     }
 }

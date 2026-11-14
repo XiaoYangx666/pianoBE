@@ -4,6 +4,8 @@ import { buildSeekIndex } from "./seekIndex.js";
 
 /** SongCache 中一份被共享的已加载曲目 */
 export interface LoadedSong {
+    /** 缓存键（默认等于曲目 id；跨存储来源时为 `source:id:checksum`） */
+    key: string;
     id: string;
     name: string;
     /** 时长（40 tick/秒） */
@@ -34,6 +36,12 @@ export interface SongCacheOptions {
     now?: () => number;
     /** 稀疏索引间隔（tick） */
     indexStepTicks?: number;
+    /**
+     * 缓存键 → 解码后头部的校验规则。
+     * 默认要求 `header.id === key`（纯 id 键）；跨存储来源（`source:id:checksum`）
+     * 由调用方提供，用于拒绝“同 id 不同内容”的数据。
+     */
+    verify?: (key: string, header: Pbe2Header) => boolean;
 }
 
 const DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
@@ -51,15 +59,17 @@ export class SongCache {
     private readonly maxBytes: number;
     private readonly now: () => number;
     private readonly indexStepTicks: number;
+    private readonly verify: (key: string, header: Pbe2Header) => boolean;
     private totalBytes = 0;
 
     constructor(
-        private readonly load: (id: string) => Promise<Uint8Array | undefined>,
+        private readonly load: (key: string) => Promise<Uint8Array | undefined>,
         options: SongCacheOptions = {}
     ) {
         this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
         this.now = options.now ?? (() => Date.now());
         this.indexStepTicks = options.indexStepTicks ?? 200;
+        this.verify = options.verify ?? ((key, header) => header.id === key);
     }
 
     /**
@@ -145,10 +155,10 @@ export class SongCache {
         };
     }
 
-    private async loadSong(id: string): Promise<LoadedSong | undefined> {
+    private async loadSong(key: string): Promise<LoadedSong | undefined> {
         let bytes: Uint8Array | undefined;
         try {
-            bytes = await this.load(id);
+            bytes = await this.load(key);
         } catch {
             return undefined;
         }
@@ -156,12 +166,13 @@ export class SongCache {
 
         try {
             const { header, events } = readPbe2Events(bytes);
-            if (header.id !== id) {
-                console.warn(`[songCache] 曲目 id 与请求不一致：${header.id} ≠ ${id}`);
+            if (!this.verify(key, header)) {
+                console.warn(`[songCache] 曲目校验失败：请求 ${key}，实际 id ${header.id}`);
                 return undefined;
             }
             const index = buildSeekIndex(events, header.hasVelocity, this.indexStepTicks);
             const song: LoadedSong = {
+                key,
                 id: header.id,
                 name: header.name,
                 duration: header.duration,
@@ -173,16 +184,16 @@ export class SongCache {
                 lastAccess: this.now(),
                 byteSize: events.byteLength + index.length * 24,
             };
-            const previous = this.loaded.get(song.id);
+            const previous = this.loaded.get(key);
             if (previous) {
-                // 同一 id 已被另一次并发加载先放入：复用已有实例
+                // 同一键已被另一次并发加载先放入：复用已有实例
                 return previous;
             }
-            this.loaded.set(song.id, song);
+            this.loaded.set(key, song);
             this.totalBytes += song.byteSize;
             return song;
         } catch (error) {
-            console.warn(`[songCache] 曲目 ${id} 解码失败`, error);
+            console.warn(`[songCache] 曲目 ${key} 解码失败`, error);
             return undefined;
         }
     }
@@ -201,7 +212,7 @@ export class SongCache {
             .sort((a, b) => a.lastAccess - b.lastAccess);
         for (const song of candidates) {
             if (this.totalBytes <= this.maxBytes) break;
-            this.remove(song.id, song);
+            this.remove(song.key, song);
         }
     }
 

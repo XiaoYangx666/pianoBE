@@ -35,8 +35,23 @@ mock.module("@minecraft/server", () => ({
         getPlayers: () => [],
     },
     Block: class {},
+    MolangVariableMap: class {
+        setVector3() {}
+        setFloat() {}
+    },
+    TextPrimitive: class {
+    },
+    BlockPermutation: {
+        resolve: (typeId: string, states: Record<string, string>) => ({
+            type: { id: typeId },
+            getState: (key: string) => states[key],
+        }),
+    },
+    ItemStack: class { constructor(public typeId: string) {} },
     Player: class {},
     PlayerPermissionLevel: { Visitor: 0, Member: 1, Operator: 2, Custom: 3 },
+    EntityComponentTypes: { Inventory: "minecraft:inventory", Equippable: "minecraft:equippable" },
+    EquipmentSlot: { Mainhand: "Mainhand" },
 }));
 
 mock.module("@minecraft/server-ui", () => ({

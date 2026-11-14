@@ -45,9 +45,17 @@ export class FakeObservable<T> {
 
 type ButtonHandler = () => void;
 
+function labelText(label: unknown): string {
+    if (label && typeof label === "object" && typeof (label as { getData?: unknown }).getData === "function") {
+        return String((label as { getData(): unknown }).getData());
+    }
+    return String(label ?? "");
+}
+
 export class FakeCustomForm {
     static forms: FakeCustomForm[] = [];
     readonly buttons = new Map<string, ButtonHandler>();
+    private readonly entries: Array<{ label: unknown; handler: ButtonHandler }> = [];
     readonly sliders: { label: string; value: FakeObservable<number> }[] = [];
     components: Array<Record<string, unknown>> = [];
     showing = false;
@@ -102,8 +110,9 @@ export class FakeCustomForm {
         this.components.push({ type: "closeButton" });
         return this;
     }
-    button(label: string, handler: ButtonHandler, options?: unknown) {
-        this.buttons.set(label, handler);
+    button(label: unknown, handler: ButtonHandler, options?: unknown) {
+        this.entries.push({ label, handler });
+        this.buttons.set(labelText(label), handler);
         this.components.push({ type: "button", label, options });
         return this;
     }
@@ -134,13 +143,25 @@ export class FakeCustomForm {
     }
 
     click(label: string) {
+        const entry = this.entries.find(item => labelText(item.label) === label);
+        if (entry) {
+            entry.handler();
+            return;
+        }
         const handler = this.buttons.get(label);
-        if (!handler) throw new Error(`表单上没有按钮「${label}」：${[...this.buttons.keys()].join(", ")}`);
+        if (!handler) throw new Error(`表单上没有按钮「${label}」：${this.buttonLabels().join(", ")}`);
         handler();
     }
 
     buttonLabels() {
-        return [...this.buttons.keys()];
+        return this.entries.map(entry => labelText(entry.label));
+    }
+
+    /** 当前所有标签的可见文本（Observable 取当前值）。 */
+    labelTexts() {
+        return this.components
+            .filter(component => component.type === "label")
+            .map(component => labelText(component.text));
     }
 }
 
@@ -335,7 +356,7 @@ export class FakeUI {
         return this;
     }
 
-    button(label: string, onClick: () => void, options?: unknown) {
+    button(label: unknown, onClick: () => void, options?: unknown) {
         this.form.button(label, () => {
             if (this.closed || this.navigating || !this.player.isValid) return;
             onClick();

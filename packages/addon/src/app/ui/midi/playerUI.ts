@@ -1,14 +1,17 @@
 import type { Block, Player } from "@minecraft/server";
 import type { ObservableString } from "@minecraft/server-ui";
 import { DDUI } from "sapi-pro";
+import { musicSourceLabel } from "@piano/core";
 import { resolveInstrument } from "@platform/assembly";
 import { pianoWorld } from "@app/PianoWorld";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { getPlayModeName, type PlayMode } from "@domain/playback/queue";
 import type { MidiPlayer } from "@domain/playback/player";
 import { midiViewModel } from "./playerViewModel";
-import { MidiListForm } from "./midiList";
-import { LibraryForm } from "./libraryUI";
+import { MusicLibraryPage } from "./libraryUI";
+import { MusicCardPage } from "./cardUI";
+import { MidiImportPage } from "./importUI";
+import { PlayQueuePage } from "./queueUI";
 
 const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
 
@@ -21,16 +24,15 @@ function switchPlayMode(player: MidiPlayer, label: ObservableString) {
 }
 
 /**
- * MIDI 播放器页面。
+ * MIDI 播放器主界面。
  *
- * - 只读状态来自钢琴共享的 `MidiPlayerViewModel`，用 `ui.retain` 持有引用，关闭时 release；
- * - 进度滑块是本页私有的 clientWritable Observable，`ui.set` 用于服务器回写，不会被当成玩家拖动；
- * - 点歌/歌单直接把传统表单压进同一个表单栈，返回时自动回到本页。
+ * 只保留播放控制与三个入口（队列 / 曲库 / 存储卡），不再有“歌单”中转页。
  */
 export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
     "§bMIDI播放",
     (ui, args) => {
         const midi = args.piano.getMidiPlayer();
+        const piano = args.piano;
         const block = args.block;
         if (!midi.isAlive() || !block.isValid) {
             ui.close();
@@ -38,21 +40,23 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
         }
 
         const viewModel = midiViewModel(midi);
-        // 先订阅失效信号再 retain：retain 触发的同步如果发现播放器已结束，本页会被关掉
         ui.subscribe(viewModel.invalid, () => ui.close());
-        ui.subscribe(args.piano.disposedSignal, () => ui.close());
+        ui.subscribe(piano.disposedSignal, () => ui.close());
         ui.retain(viewModel);
 
-        const alive = () => midi.isAlive();
+        const alive = () => midi.isAlive() && piano.isAlive();
         const refresh = () => {
             if (alive()) viewModel.sync();
         };
-        /** 点歌/歌单的“关闭”按钮回到播放器（与旧版一致：重新解析方块上的运行时） */
-        // 跳转会释放旧 DDUIContext，不能在返回回调里访问已清空的 ui.player。
-        const owner = ui.player;
-        const reopenPlayer = () => openMidiPlayer(owner, block);
 
-        // 进度：共享状态 → 页面滑块；玩家拖动滑块 → seek
+        const source = ui.string("", { clientWritable: false });
+        const syncSource = () => {
+            const ref = midi.queue.current();
+            source.setData(ref ? `§7来源：§f${musicSourceLabel(ref.source)}` : "§7队列为空");
+        };
+        syncSource();
+
+
         const progress = ui.number(viewModel.progress.getData());
         ui.subscribe(viewModel.progress, (pct) => ui.set(progress, pct));
         ui.onChange(progress, (pct) => {
@@ -63,6 +67,7 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
 
         ui.label(viewModel.state)
             .label(viewModel.midiName)
+            .label(source)
             .label(viewModel.queue)
             .label("   ")
             .label(viewModel.progressText)
@@ -77,20 +82,19 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                     void midi.play().catch((error) => console.error("[midi] 播放失败", error));
                 } else return ui.close();
                 refresh();
-            })
-            .button("♪ 点歌", () => {
-                if (!alive() || !block.isValid) return ui.close();
-                ui.push(MidiListForm, { midiPlayer: midi, p: 1, onBack: reopenPlayer });
+                syncSource();
             })
             .button("⏮ 上一首", () => {
                 if (!alive()) return ui.close();
                 midi.queue.prev();
+                syncSource();
                 void midi.play().catch((error) => console.error("[midi] 播放失败", error));
                 refresh();
             })
             .button("⏭ 下一首", () => {
                 if (!alive()) return ui.close();
                 midi.queue.next();
+                syncSource();
                 void midi.play().catch((error) => console.error("[midi] 播放失败", error));
                 refresh();
             })
@@ -98,9 +102,22 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 if (!alive()) return ui.close();
                 switchPlayMode(midi, viewModel.playMode);
             })
-            .button("歌单", () => {
+            .divider()
+            .button("播放队列", () => {
                 if (!alive() || !block.isValid) return ui.close();
-                ui.push(LibraryForm, { midiPlayer: midi, onBack: reopenPlayer });
+                ui.push(PlayQueuePage, { piano });
+            })
+            .button("音乐曲库", () => {
+                if (!alive() || !block.isValid) return ui.close();
+                ui.push(MusicLibraryPage, { piano });
+            })
+            .button("存储卡", () => {
+                if (!alive() || !block.isValid) return ui.close();
+                ui.push(MusicCardPage, { piano });
+            })
+            .button("导入 MIDI", () => {
+                if (!alive() || !block.isValid) return ui.close();
+                ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" });
             });
     }
 );

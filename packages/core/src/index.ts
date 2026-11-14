@@ -5,6 +5,7 @@ export * from "./midi/crc32.js";
 export * from "./midi/addonModule.js";
 export * from "./midi/note.js";
 export * from "./pbe2/index.js";
+export * from "./music/index.js";
 export * from "./store/ports.js";
 export * from "./store/playlistStore.js";
 export * from "./store/memory.js";

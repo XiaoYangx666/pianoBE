@@ -1,4 +1,4 @@
-import type { MidiSongMeta } from "@piano/core";
+import { sameMusicRef, type MusicRef } from "@piano/core";
 
 export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
 
@@ -13,8 +13,14 @@ export function getPlayModeName(mode: PlayMode) {
     return modeName[mode] ?? "未知播放模式";
 }
 
+/**
+ * 播放队列：只负责“接下来放哪一首”。
+ *
+ * 每条记录都是带来源的 MusicRef（钢琴 / 存储卡 / 曲库），不复制曲目正文。
+ * 身份判断同时比较来源与内容指纹，避免把不同存储里的同 id 曲目当成同一首。
+ */
 export class PlayQueue {
-    private list: MidiSongMeta[] = [];
+    private list: MusicRef[] = [];
     private index = -1;
     private mode: PlayMode = "sequence";
 
@@ -25,7 +31,7 @@ export class PlayQueue {
         this.index = -1;
     }
 
-    current(): MidiSongMeta | undefined {
+    current(): MusicRef | undefined {
         if (this.index < 0 || this.index >= this.list.length) return;
         return this.list[this.index];
     }
@@ -45,7 +51,7 @@ export class PlayQueue {
     /**
      * 插入当前后面并立即跳转
      */
-    insertBack(midi: MidiSongMeta): MidiSongMeta {
+    insertBack(midi: MusicRef): MusicRef {
         if (this.index === -1) {
             this.list.push(midi);
             this.index = 0;
@@ -61,7 +67,7 @@ export class PlayQueue {
     /**
      * 普通加入队列（尾部）
      */
-    enqueue(midi: MidiSongMeta): MidiSongMeta | undefined {
+    enqueue(midi: MusicRef): MusicRef | undefined {
         this.list.push(midi);
 
         if (this.index === -1) {
@@ -70,7 +76,7 @@ export class PlayQueue {
         }
     }
 
-    remove(index: number): MidiSongMeta | undefined {
+    remove(index: number): MusicRef | undefined {
         if (index < 0 || index >= this.list.length) return;
 
         const removed = this.list[index];
@@ -92,7 +98,7 @@ export class PlayQueue {
         return removed;
     }
 
-    jump(index: number): MidiSongMeta | undefined {
+    jump(index: number): MusicRef | undefined {
         if (index < 0 || index >= this.list.length) return;
         this.index = index;
         return this.list[index];
@@ -100,7 +106,7 @@ export class PlayQueue {
 
     /* ================== 跳转 ================== */
 
-    next(): MidiSongMeta | undefined {
+    next(): MusicRef | undefined {
         if (this.list.length === 0) return;
 
         if (this.mode === "single") {
@@ -129,7 +135,7 @@ export class PlayQueue {
         return;
     }
 
-    prev(): MidiSongMeta | undefined {
+    prev(): MusicRef | undefined {
         if (this.list.length === 0) return;
 
         if (this.mode === "single") {
@@ -169,6 +175,11 @@ export class PlayQueue {
         return this.list.map((m) => m.name ?? "unknown");
     }
 
+    /** 队列原始引用（UI/来源标记用）。 */
+    getRefs(): readonly MusicRef[] {
+        return this.list;
+    }
+
     getIndex() {
         return this.index;
     }
@@ -177,16 +188,17 @@ export class PlayQueue {
         return this.list.length;
     }
 
-    /** 查找曲目在队列中的位置；不存在返回 -1。 */
-    indexOf(id: string) {
-        return this.list.findIndex((song) => song.id === id);
+    /** 查找曲目在队列中的位置；字符串按 id 匹配（兼容旧调用），对象按来源+id+指纹匹配。 */
+    indexOf(ref: MusicRef | string) {
+        if (typeof ref === "string") return this.list.findIndex((song) => song.id === ref);
+        return this.list.findIndex((song) => sameMusicRef(song, ref));
     }
 
     snapshot() {
         return { songs: this.list.slice(), index: this.index, mode: this.mode };
     }
 
-    restore({ songs, index, mode }: ReturnType<PlayQueue["snapshot"]>) {
+    restore({ songs, index, mode }: { songs: MusicRef[]; index: number; mode: PlayMode }) {
         this.list = songs.slice();
         this.index = index;
         this.mode = mode;
@@ -195,7 +207,7 @@ export class PlayQueue {
     /* ================== 导入与导出 ================== */
 
     /**导入播放列表，覆盖当前 */
-    import(list: MidiSongMeta[]): void {
+    import(list: MusicRef[]): void {
         this.list = list;
         this.index = list.length == 0 ? -1 : 0;
     }

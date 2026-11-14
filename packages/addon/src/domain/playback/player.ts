@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { EventCursor, OTHER_SCALE, TIME_SCALE, type MidiSongMeta, type SongHandle } from "@piano/core";
+import { EventCursor, OTHER_SCALE, TIME_SCALE, type MusicRef, type SongHandle } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -12,9 +12,9 @@ interface MidiOutput {
     playing(value: boolean): void;
 }
 
-/** 播放器只需要“按 id 获取共享曲目引用”，缓存策略由 SongCache 统一负责。 */
+/** 播放器只需要“按引用获取共享曲目”，缓存策略由存储层/SongCache 统一负责。 */
 export interface MidiLoader {
-    acquire(id: string): Promise<SongHandle | undefined>;
+    acquire(ref: MusicRef): Promise<SongHandle | undefined>;
 }
 
 export class MidiPlayer {
@@ -53,7 +53,7 @@ export class MidiPlayer {
 
     checkpoint(): PlaybackRecord | undefined {
         if (this.state === "stopped" || this.isLoading) return;
-        return { version: 1, ...this.queue.snapshot(), state: this.state, seconds: this.currentTime };
+        return { version: 2, ...this.queue.snapshot(), state: this.state, seconds: this.currentTime };
     }
 
     async restore(record: PlaybackRecord) {
@@ -255,14 +255,14 @@ export class MidiPlayer {
         }
     }
 
-    private async loadMidi(info: MidiSongMeta, generation: number) {
+    private async loadMidi(info: MusicRef, generation: number) {
         try {
-            const song = await this.loader.acquire(info.id);
+            const song = await this.loader.acquire(info);
             if (generation !== this.generation) {
                 song?.release();
                 return;
             }
-            if (!song) throw new Error(`曲目内容不存在: ${info.id}`);
+            if (!song) throw new Error(`曲目内容不存在: ${info.name} (${info.id})`);
 
             this.releaseSong();
             this.song = song;

@@ -15,6 +15,7 @@ import {
 import { createPianoState, createPianoView } from "@app/ui/pianoState";
 import { scoreIndexOf } from "@domain/score/score";
 import { MidiPlayerPage } from "@app/ui/midi/playerUI";
+import { MusicCardPage } from "@app/ui/midi/cardUI";
 import { MidiImportPage } from "@app/ui/midi/importUI";
 import { PianoSettingsPage } from "@app/ui/settingsUI";
 import { PianoScorePage } from "@app/ui/scoreUI";
@@ -165,6 +166,7 @@ export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 options
             )
             .button("♪ MIDI 播放器", () => ui.push(MidiPlayerPage, { piano, block }), options)
+            .button("音乐存储卡", () => ui.push(MusicCardPage, { piano }), options)
             .button("钢琴设置", () => ui.push(PianoSettingsPage, { piano }), options)
             .button("曲谱配置", () => ui.push(PianoScorePage, { piano }), options)
             .button(
@@ -172,7 +174,7 @@ export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 () => ui.push(ShortcutSettingsForm, { bindings: loadShortcuts(player) }),
                 options
             )
-            .button("导入 MIDI", () => ui.push(MidiImportPage), options)
+            .button("导入 MIDI", () => ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" }), options)
             .toggle("简洁模式", state.compact);
     }
 );

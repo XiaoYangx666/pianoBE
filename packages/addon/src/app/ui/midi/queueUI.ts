@@ -1,235 +1,126 @@
-import { MidiPlayer } from "@domain/playback/player";
-import { CommonForm, FuncButton, NumberField, Validators } from "sapi-pro";
-import { MidiListForm } from "./midiList";
-import { PAGE_SIZE } from "./static";
+import { DDUI } from "sapi-pro";
+import type { Player } from "@minecraft/server";
+import type { PianoRuntime } from "@app/PianoRuntime";
+import { MusicLibraryPage } from "./libraryUI";
+import { PAGE_SIZE, availabilityMark, pageCount, sourceMark } from "./shared";
 
-export interface QueueListArgs {
-    midiPlayer: MidiPlayer;
-    p: number;
-    onBack?: () => void;
+export interface QueueArgs {
+    piano: PianoRuntime;
 }
 
-export const QueueListForm = CommonForm.ButtonForm<
-    QueueListArgs,
-    void
->({
-    title: "播放器序列",
-    generator(form, player, args) {
-        const queue = args.midiPlayer.queue;
-        const total = queue.getLength();
-        const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+/** 播放队列：只负责顺序，不管理歌单。来源与可用性直接标在条目上。 */
+export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => {
+    const piano = args.piano;
+    const player = ui.player;
+    ui.subscribe(piano.disposedSignal, () => ui.close());
 
-        // p = -1 时跳转到当前播放页
-        if (args.p === -1) {
-            const current = queue.getIndex();
-            args.p =
-                current >= 0 && current < total
-                    ? Math.floor(current / PAGE_SIZE) + 1
-                    : maxPage;
+    const state = { page: 1, maxPage: 1, index: -1 };
+    const head = ui.string("");
+    const pageText = ui.string("");
+    const labels = Array.from({ length: PAGE_SIZE }, () => ui.string(""));
+    const visible = Array.from({ length: PAGE_SIZE }, () => ui.boolean(false, { clientWritable: false }));
+    const prevVisible = ui.boolean(false, { clientWritable: false });
+    const nextVisible = ui.boolean(false, { clientWritable: false });
+
+    const refresh = () => {
+        if (!piano.isAlive() || ui.closed) return;
+        const midi = piano.getMidiPlayer();
+        const queue = midi.queue;
+        const refs = queue.getRefs();
+        const info = midi.getInfo();
+        state.index = queue.getIndex();
+        state.maxPage = pageCount(refs.length);
+        if (state.page > state.maxPage) state.page = state.maxPage;
+        const current = queue.current();
+        head.setData(
+            `§7队列 §f${refs.length} §7首 · 状态 §f${info.state}` +
+            (current ? `\n§7当前：§b${current.name}` : "")
+        );
+        const start = (state.page - 1) * PAGE_SIZE;
+        for (let slot = 0; slot < PAGE_SIZE; slot++) {
+            const index = start + slot;
+            const ref = refs[index];
+            if (!ref) {
+                visible[slot].setData(false);
+                continue;
+            }
+            visible[slot].setData(true);
+            const mark = index === state.index ? "§q▶ " : `${index + 1}. `;
+            labels[slot].setData(`${mark}${availabilityMark(piano.music.availability(ref))}${sourceMark(ref)} ${ref.name}`);
         }
+        pageText.setData(refs.length ? `§7第 §f${state.page}§7 / §f${state.maxPage} §7页` : "§7队列是空的");
+        prevVisible.setData(state.page > 1);
+        nextVisible.setData(state.page < state.maxPage);
+    };
 
-        if (args.p > maxPage) args.p = maxPage;
-        if (args.p < 1) args.p = 1;
+    const playCurrent = () => {
+        const midi = piano.getMidiPlayer();
+        void midi.play().catch((error) => player.sendMessage(`§c播放失败：${(error as Error)?.message ?? error}`));
+        refresh();
+    };
 
-        const current = queue.current()?.name;
-        form.body(
-            `第 ${args.p} / ${maxPage} 页\n队列: ${total} 首` +
-                (current ? `\n当前: ${current}` : "")
-        );
-    },
-    buttons: [
-        {
-            label: "添加歌曲",
-            func(ctx) {
-                ctx.push(MidiListForm, {
-                    midiPlayer: ctx.args.midiPlayer,
-                    p: 1,
-                });
-            },
-        },
-        {
-            label: "当前播放",
-            func(ctx) {
-                const queue = ctx.args.midiPlayer.queue;
-                const total = queue.getLength();
-                const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-                const current = queue.getIndex();
-                const p =
-                    current >= 0 && current < total
-                        ? Math.floor(current / PAGE_SIZE) + 1
-                        : maxPage;
-                ctx.replace(QueueListForm, { ...ctx.args, p });
-            },
-            shouldShow: (player, args) => args.midiPlayer.queue.getLength() > 0,
-        },
-        {
-            label: "页码",
-            func(ctx) {
-                ctx.push(QueuePageForm, {
-                    len: ctx.args.midiPlayer.queue.getLength(),
-                    args: ctx.args,
-                });
-            },
-            shouldShow: (player, args) =>
-                args.midiPlayer.queue.getLength() > PAGE_SIZE,
-        },
-        {
-            label: "§c清空列表",
-            func(ctx) {
-                ctx.push(ClearQueueForm, {
-                    midiPlayer: ctx.args.midiPlayer,
-                });
-            },
-            shouldShow: (player, args) => args.midiPlayer.queue.getLength() > 0,
-        },
-    ],
+    ui.label(head).label(pageText);
+    ui.button("▶ 播放 / 继续", playCurrent);
+    ui.button("⏮ 上一首", () => {
+        piano.getMidiPlayer().queue.prev();
+        playCurrent();
+    });
+    ui.button("⏭ 下一首", () => {
+        piano.getMidiPlayer().queue.next();
+        playCurrent();
+    });
+    ui.button("＋ 添加歌曲", () => ui.push(MusicLibraryPage, { piano, tab: "piano" }));
 
-    buttonGenerator(player, args) {
-        const queue = args.midiPlayer.queue;
-        const list = queue.getQueue();
-
-        const start = (args.p - 1) * PAGE_SIZE;
-        const end = start + PAGE_SIZE;
-
-        const current = queue.getIndex();
-
-        const buttons: FuncButton<typeof args, any>[] = list
-            .slice(start, end)
-            .map((name, i) => {
-                const realIndex = start + i;
-
-                return {
-                    label:
-                        realIndex === current
-                            ? `§q▶ ${name}`
-                            : `${realIndex}. ${name}`,
-                };
-            });
-        return buttons;
-    },
-
-    handler(ctx, button) {
-        const { midiPlayer: player, p } = ctx.args;
-
-        const start = (p - 1) * PAGE_SIZE;
-        const realIndex = start + button.btnIndex;
-
-        ctx.push(QueueItemForm, {
-            player,
-            index: realIndex,
-        });
-    },
-    oncancel(res, ctx) {
-        if (ctx.args.onBack) ctx.args.onBack();
-        else ctx.back();
-    },
-});
-
-const QueuePageForm = CommonForm.InputForm<
-    { p: number },
-    {
-        len: number;
-        args: QueueListArgs;
+    for (let slot = 0; slot < PAGE_SIZE; slot++) {
+        ui.button(labels[slot], () => {
+            const queue = piano.getMidiPlayer().queue;
+            const index = (state.page - 1) * PAGE_SIZE + slot;
+            if (index >= queue.getLength()) return;
+            ui.push(QueueItemPage, { piano, index });
+        }, { visible: visible[slot] });
     }
->({
-    title: "跳页",
-    fieldsGenerator(player, args) {
-        const maxPage = Math.max(1, Math.ceil(args.len / PAGE_SIZE));
-        return [
-            new NumberField("页码", `1-${maxPage}`)
-                .key("p")
-                .validator(
-                    Validators.numberRange(1, maxPage, "页码超出范围")
-                ),
-        ];
-    },
-    onSubmit(data, ctx) {
-        ctx.offUntil(QueueListForm, QueueListForm, {
-            ...ctx.args.args,
-            p: data.p,
-        });
-    },
-    onCancel(res, ctx) {
-        ctx.back();
-    },
+
+    ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
+    ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
+    ui.button("§c清空队列", () => ui.push(ClearQueuePage, { piano }));
+    ui.button("刷新", refresh);
+    ui.closeButton();
+
+    refresh();
 });
 
-const ClearQueueForm = CommonForm.SimpleMessageForm<{
-    midiPlayer: MidiPlayer;
-}>({
-    title: "清空队列",
-    generator(form, player, args) {
-        form.body(
-            `确定清空队列中的 ${args.midiPlayer.queue.getLength()} 首歌曲？`
-        );
-    },
-    button1: {
-        text: "清空",
-        func(ctx) {
-            ctx.args.midiPlayer.queue.clear();
-            ctx.back();
-        },
-    },
-    button2: {
-        text: "取消",
-        func(ctx) {
-            ctx.back();
-        },
-    },
+const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列操作", (ui, args) => {
+    const { piano, index } = args;
+    const queue = piano.getMidiPlayer().queue;
+    const ref = queue.getRefs()[index];
+    const status = ui.string("");
+    ui.label(ref ? `§b${ref.name}` : "§7（已不在队列中）");
+    ui.label(status);
+    ui.button("▶ 播放这首", () => {
+        if (!ref) return status.setData("§e曲目已不存在");
+        const midi = piano.getMidiPlayer();
+        midi.queue.jump(index);
+        void midi.play().catch((error) => status.setData(`§c播放失败：${(error as Error)?.message ?? error}`));
+        status.setData("§a已开始播放");
+    });
+    ui.button("§c从队列移除", () => {
+        piano.getMidiPlayer().queue.remove(index);
+        ui.back();
+    });
+    ui.button("返回", () => ui.back());
 });
 
-const QueueItemForm = CommonForm.ButtonForm<{
-    player: MidiPlayer;
-    index: number;
-}>({
-    title: "队列操作",
-
-    generator(form, player, args) {
-        const queue = args.player.queue;
-        const list = queue.getQueue();
-
-        const name = list[args.index] ?? "unknown";
-
-        form.body(`当前项：\n${args.index}. ${name}`);
-    },
-
-    buttons: [
-        {
-            label: "返回",
-            func(ctx) {
-                ctx.back();
-            },
-        },
-        {
-            label: "▶ 播放",
-            func(ctx) {
-                const { player, index } = ctx.args;
-
-                player.queue.jump(index);
-                void player
-                    .play()
-                    .catch((error) => console.error("[midi] 播放失败", error));
-
-                ctx.back();
-            },
-        },
-        {
-            label: "❌ 删除",
-            func(ctx) {
-                const { player, index } = ctx.args;
-                const queue = player.queue;
-
-                const isCurrent = index === queue.getIndex();
-
-                queue.remove(index);
-
-                if (isCurrent) {
-                    void player
-                        .play()
-                        .catch((error) => console.error("[midi] 播放失败", error));
-                }
-                ctx.back();
-            },
-        },
-    ],
+const ClearQueuePage = DDUI.page<QueueArgs>("清空队列", (ui, args) => {
+    const queue = args.piano.getMidiPlayer().queue;
+    ui.label(`§e确定清空队列中的 ${queue.getLength()} 首歌曲？`);
+    ui.button("§c清空", () => {
+        queue.clear();
+        ui.back();
+    });
+    ui.button("取消", () => ui.back());
 });
+
+export function openPlayQueue(player: Player, piano: PianoRuntime) {
+    if (!player.isValid || !piano.isAlive()) return;
+    DDUI.open(player, PlayQueuePage, { piano });
+}

@@ -187,8 +187,11 @@ class PianoWorld {
         for (const piano of this.pianos.values()) {
             try {
                 const integrity = piano.verify(tick);
-                if (integrity === "incomplete") this.unload(piano.location, true);
-                else if (integrity === "unloaded") this.unload(piano.location, false);
+                if (integrity === "incomplete") {
+                    // 被外部破坏成残缺组合时，先把内置音乐/卡片退出来再清理显示实体。
+                    try { destroyInstrument(piano.location, false); } catch { /* 稍后重试 */ }
+                    this.unload(piano.location, true);
+                } else if (integrity === "unloaded") this.unload(piano.location, false);
                 else {
                     if (this.isNear(piano.location)) {
                         piano.lastNearby = tick;
@@ -217,7 +220,10 @@ class PianoWorld {
         for (const piano of this.active) {
             try {
                 const integrity = piano.verify(tick);
-                if (integrity === "incomplete") this.unload(piano.location, true);
+                if (integrity === "incomplete") {
+                    try { destroyInstrument(piano.location, false); } catch { /* 稍后重试 */ }
+                    this.unload(piano.location, true);
+                }
                 else if (integrity === "unloaded") piano.holdPlaybackClock(now);
                 else if (!piano.tick(tick, now)) this.active.delete(piano);
             } catch (error) {

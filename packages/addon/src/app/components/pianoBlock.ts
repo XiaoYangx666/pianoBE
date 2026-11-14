@@ -1,12 +1,14 @@
 import { createBlockResourceEvents, createNativeDropSuppression } from "@begame/tabletop/minecraft";
 import { eventHost } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
-import { BlockCustomComponent, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";
+import { BlockCustomComponent, EntityComponentTypes, EquipmentSlot, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";
 import type { PlayerBreakBlockBeforeEvent } from "@minecraft/server";
 import { openMidiPlayer } from "@app/ui/midi/playerUI";
 import { openPiano } from "@app/ui/piano";
 import { openPianoSettings } from "@app/ui/settingsUI";
 import { pianoWorld } from "@app/PianoWorld";
+import { consumeHeldCard } from "@app/components/musicCard";
+import { isMusicCard } from "@platform/storage/cardItem";
 import { GRAND_INTERACTION_CELLS, GRAND_RETIRED_CELLS } from "@data/grand.generated";
 import { grandDefinition, instrumentBlockTypes } from "@domain/instrument/definition";
 import { destroyInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced, inspectInstrument, InstrumentLocation, resolveInstrument, resolveInstrumentSnapshot } from "@platform/assembly";
@@ -36,13 +38,43 @@ export const PianoBlockComponent: BlockCustomComponent = {
         const location = resolveInstrument(e.block);
         if (!location) return;
         if (location.definition === grandDefinition && !grandInteractionCells.has(e.block.typeId)) return;
-        if (!pianoWorld.beginInteraction(e.player)) return;
+        const player = e.player;
         const piano = pianoWorld.get(location);
         if (!piano) return;
-        const hit = pianoWorld.interactFromView(e.player, piano);
-        if (hit === "midi") void openMidiPlayer(e.player, e.block);
-        else if (hit === "settings") void openPianoSettings(e.player, piano);
-        else if (hit === "menu" || hit === "panel") void openPiano(e.player, e.block);
+
+        // 卡槽交互优先于面板：手持存储卡 → 插入；蹲下 + 空手 → 取出。
+        const hand = player.getComponent(EntityComponentTypes.Equippable)
+            ?.getEquipmentSlot(EquipmentSlot.Mainhand)?.getItem();
+        if (isMusicCard(hand)) {
+            const slot = piano.cardSlot;
+            if (!slot) {
+                player.sendMessage("§e钢琴卡槽暂不可用（请靠近后重试）。");
+                return;
+            }
+            const result = slot.insert(hand);
+            if (!result.ok) {
+                player.sendMessage(`§c${result.message}`);
+                return;
+            }
+            consumeHeldCard(player);
+            piano.refreshCardIndicator();
+            player.sendMessage("§a存储卡已插入卡槽。蹲下 + 空手右键可取回。");
+            return;
+        }
+        if (player.isSneaking && !hand) {
+            const ejected = piano.cardSlot?.ejectTo(player);
+            if (ejected) {
+                piano.refreshCardIndicator();
+                player.sendMessage(ejected.delivered ? "§a已取回存储卡。" : "§e背包已满，存储卡掉在脚下。");
+                return;
+            }
+        }
+
+        if (!pianoWorld.beginInteraction(player)) return;
+        const hit = pianoWorld.interactFromView(player, piano);
+        if (hit === "midi") void openMidiPlayer(player, e.block);
+        else if (hit === "settings") void openPianoSettings(player, piano);
+        else if (hit === "menu" || hit === "panel") void openPiano(player, e.block);
     },
 };
 
