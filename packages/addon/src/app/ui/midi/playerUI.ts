@@ -7,7 +7,6 @@ import { pianoWorld } from "@app/PianoWorld";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { getPlayModeName, type PlayMode } from "@domain/playback/queue";
 import type { MidiPlayer } from "@domain/playback/player";
-import { backButton } from "../ddui";
 import { midiViewModel } from "./playerViewModel";
 import { MusicLibraryPage } from "./libraryUI";
 import { MusicCardPage } from "./cardUI";
@@ -124,7 +123,6 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 if (!alive() || !block.isValid) return ui.close();
                 ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" });
             });
-        backButton(ui);
         ui.closeButton();
     }
 );

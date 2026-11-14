@@ -2,7 +2,6 @@ import { DDUI } from "sapi-pro";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { MusicLibraryPage } from "./libraryUI";
 import { PAGE_SIZE, availabilityMark, pageCount, sourceMark } from "./shared";
-import { backButton } from "../ddui";
 
 export interface QueueArgs {
     piano: PianoRuntime;
@@ -84,7 +83,6 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
     ui.button("§c清空队列", () => ui.push(ClearQueuePage, { piano }));
     ui.button("刷新", refresh);
-    backButton(ui);
     ui.closeButton();
 
     refresh();
@@ -108,7 +106,7 @@ const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列�
         piano.getMidiPlayer().queue.remove(index);
         ui.back();
     });
-    ui.button("返回", () => ui.back());
+    ui.closeButton();
 });
 
 const ClearQueuePage = DDUI.page<QueueArgs>("清空队列", (ui, args) => {

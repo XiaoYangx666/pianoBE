@@ -6,7 +6,6 @@ import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { CardAccess, isMusicCard, mainhandItemSlot } from "@platform/storage/cardItem";
-import { backButton } from "../ddui";
 
 /** 同一玩家两次成功入库之间的最小间隔（毫秒） */
 const SUBMIT_COOLDOWN_MS = 5_000;
@@ -266,6 +265,5 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
             status.setData("§7已清空未完成的分段");
             progress.setData("尚未接收任何分段");
         });
-    backButton(ui);
     ui.closeButton();
 });

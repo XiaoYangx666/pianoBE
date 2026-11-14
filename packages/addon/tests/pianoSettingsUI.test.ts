@@ -166,15 +166,12 @@ describe("钢琴设置（拆分为多个表单）", () => {
 });
 
 describe("DDUI 页面栈", () => {
-    test("各子页面都提供显式返回按钮（不依赖 ESC）", () => {
+    test("子页面不再放冗余“返回”，只保留原生关闭", () => {
         const { piano } = makePiano();
-        const particle = open(ParticleSettingsPage, { piano });
-        expect(particle.buttonLabels()).toContain("返回");
-
-        const text = open(TextSettingsPage, { piano });
-        expect(text.buttonLabels()).toContain("返回");
-
-        const score = open(PianoScorePage, { piano });
-        expect(score.buttonLabels()).toContain("返回");
+        for (const page of [ParticleSettingsPage, TextSettingsPage, PianoScorePage]) {
+            const form = open(page, { piano });
+            expect(form.buttonLabels()).not.toContain("返回");
+            expect(form.components.some(item => item.type === "closeButton")).toBe(true);
+        }
     });
 });

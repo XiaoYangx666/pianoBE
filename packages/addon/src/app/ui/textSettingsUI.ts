@@ -6,7 +6,6 @@ import {
 } from "@domain/piano/settings";
 import { DDUI, type ObservableLike } from "sapi-pro";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 
 /** 文字设置：琴面 LCD 的可见性、颜色、大小与偏移。 */
@@ -18,7 +17,6 @@ export const TextSettingsPage = DDUI.page<{ piano: PianoRuntime }>("文字设置
 
     if (!editor.hasScreen) {
         ui.label("§7这台三角钢琴没有琴面显示屏，文字设置不可用。");
-        backButton(ui);
         ui.closeButton();
         return;
     }
@@ -74,6 +72,5 @@ export const TextSettingsPage = DDUI.page<{ piano: PianoRuntime }>("文字设置
         });
         ui.reopen();
     });
-    backButton(ui);
     ui.closeButton();
 });

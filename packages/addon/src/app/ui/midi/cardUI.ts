@@ -7,7 +7,6 @@ import { MidiImportPage } from "./importUI";
 import { MusicLibraryPage } from "./libraryUI";
 import { TrackActionsPage } from "./trackActions";
 import { PAGE_SIZE, pageCount, sourceMark } from "./shared";
-import { backButton } from "../ddui";
 
 export interface MusicCardArgs {
     piano: PianoRuntime;
@@ -123,7 +122,6 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
     ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
     ui.button("刷新", refresh);
-    backButton(ui);
     ui.closeButton();
 
     refresh();

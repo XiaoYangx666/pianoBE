@@ -1,7 +1,6 @@
 import { DDUI } from "sapi-pro";
 import { DEFAULT_PIANO_SETTINGS, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES } from "@domain/piano/settings";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 
 /** 粒子设置：只包含与弹奏特效相关的选项。 */
@@ -30,6 +29,5 @@ export const ParticleSettingsPage = DDUI.page<{ piano: PianoRuntime }>("粒子�
         });
         ui.reopen();
     });
-    backButton(ui);
     ui.closeButton();
 });

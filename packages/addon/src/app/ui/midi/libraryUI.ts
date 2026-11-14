@@ -3,7 +3,6 @@ import { formatBytes, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { TrackActionsPage } from "./trackActions";
 import { LegacyPlaylistPage } from "./legacyPlaylistUI";
-import { backButton } from "../ddui";
 import {
     PAGE_SIZE,
     TAB_LABELS,
@@ -144,7 +143,6 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
     }, { visible: nextVisible });
     ui.button("刷新", refresh);
     ui.button("旧播放列表（只读）", () => ui.push(LegacyPlaylistPage, { piano }));
-    backButton(ui);
     ui.closeButton();
 
     refresh();

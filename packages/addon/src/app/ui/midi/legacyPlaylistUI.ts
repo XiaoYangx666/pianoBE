@@ -3,7 +3,6 @@ import { formatBytes, toMusicRef, type MusicRef, type PlaylistMeta } from "@pian
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { midiManager, playlist } from "@app/midi";
 import { PAGE_SIZE, pageCount } from "./shared";
-import { backButton } from "../ddui";
 
 export interface LegacyPlaylistArgs {
     piano: PianoRuntime;
@@ -64,7 +63,6 @@ export const LegacyPlaylistPage = DDUI.page<LegacyPlaylistArgs>("旧播放列表
     ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
     ui.button("刷新", refresh);
-    backButton(ui);
     ui.closeButton();
     refresh();
 });
@@ -130,5 +128,5 @@ const LegacyPlaylistContentPage = DDUI.page<{ piano: PianoRuntime; meta: Playlis
         })();
     });
 
-    ui.button("返回", () => ui.back());
+    ui.closeButton();
 });

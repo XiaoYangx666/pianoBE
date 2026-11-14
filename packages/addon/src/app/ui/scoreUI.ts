@@ -2,7 +2,6 @@ import { DDUI } from "sapi-pro";
 import type { PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreAt, scoreIndexOf, type PianoScore } from "@domain/score/score";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 
 /** 每页显示多少个曲谱按钮；超过后通过上一页/下一页浏览。 */
@@ -114,7 +113,6 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置",
     ui.button("上一页", () => turnPage(-1), { disabled: prevDisabled })
         .button("下一页", () => turnPage(1), { disabled: nextDisabled })
         .divider();
-    backButton(ui);
     ui.closeButton();
 
     render();

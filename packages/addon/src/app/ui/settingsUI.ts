@@ -8,7 +8,6 @@ import {
 } from "@domain/piano/settings";
 import { soundLayerAt, soundLayerIndexOf, soundTypes } from "@domain/piano/soundTypes";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 import { ParticleSettingsPage } from "./particleSettingsUI";
 import { TextSettingsPage } from "./textSettingsUI";
@@ -76,7 +75,6 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
         // 保存后重开本页，用新设置重建控件状态。
         if (apply(defaults)) ui.reopen();
     });
-    backButton(ui);
     ui.closeButton();
 });
 
