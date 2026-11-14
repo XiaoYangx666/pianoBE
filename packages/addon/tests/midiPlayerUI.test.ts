@@ -215,6 +215,28 @@ describe("MIDI 播放器页面", () => {
         expect(host.nav.pushed).toHaveLength(1);
         expect(host.nav.pushed[0].form).toBe(LibraryForm);
         expect(host.nav.pushed[0].args.midiPlayer).toBe(midi);
+        expect(typeof host.nav.pushed[0].args.onBack).toBe("function");
+    });
+
+
+    test("旧 DDUIContext 释放 player 引用后，点歌和歌单仍可返回播放器", () => {
+        for (const button of ["♪ 点歌", "歌单"]) {
+            const midi = makeMidi();
+            currentPiano = makePiano(midi);
+            const owner = makePlayer(button);
+            const block = makeBlock();
+            openMidiPlayer(owner, block);
+            const oldUi = host.active()!;
+            lastForm().click(button);
+            expect(oldUi.player).toBeUndefined();
+            expect(midi.signal.listenerCount()).toBe(0);
+            const onBack = host.nav.pushed.at(-1)!.args.onBack;
+            expect(typeof onBack).toBe("function");
+            onBack();
+            expect(lastForm().isShowing()).toBe(true);
+            expect(midi.signal.listenerCount()).toBe(1);
+            lastForm().playerClose();
+        }
     });
 
     test("服务器回写进度不 seek，玩家拖动滑块才 seek", () => {

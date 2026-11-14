@@ -48,7 +48,9 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
             if (alive()) viewModel.sync();
         };
         /** 点歌/歌单的“关闭”按钮回到播放器（与旧版一致：重新解析方块上的运行时） */
-        const reopenPlayer = () => openMidiPlayer(ui.player, block);
+        // 跳转会释放旧 DDUIContext，不能在返回回调里访问已清空的 ui.player。
+        const owner = ui.player;
+        const reopenPlayer = () => openMidiPlayer(owner, block);
 
         // 进度：共享状态 → 页面滑块；玩家拖动滑块 → seek
         const progress = ui.number(viewModel.progress.getData());
@@ -98,7 +100,7 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
             })
             .button("歌单", () => {
                 if (!alive() || !block.isValid) return ui.close();
-                ui.push(LibraryForm, { midiPlayer: midi });
+                ui.push(LibraryForm, { midiPlayer: midi, onBack: reopenPlayer });
             });
     }
 );

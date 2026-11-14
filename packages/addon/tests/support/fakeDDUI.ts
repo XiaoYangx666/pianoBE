@@ -171,13 +171,17 @@ export class FakeUI {
     private readonly writing = new WeakSet<object>();
     private closed = false;
     private navigating = false;
+    private owner: any;
+
+    get player(): any { return this.owner; }
 
     constructor(
-        readonly player: any,
+        player: any,
         readonly args: any,
         title: string,
         private readonly nav: FakeNav
     ) {
+        this.owner = player;
         this.form = new FakeCustomForm(player, title);
         this.form.onClose = () => this.dispose();
     }
@@ -381,6 +385,8 @@ export class FakeUI {
         this.closed = true;
         for (const cleanup of [...this.cleanups].reverse()) cleanup();
         this.cleanups.length = 0;
+        // 与实际 DDUIContext.release() 一致，销毁时断开 Player wrapper 引用。
+        this.owner = undefined;
     }
 }
 

@@ -1,0 +1,45 @@
+name: DDUI regression
+
+on:
+  push:
+    branches:
+      - feature/addon-overhaul
+    paths:
+      - ".github/workflows/dd-ui.yml"
+      - "packages/addon/src/app/ui/**"
+      - "packages/addon/tests/**"
+  pull_request:
+    paths:
+      - ".github/workflows/dd-ui.yml"
+      - "packages/addon/src/app/ui/**"
+      - "packages/addon/tests/**"
+  workflow_dispatch:
+
+jobs:
+  addon-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Build shared core without private vendor archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          core_dir="$RUNNER_TEMP/pianobe-core"
+          mkdir -p "$core_dir"
+          cp -R packages/core/src packages/core/package.json packages/core/tsconfig.json "$core_dir/"
+          (cd "$core_dir" && bun install && bun run build)
+          mkdir -p packages/addon/node_modules/@piano
+          ln -s "$core_dir" packages/addon/node_modules/@piano/core
+      - name: Ensure obsolete PianoViewModel is absent
+        shell: bash
+        run: |
+          if git grep -n -E 'PianoViewModel|pianoViewModel\(' -- packages/addon/src; then
+            echo "Obsolete PianoViewModel reference detected"
+            exit 1
+          fi
+      - name: Run scoped UI regression tests
+        working-directory: packages/addon
+        run: bun test tests/pianoPanel.test.ts tests/midiPlayerUI.test.ts

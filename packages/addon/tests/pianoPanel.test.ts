@@ -9,7 +9,7 @@ import { createDDUIHost, createMidiAppMock, createSapiProMock, FakeCustomForm, F
  * 覆盖迁移中最容易退化的行为：
  * - 输入 → 发声、状态文本、输入长度限制与清空；
  * - 简洁模式 / 升八度 / 快捷键的持久化（程序同步不能误触发持久化）；
- * - 共享 active keys 只更新 4 行文本，不重建表单；
+ * - 页面局部 active notes 只更新 4 行文本，不重建表单；
  * - 页面按钮把设置 / 曲谱 / MIDI / 导入压入同一个表单栈；
  * - 钢琴销毁时页面自动关闭。
  */
@@ -229,7 +229,7 @@ describe("主钢琴面板", () => {
         expect(piano.played).toEqual([]);
     });
 
-    test("共享 active keys 只更新键位行文本", () => {
+    test("页面局部按键状态只更新键位行文本", () => {
         const { piano, form } = openPanel();
         // label 顺序：状态、空行、4 行键位、空行
         const rows = form.components.filter((item) => item.type === "label").slice(2, 6);
@@ -244,6 +244,57 @@ describe("主钢琴面板", () => {
         const after = rows.map((row) => (row.text as FakeObservable<string>).getData());
         expect(after.some((row) => row.includes("§a§lz"))).toBe(false);
         expect(host.forms()).toHaveLength(1);
+    });
+
+
+    test("同一音符再次触发会延长高亮，过期由运行时 tick 清理", () => {
+        const { piano, form } = openPanel();
+        const rows = form.components.filter((item) => item.type === "label").slice(2, 6);
+        const highlighted = () => rows.some((row) =>
+            (row.text as FakeObservable<string>).getData().includes("§a§lz")
+        );
+
+        piano.noteSignal.publish({ midi: 48, duration: 0.2 });
+        piano.tickSignal.publish(103);
+        expect(highlighted()).toBe(true);
+        piano.noteSignal.publish({ midi: 48, duration: 0.4 });
+        piano.tickSignal.publish(105);
+        expect(highlighted()).toBe(true);
+        piano.tickSignal.publish(108);
+        expect(highlighted()).toBe(false);
+        expect(host.forms()).toHaveLength(1);
+    });
+
+    test("关闭后解除钢琴所有页面级信号监听，旧控件不再更新", () => {
+        const { piano, form } = openPanel();
+        const rows = form.components.filter((item) => item.type === "label").slice(2, 6);
+        expect(piano.noteSignal.listenerCount()).toBe(1);
+        expect(piano.tickSignal.listenerCount()).toBe(1);
+        expect(piano.disposedSignal.listenerCount()).toBe(1);
+        piano.noteSignal.publish({ midi: 48, duration: 0.2 });
+
+        form.playerClose();
+        expect(piano.noteSignal.listenerCount()).toBe(0);
+        expect(piano.tickSignal.listenerCount()).toBe(0);
+        expect(piano.disposedSignal.listenerCount()).toBe(0);
+        const writes = rows.map((row) => (row.text as FakeObservable<string>).writes);
+        piano.noteSignal.publish({ midi: 48, duration: 0.5 });
+        piano.tickSignal.publish(101);
+        expect(rows.map((row) => (row.text as FakeObservable<string>).writes)).toEqual(writes);
+    });
+
+    test("连续打开关闭同一架钢琴不会积累页面级订阅", () => {
+        const { player, piano, block, form } = openPanel();
+        form.playerClose();
+        for (let i = 0; i < 20; i++) {
+            openPiano(player, block);
+            expect(piano.noteSignal.listenerCount()).toBe(1);
+            expect(piano.tickSignal.listenerCount()).toBe(1);
+            host.lastForm().playerClose();
+            expect(piano.noteSignal.listenerCount()).toBe(0);
+            expect(piano.tickSignal.listenerCount()).toBe(0);
+            expect(piano.disposedSignal.listenerCount()).toBe(0);
+        }
     });
 
     test("入口按钮把对应页面压入表单栈", () => {
@@ -274,7 +325,7 @@ describe("主钢琴面板", () => {
         piano.disposedSignal.publish();
 
         expect(form.isShowing()).toBe(false);
-        // 共享 view model 随 PianoRuntime 一起销毁，不会留下钢琴信号订阅
+        // 页面级订阅在钢琴销毁时解除
         expect(piano.noteSignal.listenerCount()).toBe(0);
     });
 
