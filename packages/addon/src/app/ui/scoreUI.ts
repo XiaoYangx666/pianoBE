@@ -1,5 +1,5 @@
 import { Player, system } from "@minecraft/server";
-import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
+import { DDUI } from "sapi-pro";
 import { normalizePianoSettings, type PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreAt, scoreIndexOf, type PianoScore } from "@domain/score/score";
 import type { PianoRuntime } from "@app/PianoRuntime";
@@ -7,217 +7,149 @@ import type { PianoRuntime } from "@app/PianoRuntime";
 /** 每页显示多少个曲谱按钮；超过后通过上一页/下一页浏览。 */
 const PAGE_SIZE = 6;
 
-interface ScoreTarget {
-    piano: PianoRuntime;
-    displayId: string;
-}
-
 /**
  * 曲谱配置：安装/卸载谱架，搜索并切换当前曲谱。
  *
  * 曲谱数量可能很多，因此列表不放进钢琴主面板，也不使用下拉框；这里用
  * 动态按钮分页展示，顶部输入框按标题或 id 过滤。
+ *
+ * 页面内所有 Observable 与订阅由 DDUI 作用域托管，关闭/返回后自动释放。
  */
-class PianoScoreForm {
-    private readonly form: CustomForm;
-    private readonly mount: ObservableBoolean;
-    private readonly search: ObservableString;
-    private readonly status: ObservableString;
-    private readonly pageLabel: ObservableString;
-    private readonly slots: ObservableString[] = [];
-    private readonly slotVisible: ObservableBoolean[] = [];
-    private readonly prevDisabled = new ObservableBoolean(true);
-    private readonly nextDisabled = new ObservableBoolean(true);
-    private items: readonly PianoScore[] = [];
-    private page = 0;
-    private target?: ScoreTarget;
-    private unsubscribe?: () => void;
-    /** 表单内 Observable 的订阅，关闭时解绑。 */
-    private readonly cleanups: Array<() => void> = [];
-    private opening = false;
-    private syncing = false;
-    private readonly empty = AVAILABLE_SCORES.length === 0;
-
-    constructor(private readonly player: Player) {
-        const writable = { clientWritable: true };
-        this.mount = new ObservableBoolean(false, writable);
-        this.search = new ObservableString("", writable);
-        this.status = new ObservableString("当前曲谱：无");
-        this.pageLabel = new ObservableString("第 1 / 1 页");
-
-        const mountHandle = this.mount.subscribe(value => {
-            if (this.syncing || !this.target) return;
-            this.apply({ scoreMounted: value });
-            this.render();
-        });
-        this.cleanups.push(() => this.mount.unsubscribe(mountHandle));
-        const searchHandle = this.search.subscribe(() => {
-            if (this.syncing) return;
-            this.page = 0;
-            this.render();
-        });
-        this.cleanups.push(() => this.search.unsubscribe(searchHandle));
-
-        this.form = new CustomForm(player, "曲谱配置")
-            .label(this.status)
-            .toggle("安装谱架", this.mount);
-        if (this.empty) {
-            this.form.label("§7当前资源包没有曲谱\n请通过生成器导入真实谱面图片或 PDF\n仍可先安装空白谱架");
-        }
-        this.form
-            .label("   ")
-            .textField("搜索曲谱标题或 id", this.search)
-            .label(this.pageLabel);
-
-        for (let slot = 0; slot < PAGE_SIZE; slot++) {
-            const label = new ObservableString("");
-            const visible = new ObservableBoolean(false);
-            this.slots.push(label);
-            this.slotVisible.push(visible);
-            this.form.button(label, () => this.choose(slot), { visible });
-        }
-
-        this.form
-            .button("上一页", () => this.turnPage(-1), { disabled: this.prevDisabled })
-            .button("下一页", () => this.turnPage(1), { disabled: this.nextDisabled })
-            .closeButton();
+export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置", (ui, args) => {
+    const piano = args.piano;
+    const settings = piano.settings;
+    const displayId = piano.displayId;
+    if (!settings || !displayId) {
+        ui.player.sendMessage("§e钢琴显示实体暂不可用。");
+        ui.close();
+        return;
     }
 
-    private filtered() {
-        const query = this.search.getData().trim().toLowerCase();
+    ui.onClose(() => piano.flushSettings(displayId));
+    ui.subscribe(piano.disposedSignal, () => ui.close());
+
+    const empty = AVAILABLE_SCORES.length === 0;
+    const mount = ui.boolean(settings.scoreMounted);
+    const search = ui.string("");
+    const status = ui.string("");
+    const pageLabel = ui.string("");
+    const slots = Array.from({ length: PAGE_SIZE }, () => ui.string(""));
+    const slotVisible = Array.from({ length: PAGE_SIZE }, () =>
+        ui.boolean(false, { clientWritable: false })
+    );
+    const prevDisabled = ui.boolean(true, { clientWritable: false });
+    const nextDisabled = ui.boolean(true, { clientWritable: false });
+
+    let items: readonly PianoScore[] = [];
+    let page = 0;
+
+    const filtered = () => {
+        const query = search.getData().trim().toLowerCase();
         if (!query) return AVAILABLE_SCORES;
-        return AVAILABLE_SCORES.filter(score =>
-            score.title.toLowerCase().includes(query) || score.id.toLowerCase().includes(query)
+        return AVAILABLE_SCORES.filter(
+            (score) =>
+                score.title.toLowerCase().includes(query) || score.id.toLowerCase().includes(query)
         );
-    }
+    };
 
-    private render() {
-        if (!this.target) return;
-        this.items = this.filtered();
-        const pages = Math.max(1, Math.ceil(this.items.length / PAGE_SIZE));
-        this.page = Math.max(0, Math.min(this.page, pages - 1));
-        const selected = this.target.piano.settings?.scoreId;
-
-        for (let slot = 0; slot < PAGE_SIZE; slot++) {
-            const score = this.items[this.page * PAGE_SIZE + slot];
-            this.slotVisible[slot].setData(score !== undefined);
-            this.slots[slot].setData(score
-                ? `${score.title}   ${score.pages.length} 页${score.id === selected ? "   [当前]" : ""}`
-                : "");
-        }
-
-        const current = scoreAt(scoreIndexOf(selected));
-        this.status.setData(this.empty
-            ? "当前曲谱：无\n§7资源包内没有曲谱，请通过生成器导入"
-            : `当前曲谱：${current?.title ?? "无"}\n§7共 ${AVAILABLE_SCORES.length} 张，匹配 ${this.items.length} 张`);
-        this.pageLabel.setData(this.empty ? "没有曲谱" : `第 ${this.page + 1} / ${pages} 页`);
-        this.prevDisabled.setData(this.page <= 0);
-        this.nextDisabled.setData(this.page >= pages - 1);
-    }
-
-    private turnPage(step: number) {
-        const pages = Math.max(1, Math.ceil(this.items.length / PAGE_SIZE));
-        const next = Math.max(0, Math.min(this.page + step, pages - 1));
-        if (next === this.page) return;
-        this.page = next;
-        this.render();
-    }
-
-    private choose(slot: number) {
-        const score = this.items[this.page * PAGE_SIZE + slot];
-        if (!score) return;
-        const current = this.target?.piano.settings;
-        if (current?.scoreId === score.id) return;
-        this.apply({ scoreId: score.id });
-        this.render();
-    }
-
-    private apply(patch: Partial<PianoSettings>) {
-        const target = this.target;
-        if (!target || !this.player.isValid) return;
-        const { piano, displayId } = target;
+    /** 目标仍有效时保存补丁；失效就关面板 */
+    const apply = (patch: Partial<PianoSettings>): PianoSettings | undefined => {
         const current = piano.settings;
-        if (!current || piano.displayId !== displayId ||
-            this.player.dimension.id !== piano.location.dimension.id ||
-            piano.verify(system.currentTick) !== "complete") {
-            this.close();
+        if (
+            !current ||
+            piano.displayId !== displayId ||
+            !ui.player.isValid ||
+            ui.player.dimension.id !== piano.location.dimension.id ||
+            piano.verify(system.currentTick) !== "complete"
+        ) {
+            ui.close();
             return;
         }
         const next = normalizePianoSettings(patch, current);
-        if (Object.keys(next).every(key => next[key as keyof PianoSettings] === current[key as keyof PianoSettings])) {
+        if (
+            Object.keys(next).every(
+                (key) => next[key as keyof PianoSettings] === current[key as keyof PianoSettings]
+            )
+        ) {
             return current;
         }
         if (piano.updateSettings(current, next)) return next;
-        this.close();
-    }
+        ui.close();
+    };
 
-    async show(piano: PianoRuntime) {
-        if (this.opening || this.form.isShowing()) return;
-        const settings = piano.settings;
-        const displayId = piano.displayId;
-        if (!settings || !displayId) {
-            this.player.sendMessage("§e钢琴显示实体暂不可用。");
-            return;
+    /** 把过滤结果、分页状态和当前选择写进原生 Observable */
+    const render = () => {
+        items = filtered();
+        const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+        page = Math.max(0, Math.min(page, pages - 1));
+        const selected = piano.settings?.scoreId;
+
+        for (let slot = 0; slot < PAGE_SIZE; slot++) {
+            const score = items[page * PAGE_SIZE + slot];
+            slotVisible[slot].setData(score !== undefined);
+            slots[slot].setData(
+                score
+                    ? `${score.title}   ${score.pages.length} 页${score.id === selected ? "   [当前]" : ""}`
+                    : ""
+            );
         }
 
-        this.opening = true;
-        try {
-            this.syncing = true;
-            try {
-                this.mount.setData(settings.scoreMounted);
-                this.search.setData("");
-            } finally {
-                this.syncing = false;
-            }
-            this.page = 0;
-            this.target = { piano, displayId };
-            this.unsubscribe = piano.disposedSignal.subscribe(() => this.close());
-            this.render();
-            await this.form.show();
-        } finally {
-            this.opening = false;
-            this.close();
-        }
+        const current = scoreAt(scoreIndexOf(selected));
+        status.setData(
+            empty
+                ? "当前曲谱：无\n§7资源包内没有曲谱，请通过生成器导入"
+                : `当前曲谱：${current?.title ?? "无"}\n§7共 ${AVAILABLE_SCORES.length} 张，匹配 ${items.length} 张`
+        );
+        pageLabel.setData(empty ? "没有曲谱" : `第 ${page + 1} / ${pages} 页`);
+        prevDisabled.setData(page <= 0);
+        nextDisabled.setData(page >= pages - 1);
+    };
+
+    const turnPage = (step: number) => {
+        const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+        const next = Math.max(0, Math.min(page + step, pages - 1));
+        if (next === page) return;
+        page = next;
+        render();
+    };
+
+    const choose = (slot: number) => {
+        const score = items[page * PAGE_SIZE + slot];
+        if (!score) return;
+        if (piano.settings?.scoreId === score.id) return;
+        if (apply({ scoreId: score.id })) render();
+    };
+
+    ui.onChange(mount, (value) => {
+        if (apply({ scoreMounted: value })) render();
+    });
+    ui.onChange(search, () => {
+        page = 0;
+        render();
+    });
+
+    ui.label(status).toggle("安装谱架", mount);
+    if (empty) {
+        ui.label("§7当前资源包没有曲谱\n请通过生成器导入真实谱面图片或 PDF\n仍可先安装空白谱架");
+    }
+    ui.label("   ").textField("搜索曲谱标题或 id", search).label(pageLabel);
+
+    for (let slot = 0; slot < PAGE_SIZE; slot++) {
+        ui.button(slots[slot], () => choose(slot), { visible: slotVisible[slot] });
     }
 
-    close() {
-        const target = this.target;
-        this.target = undefined;
-        this.unsubscribe?.();
-        this.unsubscribe = undefined;
-        for (const cleanup of this.cleanups.splice(0)) {
-            try {
-                cleanup();
-            } catch {
-                // Observable 可能已随旧会话失效
-            }
-        }
-        // 关闭后不再需要保留搜索串/按钮文本，避免原生表单持有大对象。
-        try {
-            this.search?.setData("");
-        } catch {
-            // 表单已关闭
-        }
-        if (target) target.piano.flushSettings(target.displayId);
-        if (this.player.isValid && this.form.isShowing()) this.form.close();
+    ui.button("上一页", () => turnPage(-1), { disabled: prevDisabled })
+        .button("下一页", () => turnPage(1), { disabled: nextDisabled })
+        .closeButton();
+
+    render();
+});
+
+export function openScoreConfig(player: Player, piano: PianoRuntime) {
+    if (!player.isValid) return;
+    if (!piano.settings || !piano.displayId) {
+        player.sendMessage("§e钢琴显示实体暂不可用。");
+        return;
     }
-}
-
-/** 同一玩家同时只允许一个曲谱配置表单；关闭后实例直接丢弃。 */
-const activePlayers = new Set<string>();
-
-export async function openScoreConfig(player: Player, piano: PianoRuntime) {
-    if (!player.isValid || activePlayers.has(player.id)) return;
-
-    activePlayers.add(player.id);
-    const form = new PianoScoreForm(player);
-    try {
-        await form.show(piano);
-    } catch (error) {
-        console.warn("[piano] 打开曲谱配置失败", error);
-        if (player.isValid) player.sendMessage("§e无法打开曲谱配置。");
-    } finally {
-        activePlayers.delete(player.id);
-        form.close();
-    }
+    DDUI.open(player, PianoScorePage, { piano });
 }

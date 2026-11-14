@@ -3,7 +3,7 @@ import { eventHost } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { BlockCustomComponent, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";
 import type { PlayerBreakBlockBeforeEvent } from "@minecraft/server";
-import { openMidiPlayer } from "@app/ui/midi/playerUIManager";
+import { openMidiPlayer } from "@app/ui/midi/playerUI";
 import { openPiano } from "@app/ui/piano";
 import { openPianoSettings } from "@app/ui/settingsUI";
 import { pianoWorld } from "@app/PianoWorld";

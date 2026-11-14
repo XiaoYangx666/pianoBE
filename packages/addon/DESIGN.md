@@ -139,6 +139,8 @@ Minecraft playSound / 粒子 / 显示
 
 DDUI 表单在 `1.26.50` + `@minecraft/server-ui 2.2.0` 下已验证关闭即释放，不需要也不应再缓存实例。表单关闭时仍要显式解绑 Observable 监听，并在关闭前清空可能很长的文本字段（例如连音模式的输入串），避免会话数据在表单被回收前继续被持有；新增表单时请沿用 `cleanups`/`trackObservable` 模式，不要在构造函数里裸 `subscribe`。
 
+`SAPIProFormContext` **不持有** `PlayerFormStack`（导航时按玩家从全局表取），所以不会形成 `stack[] → context → stack` 的引用环。**不要给 context 加回 stack 字段**：Bedrock 的脚本运行时不会主动回收这种环，会让每次关闭都留下 context 及其 `args`（piano / block，约 1KB）。顶层关闭时还会 `resetStack(player)` 直接换一条空栈，让 context、args 和已 dispose 的 session 引用立刻全部释放；导航（push / back / replace）时不要重置，上一页还要用 args 重建。
+
 按键释放等每 tick 状态由 `PianoRuntime.tickSignal`（`PianoWorld` 的 1 tick 循环）驱动，不要为每个音符单独 `system.runTimeout`。
 
 ## 7. 有意保留的保护措施

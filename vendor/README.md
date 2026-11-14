@@ -15,3 +15,25 @@ npm install
 Only the addon (and the packages derived from its template build) needs Tabletop; `@piano/core`, `@piano/server`, `@piano/web` build without it.
 
 The installed Tabletop package declares itself private and contains no license declaration or license file; no license is inferred here. Its bundled `@begame/trace` and `@begame/trace-spec` packages include their own MIT license files inside the archive.
+
+# Vendored SAPI-Pro dependency (local DDUI development)
+
+`sapi-pro-dev.tgz` is a **local development build** of [SAPI-Pro](../SAPI-Pro) used while DDUI is
+still being validated against this addon. It is produced from a checkout of the SAPI-Pro `dev`
+branch and is not a published npm version (`vendor/*.tgz` is ignored, like the Tabletop tarball).
+
+A fresh clone restores the link with:
+
+```bash
+git clone https://github.com/XiaoYangx666/SAPI-Pro.git ../SAPI-Pro
+npm run vendor:sapipro        # builds SAPI-Pro stable, packs vendor/sapi-pro-dev.tgz, npm install
+```
+
+`tools/sync-sapipro.mjs` also accepts an explicit checkout path:
+`node tools/sync-sapipro.mjs path/to/SAPI-Pro`. Re-run it after every SAPI-Pro change; add
+`--no-install` to only refresh the tarball.
+
+Because `packages/addon/package.json` points at a tarball, `npm install` pins the archive hash in
+the lockfile. Repacking changes that hash, so refresh the lockfile (`npm install`) together with
+the tarball. When SAPI-Pro publishes a release that contains DDUI, replace this with a normal
+semver dependency.

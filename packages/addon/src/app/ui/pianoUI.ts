@@ -1,5 +1,5 @@
-import { Block, Player } from "@minecraft/server";
-import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui";
+import type { Player } from "@minecraft/server";
+import type { DDUIContext } from "sapi-pro";
 import { SCORE_RESOURCE_PACK_ID } from "@data/scorePack";
 import { AVAILABLE_SCORES, scoreAt } from "@domain/score/score";
 import { NoteInfo } from "@domain/types";
@@ -7,9 +7,9 @@ import { processNote } from "@domain/util/note";
 import { soundTypes, FOLLOW_PIANO_LAYER } from "@domain/piano/soundTypes";
 import { keyMaps } from "@domain/piano/keymap";
 import { PIANO_LAYOUT } from "@domain/piano/layout";
-import type { PianoState, PianoUIRefs } from "./pianoState";
+import type { PianoState, PianoView } from "./pianoState";
 
-function switchKeyMap(state: PianoState, p: Player) {
+export function switchKeyMap(state: PianoState, p: Player) {
     let idx = state.keyMap.getData();
     idx = (idx + 1) % keyMaps.length;
     state.keyMap.setData(idx);
@@ -30,135 +30,95 @@ export function switchSoundType(state: PianoState, p: Player) {
     p.setDynamicProperty("piano:sound", idx);
 }
 
-type Cleanup = () => void;
-
-function trackObservable<T>(
-    observable: {
-        subscribe(callback: (value: T) => void): (value: T) => void;
-        unsubscribe(callback: (value: T) => void): boolean;
-    },
-    callback: (value: T) => void,
-    cleanups: Cleanup[]
-) {
-    const handle = observable.subscribe(callback);
-    cleanups.push(() => observable.unsubscribe(handle));
-}
-
-function addScoreControls(
-    form: CustomForm,
-    state: PianoState,
-    controlsVisible: ObservableBoolean,
-    cleanups: Cleanup[]
-) {
-    // 目标版本固定为 1.26.50 + server-ui 2.2.0，form.image 是标准方法。
+/**
+ * 曲谱预览：可见性、当前页图片、上一页/下一页可用状态都由 Observable 派生。
+ * 越界页码会被纠正写回 state.scorePage（`ui.set` 不会再触发 onChange）。
+ */
+export function addScoreControls(ui: DDUIContext<any>, state: PianoState) {
     if (AVAILABLE_SCORES.length === 0) return;
-    const showScore = state.showScore;
-    const visible = new ObservableBoolean(false);
-    const source = new ObservableString("");
-    const atStart = new ObservableBoolean(true);
-    const atEnd = new ObservableBoolean(true);
+
+    const visible = ui.computed(
+        [state.controlsVisible, state.showScore],
+        () => state.controlsVisible.getData() && state.showScore.getData()
+    );
+    const source = ui.string("", { clientWritable: false });
+    const atStart = ui.boolean(true, { clientWritable: false });
+    const atEnd = ui.boolean(true, { clientWritable: false });
 
     const pages = () => scoreAt(state.score.getData())?.pages ?? [];
 
-    const updateVisibility = () => visible.setData(controlsVisible.getData() && showScore.getData());
-    trackObservable(showScore, updateVisibility, cleanups);
-    trackObservable(controlsVisible, updateVisibility, cleanups);
-    updateVisibility();
-
+    let syncing = false;
     const syncPage = () => {
-        const list = pages();
-        const page = Math.max(0, Math.min(state.scorePage.getData(), list.length - 1));
-        if (page !== state.scorePage.getData()) {
-            // 越界时先纠正下标，订阅会再同步一次。
-            state.scorePage.setData(page);
-            return;
+        if (syncing) return;
+        syncing = true;
+        try {
+            const list = pages();
+            const raw = state.scorePage.getData();
+            const page = Math.max(0, Math.min(raw, list.length - 1));
+            if (page !== raw) ui.set(state.scorePage, page);
+            ui.set(source, list[page] ?? "");
+            ui.set(atStart, page === 0);
+            ui.set(atEnd, page >= list.length - 1);
+        } finally {
+            syncing = false;
         }
-        source.setData(list[page] ?? "");
-        atStart.setData(page === 0);
-        atEnd.setData(page >= list.length - 1);
     };
-    trackObservable(state.scorePage, syncPage, cleanups);
 
-    // 曲谱选择在独立的曲谱配置表单里完成；本表单只预览当前选中的曲谱。
-    const onScoreChange = () => {
-        state.scorePage.setData(0);
+    // 翻页 / 曲谱变化时重算（立即执行一次）
+    ui.watch([state.scorePage], syncPage);
+    ui.onChange(state.score, () => {
+        ui.set(state.scorePage, 0);
         syncPage();
-    };
-    trackObservable(state.score, onScoreChange, cleanups);
-    syncPage();
+    });
 
     const turnPage = (step: number) => {
         const next = state.scorePage.getData() + step;
         if (!visible.getData() || next < 0 || next >= pages().length) return;
-        state.scorePage.setData(next);
+        ui.set(state.scorePage, next);
     };
 
-    form.toggle("在面板中显示曲谱", showScore, { visible: controlsVisible });
-    form.image(source, SCORE_RESOURCE_PACK_ID, { visible, width: .96 })
+    ui.toggle("在面板中显示曲谱", state.showScore, { visible: state.controlsVisible })
+        .image(source, SCORE_RESOURCE_PACK_ID, { visible, width: 0.96 })
         .button("上一页", () => turnPage(-1), { visible, disabled: atStart })
         .button("下一页", () => turnPage(1), { visible, disabled: atEnd });
 }
 
-export interface PianoUIActions {
-    openMidi(): void;
-    openSettings(): void;
-    openScores(): void;
-    openShortcuts(): void;
-    openImport(): void;
-}
-
-export function createPianoUI(
-    p: Player,
+export function updatePianoUI(
     state: PianoState,
-    ui: PianoUIRefs,
-    _getBlock: () => Block | null,
-    actions: PianoUIActions,
-    cleanups: Cleanup[] = []
+    view: PianoView,
+    activeNotes: ReadonlySet<number>,
+    last?: NoteInfo
 ) {
-    const options = { visible: state.controlsVisible };
+    if (!state.controlsVisible.getData()) return;
 
-    const form = new CustomForm(p, "文本钢琴")
-        .label(ui.status, options)
-        .label("   ", options);
+    const keyMap = keyMaps[state.keyMap.getData()].value;
+    const info = last ?? emptyInfo;
+    const sound = state.sound.getData();
 
-    ui.rows.forEach((row) => form.label(row, options));
+    view.write(view.keyMapLabel, `当前方案: ${keyMaps[state.keyMap.getData()].name}`);
+    view.write(view.modeLabel, state.mode.getData() ? "模式: 单音模式" : "模式: 连音模式");
+    view.write(
+        view.soundLabel,
+        sound < 0 ? "音长: 跟随钢琴" : `音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`
+    );
 
-    form.label("   ", options)
-        .textField("在此处快速打字...", state.input);
-    addScoreControls(form, state, state.controlsVisible, cleanups);
-    form.toggle("升8度 (高音模式)", state.octave)
-        .button(
-            ui.keyMapLabel,
-            () => {
-                switchKeyMap(state, p);
-                updatePianoUI(state, ui);
-            },
-            options
-        )
-        .button(
-            ui.modeLabel,
-            () => {
-                switchComMode(state, p);
-                updatePianoUI(state, ui);
-            },
-            options
-        )
-        .button(
-            ui.soundLabel,
-            () => {
-                switchSoundType(state, p);
-                updatePianoUI(state, ui);
-            },
-            options
-        )
-        .button("♪ MIDI 播放器", () => actions.openMidi(), options)
-        .button("钢琴设置", () => actions.openSettings(), options)
-        .button("曲谱配置", () => actions.openScores(), options)
-        .button("快捷键设置", () => actions.openShortcuts(), options)
-        .button("导入 MIDI", () => actions.openImport(), options)
-        .toggle("简洁模式", state.compact);
+    if (last) {
+        view.write(
+            view.status,
+            `§l§f音符: §a${info.name}\n§7音高: §e${info.pitch.toFixed(3)} §7采样: ${info.sample}`
+        );
+    } else {
+        const hasGaps = PIANO_LAYOUT.some(
+            (row) => row.some((k) => k.trim() !== "" && keyMap[k] === undefined)
+        );
+        view.write(
+            view.status,
+            hasGaps ? `§b钢琴已就绪\n§7深灰色按键为当前方案的空位` : `§b钢琴已就绪`
+        );
+    }
 
-    return form;
+    // 键位行来自 per-piano active keys，由页面按当前玩家的 keyMap/octave 渲染。
+    updatePianoRows(state, view, activeNotes);
 }
 
 const emptyInfo: NoteInfo = {
@@ -168,62 +128,10 @@ const emptyInfo: NoteInfo = {
     midi: -1,
 };
 
-/** 值没变就不写 Observable，减少每键一次的客户端同步与字符串分配。 */
-function setIfChanged(observable: ObservableString, value: string) {
-    if (observable.getData() !== value) observable.setData(value);
-}
-
-export function updatePianoUI(
-    state: PianoState,
-    ui: PianoUIRefs,
-    last?: NoteInfo
-) {
-    if (!state.controlsVisible.getData()) return;
-
-    const keyMap = keyMaps[state.keyMap.getData()].value;
-
-    const info = last ?? emptyInfo;
-
-    setIfChanged(ui.keyMapLabel, `当前方案: ${keyMaps[state.keyMap.getData()].name}`);
-    //更新模式
-    setIfChanged(
-        ui.modeLabel,
-        state.mode.getData() ? "模式: 单音模式" : "模式: 连音模式"
-    );
-    //更新sound类型
-    const sound = state.sound.getData();
-    setIfChanged(
-        ui.soundLabel,
-        sound < 0
-            ? "音长: 跟随钢琴"
-            : `音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`
-    );
-
-    if (last) {
-        setIfChanged(
-            ui.status,
-            `§l§f音符: §a${info.name}\n§7音高: §e${info.pitch.toFixed(3)} §7采样: ${info.sample}`
-        );
-    } else {
-        const hasGaps = PIANO_LAYOUT.some((row) =>
-            row.some((k) => k.trim() !== "" && keyMap[k] === undefined)
-        );
-        setIfChanged(
-            ui.status,
-            hasGaps
-                ? `§b钢琴已就绪\n§7深灰色按键为当前方案的空位`
-                : `§b钢琴已就绪`
-        );
-    }
-
-    // 键位行来自 per-piano active keys，由会话用当前 keyMap/octave 渲染。
-    ui.renderRows?.();
-}
-
 /** 用一架钢琴的 active MIDI notes 渲染当前玩家视角的键位行。 */
 export function updatePianoRows(
     state: PianoState,
-    ui: PianoUIRefs,
+    view: PianoView,
     activeNotes: ReadonlySet<number>
 ) {
     const isHigh = state.octave.getData();
@@ -239,11 +147,9 @@ export function updatePianoRows(
             if (active) {
                 rowStr += ` §a§l${k}§r `;
             } else {
-                rowStr += bound
-                    ? ` ${baseColor}${k}§r `
-                    : ` §8${k}§r `;
+                rowStr += bound ? ` ${baseColor}${k}§r ` : ` §8${k}§r `;
             }
         }
-        setIfChanged(ui.rows[i], rowStr);
+        view.write(view.rows[i], rowStr);
     });
 }

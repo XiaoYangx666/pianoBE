@@ -1,448 +1,175 @@
 import { resolveInstrument } from "@platform/assembly";
 import { Block, Player, system } from "@minecraft/server";
-import { Vector3Utils } from "sapi-pro";
+import { DDUI, Vector3Utils } from "sapi-pro";
 import { handleInput, handleShortcuts } from "@app/inputHandler";
 import { pianoWorld } from "@app/PianoWorld";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { createPianoUI, updatePianoRows, updatePianoUI } from "@app/ui/pianoUI";
-import { pianoViewModel, type PianoViewModel } from "@app/ui/pianoViewModel";
-import { FOLLOW_PIANO_LAYER, soundTypes } from "@domain/piano/soundTypes";
-import { scoreIndexOf } from "@domain/score/score";
-import { openMidiPlayer } from "@app/ui/midi/playerUIManager";
-import { openMidiImport } from "@app/ui/midi/importUI";
-import { openPianoSettings } from "@app/ui/settingsUI";
-import { openScoreConfig } from "@app/ui/scoreUI";
-import { loadShortcuts, openShortcutSettings } from "@app/ui/shortcutUI";
-import type { ShortcutBindings } from "@domain/piano/shortcuts";
-import type { PianoState, PianoUIRefs } from "@app/ui/pianoState";
 import {
-    ObservableBoolean,
-    ObservableNumber,
-    ObservableString,
-} from "@minecraft/server-ui";
+    addScoreControls,
+    switchComMode,
+    switchKeyMap,
+    switchSoundType,
+    updatePianoRows,
+    updatePianoUI,
+} from "@app/ui/pianoUI";
+import { createPianoState, createPianoView } from "@app/ui/pianoState";
+import { pianoViewModel } from "@app/ui/pianoViewModel";
+import { scoreIndexOf } from "@domain/score/score";
+import { MidiPlayerPage } from "@app/ui/midi/playerUI";
+import { MidiImportPage } from "@app/ui/midi/importUI";
+import { PianoSettingsPage } from "@app/ui/settingsUI";
+import { PianoScorePage } from "@app/ui/scoreUI";
+import { loadShortcuts, ShortcutSettingsForm } from "@app/ui/shortcutUI";
 
 /** 连音模式下保留的输入尾部长度；parseInput 只读最后 1~3 个字符。 */
 const MAX_INPUT_LENGTH = 32;
 
-/** 单个玩家的钢琴面板 UI 会话；真正的钢琴状态在 PianoRuntime。 */
-class PianoPanelSession {
-    private form: any;
-    private state!: PianoState;
-    private ui!: PianoUIRefs;
-    private piano?: PianoRuntime;
-    private unsubscribePiano?: () => void;
-    /** 这架钢琴共享的按键视图。 */
-    private viewModel?: PianoViewModel;
-    private activeKeysUnsub?: () => void;
-    /** 表单内 Observable 的订阅，关闭时显式解绑，避免回调闭包拖住会话。 */
-    private readonly cleanups: Array<() => void> = [];
-    private disposed = false;
+/**
+ * 文本钢琴主面板。
+ *
+ * 业务状态（PianoState）与输入解析留在 PianoBE；页面生命周期、订阅、定时器、
+ * 导航与“旧会话失效”由 DDUI 负责。面板关闭/返回时不会重建整张表单以外的任何东西。
+ */
+export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
+    "文本钢琴",
+    (ui, args) => {
+        const player = ui.player;
+        const { piano, block } = args;
+        if (!block.isValid || !piano.isAlive()) {
+            ui.close();
+            return;
+        }
+        ui.subscribe(piano.disposedSignal, () => ui.close());
 
-    private leftBlock: Block | null = null;
-    private inited = false;
-    private lastLength = 0;
-    private shortcuts!: ShortcutBindings;
-    /** 防止同一帧内连续交互导致 show() 并发调用（两次 show 会刷新表单实例，客户端写入被拒） */
-    private opening = false;
-    private syncingCompact = false;
-    /** 输入框清空定时器是否已排队，避免每个字符都挂一条 runTimeout。 */
-    private clearScheduled = false;
+        const state = createPianoState(player, ui);
+        const view = createPianoView(ui);
+        const shortcuts = loadShortcuts(player);
+        /** 这架钢琴共享的按键视图；它的生命周期属于 PianoRuntime，页面只订阅。 */
+        const viewModel = pianoViewModel(piano);
+        const activeNotes = () => viewModel.activeNotes();
 
-    constructor(private player: Player) {}
+        // 共享按键变化只重绘 4 行文本，不重建表单
+        ui.subscribe(viewModel.activeKeys, () => updatePianoRows(state, view, activeNotes()));
 
-    /** 订阅 Observable 并登记解绑函数。 */
-    private track<T>(
-        observable: {
-            subscribe(callback: (value: T) => void): (value: T) => void;
-            unsubscribe(callback: (value: T) => void): boolean;
-        },
-        callback: (value: T) => void
-    ) {
-        const handle = observable.subscribe(callback);
-        this.cleanups.push(() => observable.unsubscribe(handle));
-    }
-
-    /** 设置当前钢琴方块 */
-    setPianoBlock(block: Block) {
-        const location = resolveInstrument(block);
-        if (!location) return false;
-        const anchor = location.dimension.getBlock(location.pos);
-        const piano = pianoWorld.get(location);
-        if (!anchor || !piano) return false;
-
-        this.releaseViewModel();
-        this.leftBlock = anchor;
-        this.piano = piano;
-
-        this.viewModel = pianoViewModel(piano);
-        const viewModel = this.viewModel;
-        const activeKeys = viewModel.activeKeys.subscribe(() => this.renderRows());
-        this.activeKeysUnsub = () => viewModel.activeKeys.unsubscribe(activeKeys);
-
-        this.unsubscribePiano = piano.disposedSignal.subscribe(() => {
-            this.piano = undefined;
-            this.leftBlock = null;
-            this.unsubscribePiano = undefined;
-            this.close();
+        // 玩家级状态持久化；ui.set 的同步不会触发
+        ui.onChange(state.octave, (octave) => {
+            if (player.isValid) player.setDynamicProperty("piano:octave", octave);
+            updatePianoUI(state, view, activeNotes());
         });
-        return true;
-    }
+        ui.onChange(state.compact, (compact) => {
+            if (player.isValid) player.setDynamicProperty("piano:compact", compact);
+            updatePianoUI(state, view, activeNotes());
+        });
+        ui.onChange(state.showScore, (show) => {
+            if (player.isValid) player.setDynamicProperty("piano:scorePreview", show);
+        });
 
-    /** 释放本会话对共享 view model 的引用，不销毁 view model。 */
-    private releaseViewModel() {
-        this.activeKeysUnsub?.();
-        this.activeKeysUnsub = undefined;
-        this.unsubscribePiano?.();
-        this.unsubscribePiano = undefined;
-        this.viewModel = undefined;
-    }
+        // 打开时同步：大钢琴只有主面板入口，简洁模式只在有屏幕的钢琴上生效
+        ui.set(state.compact, piano.hasScreen && player.getDynamicProperty("piano:compact") === true);
+        ui.set(state.score, scoreIndexOf(piano.settings?.scoreId));
 
-    /** 用共享 active keys + 当前玩家的 keyMap/octave 重绘键位行。 */
-    private renderRows() {
-        if (!this.state || !this.ui) return;
-        updatePianoRows(this.state, this.ui, this.viewModel?.activeNotes() ?? new Set());
-    }
-
-    /** 初始化（只执行一次） */
-    private init() {
-        if (this.inited || !this.leftBlock || !this.piano?.isAlive() || !this.player.isValid) return;
-        this.inited = true;
-
-        // === state ===
-        const keyMapIdx =
-            (this.player.getDynamicProperty("piano:keyMap") as number) ?? 0;
-        const mode =
-            (this.player.getDynamicProperty("piano:comMode") as boolean) ??
-            true;
-        const storedSound = this.player.getDynamicProperty("piano:sound");
-        const sound = typeof storedSound === "number" && soundTypes[storedSound]
-            ? storedSound
-            : FOLLOW_PIANO_LAYER;
-        const compact = this.player.getDynamicProperty("piano:compact") === true;
-        const showScore = this.player.getDynamicProperty("piano:scorePreview") === true;
-        const octave = this.player.getDynamicProperty("piano:octave") === true;
-
-        this.state = {
-            keyMap: new ObservableNumber(keyMapIdx),
-            mode: new ObservableBoolean(mode),
-            octave: new ObservableBoolean(octave, {
-                clientWritable: true,
-            }),
-            compact: new ObservableBoolean(compact, {
-                clientWritable: true,
-            }),
-            showScore: new ObservableBoolean(showScore, {
-                clientWritable: true,
-            }),
-            controlsVisible: new ObservableBoolean(!compact),
-            input: new ObservableString("", {
-                clientWritable: true,
-            }),
-            sound: new ObservableNumber(sound),
-            score: new ObservableNumber(0),
-            scorePage: new ObservableNumber(0),
+        const shouldClose = () => {
+            if (!player.isValid || !piano.isAlive()) return true;
+            if (player.dimension.id !== piano.location.dimension.id) return true;
+            if (piano.verify(system.currentTick) !== "complete") return true;
+            return Vector3Utils.squaredDistance(player.location, piano.center) > 25;
         };
 
-        // === UI ===
-        this.ui = {
-            status: new ObservableString("§b钢琴已就绪"),
-            rows: [
-                new ObservableString(""),
-                new ObservableString(""),
-                new ObservableString(""),
-                new ObservableString(""),
-            ],
-            keyMapLabel: new ObservableString(""),
-            modeLabel: new ObservableString(""),
-            soundLabel: new ObservableString(""),
-            renderRows: () => this.renderRows(),
-        };
+        // === 输入：每个字符一次，只做状态更新与文本写入 ===
+        let lastLength = 0;
+        let clearScheduled = false;
+        ui.onChange(state.input, (value) => {
+            if (shouldClose()) return ui.close();
 
-        // === form（每个会话创建一次）===
-        this.form = createPianoUI(
-            this.player,
-            this.state,
-            this.ui,
-            () => this.leftBlock,
-            {
-                openMidi: () => this.openMidi(),
-                openSettings: () => this.openSettings(),
-                openScores: () => this.openScores(),
-                openShortcuts: () => this.openShortcuts(),
-                openImport: () => this.openImport(),
-            },
-            this.cleanups
-        );
-
-        // === 订阅（只注册一次）===
-
-        this.shortcuts = loadShortcuts(this.player);
-
-        // 输入
-        this.track(this.state.input, (val) => {
-            // ❗玩家 / 方块校验
-            if (this.shouldClose()) {
-                this.close();
+            // 删除/清空不会触发发声
+            if (value.length <= lastLength) {
+                lastLength = value.length;
                 return;
             }
-
-            // ❗长度控制
-            if (val.length <= this.lastLength) {
-                this.lastLength = val.length;
-                return;
-            }
-
-            const added = val.slice(this.lastLength);
-            this.lastLength = val.length;
+            const added = value.slice(lastLength);
+            lastLength = value.length;
 
             // 先处理本次新输入的快捷键，再按普通音符处理
-            if (handleShortcuts(added, this.state, this.player, this.shortcuts)) {
-                updatePianoUI(this.state, this.ui);
+            if (handleShortcuts(added, state, player, shortcuts)) {
+                updatePianoUI(state, view, activeNotes());
             }
 
-            // 处理输入
-            const result = handleInput(val, this.state, this.piano!, this.player);
+            const result = handleInput(value, state, piano, player);
+            updatePianoUI(state, view, activeNotes(), result.last);
 
-            // 更新 UI
-            updatePianoUI(this.state, this.ui, result.last);
-
-            // 连音模式不会清空输入框，长期打字会把整串文本留在 Observable 里；
-            // parseInput 只看最后 1~3 个字符，保留一小段尾部即可。
-            if (!result.shouldClear && val.length > MAX_INPUT_LENGTH) {
-                const trimmed = val.slice(-MAX_INPUT_LENGTH);
-                this.lastLength = trimmed.length;
-                this.state.input.setData(trimmed);
+            // 连音模式不会清空输入框，长期打字只保留一小段尾部
+            if (!result.shouldClear && value.length > MAX_INPUT_LENGTH) {
+                const trimmed = value.slice(-MAX_INPUT_LENGTH);
+                lastLength = trimmed.length;
+                ui.set(state.input, trimmed);
             }
 
-            // 清空输入
-            if (result.shouldClear && !this.clearScheduled) {
-                this.clearScheduled = true;
-                system.runTimeout(() => {
-                    this.clearScheduled = false;
-                    if (this.disposed) return;
-                    try {
-                        this.state.input.setData("");
-                    } catch {
-                        // 表单已关闭或 Observable 已失效
-                    }
+            if (result.shouldClear && !clearScheduled) {
+                clearScheduled = true;
+                ui.timeout(() => {
+                    clearScheduled = false;
+                    lastLength = 0;
+                    ui.set(state.input, "");
                 }, 1);
             }
         });
-        // 升8度
-        this.track(this.state.octave, (octave) => {
-            if (this.player.isValid) this.player.setDynamicProperty("piano:octave", octave);
-            updatePianoUI(this.state, this.ui);
-        });
 
-        // 简洁模式：隐藏文字与按钮，只留输入框和开关；选择按玩家保存
-        this.track(this.state.compact, (compact) => {
-            if (!this.syncingCompact && this.player.isValid) this.player.setDynamicProperty("piano:compact", compact);
-            this.state.controlsVisible.setData(!compact);
-            updatePianoUI(this.state, this.ui);
-        });
+        updatePianoUI(state, view, activeNotes());
 
-        // 曲谱预览开关同样按玩家保存，快捷键与面板开关共用这一份状态
-        this.track(this.state.showScore, (show) => {
-            if (this.player.isValid) this.player.setDynamicProperty("piano:scorePreview", show);
-        });
+        // === 控件（与迁移前一一对应）===
+        const options = { visible: state.controlsVisible };
+        ui.label(view.status, options).label("   ", options);
+        view.rows.forEach((row) => ui.label(row, options));
+        ui.label("   ", options).textField("在此处快速打字...", state.input);
+
+        addScoreControls(ui, state);
+
+        const refresh = () => updatePianoUI(state, view, activeNotes());
+
+        ui.toggle("升8度 (高音模式)", state.octave)
+            .button(
+                view.keyMapLabel,
+                () => {
+                    switchKeyMap(state, player);
+                    refresh();
+                },
+                options
+            )
+            .button(
+                view.modeLabel,
+                () => {
+                    switchComMode(state, player);
+                    refresh();
+                },
+                options
+            )
+            .button(
+                view.soundLabel,
+                () => {
+                    switchSoundType(state, player);
+                    refresh();
+                },
+                options
+            )
+            .button("♪ MIDI 播放器", () => ui.push(MidiPlayerPage, { piano, block }), options)
+            .button("钢琴设置", () => ui.push(PianoSettingsPage, { piano }), options)
+            .button("曲谱配置", () => ui.push(PianoScorePage, { piano }), options)
+            .button(
+                "快捷键设置",
+                () => ui.push(ShortcutSettingsForm, { bindings: loadShortcuts(player) }),
+                options
+            )
+            .button("导入 MIDI", () => ui.push(MidiImportPage), options)
+            .toggle("简洁模式", state.compact);
     }
+);
 
-    /** 打开 UI */
-    async show() {
-        this.init();
-        if (!this.form) return;
-
-        // 已在显示 / 正在打开时不要再次 show，否则会重新绑定 DDUI 实例
-        if (this.opening || this.form.isShowing()) return;
-
-        this.opening = true;
-        try {
-            // Grand pianos use the main panel as the only entry to settings and MIDI.
-            const compact = this.piano?.hasScreen === true && this.player.getDynamicProperty("piano:compact") === true;
-            this.syncingCompact = true;
-            try {
-                this.state.compact.setData(compact);
-            } finally {
-                this.syncingCompact = false;
-            }
-            // 同步当前钢琴的曲谱选择；首次打开或换了一架琴时更新面板预览
-            this.state.score.setData(this.currentScoreIndex());
-            this.shortcuts = loadShortcuts(this.player);
-
-            // 重置输入状态
-            this.lastLength = 0;
-            this.state.input.setData("");
-
-            // 刷新 UI
-            updatePianoUI(this.state, this.ui);
-
-            await this.showForm();
-        } catch (e) {
-            console.error("[piano] 打开表单失败", e);
-            this.close();
-        } finally {
-            this.opening = false;
-        }
-    }
-
-    /**
-     * 显示表单。每个会话只打开一次；返回 UserBusy 时说明玩家正占用其它 UI，
-     * 直接放弃本次打开即可（reopen 已在关闭后等待 2 tick）。
-     */
-    private async showForm() {
-        try {
-            await this.form.show();
-        } catch (e) {
-            // 已经在显示：视为成功
-            if ((e as { reason?: string })?.reason !== "AlreadyShowing") throw e;
-        }
-    }
-
-    close() {
-        // 1. 关闭 UI
-        try {
-            if (this.form?.isShowing?.()) {
-                this.form.close();
-            }
-        } catch {
-            // 玩家已离开/表单已随旧会话关闭
-        }
-    }
-
-    /**
-     * 面板里的入口按钮：DDUI 同一玩家同时只能有一个表单，
-     * 先关掉本表单并记下关闭时刻，等客户端完成关闭后再打开目标界面。
-     */
-    private reopen(open: () => void) {
-        const player = this.player;
-        if (!player.isValid) return;
-        this.close();
-        system.runTimeout(() => {
-            if (player.isValid) open();
-        }, 2);
-    }
-
-    private currentScoreIndex() {
-        return scoreIndexOf(this.piano?.settings?.scoreId);
-    }
-
-    /** 「MIDI 播放器」入口 */
-    private openMidi() {
-        const player = this.player;
-        const block = this.leftBlock;
-        if (!block || !player.isValid) return;
-        this.reopen(() => {
-            if (block.isValid) void openMidiPlayer(player, block);
-        });
-    }
-
-    /** 「钢琴设置」入口 */
-    private openSettings() {
-        const player = this.player;
-        const piano = this.piano;
-        if (!piano || !player.isValid) return;
-        this.reopen(() => {
-            if (piano.isAlive()) void openPianoSettings(player, piano);
-        });
-    }
-
-    /** 「曲谱配置」入口 */
-    private openScores() {
-        const player = this.player;
-        const piano = this.piano;
-        if (!piano || !player.isValid) return;
-        this.reopen(() => {
-            if (piano.isAlive()) void openScoreConfig(player, piano);
-        });
-    }
-
-    /** 「快捷键设置」入口：使用 sapi-pro 的 ConfigForm */
-    private openShortcuts() {
-        const player = this.player;
-        if (!player.isValid) return;
-        this.reopen(() => {
-            if (!player.isValid) return;
-            try {
-                openShortcutSettings(player);
-            } catch (error) {
-                console.warn("[piano] 打开快捷键设置失败", error);
-                if (player.isValid) player.sendMessage("§e无法打开快捷键设置。");
-            }
-        });
-    }
-
-    /** 「导入 MIDI」入口（DDUI 分段粘贴） */
-    private openImport() {
-        const player = this.player;
-        if (!player.isValid) return;
-        this.reopen(() => {
-            if (player.isValid) void openMidiImport(player);
-        });
-    }
-
-    /** 表单关闭后清理会话；已排队的两 tick 回调只捕获 player，不依赖本对象。 */
-    dispose() {
-        if (this.disposed) return;
-        this.disposed = true;
-        // 表单在原生层可能仍被保留；先关表单前清掉输入框里可能很长的一串文本。
-        try {
-            this.state?.input?.setData("");
-        } catch {
-            // Observable 已失效
-        }
-        this.close();
-        this.releaseViewModel();
-        for (const cleanup of this.cleanups.splice(0)) {
-            try {
-                cleanup();
-            } catch {
-                // Observable 可能已随旧会话失效
-            }
-        }
-        this.piano = undefined;
-        this.leftBlock = null;
-        this.form = undefined;
-        this.state = undefined as never;
-        this.ui = undefined as never;
-        this.shortcuts = undefined as never;
-        this.player = undefined as never;
-        this.inited = false;
-        this.lastLength = 0;
-        this.clearScheduled = false;
-        this.opening = false;
-    }
-
-    private shouldClose(): boolean {
-        const p = this.player;
-        const piano = this.piano;
-
-        //玩家失效
-        if (!p.isValid) return true;
-        // 方块失效
-        if (!piano?.isAlive() || p.dimension.id !== piano.location.dimension.id ||
-            piano.verify(system.currentTick) !== "complete") return true;
-        //距离太远
-        if (Vector3Utils.squaredDistance(p.location, piano.center) > 25) {
-            return true;
-        }
-        return false;
-    }
-}
-
-/** 同一玩家同时只允许一个钢琴面板；关闭后实例直接丢弃。 */
-const activePlayers = new Set<string>();
-
-/** 对外入口。这里新建的只是玩家级 UI 包装，真实 PianoRuntime 由 PianoWorld 缓存复用。 */
-export async function openPiano(p: Player, block: Block) {
-    if (!p.isValid || activePlayers.has(p.id)) return;
-
-    activePlayers.add(p.id);
-    const session = new PianoPanelSession(p);
-    try {
-        if (!session.setPianoBlock(block)) return;
-        await session.show();
-    } finally {
-        activePlayers.delete(p.id);
-        session.dispose();
-    }
+/** 对外入口。这里新建的只是玩家级 UI 页面，真实 PianoRuntime 由 PianoWorld 缓存复用。 */
+export function openPiano(player: Player, block: Block) {
+    if (!player.isValid || !block.isValid) return;
+    const location = resolveInstrument(block);
+    const anchor = location?.dimension.getBlock(location.pos);
+    const piano = location ? pianoWorld.get(location) : undefined;
+    if (!anchor || !piano || !piano.isAlive()) return;
+    DDUI.open(player, PianoPanelPage, { piano, block: anchor });
 }

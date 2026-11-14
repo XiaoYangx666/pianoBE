@@ -41,7 +41,8 @@
         "build:generator": "npm run build -w @piano/generator",
         "build:timbres": "node tools/build-piano-timbres.mjs",
         "verify:timbres": "bun tools/verify-timbres.mjs",
-        "vendor:tabletop": "node tools/pack-tabletop.mjs"
+        "vendor:tabletop": "node tools/pack-tabletop.mjs",
+        "vendor:sapipro": "node tools/sync-sapipro.mjs"
     },
     "devDependencies": {
         "@minecraft/server": "2.10.0",

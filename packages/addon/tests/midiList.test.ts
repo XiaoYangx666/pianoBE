@@ -1,45 +1,14 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { MidiPlayer } from "../src/domain/playback/player";
+import { createSapiProMock, createMidiAppMock } from "./support/fakeDDUI";
 
 const page = mock(async () => ({ items: [], total: 0 }));
 const getContent = mock(async () => [] as string[]);
 const setContent = mock(async () => {});
 
-mock.module("@app/midi", () => ({
-    midiManager: {
-        page,
-        metaAll: async () => [],
-        infoOf: async () => undefined,
-        getInfo: () => undefined,
-    },
-    importedMidiManager: {
-        page,
-        metaAll: async () => [],
-        infoOf: async () => undefined,
-        getInfo: () => undefined,
-    },
-    playlist: { getContent, setContent },
-}));
+mock.module("@app/midi", () => createMidiAppMock({ page, getContent, setContent }));
 
-class FakeField {
-    key() { return this; }
-    validator() { return this; }
-}
-
-mock.module("sapi-pro", () => ({
-    formManager: { open: () => {} },
-    CommonForm: {
-        ButtonForm: (config: unknown) => config,
-        InputForm: (config: unknown) => config,
-        SimpleMessageForm: (config: unknown) => config,
-    },
-    NumberField: FakeField,
-    TextField: FakeField,
-    Validators: {
-        numberRange: () => () => undefined,
-        stringLength: () => () => undefined,
-    },
-}));
+mock.module("sapi-pro", () => createSapiProMock());
 
 const { MidiListForm } = await import("../src/app/ui/midi/midiList");
 const { QueueListForm } = await import("../src/app/ui/midi/queueUI");
