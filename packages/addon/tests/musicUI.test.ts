@@ -196,16 +196,18 @@ describe("音乐曲库页面", () => {
 });
 
 describe("存储卡页面", () => {
-    test("未插卡时展示真实卡槽状态，插入按钮给出提示", async () => {
-        const { piano } = makePiano();
+    test("卡被弹出后页面进入空卡状态，且没有“插入”按钮", async () => {
+        const { piano } = makePiano({ cardAccess: { item: {}, storage: () => fakeStorage([], "card") } });
         const form = open(MusicCardPage, { piano });
+        // 页面打开时卡还在，入口页负责判断是否显示本页
+        expect(form.buttonLabels()).toContain("弹出存储卡");
+        expect(form.buttonLabels()).not.toContain("插入手中的卡");
 
-        const labels = form.labelTexts();
-        expect(labels.some(text => text.includes("未插卡"))).toBe(true);
-
-        form.click("插入手中的卡");
-        const updated = form.labelTexts();
-        expect(updated.some(text => text.includes("请把音乐存储卡拿在主手"))).toBe(true);
+        // 模拟卡被取走后的重建状态
+        piano.cardAccess = undefined;
+        const empty = open(MusicCardPage, { piano });
+        expect(empty.labelTexts().some(text => text.includes("未插卡"))).toBe(true);
+        expect(empty.buttonLabels()).not.toContain("插入手中的卡");
     });
 });
 

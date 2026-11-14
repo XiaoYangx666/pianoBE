@@ -1,8 +1,7 @@
 import { DDUI } from "sapi-pro";
 import { formatBytes, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { consumeHeldCard } from "@app/components/musicCard";
-import { cardName, isMusicCard, mainhandItemSlot } from "@platform/storage/cardItem";
+import { cardName } from "@platform/storage/cardItem";
 import { MidiImportPage } from "./importUI";
 import { MusicLibraryPage } from "./libraryUI";
 import { TrackActionsPage } from "./trackActions";
@@ -88,18 +87,6 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
         } catch (error) {
             status.setData(`§c${(error as Error)?.message ?? error}`);
         }
-    });
-
-    ui.button("插入手中的卡", () => {
-        const slot = mainhandItemSlot(player);
-        const hand = slot?.read();
-        if (!isMusicCard(hand)) return status.setData("§e请把音乐存储卡拿在主手");
-        const cardSlot = piano.cardSlot;
-        if (!cardSlot) return status.setData("§c卡槽暂不可用");
-        const result = cardSlot.insert(hand);
-        if (!result.ok) return status.setData(`§c${result.message}`);
-        consumeHeldCard(player);
-        afterChange("§a存储卡已插入");
     });
 
     ui.button("弹出存储卡", () => {
