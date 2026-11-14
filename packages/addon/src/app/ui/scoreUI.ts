@@ -1,7 +1,8 @@
+import { DDUI } from "sapi-pro";
 import type { PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreAt, scoreIndexOf, type PianoScore } from "@domain/score/score";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { appPage, backButton } from "./ddui";
+import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 
 /** 每页显示多少个曲谱按钮；超过后通过上一页/下一页浏览。 */
@@ -15,7 +16,7 @@ const PAGE_SIZE = 6;
  *
  * 页面内所有 Observable 与订阅由 DDUI 作用域托管，关闭/返回后自动释放。
  */
-export const PianoScorePage = appPage<{ piano: PianoRuntime }>("曲谱配置", (ui, args) => {
+export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置", (ui, args) => {
     const piano = args.piano;
     const editor = settingsEditor(ui, piano);
     if (!editor) return;

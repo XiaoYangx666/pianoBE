@@ -4,13 +4,13 @@ import {
     normalizePianoColor,
     type PianoSettings,
 } from "@domain/piano/settings";
-import type { ObservableLike } from "sapi-pro";
+import { DDUI, type ObservableLike } from "sapi-pro";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { appPage, backButton } from "./ddui";
+import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 
 /** 文字设置：琴面 LCD 的可见性、颜色、大小与偏移。 */
-export const TextSettingsPage = appPage<{ piano: PianoRuntime }>("文字设置", (ui, args) => {
+export const TextSettingsPage = DDUI.page<{ piano: PianoRuntime }>("文字设置", (ui, args) => {
     const editor = settingsEditor(ui, args.piano);
     if (!editor) return;
     const settings = editor.current();

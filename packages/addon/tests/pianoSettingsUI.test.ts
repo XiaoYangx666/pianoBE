@@ -166,28 +166,15 @@ describe("钢琴设置（拆分为多个表单）", () => {
 });
 
 describe("DDUI 页面栈", () => {
-    test("子页面按 ESC/关闭只回退一层，根页面才关闭整个界面", () => {
-        let backCalls = 0;
-        const subContext: any = {
-            depth: 2,
-            back: () => { backCalls++; },
-            _dduiSession: { navigate: (mutate: () => void) => mutate() },
-        };
-        (PianoSettingsPage.handler as any)("UserClosed", subContext);
-        expect(backCalls).toBe(1);
+    test("各子页面都提供显式返回按钮（不依赖 ESC）", () => {
+        const { piano } = makePiano();
+        const particle = open(ParticleSettingsPage, { piano });
+        expect(particle.buttonLabels()).toContain("返回");
 
-        backCalls = 0;
-        const rootContext: any = {
-            depth: 1,
-            back: () => { backCalls++; },
-            _dduiSession: { navigate: (mutate: () => void) => mutate() },
-        };
-        (PianoSettingsPage.handler as any)("UserClosed", rootContext);
-        expect(backCalls).toBe(0);
+        const text = open(TextSettingsPage, { piano });
+        expect(text.buttonLabels()).toContain("返回");
 
-        // 程序化导航（ServerClosed）不会被当成玩家关闭而多弹一层
-        backCalls = 0;
-        (PianoSettingsPage.handler as any)("ServerClosed", subContext);
-        expect(backCalls).toBe(0);
+        const score = open(PianoScorePage, { piano });
+        expect(score.buttonLabels()).toContain("返回");
     });
 });

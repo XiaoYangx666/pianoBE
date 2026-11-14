@@ -1,3 +1,4 @@
+import { DDUI } from "sapi-pro";
 import { formatBytes, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { consumeHeldCard } from "@app/components/musicCard";
@@ -6,7 +7,7 @@ import { MidiImportPage } from "./importUI";
 import { MusicLibraryPage } from "./libraryUI";
 import { TrackActionsPage } from "./trackActions";
 import { PAGE_SIZE, pageCount, sourceMark } from "./shared";
-import { appPage, backButton } from "../ddui";
+import { backButton } from "../ddui";
 
 export interface MusicCardArgs {
     piano: PianoRuntime;
@@ -16,7 +17,7 @@ export interface MusicCardArgs {
  * 存储卡管理：状态完全来自卡槽里的真实 ItemStack，不使用独立布尔状态。
  * 所有修改都可能被“玩家移走/替换卡片”打断，CardAccess 会拒绝写入错误物品。
  */
-export const MusicCardPage = appPage<MusicCardArgs>("音乐存储卡", (ui, args) => {
+export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, args) => {
     const piano = args.piano;
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());

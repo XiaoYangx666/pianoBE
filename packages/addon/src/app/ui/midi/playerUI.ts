@@ -7,7 +7,7 @@ import { pianoWorld } from "@app/PianoWorld";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { getPlayModeName, type PlayMode } from "@domain/playback/queue";
 import type { MidiPlayer } from "@domain/playback/player";
-import { appPage, backButton } from "../ddui";
+import { backButton } from "../ddui";
 import { midiViewModel } from "./playerViewModel";
 import { MusicLibraryPage } from "./libraryUI";
 import { MusicCardPage } from "./cardUI";
@@ -29,7 +29,7 @@ function switchPlayMode(player: MidiPlayer, label: ObservableString) {
  *
  * 只保留播放控制与三个入口（队列 / 曲库 / 存储卡），不再有“歌单”中转页。
  */
-export const MidiPlayerPage = appPage<{ piano: PianoRuntime; block: Block }>(
+export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
     "§bMIDI播放",
     (ui, args) => {
         const midi = args.piano.getMidiPlayer();

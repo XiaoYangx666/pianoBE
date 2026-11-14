@@ -1,14 +1,14 @@
+import { DDUI } from "sapi-pro";
 import type { MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { musicSourceLabel } from "@piano/core";
-import { appPage } from "../ddui";
 
 export interface TrackActionArgs {
     piano: PianoRuntime;
     ref: MusicRef;
 }
 
-export const TrackActionsPage = appPage<TrackActionArgs>("歌曲操作", (ui, args) => {
+export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲操作", (ui, args) => {
     const { piano, ref } = args;
     const player = ui.player;
     const status = ui.string("");
@@ -92,7 +92,7 @@ export const TrackActionsPage = appPage<TrackActionArgs>("歌曲操作", (ui, ar
     ui.button("返回", () => ui.back());
 });
 
-const ConfirmDeletePage = appPage<TrackActionArgs>("确认删除", (ui, args) => {
+const ConfirmDeletePage = DDUI.page<TrackActionArgs>("确认删除", (ui, args) => {
     const { piano, ref } = args;
     const status = ui.string("");
     ui.label(`§e确定从${ref.source === "card" ? "存储卡" : "钢琴"}删除：`);

@@ -1,14 +1,15 @@
+import { DDUI } from "sapi-pro";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { MusicLibraryPage } from "./libraryUI";
 import { PAGE_SIZE, availabilityMark, pageCount, sourceMark } from "./shared";
-import { appPage, backButton } from "../ddui";
+import { backButton } from "../ddui";
 
 export interface QueueArgs {
     piano: PianoRuntime;
 }
 
 /** 播放队列：只负责顺序，不管理歌单。来源与可用性直接标在条目上。 */
-export const PlayQueuePage = appPage<QueueArgs>("播放队列", (ui, args) => {
+export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => {
     const piano = args.piano;
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
@@ -89,7 +90,7 @@ export const PlayQueuePage = appPage<QueueArgs>("播放队列", (ui, args) => {
     refresh();
 });
 
-const QueueItemPage = appPage<{ piano: PianoRuntime; index: number }>("队列操作", (ui, args) => {
+const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列操作", (ui, args) => {
     const { piano, index } = args;
     const queue = piano.getMidiPlayer().queue;
     const ref = queue.getRefs()[index];
@@ -110,7 +111,7 @@ const QueueItemPage = appPage<{ piano: PianoRuntime; index: number }>("队列操
     ui.button("返回", () => ui.back());
 });
 
-const ClearQueuePage = appPage<QueueArgs>("清空队列", (ui, args) => {
+const ClearQueuePage = DDUI.page<QueueArgs>("清空队列", (ui, args) => {
     const queue = args.piano.getMidiPlayer().queue;
     ui.label(`§e确定清空队列中的 ${queue.getLength()} 首歌曲？`);
     ui.button("§c清空", () => {

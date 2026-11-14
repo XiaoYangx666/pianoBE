@@ -1,3 +1,4 @@
+import { DDUI } from "sapi-pro";
 import { Player } from "@minecraft/server";
 import { formatBytes, ImportAssembler, parseImportChunk, type ImportProgress } from "@piano/core";
 import type { MusicStorage } from "@domain/music/storage";
@@ -5,7 +6,7 @@ import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { CardAccess, isMusicCard, mainhandItemSlot } from "@platform/storage/cardItem";
-import { appPage, backButton } from "../ddui";
+import { backButton } from "../ddui";
 
 /** 同一玩家两次成功入库之间的最小间隔（毫秒） */
 const SUBMIT_COOLDOWN_MS = 5_000;
@@ -91,7 +92,7 @@ export interface MidiImportArgs {
  * - ImportAssembler 自动识别任务、支持乱序/重复/中断续传；
  * - 提交时按选择的真实存储写入（钢琴 / 卡槽卡 / 手持卡 / 旧导入曲库）。
  */
-export const MidiImportPage = appPage<MidiImportArgs>("导入 MIDI", (ui, args) => {
+export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args) => {
     const player = ui.player;
     if (!canImportMidi(player)) {
         player.sendMessage("§e管理员未开放玩家导入 MIDI。");

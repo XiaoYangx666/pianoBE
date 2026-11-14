@@ -8,7 +8,7 @@ import {
 } from "@domain/piano/settings";
 import { soundLayerAt, soundLayerIndexOf, soundTypes } from "@domain/piano/soundTypes";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { appPage, backButton } from "./ddui";
+import { backButton } from "./ddui";
 import { settingsEditor } from "./pianoSettings";
 import { ParticleSettingsPage } from "./particleSettingsUI";
 import { TextSettingsPage } from "./textSettingsUI";
@@ -20,7 +20,7 @@ import { PianoScorePage } from "./scoreUI";
  * 主表单 → 粒子设置 / 文字设置 / 曲谱配置；子表单“返回”回到这里，
  * 关闭（ESC 在一级页面）才会退出整个界面。
  */
-export const PianoSettingsPage = appPage<{ piano: PianoRuntime }>("钢琴设置", (ui, args) => {
+export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设置", (ui, args) => {
     const piano = args.piano;
     const editor = settingsEditor(ui, piano);
     if (!editor) return;

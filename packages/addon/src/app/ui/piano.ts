@@ -14,7 +14,6 @@ import {
 } from "@app/ui/pianoUI";
 import { createPianoState, createPianoView } from "@app/ui/pianoState";
 import { scoreIndexOf } from "@domain/score/score";
-import { appPage } from "@app/ui/ddui";
 import { MidiPlayerPage } from "@app/ui/midi/playerUI";
 import { PianoSettingsPage } from "@app/ui/settingsUI";
 import { loadShortcuts, ShortcutSettingsForm } from "@app/ui/shortcutUI";
@@ -28,7 +27,7 @@ const MAX_INPUT_LENGTH = 32;
  * 业务状态（PianoState）与输入解析留在 PianoBE；页面生命周期、订阅、定时器、
  * 导航与“旧会话失效”由 DDUI 负责。面板关闭/返回时不会重建整张表单以外的任何东西。
  */
-export const PianoPanelPage = appPage<{ piano: PianoRuntime; block: Block }>(
+export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
     "文本钢琴",
     (ui, args) => {
         const player = ui.player;

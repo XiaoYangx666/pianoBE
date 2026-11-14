@@ -1,8 +1,9 @@
+import { DDUI } from "sapi-pro";
 import { formatBytes, toMusicRef, type MusicRef, type PlaylistMeta } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { midiManager, playlist } from "@app/midi";
 import { PAGE_SIZE, pageCount } from "./shared";
-import { appPage, backButton } from "../ddui";
+import { backButton } from "../ddui";
 
 export interface LegacyPlaylistArgs {
     piano: PianoRuntime;
@@ -14,7 +15,7 @@ export interface LegacyPlaylistArgs {
  * 保留读取/导出/迁移能力，不再提供创建、改名、公开设置等编辑操作；
  * 新设计里“播放顺序”由钢琴自己的队列负责。
  */
-export const LegacyPlaylistPage = appPage<LegacyPlaylistArgs>("旧播放列表（只读）", (ui, args) => {
+export const LegacyPlaylistPage = DDUI.page<LegacyPlaylistArgs>("旧播放列表（只读）", (ui, args) => {
     const piano = args.piano;
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
@@ -68,7 +69,7 @@ export const LegacyPlaylistPage = appPage<LegacyPlaylistArgs>("旧播放列表�
     refresh();
 });
 
-const LegacyPlaylistContentPage = appPage<{ piano: PianoRuntime; meta: PlaylistMeta }>("旧列表内容", (ui, args) => {
+const LegacyPlaylistContentPage = DDUI.page<{ piano: PianoRuntime; meta: PlaylistMeta }>("旧列表内容", (ui, args) => {
     const { piano, meta } = args;
     const status = ui.string("§7正在读取…");
     const listText = ui.string("", { clientWritable: false });
