@@ -2,15 +2,12 @@ import { DDUI } from "sapi-pro";
 import { formatBytes, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { TrackActionsPage } from "./trackActions";
-import { LegacyPlaylistPage } from "./legacyPlaylistUI";
 import {
     PAGE_SIZE,
     TAB_LABELS,
     TAB_ORDER,
-    clampPage,
     listTab,
     pageCount,
-    sourceMark,
     type LibraryTab,
 } from "./shared";
 
@@ -20,13 +17,15 @@ export interface LibraryArgs {
     tab?: LibraryTab;
     /** 打开时带入的搜索词 */
     query?: string;
+    /** 打开时所在页（从歌曲详情返回时保持） */
+    page?: number;
 }
 
 /**
  * 统一音乐曲库：钢琴内置 / 存储卡 / 内置或远程曲库 / 旧导入曲库。
  *
- * DDUI 不支持动态增删控件，因此固定 8 个槽位用 Observable 更新文本与可见性；
- * 换页、搜索、切换来源都只刷新数据，不重建页面。
+ * 来源、搜索词与页码写回 args（页面上下文），进入歌曲详情再返回时状态不丢。
+ * DDUI 不支持动态增删控件，固定 8 个槽位用 Observable 更新文本与可见性。
  */
 export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args) => {
     const piano = args.piano;
@@ -35,13 +34,20 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
 
     const state = {
         tab: (args.tab ?? "piano") as LibraryTab,
-        page: 1,
+        page: Math.max(1, args.page ?? 1),
         query: args.query ?? "",
         request: 0,
         refs: [] as MusicRef[],
         total: 0,
         maxPage: 1,
     };
+    /** 把当前浏览状态写回页面上下文，返回时按原状态重建。 */
+    const persist = () => {
+        args.tab = state.tab;
+        args.query = state.query;
+        args.page = state.page;
+    };
+    persist();
 
     const source = ui.number(TAB_ORDER.indexOf(state.tab));
     const search = ui.string(state.query);
@@ -55,6 +61,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
 
     const refresh = () => {
         if (!piano.isAlive() || ui.closed) return;
+        persist();
         const request = ++state.request;
         const page = state.page;
         status.setData("§7正在读取…");
@@ -65,6 +72,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
             // 数据源收缩（删除/换卡/筛选变化）时回到最后一页并重新取。
             if (page > state.maxPage && state.maxPage >= 1 && result.refs.length === 0) {
                 state.page = state.maxPage;
+                persist();
                 refresh();
                 return;
             }
@@ -72,7 +80,8 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
             for (let index = 0; index < PAGE_SIZE; index++) {
                 const ref = result.refs[index];
                 visible[index].setData(Boolean(ref));
-                labels[index].setData(ref ? `${sourceMark(ref)} ${ref.name}` : "");
+                // 按钮文本不支持格式化符号，只放纯文本。
+                labels[index].setData(ref ? ref.name : "");
             }
             const note = result.note ? `\n${result.note}` : "";
             status.setData(
@@ -142,7 +151,6 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         refresh();
     }, { visible: nextVisible });
     ui.button("刷新", refresh);
-    ui.button("旧播放列表（只读）", () => ui.push(LegacyPlaylistPage, { piano }));
     ui.closeButton();
 
     refresh();

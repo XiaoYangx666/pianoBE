@@ -80,7 +80,7 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲操作", (ui, 
         }).catch(fail);
     });
 
-    ui.button("§c删除", () => {
+    ui.button("删除", () => {
         if (!alive()) return ui.close();
         if (ref.source === "library") {
             status.setData("§7曲库中的曲目不能在这里删除");
@@ -98,7 +98,7 @@ const ConfirmDeletePage = DDUI.page<TrackActionArgs>("确认删除", (ui, args) 
     ui.label(`§e确定从${ref.source === "card" ? "存储卡" : "钢琴"}删除：`);
     ui.label(`§f${ref.name}`);
     ui.label(status);
-    ui.button("§c确认删除", () => {
+    ui.button("确认删除", () => {
         const storage = ref.source === "card" ? piano.cardStorage : piano.storage;
         if (!storage) return status.setData("§c存储已不可用");
         const removed = storage.remove(ref.id);

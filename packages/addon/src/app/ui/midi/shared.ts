@@ -27,10 +27,6 @@ export function pageCount(total: number, size = PAGE_SIZE): number {
     return Math.max(1, Math.ceil(total / size));
 }
 
-export function clampPage(page: number, total: number, size = PAGE_SIZE): number {
-    return Math.max(1, Math.min(Math.max(1, page), pageCount(total, size)));
-}
-
 function filterEntries(entries: StoredMusicEntry[], query: string): StoredMusicEntry[] {
     const q = query.trim().toLowerCase();
     return q ? entries.filter(entry => entry.name.toLowerCase().includes(q)) : entries;
@@ -71,15 +67,15 @@ export async function listTab(
     };
 }
 
-/** 队列条目的来源标记（用于列表前缀）。 */
+/** 队列条目的来源标记（按钮文本不支持颜色符号，只用纯文本前缀）。 */
 export function sourceMark(ref: MusicRef): string {
     switch (ref.source) {
-        case "piano": return "§d[琴]";
-        case "card": return "§b[卡]";
-        default: return "§7[库]";
+        case "piano": return "[琴]";
+        case "card": return "[卡]";
+        default: return "[库]";
     }
 }
 
 export function availabilityMark(state: "ok" | "missing" | "unknown"): string {
-    return state === "ok" ? "" : state === "missing" ? "§c⚠ " : "§e? ";
+    return state === "ok" ? "" : state === "missing" ? "⚠ " : "? ";
 }

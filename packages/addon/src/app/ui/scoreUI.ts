@@ -15,7 +15,7 @@ const PAGE_SIZE = 6;
  *
  * 页面内所有 Observable 与订阅由 DDUI 作用域托管，关闭/返回后自动释放。
  */
-export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置", (ui, args) => {
+export const PianoScorePage = DDUI.page<{ piano: PianoRuntime; query?: string; page?: number }>("曲谱配置", (ui, args) => {
     const piano = args.piano;
     const editor = settingsEditor(ui, piano);
     if (!editor) return;
@@ -24,7 +24,7 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置",
 
     const empty = AVAILABLE_SCORES.length === 0;
     const mount = ui.boolean(settings.scoreMounted);
-    const search = ui.string("");
+    const search = ui.string(args.query ?? "");
     const status = ui.string("");
     const pageLabel = ui.string("");
     const slots = Array.from({ length: PAGE_SIZE }, () => ui.string(""));
@@ -35,7 +35,7 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置",
     const nextDisabled = ui.boolean(true, { clientWritable: false });
 
     let items: readonly PianoScore[] = [];
-    let page = 0;
+    let page = Math.max(0, args.page ?? 0);
 
     const filtered = () => {
         const query = search.getData().trim().toLowerCase();
@@ -54,6 +54,9 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime }>("曲谱配置",
         items = filtered();
         const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
         page = Math.max(0, Math.min(page, pages - 1));
+        // 写回页面上下文：返回本页时恢复搜索与页码。
+        args.page = page;
+        args.query = search.getData().trim();
         const selected = piano.settings?.scoreId;
 
         for (let slot = 0; slot < PAGE_SIZE; slot++) {

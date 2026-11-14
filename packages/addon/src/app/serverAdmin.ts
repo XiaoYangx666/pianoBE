@@ -1,7 +1,6 @@
-import { midiManager, useRemotePlaylist } from "@app/midi";
+import { midiManager } from "@app/midi";
 import { getNetFetch } from "@platform/server/net";
 import { RemoteMidiSource } from "@platform/server/admin/netSource";
-import { RemotePlaylistFacade } from "@platform/server/admin/remotePlaylist";
 import { world } from "@minecraft/server";
 import { secrets, variables } from "@minecraft/server-admin";
 
@@ -81,10 +80,6 @@ export async function initServerAdmin(): Promise<boolean> {
             extraHeaders,
         })
     );
-
-    // server 构建：播放列表切换为后端纯前端（零本地存储）
-    useRemotePlaylist(new RemotePlaylistFacade(url, fetch, extraHeaders));
-    console.log("[serverAdmin] 播放列表已切换为后端远程实现（零本地存储）");
     console.log(`[serverAdmin] 远程曲库已启用: ${url}`);
     initialized = true;
     return true;

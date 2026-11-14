@@ -5,10 +5,12 @@ import { cardName } from "@platform/storage/cardItem";
 import { MidiImportPage } from "./importUI";
 import { MusicLibraryPage } from "./libraryUI";
 import { TrackActionsPage } from "./trackActions";
-import { PAGE_SIZE, pageCount, sourceMark } from "./shared";
+import { PAGE_SIZE, pageCount } from "./shared";
 
 export interface MusicCardArgs {
     piano: PianoRuntime;
+    /** 当前页（从歌曲详情返回时保持） */
+    page?: number;
 }
 
 /**
@@ -20,7 +22,9 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
 
-    const state = { page: 1, refs: [] as MusicRef[], maxPage: 1 };
+    const state = { page: Math.max(1, args.page ?? 1), refs: [] as MusicRef[], maxPage: 1 };
+    const persist = () => { args.page = state.page; };
+    persist();
     const title = ui.string("");
     const status = ui.string("");
     const usage = ui.string("");
@@ -35,6 +39,7 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
 
     const refresh = () => {
         if (!piano.isAlive() || ui.closed) return;
+        persist();
         const access = piano.cardAccess;
         const item = access?.item;
         if (!access || !item) {
@@ -55,14 +60,18 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
         usage.setData(`§7已存 §f${stat.songs} §7首 · §f${formatBytes(stat.usedBytes)}§7 / §f${formatBytes(stat.limitBytes)}${over}`);
         const entries = storage.list();
         state.maxPage = pageCount(entries.length);
-        if (state.page > state.maxPage) state.page = state.maxPage;
+        if (state.page > state.maxPage) {
+            state.page = state.maxPage;
+            persist();
+        }
         state.refs = entries
             .slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE)
             .map(entry => ({ id: entry.id, name: entry.name, duration: entry.duration, noteCount: entry.noteCount, bytes: entry.bytes, checksum: entry.checksum, source: "card" as const }));
         for (let index = 0; index < PAGE_SIZE; index++) {
             const ref = state.refs[index];
             visible[index].setData(Boolean(ref));
-            labels[index].setData(ref ? `${sourceMark(ref)} ${ref.name}` : "");
+            // 按钮文本不支持格式化符号，只放纯文本。
+            labels[index].setData(ref ? ref.name : "");
         }
         pageText.setData(entries.length ? `§7第 §f${state.page}§7 / §f${state.maxPage} §7页` : "§7这张卡还是空的");
         prevVisible.setData(state.page > 1);

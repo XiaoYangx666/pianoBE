@@ -513,9 +513,7 @@ export function createSapiProMock(host: FakeDDUIHost = createDDUIHost()) {
 }
 
 /** 统一的 `@app/midi` 测试替身（同样避免多文件 mock 形状不一致）。 */
-export function createMidiAppMock(
-    overrides: { page?: unknown; getContent?: unknown; setContent?: unknown } = {}
-) {
+export function createMidiAppMock(overrides: { page?: unknown } = {}) {
     const page = overrides.page ?? (async () => ({ items: [], total: 0 }));
     return {
         midiManager: {
@@ -533,9 +531,5 @@ export function createMidiAppMock(
             refresh: async () => {},
         },
         importedSongs: { save: () => ({}) },
-        playlist: {
-            getContent: overrides.getContent ?? (async () => []),
-            setContent: overrides.setContent ?? (async () => {}),
-        },
     };
 }

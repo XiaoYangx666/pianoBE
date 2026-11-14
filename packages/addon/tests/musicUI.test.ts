@@ -174,8 +174,8 @@ describe("音乐曲库页面", () => {
         const form = open(MusicLibraryPage, { piano });
         await Promise.resolve();
 
-        expect(form.buttonLabels()).toContain("§d[琴] 小星星");
-        form.click("§d[琴] 小星星");
+        expect(form.buttonLabels()).toContain("小星星");
+        form.click("小星星");
         expect(host.nav.pushed.at(-1)!.form).toBe(TrackActionsPage);
         expect((host.nav.pushed.at(-1)!.args as any).ref.source).toBe("piano");
     });
@@ -191,7 +191,32 @@ describe("音乐曲库页面", () => {
 
         const labels = form.labelTexts();
         expect(labels.some(text => text.includes("卡槽为空"))).toBe(true);
-        expect(form.buttonLabels()).not.toContain("§d[琴] 小星星");
+        expect(form.buttonLabels()).not.toContain("小星星");
+    });
+
+    test("来源/搜索/页码写回页面上下文，返回后重建保持", async () => {
+        const { piano } = makePiano();
+        const args: any = { piano };
+        const form = open(MusicLibraryPage, args);
+        await Promise.resolve();
+
+        dropdown(form).setData(2); // 内置/远程曲库
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const search = form.components.find(item => item.type === "textField")!.value as FakeObservable<string>;
+        search.setData("星");
+        form.click("搜索");
+        await Promise.resolve();
+
+        expect(args.tab).toBe("library");
+        expect(args.query).toBe("星");
+        expect(args.page).toBe(1);
+
+        const rebuilt = open(MusicLibraryPage, args);
+        expect(dropdown(rebuilt).getData()).toBe(2);
+        const searchAgain = rebuilt.components.find(item => item.type === "textField")!.value as FakeObservable<string>;
+        expect(searchAgain.getData()).toBe("星");
     });
 });
 

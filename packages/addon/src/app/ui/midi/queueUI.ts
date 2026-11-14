@@ -5,6 +5,8 @@ import { PAGE_SIZE, availabilityMark, pageCount, sourceMark } from "./shared";
 
 export interface QueueArgs {
     piano: PianoRuntime;
+    /** 当前页（从条目详情返回时保持） */
+    page?: number;
 }
 
 /** 播放队列：只负责顺序，不管理歌单。来源与可用性直接标在条目上。 */
@@ -13,7 +15,9 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
     const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
 
-    const state = { page: 1, maxPage: 1, index: -1 };
+    const state = { page: Math.max(1, args.page ?? 1), maxPage: 1, index: -1 };
+    const persist = () => { args.page = state.page; };
+    persist();
     const head = ui.string("");
     const pageText = ui.string("");
     const labels = Array.from({ length: PAGE_SIZE }, () => ui.string(""));
@@ -23,13 +27,17 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
 
     const refresh = () => {
         if (!piano.isAlive() || ui.closed) return;
+        persist();
         const midi = piano.getMidiPlayer();
         const queue = midi.queue;
         const refs = queue.getRefs();
         const info = midi.getInfo();
         state.index = queue.getIndex();
         state.maxPage = pageCount(refs.length);
-        if (state.page > state.maxPage) state.page = state.maxPage;
+        if (state.page > state.maxPage) {
+            state.page = state.maxPage;
+            persist();
+        }
         const current = queue.current();
         head.setData(
             `§7队列 §f${refs.length} §7首 · 状态 §f${info.state}` +
@@ -44,7 +52,8 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
                 continue;
             }
             visible[slot].setData(true);
-            const mark = index === state.index ? "§q▶ " : `${index + 1}. `;
+            // 按钮文本不支持格式化符号，只放纯文本。
+            const mark = index === state.index ? "▶ " : `${index + 1}. `;
             labels[slot].setData(`${mark}${availabilityMark(piano.music.availability(ref))}${sourceMark(ref)} ${ref.name}`);
         }
         pageText.setData(refs.length ? `§7第 §f${state.page}§7 / §f${state.maxPage} §7页` : "§7队列是空的");
@@ -81,7 +90,7 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
 
     ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
-    ui.button("§c清空队列", () => ui.push(ClearQueuePage, { piano }));
+    ui.button("清空队列", () => ui.push(ClearQueuePage, { piano }));
     ui.button("刷新", refresh);
     ui.closeButton();
 
@@ -102,7 +111,7 @@ const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列�
         void midi.play().catch((error) => status.setData(`§c播放失败：${(error as Error)?.message ?? error}`));
         status.setData("§a已开始播放");
     });
-    ui.button("§c从队列移除", () => {
+    ui.button("从队列移除", () => {
         piano.getMidiPlayer().queue.remove(index);
         ui.back();
     });
@@ -112,7 +121,7 @@ const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列�
 const ClearQueuePage = DDUI.page<QueueArgs>("清空队列", (ui, args) => {
     const queue = args.piano.getMidiPlayer().queue;
     ui.label(`§e确定清空队列中的 ${queue.getLength()} 首歌曲？`);
-    ui.button("§c清空", () => {
+    ui.button("清空", () => {
         queue.clear();
         ui.back();
     });
