@@ -55,14 +55,11 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
     const particleSummary = ui.string(settings.particles ? "§7粒子：§a开" : "§7粒子：§c关", { clientWritable: false });
     const textSummary = ui.string(settings.textVisible ? "§7琴面文字：§a显示" : "§7琴面文字：§c隐藏", { clientWritable: false });
 
-    ui.label("§7常用演奏设置；更多选项在下面的子页里。");
     ui.label(particleSummary).label(textSummary);
     ui.dropdown("钢琴音色", timbre,
         AVAILABLE_PIANO_TIMBRES.map(({ label, value, description }) => ({ label, value, description })));
-    ui.slider("钢琴音量（%，100 为正常，200 为最大）", volume, ...PIANO_SETTINGS_LIMITS.volume, { step: 1 });
-    ui.toggle(spatialLabel, spatialAudio, {
-        description: "开 = 有距离衰减/定位（单声道）；关 = 立体声（无定位）",
-    });
+    ui.slider("钢琴音量（%）", volume, ...PIANO_SETTINGS_LIMITS.volume, { step: 1 });
+    ui.toggle(spatialLabel, spatialAudio, { description: "开：有方位与距离衰减。" });
     ui.dropdown("手动弹奏音长", soundLayer, soundTypes.map(({ name }, value) => ({ label: name, value })));
 
     ui.divider();
