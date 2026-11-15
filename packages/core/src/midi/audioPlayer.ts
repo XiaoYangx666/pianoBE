@@ -132,6 +132,8 @@ export abstract class SampledMidiPlayer {
     private startTime = 0;
     private timer: ReturnType<typeof setInterval> | null = null;
     private timerId = 0;
+    /** 上次进度广播的音频时钟（秒），用于限制进度刷新频率 */
+    private lastEmitTime = 0;
     /** seek/重播代数：使 seek 前已排定的异步音符失效 */
     private seekGen = 0;
 
@@ -210,6 +212,7 @@ export abstract class SampledMidiPlayer {
         this.events = events;
         this.nextIndex = 0;
         this.startTime = ctx.currentTime;
+        this.lastEmitTime = 0;
         this.state = {
             status: "playing",
             songId,
@@ -260,6 +263,7 @@ export abstract class SampledMidiPlayer {
         this.nextIndex = this.events.findIndex((n) => n.time >= t);
         if (this.nextIndex === -1) this.nextIndex = this.events.length;
         this.startTime = this.ctx.currentTime - t;
+        this.lastEmitTime = t;
         this.emit();
     }
 
@@ -354,7 +358,11 @@ export abstract class SampledMidiPlayer {
         }
 
         this.state.currentTime = Math.min(current, this.state.duration);
-        this.emit();
+        // 进度广播限流到 ~10Hz：50ms 的调度粒度保留，但不必每次都通知 UI 重渲染
+        if (current - this.lastEmitTime >= 0.1) {
+            this.lastEmitTime = current;
+            this.emit();
+        }
     }
 
     private clearTimer() {
