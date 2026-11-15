@@ -76,16 +76,19 @@ addon 启动时动态导入 `@minecraft/server-admin` 读取配置、`@minecraft
 pianoBE/
 ├── packages/          # npm workspaces：共享库与各交付物
 │   ├── core/          # 共享核心库 @piano/core（零 MC 依赖）
+│   ├── ui/            # 共享设计系统 @piano/ui：Tailwind 主题、基础组件、布局、播放器
 │   ├── addon/         # 附加包 @piano/addon（双目标构建：模板包 / 服务器专用包）
 │   ├── server/        # 后端 @piano/server：Hono + bun:sqlite + 文件曲库
-│   ├── web/           # 管理页 @piano/web：React + Vite
-│   └── generator/     # 独立生成器 @piano/generator（Cloudflare 可部署）
+│   ├── web/           # 管理页 @piano/web：React + Tailwind + Vite
+│   └── generator/     # 独立生成器 @piano/generator（React + Tailwind + Vite，Cloudflare 可部署）
 ├── midis/             # 曲库数据资产（见"曲库与贡献"）
 ├── tools/             # 转换与验证脚本
 ```
 （sapi-pro 使用 npm 发布版，不再 vendor 内置）
 
-**依赖方向**：`addon`、`server`、`generator` → `core`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
+**依赖方向**：`addon`、`server`、`generator` → `core`；`web`、`generator` → `ui`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
+
+**前端约定**：两个 React 应用共用 `@piano/ui` 的 Tailwind 设计系统、基础控件（按钮/输入框/下拉/标签）、`AppLayout`（桌面侧栏 / 移动底部导航）、`PlayerBar` 与歌曲行组件；深浅色通过 `data-theme` + `--pb-*` 变量切换。`generator` 的播放器绑定模板音色，`web` 的播放器读取 `/piano` 采样；两者都基于 `@piano/core/player`，跨路由保持播放。
 
 ### 两个 Addon 包（同一份源码，注入式条件编译）
 
