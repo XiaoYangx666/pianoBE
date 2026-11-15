@@ -1,22 +1,13 @@
 import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { Button } from "@piano/ui";
 import { KeyRound, LibraryBig, ListMusic, LogOut } from "lucide-react";
-import { AppLayout, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { AppLayout, Button, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { getToken, setToken } from "./api";
 import { Login } from "./Login";
 import { SongsPage } from "./SongsPage";
 import { PlaylistsPage } from "./PlaylistsPage";
 import { TokensPage } from "./TokensPage";
 import { midiPlayer } from "./midiPlayer";
-
-const brandMark = (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="currentColor" opacity="0.92" />
-        <path d="M7 5v9M12 5v9M17 5v9" stroke="#243056" strokeWidth="1.9" />
-        <path d="M5 17h14" stroke="#243056" strokeWidth="1.6" opacity="0.6" />
-    </svg>
-);
 
 const nav: AppNavItem[] = [
     { to: "/", label: "曲目库", icon: <LibraryBig size={18} />, end: true },
@@ -39,11 +30,12 @@ export default function App() {
 
     return (
         <AppLayout
-            brand={{ name: "PianoBE", subtitle: "服务端控制台", mark: brandMark, to: "/" }}
+            brand={{ name: "PianoBE", subtitle: "服务端控制台", to: "/" }}
             nav={nav}
             navLabel="管理"
             bottomNav={nav}
             player={midiPlayer}
+            repoUrl="https://github.com/XiaoYangx666/pianoBE"
             headerActions={
                 <>
                     <ThemeToggle />
