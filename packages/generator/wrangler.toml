@@ -9,6 +9,8 @@ main = "./worker/index.ts"
 directory = "./dist"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
+# SPA fallback：React Router 的 /addon 等路径直接刷新也能命中 index.html
+not_found_handling = "single-page-application"
 
 [[d1_databases]]
 binding = "DB"

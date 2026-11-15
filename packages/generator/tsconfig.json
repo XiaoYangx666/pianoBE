@@ -4,10 +4,12 @@
         "lib": ["es2022", "dom", "dom.iterable"],
         "module": "es2022",
         "moduleResolution": "bundler",
+        "jsx": "react-jsx",
         "strict": true,
         "noEmit": true,
         "skipLibCheck": true,
+        "useDefineForClassFields": true,
         "types": ["vite/client"]
     },
-    "include": ["src"]
+    "include": ["src", "vite.config.ts"]
 }
