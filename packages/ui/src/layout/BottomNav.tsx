@@ -9,7 +9,7 @@ export interface BottomNavProps {
 export function BottomNav({ items }: BottomNavProps) {
     return (
         <nav
-            className="flex items-stretch border-t border-ore-divider bg-ore-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+            className="flex items-stretch gap-1 border-t border-ore-divider bg-ore-raised/95 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] backdrop-blur"
             aria-label="底部导航"
         >
             {items
@@ -21,14 +21,16 @@ export function BottomNav({ items }: BottomNavProps) {
                         end={item.end}
                         className={({ isActive }) =>
                             [
-                                "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors",
+                                "group flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1 text-[10.5px] transition-colors",
                                 isActive
                                     ? "text-[color:var(--pb-primary-light)]"
                                     : "text-ore-dim hover:text-ore-text",
                             ].join(" ")
                         }
                     >
-                        {item.icon}
+                        <span className="grid h-6 w-10 place-items-center rounded-full transition-colors group-aria-[current=page]:bg-brand/12">
+                            {item.icon}
+                        </span>
                         <span>{item.label}</span>
                     </NavLink>
                 ))}

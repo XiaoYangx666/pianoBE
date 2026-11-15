@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
 
+/**
+ * 页面标题条：单行紧凑布局。
+ * 大标题时代已经过去，这里只保留 17px 的标题 + 可选说明/操作，
+ * 把纵向空间尽量留给内容。
+ */
 export function PageHeader({
     eyebrow,
     title,
@@ -12,16 +17,16 @@ export function PageHeader({
     actions?: ReactNode;
 }) {
     return (
-        <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex min-w-0 items-baseline gap-2.5">
+                <h1 className="shrink-0 text-[17px] font-semibold leading-tight tracking-[-0.01em]">{title}</h1>
                 {eyebrow && (
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ore-dim">{eyebrow}</div>
+                    <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-ore-dimmer sm:inline">
+                        {eyebrow}
+                    </span>
                 )}
-                <h1 className={`text-[clamp(20px,2.4vw,26px)] font-[650] leading-tight tracking-[-0.01em] ${eyebrow ? "mt-1" : ""}`}>
-                    {title}
-                </h1>
                 {description && (
-                    <div className="mt-1.5 max-w-[680px] text-[13px] leading-relaxed text-ore-dim">{description}</div>
+                    <span className="hidden min-w-0 truncate text-xs text-ore-dim lg:inline">{description}</span>
                 )}
             </div>
             {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -39,10 +44,10 @@ export function SectionHeader({
     actions?: ReactNode;
 }) {
     return (
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
                 <div className="text-sm font-semibold">{title}</div>
-                {description && <div className="mt-1 text-xs text-ore-dim">{description}</div>}
+                {description && <div className="mt-0.5 text-xs text-ore-dim">{description}</div>}
             </div>
             {actions}
         </div>

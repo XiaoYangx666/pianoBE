@@ -54,11 +54,6 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
             onClose={onClose}
             title="游戏内导入码"
             size="lg"
-            footer={
-                <Button type="button" onClick={() => void copyAll()}>
-                    {copiedAll ? "已复制" : "复制全部分段"}
-                </Button>
-            }
         >
             <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2 text-xs leading-relaxed text-ore-dim">

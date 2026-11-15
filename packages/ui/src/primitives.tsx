@@ -8,6 +8,7 @@ import {
     type ReactNode,
     type TextareaHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * 应用基础控件（PianoBE 自己的实现）。
@@ -25,13 +26,14 @@ const cx = (...values: Array<string | false | null | undefined>) => values.filte
 export type ButtonColor = "primary" | "secondary" | "destructive";
 
 const BUTTON_TONE: Record<ButtonColor, string> = {
-    primary: "bg-brand text-white border-b-2 border-[var(--pb-primary-shadow)] hover:bg-brand-hover active:border-b-0",
-    secondary: "bg-[var(--pb-control)] text-ore-text border border-[var(--pb-control-border)] hover:bg-[var(--pb-control-hover)]",
-    destructive: "bg-[#b93b32] text-white border-b-2 border-[#7e241d] hover:bg-[#c8453b] active:border-b-0",
+    primary: "bg-brand text-white shadow-sm hover:bg-brand-hover active:bg-brand",
+    secondary:
+        "bg-[var(--pb-control)] text-ore-text border border-[var(--pb-control-border)] hover:bg-[var(--pb-control-hover)]",
+    destructive: "bg-[#b93b32] text-white shadow-sm hover:bg-[#c8453b] active:bg-[#b93b32]",
 };
 
 const BUTTON_SIZE = {
-    md: "h-9 min-w-[64px] px-3.5 text-[13px] rounded-md",
+    md: "h-9 min-w-[64px] px-3.5 text-[13px] rounded-lg",
     sm: "h-8 min-w-0 px-2.5 text-xs rounded-md",
 } as const;
 
@@ -234,12 +236,20 @@ export interface MenuProps {
     trigger: ReactNode;
     items: MenuItem[];
     align?: "start" | "end";
+    /** 展开方向；贴底部的播放条需要向上弹 */
+    side?: "bottom" | "top";
     className?: string;
 }
 
-/** 轻量下拉菜单：支持方向键导航、Home/End、Esc 关闭并回焦到触发器。 */
-export function Menu({ trigger, items, align = "start", className }: MenuProps) {
+/** 轻量下拉菜单：挂到 body、自动判断上下方向，避免被滚动容器或底栏裁掉。 */
+export function Menu({ trigger, items, align = "start", side = "bottom", className }: MenuProps) {
     const [open, setOpen] = useState(false);
+    const [position, setPosition] = useState<{
+        left: number;
+        width: number;
+        top?: number;
+        bottom?: number;
+    } | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLSpanElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -259,17 +269,55 @@ export function Menu({ trigger, items, align = "start", className }: MenuProps) 
     };
 
     useEffect(() => {
-        if (!open) return;
+        if (!open) {
+            setPosition(null);
+            return;
+        }
+
+        const place = () => {
+            const el = triggerRef.current;
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const width = Math.max(180, Math.round(rect.width));
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            // 播放条在页面底部：优先向上；其它位置空间不足时自动翻转
+            const openUp =
+                side === "top" ? spaceAbove > 120 : spaceBelow < 280 && spaceAbove > spaceBelow;
+            const rawLeft = align === "end" ? rect.right - width : rect.left;
+            const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8));
+
+            setPosition(
+                openUp
+                    ? { left, width, bottom: window.innerHeight - rect.top + 6 }
+                    : { left, width, top: rect.bottom + 6 }
+            );
+        };
+
+        place();
 
         const onPointerDown = (event: PointerEvent) => {
-            if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+            const target = event.target as Node;
+            if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+            setOpen(false);
         };
-        document.addEventListener("pointerdown", onPointerDown);
+        const onScroll = (event: Event) => {
+            if (menuRef.current?.contains(event.target as Node)) return;
+            setOpen(false);
+        };
+        const onResize = () => setOpen(false);
 
-        // 打开后把焦点交给第一项，键盘用户可以直接上下选
+        document.addEventListener("pointerdown", onPointerDown);
+        document.addEventListener("scroll", onScroll, true);
+        window.addEventListener("resize", onResize);
+
         requestAnimationFrame(() => focusItem(0));
-        return () => document.removeEventListener("pointerdown", onPointerDown);
-    }, [open]);
+        return () => {
+            document.removeEventListener("pointerdown", onPointerDown);
+            document.removeEventListener("scroll", onScroll, true);
+            window.removeEventListener("resize", onResize);
+        };
+    }, [open, align, side]);
 
     return (
         <div ref={rootRef} className={cx("relative inline-flex", className)}>
@@ -287,63 +335,72 @@ export function Menu({ trigger, items, align = "start", className }: MenuProps) 
             >
                 {trigger}
             </span>
-            {open && (
-                <div
-                    ref={menuRef}
-                    role="menu"
-                    onKeyDown={(event) => {
-                        const nodes = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
-                        const index = nodes.indexOf(document.activeElement as HTMLButtonElement);
+            {open &&
+                position &&
+                createPortal(
+                    <div
+                        ref={menuRef}
+                        role="menu"
+                        style={{
+                            position: "fixed",
+                            left: position.left,
+                            width: position.width,
+                            top: position.top,
+                            bottom: position.bottom,
+                        }}
+                        onKeyDown={(event) => {
+                            const nodes = [
+                                ...(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []),
+                            ];
+                            const index = nodes.indexOf(document.activeElement as HTMLButtonElement);
 
-                        if (event.key === "Escape") {
-                            event.preventDefault();
-                            close();
-                        } else if (event.key === "ArrowDown") {
-                            event.preventDefault();
-                            focusItem(index + 1);
-                        } else if (event.key === "ArrowUp") {
-                            event.preventDefault();
-                            focusItem(index - 1);
-                        } else if (event.key === "Home") {
-                            event.preventDefault();
-                            focusItem(0);
-                        } else if (event.key === "End") {
-                            event.preventDefault();
-                            focusItem(nodes.length - 1);
-                        } else if (event.key === "Tab") {
-                            setOpen(false);
-                        }
-                    }}
-                    className={cx(
-                        "absolute top-[calc(100%+4px)] z-50 min-w-[180px] rounded-lg border border-[color:var(--pb-border)] bg-ore-raised p-1 shadow-2xl",
-                        align === "end" ? "right-0" : "left-0"
-                    )}
-                >
-                    {items.map((item) => (
-                        <button
-                            key={item.key}
-                            type="button"
-                            role="menuitem"
-                            tabIndex={-1}
-                            onClick={() => {
+                            if (event.key === "Escape") {
+                                event.preventDefault();
                                 close();
-                                item.onSelect?.();
-                            }}
-                            className={cx(
-                                "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-[13px] transition-colors",
-                                item.danger
-                                    ? "text-red-600 hover:bg-red-500/12 dark:text-red-600 dark:text-red-300"
-                                    : "text-ore-text hover:bg-[var(--pb-hover)]",
-                                item.selected && "text-[color:var(--pb-primary-light)]"
-                            )}
-                        >
-                            {item.icon}
-                            <span className="flex-1 truncate">{item.label}</span>
-                            {item.selected && <span className="text-[11px]">✓</span>}
-                        </button>
-                    ))}
-                </div>
-            )}
+                            } else if (event.key === "ArrowDown") {
+                                event.preventDefault();
+                                focusItem(index + 1);
+                            } else if (event.key === "ArrowUp") {
+                                event.preventDefault();
+                                focusItem(index - 1);
+                            } else if (event.key === "Home") {
+                                event.preventDefault();
+                                focusItem(0);
+                            } else if (event.key === "End") {
+                                event.preventDefault();
+                                focusItem(nodes.length - 1);
+                            } else if (event.key === "Tab") {
+                                setOpen(false);
+                            }
+                        }}
+                        className="z-[3000] max-h-[min(70vh,360px)] overflow-y-auto rounded-lg border border-[color:var(--pb-border)] bg-ore-raised p-1 shadow-2xl"
+                    >
+                        {items.map((item) => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                role="menuitem"
+                                tabIndex={-1}
+                                onClick={() => {
+                                    close();
+                                    item.onSelect?.();
+                                }}
+                                className={cx(
+                                    "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-[13px] transition-colors",
+                                    item.danger
+                                        ? "text-red-600 hover:bg-red-500/12 dark:text-red-300"
+                                        : "text-ore-text hover:bg-[var(--pb-hover)]",
+                                    item.selected && "text-[color:var(--pb-primary-light)]"
+                                )}
+                            >
+                                {item.icon}
+                                <span className="flex-1 truncate">{item.label}</span>
+                                {item.selected && <span className="text-[11px]">✓</span>}
+                            </button>
+                        ))}
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }

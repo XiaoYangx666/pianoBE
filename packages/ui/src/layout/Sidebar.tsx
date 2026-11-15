@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+import { Github } from "lucide-react";
 
 export interface AppNavItem {
     /** 路由地址；为空时视为不可导航的占位项 */
@@ -18,13 +19,15 @@ export interface SidebarProps {
     collapsed?: boolean;
     label?: string;
     footer?: ReactNode;
+    /** 仓库地址；有值时在底部显示 GitHub 入口 */
+    repoUrl?: string;
     onNavigate?: () => void;
 }
 
 const itemBase =
     "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors";
 
-export function Sidebar({ items, collapsed = false, label, footer, onNavigate }: SidebarProps) {
+export function Sidebar({ items, collapsed = false, label, footer, repoUrl, onNavigate }: SidebarProps) {
     return (
         <div className="flex h-full flex-col p-2">
             <nav className="flex flex-col gap-0.5" aria-label="主导航">
@@ -81,11 +84,34 @@ export function Sidebar({ items, collapsed = false, label, footer, onNavigate }:
                     );
                 })}
             </nav>
-            {footer && !collapsed && (
-                <div className="mt-auto border-t border-ore-divider px-2.5 pt-2.5 text-[11px] leading-relaxed text-ore-dimmer">
-                    {footer}
-                </div>
-            )}
+            <div className="mt-auto flex flex-col gap-2 pt-2">
+                {footer && !collapsed && (
+                    <div className="border-t border-ore-divider px-2.5 pt-2.5 text-[11px] leading-relaxed text-ore-dimmer">
+                        {footer}
+                    </div>
+                )}
+
+                {repoUrl && (
+                    <a
+                        href={repoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="在 GitHub 上查看项目"
+                        className={[
+                            "flex items-center gap-2 rounded-md text-[12px] text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text",
+                            collapsed ? "mx-auto h-9 w-9 justify-center" : "px-2.5 py-2",
+                        ].join(" ")}
+                    >
+                        <Github size={15} />
+                        {!collapsed && (
+                            <>
+                                <span className="flex-1">GitHub</span>
+                                <span className="text-[10px] text-ore-dimmer">↗</span>
+                            </>
+                        )}
+                    </a>
+                )}
+            </div>
         </div>
     );
 }

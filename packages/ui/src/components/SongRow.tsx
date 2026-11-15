@@ -97,26 +97,12 @@ export function SongRow({
                 )}
                 {actions}
                 {onPlay && (
-                    <button
-                        type="button"
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-ore-border bg-[var(--pb-soft)] text-ore-text transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={playLabel ?? (playState === "playing" ? "停止试听" : "试听")}
-                        title={playDisabled ? "需先加载模板" : (playState === "playing" ? "停止试听" : "试听")}
+                    <RowPlayButton
+                        playState={playState}
+                        onPlay={onPlay}
                         disabled={playDisabled}
-                        onClick={onPlay}
-                    >
-                        {playState === "pending" ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        ) : playState === "playing" ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <rect x="6" y="6" width="12" height="12" rx="1.5" />
-                            </svg>
-                        ) : (
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
-                        )}
-                    </button>
+                        label={playLabel}
+                    />
                 )}
                 {onRemove && (
                     <IconButton size="sm" aria-label={removeLabel} title={removeLabel} onClick={onRemove}>
@@ -129,6 +115,49 @@ export function SongRow({
                 )}
             </div>
         </div>
+    );
+}
+
+/** 行内试听按钮：统一用图标表示播放 / 停止，省掉「试听」「停止」文字。 */
+export function RowPlayButton({
+    playState = "idle",
+    onPlay,
+    disabled,
+    label,
+}: {
+    playState?: RowPlayState;
+    onPlay: () => void;
+    disabled?: boolean;
+    /** 自定义无障碍标签，例如「试听此音色」 */
+    label?: string;
+}) {
+    const playing = playState === "playing";
+    return (
+        <button
+            type="button"
+            className={[
+                "grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-[color,border-color,background-color] disabled:cursor-not-allowed disabled:opacity-40",
+                playing
+                    ? "border-brand bg-brand text-white hover:bg-brand-hover"
+                    : "border-ore-border bg-[var(--pb-soft)] text-ore-text hover:border-brand/60 hover:text-brand",
+            ].join(" ")}
+            aria-label={label ?? (playing ? "停止试听" : "试听")}
+            title={disabled ? "需先加载模板" : (label ?? (playing ? "停止试听" : "试听"))}
+            disabled={disabled}
+            onClick={onPlay}
+        >
+            {playState === "pending" ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : playing ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                </svg>
+            ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                </svg>
+            )}
+        </button>
     );
 }
 
