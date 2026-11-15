@@ -1,8 +1,7 @@
 import { memo, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
-import { Button } from "@piano/ui";
-import { AudioWaveform, Download, History, LibraryBig, PackageOpen } from "lucide-react";
-import { AppLayout, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AppLayout, Button, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { AudioWaveform, History, LibraryBig, PackageOpen } from "lucide-react";
 import { previewPlayer } from "./player";
 import { useGenerator } from "./store/generator";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -29,20 +28,13 @@ function ChangelogButton() {
     );
 }
 
-const brandMark = (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="currentColor" opacity="0.92" />
-        <path d="M7 5v9M12 5v9M17 5v9" stroke="#243056" strokeWidth="1.9" />
-        <path d="M4 14h16" stroke="#243056" strokeWidth="1.4" opacity="0.55" />
-    </svg>
-);
-
 export default function App() {
     const init = useGenerator((state) => state.init);
     const loadingText = useGenerator((state) => state.loadingText);
-    const template = useGenerator((state) => state.template);
-    const exporting = useGenerator((state) => state.exporting);
-    const exportAddon = useGenerator((state) => state.exportAddon);
+    const timbres = useGenerator((state) => state.timbres);
+    const previewTimbreId = useGenerator((state) => state.previewTimbreId);
+    const setPreviewTimbre = useGenerator((state) => state.setPreviewTimbre);
+    const { pathname } = useLocation();
 
     useEffect(() => {
         void init();
@@ -63,25 +55,22 @@ export default function App() {
     return (
         <>
             <AppLayout
-                brand={{ name: "PianoBE", subtitle: "Minecraft 音乐工具", mark: brandMark, to: "/" }}
+                brand={{ name: "PianoBE", subtitle: "Minecraft 音乐工具", to: "/" }}
                 nav={nav}
                 navLabel="工作区"
                 bottomNav={nav.slice(0, 2)}
                 player={previewPlayer}
+                playerExtras={{
+                    timbres: timbres.map((item) => ({ id: item.id, label: item.label })),
+                    timbreId: previewTimbreId,
+                    onTimbreChange: (id) => void setPreviewTimbre(id),
+                }}
+                repoUrl="https://github.com/XiaoYangx666/pianoBE"
+                mobileFlush={pathname !== "/convert"}
                 headerActions={
                     <>
                         <ThemeToggle />
                         <ChangelogButton />
-                        <Button
-                            type="button"
-                            size="sm"
-                            loading={exporting}
-                            disabled={!template || exporting}
-                            onClick={() => void exportAddon()}
-                        >
-                            <Download size={14} />
-                            <span className="hidden sm:inline">导出附加包</span>
-                        </Button>
                     </>
                 }
                 sidebarFooter={

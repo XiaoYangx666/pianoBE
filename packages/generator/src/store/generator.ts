@@ -23,6 +23,7 @@ import { loadTimbreIndex, loadTimbrePack, type LoadedTimbrePack, type TimbreInde
 import { importScorePack, MAX_TITLE_CHARS, type ScoreEntry } from "../scores";
 import { importScorePages } from "../importPages";
 import type { SongEntry } from "../types";
+import { deleteLocalSong, listLocalSongs, putLocalSongs, type StoredSong } from "../localLibrary";
 
 export type LibrarySort = "adds" | "plays" | "name" | "default";
 
@@ -66,7 +67,11 @@ interface GeneratorState {
     ready: boolean;
     loadingText: string | null;
     template: TemplateInfo | null;
+    /** 当前附加包工作区：模板曲目 + 从「我的音乐」加入的曲目 */
     songs: SongEntry[];
+    /** 本地持久音乐库：只存 PBE2，跨刷新保留 */
+    myMusic: StoredSong[];
+    myMusicReady: boolean;
     scores: ScoreEntry[];
     library: LibraryMeta[] | null;
     libSort: LibrarySort;
@@ -88,8 +93,10 @@ interface GeneratorState {
     setAddonDesc: (value: string) => void;
     setRandomUuid: (value: boolean) => void;
 
-    addMidiFiles: (files: File[]) => Promise<void>;
+    addMidiFiles: (files: File[], options?: { addToAddon?: boolean }) => Promise<void>;
     addLibrarySong: (id: string) => Promise<void>;
+    addToAddon: (entry: SongEntry) => void;
+    removeMyMusicSong: (id: string) => Promise<void>;
     togglePreview: (entry: SongEntry) => Promise<void>;
     previewLibrarySong: (meta: LibraryMeta) => Promise<void>;
     removeSong: (id: string) => void;
@@ -144,6 +151,8 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     loadingText: null,
     template: null,
     songs: [],
+    myMusic: [],
+    myMusicReady: false,
     scores: [],
     library: null,
     libSort: "adds",
@@ -168,6 +177,13 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         libraryPromise
             .then((library) => set({ library }))
             .catch((error) => notifyError("曲库加载失败", error));
+
+        listLocalSongs()
+            .then((myMusic) => set({ myMusic, myMusicReady: true }))
+            .catch((error) => {
+                console.error("[generator] 本地音乐库加载失败", error);
+                set({ myMusicReady: true });
+            });
 
         loadTimbreIndex()
             .then((index) => {
@@ -241,40 +257,47 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     setAddonDesc: (addonDesc) => set({ addonDesc }),
     setRandomUuid: (randomUuid) => set({ randomUuid }),
 
-    addMidiFiles: async (files) => {
-        if (!get().template) {
-            notifications.show({ title: "模板尚未加载", message: "请等待底包解析完成后再导入 MIDI", color: "yellow" });
-            return;
-        }
+    addMidiFiles: async (files, options) => {
+        const addToAddon = options?.addToAddon ?? false;
         set({ loadingText: "正在转换 MIDI..." });
         let skipped = 0;
-        const added: SongEntry[] = [];
+        const added: StoredSong[] = [];
+        const base = Date.now();
         try {
             for (const file of files) {
                 try {
                     const entry = await midiFileToEntry(file);
-                    const libraryIds = new Set((get().library ?? []).map((meta) => meta.id));
-                    const current = get().songs;
-                    if (current.some((song) => song.id === entry.id) || libraryIds.has(entry.id)) {
+                    if (get().myMusic.some((song) => song.id === entry.id)) {
                         skipped++;
                         continue;
                     }
-                    added.push(entry);
+                    added.push({ ...entry, createdAt: base + added.length });
                 } catch (error) {
                     notifyError(`MIDI 导入失败：${file.name}`, error);
                 }
             }
-            if (added.length > 0) set({ songs: [...get().songs, ...added] });
             if (added.length > 0) {
+                try {
+                    await putLocalSongs(added);
+                } catch (error) {
+                    notifyError("写入我的音乐失败", error);
+                    return;
+                }
+                set({ myMusic: [...added].reverse().concat(get().myMusic) });
+                if (addToAddon) {
+                    const current = get().songs;
+                    const fresh = added.filter((entry) => !current.some((song) => song.id === entry.id));
+                    if (fresh.length > 0) set({ songs: [...current, ...fresh] });
+                }
                 notifications.show({
-                    title: "MIDI 已导入",
-                    message: `新增 ${added.length} 首${skipped ? `，跳过 ${skipped} 首重复曲目` : ""}`,
+                    title: addToAddon ? "已导入并加入附加包" : "已加入我的音乐",
+                    message: `新增 ${added.length} 首${skipped ? `，跳过 ${skipped} 首重复曲目` : ""}${addToAddon ? "" : " · 可在「我的音乐」加入附加包"}`,
                     color: "teal",
                 });
             } else if (skipped > 0) {
                 notifications.show({
                     title: "没有新增曲目",
-                    message: `${skipped} 个文件已在列表或曲库中`,
+                    message: `${skipped} 首已经在我的音乐里`,
                     color: "gray",
                 });
             }
@@ -289,15 +312,22 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     },
 
     addLibrarySong: async (id) => {
+        if (get().pendingAddId === id) return;
         const library = get().library;
         if (!library) return;
         const meta = library.find((item) => item.id === id);
-        if (!meta || get().songs.some((song) => song.id === id)) return;
+        if (!meta) return;
+        if (get().myMusic.some((song) => song.id === id)) {
+            notifications.show({ title: "已在我的音乐里", message: meta.name, color: "gray" });
+            return;
+        }
         set({ pendingAddId: id });
         try {
             const song = await get().loadLibraryEntry(meta);
-            set({ songs: [...get().songs, song] });
-            notifications.show({ title: "已加入制作清单", message: meta.name, color: "teal" });
+            const stored: StoredSong = { ...song, fromLibrary: true, createdAt: Date.now() };
+            await putLocalSongs([stored]);
+            set({ myMusic: [stored, ...get().myMusic] });
+            notifications.show({ title: "已加入我的音乐", message: `${meta.name} · 可在「我的音乐」加入附加包`, color: "teal" });
             void recordLibraryAdd(id).then((counted) => {
                 if (!counted) return;
                 const current = get().library;
@@ -305,9 +335,24 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                 set({ library: current.map((item) => (item.id === id ? { ...item, adds: item.adds + 1 } : item)) });
             });
         } catch (error) {
-            notifyError("曲库加载失败", error);
+            notifyError("加入我的音乐失败", error);
         } finally {
             set({ pendingAddId: null });
+        }
+    },
+
+    addToAddon: (entry) => {
+        if (get().songs.some((song) => song.id === entry.id)) return;
+        set({ songs: [...get().songs, entry] });
+        notifications.show({ title: "已加入附加包", message: entry.name, color: "teal" });
+    },
+
+    removeMyMusicSong: async (id) => {
+        try {
+            await deleteLocalSong(id);
+            set({ myMusic: get().myMusic.filter((song) => song.id !== id) });
+        } catch (error) {
+            notifyError("从我的音乐删除失败", error);
         }
     },
 
@@ -380,7 +425,6 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     setPreviewTimbre: async (id) => {
         const meta = get().timbres.find((item) => item.id === id);
         if (!meta || !get().template) return;
-        previewPlayer.stop();
         if (!meta.bundled) {
             set({ loadingText: "加载音色包..." });
             try {
