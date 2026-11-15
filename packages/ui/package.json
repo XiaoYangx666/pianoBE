@@ -1,0 +1,23 @@
+{
+  "name": "@piano/ui",
+  "version": "0.1.0",
+  "description": "PianoBE 共享设计系统：主题、布局与业务组件（Tailwind）",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles/tailwind.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.0.0"
+  },
+  "dependencies": {
+    "lucide-react": "^0.545.0",
+    "zustand": "^5.0.0"
+  }
+}

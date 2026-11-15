@@ -1,0 +1,151 @@
+/* ---------------------------------------------------------------- *
+ * PianoBE 样式入口（Tailwind v4）。
+ *
+ * 两个应用都只 import 这一个文件：Tailwind 的编译单元因此唯一。
+ *
+ * 主题策略：
+ * - @theme 里的颜色全部指向 --pb-* 变量，运行时由 [data-theme] 切换；
+ * - 默认浅色，`[data-theme="dark"]` 覆盖成深色；
+ * - 额外注册一个 dark: 变体，绑定到 data-theme 而不是系统偏好。
+ * ---------------------------------------------------------------- */
+
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* 组件源码就在本包，显式声明扫描范围；各应用再补自己的目录 */
+@source "../";
+
+/* dark: 跟随 data-theme，而不是 prefers-color-scheme */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+    --color-ore-deep: var(--pb-deep);
+    --color-ore-sunken: var(--pb-sunken);
+    --color-ore-surface: var(--pb-surface);
+    --color-ore-raised: var(--pb-raised);
+    --color-ore-border: var(--pb-border);
+    --color-ore-divider: var(--pb-divider);
+    --color-ore-text: var(--pb-text);
+    --color-ore-dim: var(--pb-dim);
+    --color-ore-dimmer: var(--pb-dimmer);
+
+    --color-brand: #4c6ef5;
+    --color-brand-hover: #5c7cfa;
+
+    --font-sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---------- 浅色（默认） ---------- */
+:root {
+    color-scheme: light;
+
+    --pb-deep: #e4e7ee;
+    --pb-sunken: #eff1f5;
+    --pb-surface: #ffffff;
+    --pb-raised: #ffffff;
+    --pb-border: #d3d8e2;
+    --pb-divider: #e3e7ef;
+    --pb-text: #1b1d22;
+    --pb-dim: #5b6270;
+    --pb-dimmer: #8a91a0;
+
+    --pb-hover: rgba(16, 22, 40, 0.05);
+    --pb-soft: rgba(16, 22, 40, 0.03);
+    --pb-field: #ffffff;
+    --pb-code: rgba(16, 22, 40, 0.05);
+
+    --pb-control: #f2f4f8;
+    --pb-control-hover: #e8ecf3;
+    --pb-control-border: #ccd2de;
+
+    --pb-primary: #4c6ef5;
+    --pb-primary-light: #3b5bdb;
+    --pb-primary-shadow: #2b3f9e;
+    --pb-shadow: rgba(15, 20, 35, 0.14);
+    --pb-track: rgba(16, 22, 40, 0.12);
+}
+
+/* ---------- 深色 ---------- */
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --pb-deep: #17181c;
+    --pb-sunken: #1c1d21;
+    --pb-surface: #23252a;
+    --pb-raised: #26282d;
+    --pb-border: #3a3c41;
+    --pb-divider: #303237;
+    --pb-text: #e8e9ec;
+    --pb-dim: #9aa0aa;
+    --pb-dimmer: #6d7480;
+
+    --pb-hover: rgba(255, 255, 255, 0.05);
+    --pb-soft: rgba(255, 255, 255, 0.03);
+    --pb-field: rgba(0, 0, 0, 0.25);
+    --pb-code: rgba(0, 0, 0, 0.35);
+
+    --pb-control: #33353a;
+    --pb-control-hover: #3c3f45;
+    --pb-control-border: #42454c;
+
+    --pb-primary-light: #91a7ff;
+    --pb-shadow: rgba(0, 0, 0, 0.5);
+    --pb-track: rgba(255, 255, 255, 0.12);
+}
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--pb-sunken);
+    color: var(--pb-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--pb-text) 22%, transparent);
+    border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--pb-text) 34%, transparent);
+}
+
+@keyframes pbStatusIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
