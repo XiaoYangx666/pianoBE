@@ -1,31 +1,39 @@
 import { useEffect, useState } from "react";
+import { Button, IconButton, Textfield } from "@piano/ui";
+import { ArrowLeft, Globe2, ListMusic, Plus, Search, Trash2, UserRound } from "lucide-react";
+import {
+    ConfirmDialog,
+    EmptyState,
+    PageHeader,
+    SongBadge,
+    SongRow,
+    notify,
+} from "@piano/ui";
 import { api, type MidiSongMeta, type PlaylistMeta } from "./api";
 
 export function PlaylistsPage() {
     const [mine, setMine] = useState<PlaylistMeta[]>([]);
-    const [pub, setPub] = useState<PlaylistMeta[]>([]);
+    const [publicLists, setPublicLists] = useState<PlaylistMeta[]>([]);
     const [error, setError] = useState("");
-    const [detail, setDetail] = useState<
-        (PlaylistMeta & { items: string[] }) | null
-    >(null);
+    const [detail, setDetail] = useState<(PlaylistMeta & { items: string[] }) | null>(null);
     const [songNames, setSongNames] = useState<Record<string, string>>({});
+    const [newName, setNewName] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<PlaylistMeta | null>(null);
 
-    const load = async () => {
+    const load = async (keepDetail = true) => {
         setError("");
         try {
-            const [m, p, songs] = await Promise.all([
+            const [mineRes, publicRes, songs] = await Promise.all([
                 api.listPlaylists(),
                 api.listPlaylists("?public=1"),
                 api.listSongs("", 1),
             ]);
-            setMine(m.items);
-            setPub(p.items.filter((x) => !m.items.some((y) => y.id === x.id)));
-            setSongNames(
-                Object.fromEntries(songs.items.map((s) => [s.id, s.name]))
-            );
-            if (detail) {
-                const d = await api.getPlaylist(detail.id);
-                setDetail({ ...d });
+            setMine(mineRes.items);
+            setPublicLists(publicRes.items.filter((item) => !mineRes.items.some((own) => own.id === item.id)));
+            setSongNames(Object.fromEntries(songs.items.map((song) => [song.id, song.name])));
+            if (keepDetail && detail) {
+                setDetail(await api.getPlaylist(detail.id));
             }
         } catch (e) {
             setError((e as Error).message);
@@ -33,246 +41,363 @@ export function PlaylistsPage() {
     };
 
     useEffect(() => {
-        load();
+        void load(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const create = async (name: string) => {
-        if (name.trim().length < 2) return;
-        await api.createPlaylist(name.trim());
+    const create = async () => {
+        const name = newName.trim();
+        if (name.length < 2) return;
+        setBusy(true);
+        try {
+            await api.createPlaylist(name);
+            setNewName("");
+            notify({ title: "播放列表已创建", message: name, color: "teal" });
+            await load(false);
+        } catch (e) {
+            notify({ title: "创建失败", message: (e as Error).message, color: "red" });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const open = async (id: number) => {
+        setBusy(true);
+        try {
+            setDetail(await api.getPlaylist(id));
+        } catch (e) {
+            notify({ title: "加载失败", message: (e as Error).message, color: "red" });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const patch = async (id: number, patchValue: { name?: string; public?: boolean }) => {
+        await api.updatePlaylist(id, patchValue);
         await load();
     };
 
-    const patch = async (id: number, patch: { name?: string; public?: boolean }) => {
-        await api.updatePlaylist(id, patch);
-        await load();
+    const confirmRemove = async () => {
+        if (!deleteTarget) return;
+        const playlist = deleteTarget;
+        setDeleteTarget(null);
+        try {
+            await api.deletePlaylist(playlist.id);
+            setDetail(null);
+            notify({ title: "播放列表已删除", message: playlist.name, color: "teal" });
+            await load(false);
+        } catch (e) {
+            notify({ title: "删除失败", message: (e as Error).message, color: "red" });
+        }
     };
 
-    const remove = async (id: number) => {
-        if (!confirm("确认删除该播放列表？")) return;
-        await api.deletePlaylist(id);
-        setDetail(null);
-        await load();
-    };
-
-    const addItems = async (ids: string[]) => {
+    const setItems = async (items: string[]) => {
         if (!detail) return;
-        await api.setPlaylistItems(detail.id, [...detail.items, ...ids]);
-        await load();
+        try {
+            await api.setPlaylistItems(detail.id, items);
+            await load();
+        } catch (e) {
+            notify({ title: "更新失败", message: (e as Error).message, color: "red" });
+        }
     };
 
-    const removeItem = async (id: string) => {
-        if (!detail) return;
-        await api.setPlaylistItems(
-            detail.id,
-            detail.items.filter((x) => x !== id)
+    const errorBanner = error && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">{error}</div>
+    );
+
+    if (detail) {
+        return (
+            <div className="flex flex-col gap-4">
+                <PageHeader
+                    eyebrow="Playlist"
+                    title={detail.name}
+                    description={`${detail.items.length} 首曲目 · 播放 ${detail.playCount} 次 · 所有者 ${detail.owner}`}
+                    actions={
+                        <>
+                            <Button type="button" color="secondary" size="sm" onClick={() => setDetail(null)}>
+                                <ArrowLeft size={14} /> 返回列表
+                            </Button>
+                            <Button
+                                type="button"
+                                color="secondary"
+                                size="sm"
+                                onClick={() => void patch(detail.id, { public: !detail.public })}
+                            >
+                                <Globe2 size={14} /> {detail.public ? "公开中" : "设为公开"}
+                            </Button>
+                            <Button type="button" color="destructive" size="sm" onClick={() => setDeleteTarget(detail)}>
+                                <Trash2 size={14} /> 删除
+                            </Button>
+                        </>
+                    }
+                />
+
+                {errorBanner}
+
+                <section className="rounded-xl border border-ore-border bg-ore-raised p-4">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <Textfield
+                            className="w-[280px]"
+                            label="播放列表名称"
+                            value={detail.name}
+                            onBlur={(event: React.FocusEvent<HTMLElement>) => {
+                                const value = (event.target as unknown as { value?: string }).value?.trim();
+                                if (value && value !== detail.name) void patch(detail.id, { name: value });
+                            }}
+                        />
+                        <label className="flex items-center gap-2 text-xs text-ore-dim">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-[var(--pb-primary)]"
+                                checked={detail.public}
+                                onChange={(event) => void patch(detail.id, { public: event.currentTarget.checked })}
+                            />
+                            {detail.public ? "所有人可见" : "仅自己可见"}
+                        </label>
+                    </div>
+
+                    <div className="my-3 h-px bg-ore-divider" />
+
+                    <div className="mb-1.5 text-sm font-semibold">曲目（{detail.items.length}）</div>
+                    {detail.items.length === 0 ? (
+                        <EmptyState compact title="列表为空" description="从下方搜索并添加曲目" />
+                    ) : (
+                        <div className="flex flex-col gap-0.5">
+                            {detail.items.map((id, index) => (
+                                <SongRow
+                                    key={`${id}-${index}`}
+                                    index={index + 1}
+                                    title={songNames[id] ?? id}
+                                    id={id}
+                                    onRemove={() => void setItems(detail.items.filter((item) => item !== id))}
+                                    removeLabel="从列表移除"
+                                />
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                <AddSongPicker exclude={detail.items} onAdd={(ids) => void setItems([...detail.items, ...ids])} />
+
+                <ConfirmDialog
+                    opened={Boolean(deleteTarget)}
+                    title="删除播放列表"
+                    danger
+                    confirmLabel="删除"
+                    description={`确定删除「${deleteTarget?.name ?? ""}」？该操作不可恢复。`}
+                    onConfirm={() => void confirmRemove()}
+                    onCancel={() => setDeleteTarget(null)}
+                />
+            </div>
         );
-        await load();
-    };
+    }
 
     return (
-        <section className="page">
-            {error && <p className="error">{error}</p>}
+        <div className="flex flex-col gap-4">
+            <PageHeader
+                eyebrow="Playlists"
+                title="播放列表"
+                description="管理服务端播放列表、公开状态与曲目顺序。公开列表会出现在「公开广场」。"
+            />
 
-            {detail ? (
-                <div className="card">
-                    <div className="toolbar">
-                        <button onClick={() => setDetail(null)}>← 返回</button>
-                        <input
-                            defaultValue={detail.name}
-                            onBlur={(e) =>
-                                e.target.value !== detail.name &&
-                                patch(detail.id, { name: e.target.value })
-                            }
-                        />
-                        <button
-                            className={detail.public ? "" : "primary"}
-                            onClick={() => patch(detail.id, { public: !detail.public })}
-                        >
-                            {detail.public ? "公开中（点击设为私有）" : "设为公开"}
-                        </button>
-                        <button className="danger" onClick={() => remove(detail.id)}>
-                            删除列表
-                        </button>
-                    </div>
-                    <p className="hint">
-                        {detail.items.length} 首 · 播放 {detail.playCount} 次
-                    </p>
-                    <h3>歌曲（{detail.items.length}）</h3>
-                    <ul className="items">
-                        {detail.items.map((id) => (
-                            <li key={id}>
-                                <span>{songNames[id] ?? id}</span>
-                                <span className="mono">{id}</span>
-                                <button className="danger" onClick={() => removeItem(id)}>
-                                    移除
-                                </button>
-                            </li>
-                        ))}
-                        {detail.items.length === 0 && (
-                            <li className="empty">列表为空</li>
-                        )}
-                    </ul>
-                    <AddSongPicker
-                        exclude={detail.items}
-                        songNames={songNames}
-                        onAdd={addItems}
+            {errorBanner}
+
+            <section className="rounded-xl border border-ore-border bg-ore-raised p-4">
+                <div className="flex flex-wrap items-end gap-2.5">
+                    <Textfield
+                        className="w-[280px]"
+                        label="新建播放列表"
+                        placeholder="列表名称（2~24 字）"
+                        value={newName}
+                        onInput={(event) => {
+                            const target = event.target as unknown as { value?: unknown };
+                            if (typeof target?.value === "string") setNewName(target.value);
+                        }}
+                        onKeyDown={(event: React.KeyboardEvent) => {
+                            if (event.key === "Enter") void create();
+                        }}
                     />
+                    <Button
+                        type="button"
+                        size="sm"
+                        loading={busy}
+                        disabled={newName.trim().length < 2}
+                        onClick={() => void create()}
+                    >
+                        <Plus size={14} /> 创建
+                    </Button>
                 </div>
-            ) : (
-                <>
-                    <CreateList onCreated={create} />
-                    <h3>我的播放列表</h3>
-                    <PlaylistTable
-                        lists={mine}
-                        onOpen={async (id) =>
-                            setDetail(await api.getPlaylist(id))
-                        }
-                    />
-                    <h3>公开广场</h3>
-                    <PlaylistTable
-                        lists={pub}
-                        onOpen={async (id) =>
-                            setDetail(await api.getPlaylist(id))
-                        }
-                    />
-                </>
-            )}
+            </section>
+
+            <PlaylistSection
+                title="我的播放列表"
+                description="由当前令牌拥有的列表"
+                lists={mine}
+                onOpen={open}
+                onRemove={(playlist) => setDeleteTarget(playlist)}
+                empty="还没有创建播放列表"
+            />
+            <PlaylistSection
+                title="公开广场"
+                description="其他用户公开的播放列表"
+                lists={publicLists}
+                onOpen={open}
+                empty="暂无公开播放列表"
+            />
+
+            <ConfirmDialog
+                opened={Boolean(deleteTarget)}
+                title="删除播放列表"
+                danger
+                confirmLabel="删除"
+                description={`确定删除「${deleteTarget?.name ?? ""}」？该操作不可恢复。`}
+                onConfirm={() => void confirmRemove()}
+                onCancel={() => setDeleteTarget(null)}
+            />
+        </div>
+    );
+}
+
+function PlaylistSection({
+    title,
+    description,
+    lists,
+    onOpen,
+    onRemove,
+    empty,
+}: {
+    title: string;
+    description: string;
+    lists: PlaylistMeta[];
+    onOpen: (id: number) => Promise<void>;
+    onRemove?: (playlist: PlaylistMeta) => void;
+    empty: string;
+}) {
+    return (
+        <section className="overflow-hidden rounded-xl border border-ore-border bg-ore-raised">
+            <div className="border-b border-ore-divider px-4 py-3">
+                <div className="text-sm font-semibold">{title}</div>
+                <div className="mt-0.5 text-xs text-ore-dim">{description}</div>
+            </div>
+            <div className="p-1.5">
+                {lists.length === 0 ? (
+                    <EmptyState compact icon={<ListMusic size={20} />} title={empty} />
+                ) : (
+                    <div className="flex flex-col gap-0.5">
+                        {lists.map((playlist) => (
+                            <SongRow
+                                key={playlist.id}
+                                leading={
+                                    <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg border border-brand/35 bg-brand/12 text-[color:var(--pb-primary-light)]">
+                                        <ListMusic size={17} />
+                                    </div>
+                                }
+                                title={playlist.name}
+                                badges={
+                                    playlist.public ? <SongBadge tone="success">公开</SongBadge> : <SongBadge>私有</SongBadge>
+                                }
+                                meta={[
+                                    <span key="owner" className="inline-flex items-center gap-1">
+                                        <UserRound size={11} />
+                                        {playlist.owner}
+                                    </span>,
+                                    <span key="plays">{playlist.playCount} 次播放</span>,
+                                    <span key="updated">{new Date(playlist.updatedAt * 1000).toLocaleDateString()}</span>,
+                                ]}
+                                actions={
+                                    <div className="flex items-center gap-1.5">
+                                        <Button type="button" color="secondary" size="sm" onClick={() => void onOpen(playlist.id)}>
+                                            打开
+                                        </Button>
+                                        {onRemove && (
+                                            <IconButton
+                                                size="sm"
+                                                aria-label="删除播放列表"
+                                                title="删除播放列表"
+                                                onClick={() => onRemove(playlist)}
+                                            >
+                                                <Trash2 size={14} className="text-red-600 dark:text-red-400" />
+                                            </IconButton>
+                                        )}
+                                    </div>
+                                }
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
         </section>
     );
 }
 
-function CreateList({ onCreated }: { onCreated: (name: string) => Promise<void> }) {
-    const [name, setName] = useState("");
-    return (
-        <div className="toolbar">
-            <input
-                placeholder="新列表名称（2~24 字）"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                        onCreated(name);
-                        setName("");
-                    }
-                }}
-            />
-            <button
-                className="primary"
-                disabled={name.trim().length < 2}
-                onClick={() => {
-                    onCreated(name);
-                    setName("");
-                }}
-            >
-                创建列表
-            </button>
-        </div>
-    );
-}
-
-function PlaylistTable({
-    lists,
-    onOpen,
-}: {
-    lists: PlaylistMeta[];
-    onOpen: (id: number) => Promise<void>;
-}) {
-    return (
-        <table>
-            <thead>
-                <tr>
-                    <th>名称</th>
-                    <th>作者</th>
-                    <th>播放</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {lists.map((m) => (
-                    <tr key={m.id}>
-                        <td>
-                            {m.public && (
-                                <span className="public-badge" title="公开列表">
-                                    <GlobeIcon /> 公开
-                                </span>
-                            )}
-                            {m.name}
-                        </td>
-                        <td className="mono">{m.owner}</td>
-                        <td>{m.playCount}</td>
-                        <td>
-                            <button onClick={() => onOpen(m.id)}>管理</button>
-                        </td>
-                    </tr>
-                ))}
-                {lists.length === 0 && (
-                    <tr>
-                        <td colSpan={4} className="empty">
-                            暂无列表
-                        </td>
-                    </tr>
-                )}
-            </tbody>
-        </table>
-    );
-}
-
-function AddSongPicker({
-    exclude,
-    songNames,
-    onAdd,
-}: {
-    exclude: string[];
-    songNames: Record<string, string>;
-    onAdd: (ids: string[]) => Promise<void>;
-}) {
+function AddSongPicker({ exclude, onAdd }: { exclude: string[]; onAdd: (ids: string[]) => void }) {
     const [q, setQ] = useState("");
     const [result, setResult] = useState<MidiSongMeta[]>([]);
+    const [searching, setSearching] = useState(false);
 
     const search = async () => {
-        const res = await api.listSongs(q);
-        setResult(res.items.filter((s) => !exclude.includes(s.id)));
+        setSearching(true);
+        try {
+            const res = await api.listSongs(q);
+            setResult(res.items.filter((song) => !exclude.includes(song.id)));
+        } finally {
+            setSearching(false);
+        }
     };
 
     return (
-        <div className="card add-picker">
-            <div className="toolbar">
-                <input
-                    placeholder="搜索曲库添加歌曲"
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && search()}
-                />
-                <button onClick={search}>搜索</button>
+        <section className="rounded-xl border border-ore-border bg-ore-raised p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <div className="text-sm font-semibold">添加曲目</div>
+                    <div className="mt-0.5 text-xs text-ore-dim">搜索服务端曲目并加入当前播放列表</div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Textfield
+                        className="w-[220px]"
+                        placeholder="搜索曲名"
+                        value={q}
+                        onInput={(event) => {
+                            const target = event.target as unknown as { value?: unknown };
+                            if (typeof target?.value === "string") setQ(target.value);
+                        }}
+                        onKeyDown={(event: React.KeyboardEvent) => {
+                            if (event.key === "Enter") void search();
+                        }}
+                    />
+                    <Button type="button" color="secondary" size="sm" loading={searching} onClick={() => void search()}>
+                        <Search size={13} /> 搜索
+                    </Button>
+                </div>
             </div>
-            <ul className="items">
-                {result.map((s) => (
-                    <li key={s.id}>
-                        <span>{s.name}</span>
-                        <span className="mono">{s.id}</span>
-                        <button
-                            onClick={() => {
-                                onAdd([s.id]);
-                                setResult(result.filter((x) => x.id !== s.id));
-                            }}
-                        >
-                            添加
-                        </button>
-                    </li>
+            <div className="flex flex-col gap-0.5">
+                {result.map((song) => (
+                    <SongRow
+                        key={song.id}
+                        title={song.name}
+                        id={song.id}
+                        meta={[`${(song.noteCount ?? 0).toLocaleString()} 音符`]}
+                        actions={
+                            <Button
+                                type="button"
+                                color="secondary"
+                                size="sm"
+                                onClick={() => {
+                                    onAdd([song.id]);
+                                    setResult((current) => current.filter((item) => item.id !== song.id));
+                                }}
+                            >
+                                <Plus size={13} /> 添加
+                            </Button>
+                        }
+                    />
                 ))}
-                {result.length === 0 && <li className="empty">搜索后选择歌曲</li>}
-            </ul>
-            {Object.keys(songNames).length > 0 && null}
-        </div>
-    );
-}
-
-function GlobeIcon() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <circle cx="12" cy="12" r="10" />
-            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
+                {result.length === 0 && (
+                    <div className="py-4 text-center text-xs text-ore-dim">
+                        {searching ? "搜索中…" : "输入关键词后搜索"}
+                    </div>
+                )}
+            </div>
+        </section>
     );
 }

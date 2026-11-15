@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState } from "react";
+import { Button, IconButton, Menu, Textfield } from "@piano/ui";
+import { MoreVertical, Pencil, RefreshCw, Trash2, Upload } from "lucide-react";
+import {
+    ConfirmDialog,
+    Dialog,
+    EmptyState,
+    FileDropzone,
+    PageHeader,
+    SongBadge,
+    SongRow,
+    notify,
+    usePlayerState,
+} from "@piano/ui";
 import { api, formatDuration, type MidiSongMeta } from "./api";
-import { midiPlayer, type PlayerState } from "./midiPlayer";
+import { midiPlayer } from "./midiPlayer";
+
 export function SongsPage() {
     const [q, setQ] = useState("");
     const [list, setList] = useState<MidiSongMeta[]>([]);
@@ -9,7 +23,12 @@ export function SongsPage() {
     const [pageSize] = useState(50);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const [pendingId, setPendingId] = useState<string | null>(null);
+    const [renameTarget, setRenameTarget] = useState<MidiSongMeta | null>(null);
+    const [renameValue, setRenameValue] = useState("");
+    const [deleteTarget, setDeleteTarget] = useState<MidiSongMeta | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+    const player = usePlayerState(midiPlayer);
 
     const load = async (kw = q, p = page) => {
         setBusy(true);
@@ -27,260 +46,297 @@ export function SongsPage() {
     };
 
     useEffect(() => {
-        load("");
+        void load("", 1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const upload = async (files: FileList | null) => {
-        if (!files || files.length === 0) return;
+    const upload = async (files: File[]) => {
+        if (files.length === 0) return;
         setBusy(true);
         setError("");
         let ok = 0;
         let fail = 0;
-        for (const f of Array.from(files)) {
+        for (const file of files) {
             try {
-                await api.uploadSong(f);
+                await api.uploadSong(file);
                 ok++;
             } catch (e) {
                 fail++;
-                setError(`「${f.name}」上传失败: ${(e as Error).message}`);
+                notify({ title: `上传失败：${file.name}`, message: (e as Error).message, color: "red" });
             }
         }
-        if (fileRef.current) fileRef.current.value = "";
         setBusy(false);
         await load();
-        if (fail === 0 && ok > 0) setError(`成功上传 ${ok} 首`);
+        if (ok > 0) {
+            notify({
+                title: "上传完成",
+                message: `成功 ${ok} 首${fail ? `，失败 ${fail} 首` : ""}`,
+                color: fail ? "yellow" : "teal",
+            });
+        }
     };
 
-    const remove = async (id: string) => {
-        if (!confirm("确认删除该曲目？")) return;
+    const confirmRemove = async () => {
+        if (!deleteTarget) return;
+        const song = deleteTarget;
+        setDeleteTarget(null);
         try {
-            await api.deleteSong(id);
+            await api.deleteSong(song.id);
+            notify({ title: "曲目已删除", message: song.name, color: "teal" });
             await load();
         } catch (e) {
-            setError((e as Error).message);
+            notify({ title: "删除失败", message: (e as Error).message, color: "red" });
+        }
+    };
+
+    const saveRename = async () => {
+        if (!renameTarget) return;
+        const clean = renameValue.trim();
+        if (!clean || clean === renameTarget.name) {
+            setRenameTarget(null);
+            return;
+        }
+        try {
+            await api.renameSong(renameTarget.id, clean);
+            setRenameTarget(null);
+            notify({ title: "已重命名", message: clean, color: "teal" });
+            await load();
+        } catch (e) {
+            notify({ title: "重命名失败", message: (e as Error).message, color: "red" });
+        }
+    };
+
+    const play = async (song: MidiSongMeta) => {
+        const isCurrent = player.songId === song.id && player.status !== "idle";
+        if (isCurrent && player.status === "playing") {
+            midiPlayer.pause();
+            return;
+        }
+        if (isCurrent && player.status === "paused") {
+            midiPlayer.resume();
+            return;
+        }
+        setPendingId(song.id);
+        try {
+            const buffer = await api.getSongRaw(song.id);
+            await midiPlayer.play(song.id, buffer, song.name, song.duration / 40);
+        } catch (e) {
+            notify({ title: "播放失败", message: (e as Error).message, color: "red" });
+        } finally {
+            setPendingId(null);
         }
     };
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     return (
-        <section className="page">
-            <div className="toolbar">
-                <input
-                    placeholder="搜索曲名..."
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && load(q, 1)}
-                />
-                <button onClick={() => load(q, 1)}>搜索</button>
-                <label className="btn primary">
-                    上传 MIDI
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        multiple
-                        accept=".mid,.midi"
-                        style={{ display: "none" }}
-                        onChange={(e) => upload(e.target.files)}
+        <div className="flex flex-col gap-4">
+            <PageHeader
+                eyebrow="Server Library"
+                title="曲目库"
+                description="管理服务端保存的 MIDI 曲目：上传、试听、重命名与删除。前端播放器使用 /piano 采样，跨页面保持播放状态。"
+                actions={
+                    <>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".mid,.midi"
+                            multiple
+                            hidden
+                            onChange={(event) => {
+                                const files = Array.from(event.target.files ?? []);
+                                event.target.value = "";
+                                if (files.length > 0) void upload(files);
+                            }}
+                        />
+                        <Button type="button" size="sm" onClick={() => fileRef.current?.click()}>
+                            <Upload size={14} /> 上传 MIDI
+                        </Button>
+                    </>
+                }
+            />
+
+            <FileDropzone
+                compact
+                accept={[".mid", ".midi"]}
+                title="拖入 MIDI 文件批量上传"
+                description="上传后立即出现在服务端曲目库"
+                icon={<Upload size={16} />}
+                onDrop={(files) => void upload(files)}
+            />
+
+            <section className="overflow-hidden rounded-xl border border-ore-border bg-ore-raised">
+                <div className="flex flex-wrap items-center gap-2.5 border-b border-ore-divider p-3">
+                    <Textfield
+                        className="w-[240px] shrink-0"
+                        placeholder="搜索曲名…"
+                        value={q}
+                        onInput={(event) => {
+                            const target = event.target as unknown as { value?: unknown };
+                            if (typeof target?.value === "string") setQ(target.value);
+                        }}
+                        onKeyDown={(event: React.KeyboardEvent) => {
+                            if (event.key === "Enter") void load(q, 1);
+                        }}
                     />
-                </label>
-            </div>
-            {error && <p className="error">{error}</p>}
-            <p className="hint">共 {total} 首 · 第 {page}/{totalPages} 页{busy ? "（加载中...）" : ""}</p>
-            <div className="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>曲名</th>
-                            <th>时长</th>
-                            <th>音符数</th>
-                            <th>大小</th>
-                            <th className="hide-mobile">ID</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {list.map((m, i) => (
-                            <tr key={m.id}>
-                                <td>{(page - 1) * pageSize + i + 1}</td>
-                                <td>
-                                    <EditableName
-                                        id={m.id}
-                                        name={m.name}
-                                        onError={(e) => setError(e)}
-                                    />
-                                </td>
-                                <td>{formatDuration(m.duration)}</td>
-                                <td>{m.noteCount?.toLocaleString() ?? "-"}</td>
-                                <td>{m.dataSize != null ? formatBytes(m.dataSize) : "-"}</td>
-                                <td className="mono hide-mobile">{m.id}</td>
-                                <td>
-                                    <PlayButton
-                                        song={m}
-                                        onError={(e) => setError(e)}
-                                    />
-                                    <button className="danger" onClick={() => remove(m.id)}>
-                                        删除
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                        {list.length === 0 && !busy && (
-                            <tr>
-                                <td colSpan={7} className="empty">
-                                    暂无曲目，点击"上传 MIDI"导入
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                busy={busy}
-                onChange={(p) => load("", p)}
-            />
-        </section>
-    );
-}
+                    <Button type="button" color="secondary" size="sm" loading={busy} onClick={() => void load(q, 1)}>
+                        搜索
+                    </Button>
+                    <Button type="button" color="secondary" size="sm" loading={busy} onClick={() => void load("", 1)}>
+                        <RefreshCw size={13} /> 刷新
+                    </Button>
+                    <div className="flex-1" />
+                    <span className="text-[11px] text-ore-dim">
+                        共 {total} 首 · 第 {page}/{totalPages} 页
+                    </span>
+                </div>
 
-function Pagination({
-    page,
-    totalPages,
-    busy,
-    onChange,
-}: {
-    page: number;
-    totalPages: number;
-    busy: boolean;
-    onChange: (p: number) => void;
-}) {
-    if (totalPages <= 1) return null;
-    return (
-        <div className="pagination">
-            <button disabled={page <= 1 || busy} onClick={() => onChange(page - 1)}>
-                上一页
-            </button>
-            <span className="hint">
-                第 {page} / {totalPages} 页
-            </span>
-            <button disabled={page >= totalPages || busy} onClick={() => onChange(page + 1)}>
-                下一页
-            </button>
+                {error && (
+                    <div className="m-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
+                        请求失败：{error}
+                    </div>
+                )}
+
+                <div className="p-1.5">
+                    {list.length === 0 && !busy ? (
+                        <EmptyState
+                            compact
+                            title="还没有曲目"
+                            description="上传 MIDI 后会显示在这里"
+                            action={
+                                <Button type="button" color="secondary" size="sm" onClick={() => fileRef.current?.click()}>
+                                    上传 MIDI
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <div className="flex flex-col gap-0.5">
+                            {list.map((song, index) => {
+                                const isCurrent = player.songId === song.id && player.status !== "idle";
+                                return (
+                                    <SongRow
+                                        key={song.id}
+                                        index={(page - 1) * pageSize + index + 1}
+                                        title={song.name}
+                                        id={song.id}
+                                        meta={[
+                                            <span key="dur">{formatDuration(song.duration)}</span>,
+                                            <span key="notes">
+                                                {song.noteCount != null
+                                                    ? `${song.noteCount.toLocaleString()} 音符`
+                                                    : "音符数未知"}
+                                            </span>,
+                                            <span key="size">{song.dataSize != null ? formatBytes(song.dataSize) : "—"}</span>,
+                                        ]}
+                                        badges={isCurrent ? <SongBadge tone="success">播放中</SongBadge> : undefined}
+                                        active={isCurrent}
+                                        playState={
+                                            pendingId === song.id
+                                                ? "pending"
+                                                : isCurrent && player.status === "playing"
+                                                  ? "playing"
+                                                  : "idle"
+                                        }
+                                        onPlay={() => void play(song)}
+                                        actions={
+                                            <Menu
+                                                align="end"
+                                                trigger={
+                                                    <IconButton size="sm" aria-label="更多操作" title="更多操作">
+                                                        <MoreVertical size={15} />
+                                                    </IconButton>
+                                                }
+                                                items={[
+                                                    {
+                                                        key: "rename",
+                                                        label: "重命名",
+                                                        icon: <Pencil size={13} />,
+                                                        onSelect: () => {
+                                                            setRenameTarget(song);
+                                                            setRenameValue(song.name);
+                                                        },
+                                                    },
+                                                    {
+                                                        key: "delete",
+                                                        label: "删除",
+                                                        icon: <Trash2 size={13} />,
+                                                        danger: true,
+                                                        onSelect: () => setDeleteTarget(song),
+                                                    },
+                                                ]}
+                                            />
+                                        }
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1.5 border-t border-ore-divider p-3">
+                        <button
+                            type="button"
+                            className="rounded-md border border-ore-border px-2.5 py-1 text-xs text-ore-dim disabled:opacity-40"
+                            disabled={busy || page <= 1}
+                            onClick={() => void load(q, page - 1)}
+                        >
+                            上一页
+                        </button>
+                        <span className="px-2 text-xs tabular-nums text-ore-dim">
+                            {page} / {totalPages}
+                        </span>
+                        <button
+                            type="button"
+                            className="rounded-md border border-ore-border px-2.5 py-1 text-xs text-ore-dim disabled:opacity-40"
+                            disabled={busy || page >= totalPages}
+                            onClick={() => void load(q, page + 1)}
+                        >
+                            下一页
+                        </button>
+                    </div>
+                )}
+            </section>
+
+            <Dialog
+                opened={Boolean(renameTarget)}
+                onClose={() => setRenameTarget(null)}
+                title="重命名曲目"
+                size="sm"
+                footer={
+                    <>
+                        <Button type="button" color="secondary" size="sm" onClick={() => setRenameTarget(null)}>
+                            取消
+                        </Button>
+                        <Button type="button" size="sm" onClick={() => void saveRename()}>
+                            保存
+                        </Button>
+                    </>
+                }
+            >
+                <Textfield
+                    label="曲目名称"
+                    value={renameValue}
+                    onInput={(event) => {
+                        const target = event.target as unknown as { value?: unknown };
+                        if (typeof target?.value === "string") setRenameValue(target.value);
+                    }}
+                    onKeyDown={(event: React.KeyboardEvent) => {
+                        if (event.key === "Enter") void saveRename();
+                    }}
+                />
+            </Dialog>
+
+            <ConfirmDialog
+                opened={Boolean(deleteTarget)}
+                title="删除曲目"
+                danger
+                confirmLabel="删除"
+                description={`确定删除「${deleteTarget?.name ?? ""}」？该操作会同时移除服务端文件，且不可恢复。`}
+                onConfirm={() => void confirmRemove()}
+                onCancel={() => setDeleteTarget(null)}
+            />
         </div>
-    );
-}
-
-function EditableName({
-    id,
-    name,
-    onError,
-}: {
-    id: string;
-    name: string;
-    onError: (msg: string) => void;
-}) {
-    const [editing, setEditing] = useState(false);
-    const [value, setValue] = useState(name);
-
-    const save = async () => {
-        const clean = value.trim();
-        setEditing(false);
-        if (!clean || clean === name) return;
-        try {
-            await api.renameSong(id, clean);
-        } catch (e) {
-            onError((e as Error).message);
-            setValue(name);
-        }
-    };
-
-    if (editing) {
-        return (
-            <input
-                autoFocus
-                className="rename-input"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={save}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") save();
-                    if (e.key === "Escape") {
-                        setValue(name);
-                        setEditing(false);
-                    }
-                }}
-            />
-        );
-    }
-    return (
-        <span className="song-name" title="点击改名" onClick={() => setEditing(true)}>
-            {name}
-        </span>
-    );
-}
-
-function PlayButton({
-    song,
-    onError,
-}: {
-    song: MidiSongMeta;
-    onError: (msg: string) => void;
-}) {
-    const [state, setState] = useState<PlayerState>(midiPlayer.getState());
-
-    useEffect(() => midiPlayer.subscribe(setState), []);
-
-    const isCurrent = state.songId === song.id && state.status !== "idle";
-
-    const click = async () => {
-        if (isCurrent && state.status === "playing") {
-            midiPlayer.pause();
-            return;
-        }
-        if (isCurrent && state.status === "paused") {
-            midiPlayer.resume();
-            return;
-        }
-        try {
-            const buffer = await api.getSongRaw(song.id);
-            // duration 已按 TIME_SCALE=40 缩放，换算秒
-            await midiPlayer.play(song.id, buffer, song.name, song.duration / 40);
-        } catch (e) {
-            onError((e as Error).message);
-        }
-    };
-
-    const isPlaying = isCurrent && state.status === "playing";
-    const isPaused = isCurrent && state.status === "paused";
-
-    return (
-        <button
-            className={isCurrent ? "active" : ""}
-            onClick={click}
-            title={isPlaying ? "暂停" : "试听"}
-        >
-            {isPlaying ? <PauseIcon /> : <PlayIcon />}
-        </button>
-    );
-}
-
-function PlayIcon() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M8 5v14l11-7z" />
-        </svg>
-    );
-}
-
-function PauseIcon() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-        </svg>
     );
 }
 

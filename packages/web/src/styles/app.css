@@ -1,0 +1,3 @@
+/* web 控制台的样式入口：Tailwind / OreUI 由 @piano/ui 提供 */
+@import "@piano/ui/styles.css";
+@source "../";
