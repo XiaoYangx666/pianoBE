@@ -38,6 +38,8 @@ export interface PlayerState {
     currentTime: number;
     /** 总时长（秒） */
     duration: number;
+    /** 播放音量 0~1 */
+    volume: number;
 }
 
 /** 采样加载器：dir=piano/piano_short/piano_long，fileName 为模板内原始名（如 "D#4.ogg"） */
@@ -142,12 +144,16 @@ export abstract class SampledMidiPlayer {
 
     private timbreValue: number = DEFAULT_PIANO_TIMBRE;
 
+    /** 上一次设置的音量：换曲/换 AudioContext 后沿用 */
+    private volumeValue = 1;
+
     private state: PlayerState = {
         status: "idle",
         songId: null,
         songName: "",
         currentTime: 0,
         duration: 0,
+        volume: 1,
     };
     private listeners = new Set<(s: PlayerState) => void>();
 
@@ -197,7 +203,7 @@ export abstract class SampledMidiPlayer {
         const ctx = createAudioContext();
         this.ctx = ctx;
         const master = ctx.createGain();
-        master.gain.value = 1.6;
+        master.gain.value = 1.6 * this.volumeValue;
         // 压缩器：多音符叠加时限幅，防止削波失真，同时整体响度更足
         const comp = ctx.createDynamicsCompressor();
         comp.threshold.value = -16;
@@ -219,6 +225,7 @@ export abstract class SampledMidiPlayer {
             songName,
             currentTime: 0,
             duration: durationSec,
+            volume: this.volumeValue,
         };
         this.emit();
 
@@ -282,6 +289,7 @@ export abstract class SampledMidiPlayer {
             songName: "",
             currentTime: 0,
             duration: 0,
+            volume: this.volumeValue,
         };
         this.emit();
     }
@@ -291,6 +299,20 @@ export abstract class SampledMidiPlayer {
         this.sampleCache.clear();
         this.sampleFailed.clear();
         this.preloaded = false;
+    }
+
+    /** 当前音量 0~1 */
+    get volume() {
+        return this.volumeValue;
+    }
+
+    /** 调整音量；立即作用于正在播放的 master gain，并对之后的播放生效。 */
+    setVolume(volume: number) {
+        const next = Math.max(0, Math.min(1, volume));
+        this.volumeValue = next;
+        this.state.volume = next;
+        if (this.master) this.master.gain.value = 1.6 * next;
+        this.emit();
     }
 
     /** 当前播放音色（音色编号与 @piano/core 的 PIANO_TIMBRES 一致） */
