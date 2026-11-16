@@ -3,7 +3,7 @@ import { parseInput } from "@domain/input/parse";
 import type { Player } from "@minecraft/server";
 import type { PianoState } from "@app/ui/pianoState";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { playerSoundLayer } from "@app/playerSound";
+import { playerVelocity } from "@app/playerSound";
 import { shortcutAction, type ShortcutBindings } from "@domain/piano/shortcuts";
 import { switchComMode, switchSoundType } from "@app/ui/pianoUI";
 import { scoreAt } from "@domain/score/score";
@@ -55,8 +55,8 @@ export function handleInput(val: string, state: PianoState, piano: PianoRuntime,
     const octave = state.octave.getData();
     const { keys, notes } = parseInput(val, comMode, keyMap, octave);
 
-    const layer = playerSoundLayer(player, piano);
-    for (const note of notes) piano.playNote(note, layer, .15);
+    const velocity = playerVelocity(player, piano);
+    for (const note of notes) piano.playNote(note, velocity, .15);
 
     return { keys, last: notes.at(-1), shouldClear: !comMode };
 }

@@ -10,7 +10,7 @@ import {
 import { displayAnchor, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, removePianoDisplay, SCORE_MOUNTED, SCORE_STAND_ENTITY } from "@platform/display";
 import { hitsGrandPanel, pickScorePage, pickPianoKey, pickPianoMenu, pickPianoPanel, pianoEye, pianoRay } from "@domain/geometry/keyRay";
 import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
-import { playerSoundLayer } from "@app/playerSound";
+import { playerVelocity } from "@app/playerSound";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
 
 class PianoWorld {
@@ -105,7 +105,7 @@ class PianoWorld {
         const ray = pianoRay(piano.center, piano.right, player.getHeadLocation(), player.getViewDirection());
         const midi = pickPianoKey(ray, 4, midi => piano.isKeyDown(midi), piano.hitModel);
         if (midi !== undefined) {
-            piano.playKey(midi, playerSoundLayer(player, piano));
+            piano.playKey(midi, playerVelocity(player, piano));
             return "key";
         }
         const grand = !piano.hasScreen;

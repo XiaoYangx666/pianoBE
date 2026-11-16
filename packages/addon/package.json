@@ -17,7 +17,7 @@
     },
     "dependencies": {
         "@begame/tabletop": "file:../../vendor/begame-tabletop-0.1.16.tgz",
-        "@minecraft/server": "2.10.0",
+        "@minecraft/server": "2.11.0",
         "@minecraft/server-admin": "1.0.0-beta.1.26.50-stable",
         "@minecraft/server-net": "1.0.0-beta.1.26.50-stable",
         "@minecraft/server-ui": "2.2.0",

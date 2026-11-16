@@ -33,7 +33,7 @@ import {
     velocityGainDb,
     voiceStats,
 } from "../packages/core/dist/audioLab/index.js";
-import { getSoundLayerByDuration, processNote } from "../packages/core/dist/midi/note.js";
+import { pianoSoundId, processNote, velocityLayerIndex } from "../packages/core/dist/midi/note.js";
 
 const { Midi } = midiPkg;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -138,10 +138,11 @@ function sampleRequest(note, config, manifest) {
             layerIndex,
         };
     }
-    const tier = getSoundLayerByDuration(note.duration);
-    const dir = tier === "standard" ? "piano" : `piano_${tier}`;
+    const layer = config.velocityMode === "single"
+        ? 1
+        : velocityLayerIndex(Math.max(1, Math.round(note.velocity * 127)), 0);
     return {
-        path: join(SOUNDS, dir, `${noteNameToFile(info.sample)}.ogg`),
+        path: join(SOUNDS, pianoSoundId(0, layer), `${noteNameToFile(info.sample)}.ogg`),
         pitch: info.pitch,
         gain: 10 ** (velocityGainDb(note.velocity, config.velocityExponent) / 20),
         layerIndex: 0,

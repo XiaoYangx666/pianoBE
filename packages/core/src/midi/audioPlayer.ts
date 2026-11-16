@@ -1,11 +1,12 @@
 import {
     processNote,
-    getSoundLayerByDuration,
     noteNameToMidi,
     pianoSoundId,
+    pianoSoundDirs,
+    velocityLayerIndex,
+    velocityVolume,
     DEFAULT_PIANO_TIMBRE,
     PIANO_SAMPLE_KEYS,
-    PIANO_SOUND_LAYERS,
 } from "./note.js";
 
 /**
@@ -42,33 +43,28 @@ export interface PlayerState {
     volume: number;
 }
 
-/** 采样加载器：dir=piano/piano_short/piano_long，fileName 为模板内原始名（如 "D#4.ogg"） */
+/** 采样加载器：dir=classic_grand_v2 等力度层目录，fileName 为模板内原始名（如 "D#4.ogg"） */
 export type SampleSource = (
     dir: string,
     fileName: string
 ) => Promise<ArrayBuffer | null>;
 
-/** 采样档位 → rp/sounds 目录名（与 addon 结构一致） */
-export const SAMPLE_DIRS: Record<string, string> = {
-    piano: "piano",
-    piano_short: "piano_short",
-    piano_long: "piano_long",
-};
+/** 默认音色的力度层目录（与 addon 结构一致） */
+export const SAMPLE_DIRS: string[] = pianoSoundDirs(DEFAULT_PIANO_TIMBRE);
 
 /** 全部采样键名（基础键 C/D#/F#/A；文件系统命名差异由 SampleSource 处理） */
 export const SAMPLE_KEYS = PIANO_SAMPLE_KEYS;
 
-/** 默认音色全量采样清单：3 档 × 30 键 = 90 个 */
-export const ALL_SAMPLES = Object.values(SAMPLE_DIRS).flatMap((dir) =>
+/** 默认音色全量采样清单：力度层 × 30 键 */
+export const ALL_SAMPLES = SAMPLE_DIRS.flatMap((dir) =>
     SAMPLE_KEYS.map((key) => ({ dir, sample: key }))
 );
 
-/** 指定音色的全量采样清单（3 档 × 30 键） */
+/** 指定音色的全量采样清单（力度层 × 30 键） */
 export function pianoSamples(timbre: number) {
-    return PIANO_SOUND_LAYERS.flatMap((layer) => {
-        const dir = pianoSoundId(timbre, layer);
-        return PIANO_SAMPLE_KEYS.map((sample) => ({ dir, sample }));
-    });
+    return pianoSoundDirs(timbre).flatMap((dir) =>
+        PIANO_SAMPLE_KEYS.map((sample) => ({ dir, sample }))
+    );
 }
 
 // ---- WebAudio 最小类型面（core 不引 DOM lib，避免污染全局类型） ----
@@ -397,7 +393,8 @@ export abstract class SampledMidiPlayer {
     /** 播放单个音符：core 映射选采样 + 变调（playbackRate），与 addon 一致 */
     private async playNote(ctx: CtxLike, master: GainLike, note: NoteEvent, when: number) {
         const info = processNote(note.midi, false);
-        const dir = pianoSoundId(this.timbreValue, getSoundLayerByDuration(note.duration));
+        const velocity = Math.max(1, Math.round(note.velocity * 127));
+        const dir = pianoSoundId(this.timbreValue, velocityLayerIndex(velocity, this.timbreValue));
         let buffer = await this.getSample(ctx, dir, info.sample);
         let pitch = info.pitch;
         if (!buffer) {
@@ -458,7 +455,7 @@ export abstract class SampledMidiPlayer {
         }
     }
 
-    /** 播放采样 buffer：变调 + 力度包络，短时值截断（与 addon 分档一致） */
+    /** 播放采样 buffer：变调 + 力度音量，Note Off 后约 600ms 淡出（与 addon 一致） */
     private playBuffer(
         ctx: CtxLike,
         master: GainLike,
@@ -473,8 +470,8 @@ export abstract class SampledMidiPlayer {
         src.playbackRate.value = pitch;
 
         const gain = ctx.createGain();
-        // sqrt 力度曲线：低力度也保有可闻响度；峰值上限提高
-        const peak = 0.95 * Math.sqrt(Math.max(0, Math.min(1, velocity)));
+        // 力度 → 音量倍数；参考力度 90 为 1，强奏最高约 1.67 倍。
+        const peak = Math.min(1.2, 0.95 * velocityVolume(velocity * 127));
         const t = when;
 
         gain.gain.setValueAtTime(0, t);
@@ -484,9 +481,10 @@ export abstract class SampledMidiPlayer {
         const sampleDur = buffer.duration / pitch;
         const naturalEnd = t + sampleDur;
         const noteEnd = t + Math.max(0.12, duration);
-        if (noteEnd < naturalEnd) {
+        const releaseEnd = Math.min(naturalEnd, noteEnd + 0.6);
+        if (releaseEnd < naturalEnd) {
             gain.gain.setValueAtTime(peak, noteEnd);
-            gain.gain.linearRampToValueAtTime(0.0001, noteEnd + 0.08);
+            gain.gain.linearRampToValueAtTime(0.0001, releaseEnd);
         } else {
             gain.gain.setValueAtTime(peak, naturalEnd - 0.05);
             gain.gain.linearRampToValueAtTime(0.0001, naturalEnd);
@@ -495,6 +493,6 @@ export abstract class SampledMidiPlayer {
         src.connect(gain);
         gain.connect(master);
         src.start(t);
-        src.stop(naturalEnd + 0.05);
+        src.stop(Math.min(naturalEnd, releaseEnd) + 0.05);
     }
 }

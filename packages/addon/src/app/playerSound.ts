@@ -1,16 +1,16 @@
 import type { Player } from "@minecraft/server";
 import { DEFAULT_PIANO_SETTINGS } from "@domain/piano/settings";
-import { FOLLOW_PIANO_LAYER, resolveSoundLayer } from "@domain/piano/soundTypes";
+import { FOLLOW_PIANO_VELOCITY, resolveManualVelocity } from "@domain/piano/soundTypes";
 import type { PianoRuntime } from "@app/PianoRuntime";
 
 /**
- * 手动弹奏用的音长层，唯一入口：玩家在钢琴面板里选过就用玩家的，否则跟随钢琴设置。
- * 只有面板里的「音长」按钮会写 `piano:sound`，没点过的玩家没有这个属性。
+ * 手动敲键力度，唯一入口：玩家在自己的按钮里选过就用自己的，
+ * 否则跟随钢琴设置。只由服务器写入 `piano:sound`，没设置就没有属性。
  */
-export function playerSoundLayer(player: Player, piano: PianoRuntime) {
+export function playerVelocity(player: Player, piano: PianoRuntime) {
     const override = player.getDynamicProperty("piano:sound");
-    return resolveSoundLayer(
-        typeof override === "number" ? override : FOLLOW_PIANO_LAYER,
-        piano.settings?.soundLayer ?? DEFAULT_PIANO_SETTINGS.soundLayer
+    return resolveManualVelocity(
+        typeof override === "number" ? override : FOLLOW_PIANO_VELOCITY,
+        piano.settings?.manualVelocity ?? DEFAULT_PIANO_SETTINGS.manualVelocity
     );
 }

@@ -31,12 +31,12 @@ export default defineConfig({
             // clean 模式：manifest 从配置全量重建，双配置交替构建互不污染
             manifest: {
                 merge: "clean",
-                minEngineVersion: "1.26.50",
+                minEngineVersion: "1.26.60",
             },
             name: "钢琴",
             description: "钢琴行为包",
             dependencies: {
-                "@minecraft/server": "2.10.0",
+                "@minecraft/server": "2.11.0",
                 "@minecraft/server-ui": "2.2.0",
                 "sapi-pro": "0.4.3-stable",
                 "@minecraft/vanilla-data": "1.26.50",
@@ -49,7 +49,7 @@ export default defineConfig({
             moduleUuid: "36d4f042-edf0-4be3-8d48-8165de3057ad",
             manifest: {
                 merge: "clean",
-                minEngineVersion: "1.26.50",
+                minEngineVersion: "1.26.60",
             },
             name: "钢琴资源包",
             description: "钢琴资源包",

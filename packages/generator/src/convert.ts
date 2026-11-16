@@ -6,7 +6,7 @@ import type { SongEntry } from "./types";
 export async function midiFileToEntry(file: File): Promise<SongEntry> {
     const buffer = new Uint8Array(await file.arrayBuffer());
     const song = midiBufferToSong(buffer, file.name.replace(/\.midi?$/i, ""));
-    const data = encodePbe2(song);
+    const data = encodePbe2(song, { includeVelocity: true });
     const header = readPbe2Header(data);
     return {
         id: header.id,

@@ -9,14 +9,19 @@
  *   node tools/build-piano-timbres.mjs upright classic_grand
  *   node tools/build-piano-timbres.mjs bright_grand   # 从本地母带重建 Salamander
  *   node tools/build-piano-timbres.mjs --definitions-only  # 只重建 sound_definitions.json
+ *   VORBIS_Q=1 node tools/build-piano-timbres.mjs  # 更小的 OGG（默认 q2）
  *
  * 输出：
- *   packages/addon/rp/sounds/<音色>/{short,standard,long}/*.ogg
+ *   packages/addon/rp/sounds/<音色>_v{1..3}/*.ogg
  *   packages/addon/rp/sounds/sound_definitions.json
  *
- * 每个采样会生成两套音效定义，共用同一批 OGG：
- *   3D（单声道、有距离衰减）：piano.C4 / piano_short.C4 / classic_grand.C4
- *   立体声（保留立体声、无定位）：piano_stereo.C4 / piano_short_stereo.C4 / classic_grand_stereo.C4
+ * 每个力度层会生成两套音效定义，共用同一批 OGG：
+ *   3D（单声道、有距离衰减）：classic_grand_v2.C4
+ *   立体声（保留立体声、无定位）：classic_grand_v2_stereo.C4
+ *
+ * 采样只有一档长音（4s），Note Off 后的释放交给游戏端 SoundInstance.fade()。
+ * 力度层是真实的多力度采样（VCSL vl2/vl3/vl4、KW vL/vH、SF2 三力度渲染），
+ * 层内响度用播放端力度曲线控制，不再用采样时长分档。
  *
  * 下载的源采样缓存在 tools/piano_timbres_source/（已 gitignore）。
  * Salamander（明亮三角）的母带不随仓库分发，放在 tools/piano_source/（同样已 gitignore）。
@@ -29,7 +34,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { PIANO_TIMBRES, PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, pianoSoundId } from "@piano/core";
+import { PIANO_TIMBRES, PIANO_SAMPLE_KEYS, pianoSoundId, pianoSoundLayers } from "@piano/core";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CACHE = join(ROOT, "tools", "piano_timbres_source");
@@ -40,12 +45,10 @@ const FLUIDSYNTH = process.env.FLUIDSYNTH ?? "fluidsynth";
 const SEVEN_ZIP = process.env.SEVEN_ZIP ?? "7z";
 
 const BASE_NOTES = PIANO_SAMPLE_KEYS;
-const LAYERS = PIANO_SOUND_LAYERS;
-const LAYER_OPTIONS = {
-    short: { duration: 0.5, fadeStart: 0.25, fade: 0.25 },
-    standard: { duration: 2, fadeStart: 1.4, fade: 0.6 },
-    long: { duration: 4, fadeStart: 3, fade: 1 },
-};
+/** 单档长音：4 秒，最后 0.5 秒淡出，避免采样尾部硬切。 */
+const SAMPLE_OPTIONS = { duration: 4, fadeStart: 3.5, fade: 0.5 };
+/** SF2 三个力度层的渲染用 MIDI 力度；也是采样层的标称力度。 */
+const VELOCITY_LAYER_VELOCITIES = [32, 72, 112];
 
 const MAX_PEAK_DB = -6;
 /** 音色整体响度目标：取逐键响度的中位数对齐，不要求每个键都到目标。 */
@@ -86,44 +89,49 @@ const VCSL_MIDI = [
     32, 44, 56, 68, 80, 92, 104, // G#1–G#7
 ];
 const VCSL_NOTES = VCSL_MIDI.map((midi) => midiToNoteName(midi));
-const VCSL_VELOCITY = 3;
 
 const TIMBRES = {
-    // 标准钢琴：FluidR3 GM 的 Acoustic Grand（MIT），用 FluidSynth 渲染 program 0。
+    // 标准钢琴：FluidR3 GM 的 Acoustic Grand（MIT），用 FluidSynth 渲染 program 0 的三个力度。
     piano: {
         label: "Standard Piano (FluidR3 GM)",
         sf2: "fluidr3",
         program: 0,
     },
-    // 经典三角：VCSL 施坦威 B（CC0），全音采样。
+    // 经典三角：VCSL 施坦威 B（CC0），vl2 / vl3 / vl4 三层真实力度采样。
     classic_grand: {
         label: "Classic Grand (VCSL Steinway B)",
-        source: (note) => {
+        source: (note, layer) => {
             const target = noteToMidi(note);
             const best = VCSL_NOTES.reduce((a, b) =>
                 Math.abs(noteToMidi(b) - target) < Math.abs(noteToMidi(a) - target) ? b : a);
+            const velocity = ["vl2", "vl3", "vl4"][layer];
             return {
-                url: `${VCSL_BASE}/JHPiano_Sus_Close_${best.replace("#", "%23")}_vl${VCSL_VELOCITY}_rr1.wav`,
+                url: `${VCSL_BASE}/JHPiano_Sus_Close_${best.replace("#", "%23")}_${velocity}_rr1.wav`,
                 extension: "wav",
-                cacheName: `VCSL_${best.replace("#", "s")}_vl${VCSL_VELOCITY}.wav`,
+                cacheName: `VCSL_${best.replace("#", "s")}_${velocity}.wav`,
                 transpose: target - noteToMidi(best),
             };
         },
     },
     // 明亮三角：Salamander Grand Piano V3（CC BY 3.0，Yamaha C5），母带不随仓库分发。
+    // 目前只有单层母带，先保持 1 层；补齐多力度源后再升到 3 层。
     bright_grand: {
         label: "Bright Grand (Salamander C5)",
+        layers: 1,
         source: (note) => ({ local: join(ROOT, "tools", "piano_source", `${note}.ogg`) }),
     },
-    // 原声立式：FreePats Upright Piano KW（CC0，Kawai 立式）。
+    // 原声立式：FreePats Upright Piano KW（CC0，Kawai 立式），vL / vH 两层。
     upright: {
         label: "Upright Piano (FreePats KW)",
-        source: (note) => {
-            // A2 / C4 只有低力度层，其余优先使用高力度层。
-            const velocity = note === "A2" || note === "C4" ? "vL" : "vH";
+        layers: 2,
+        source: (note, layer) => {
+            // A2 / C4 没有 vH，高力度层复用 vL。
+            const missingHigh = (note === "A2" || note === "C4") && layer === 1;
+            const velocity = layer === 0 || missingHigh ? "vL" : "vH";
             return {
                 url: `${KW_BASE}/${note.replace("#", "%23")}${velocity}.flac`,
                 extension: "flac",
+                cacheName: `${note.replace("#", "s")}_${velocity}.flac`,
             };
         },
     },
@@ -134,6 +142,13 @@ const TIMBRES = {
         program: 0,
     },
 };
+
+/** 该音色实际生成的力度层序号；与 @piano/core 的配置保持一致。 */
+function timbreLayers(timbreId) {
+    const definition = TIMBRES[timbreId];
+    return pianoSoundLayers(PIANO_TIMBRES.find((timbre) => timbre.id === timbreId).value);
+}
+
 
 function run(command, args, options = {}) {
     return new Promise((resolvePromise, reject) => {
@@ -171,7 +186,7 @@ async function download(url, target, refresh) {
     if (!existsSync(target)) throw new Error(`下载失败 ${url}`);
 }
 
-function midiForNote(note, program = 0, seconds = 10) {
+function midiForNote(note, program = 0, seconds = 10, velocity = 0x50) {
     const midi = noteToMidi(note);
     const division = 480;
     const ticks = Math.round(seconds * division);
@@ -182,7 +197,7 @@ function midiForNote(note, program = 0, seconds = 10) {
     };
     const events = [
         0x00, 0xc0, program,
-        0x00, 0x90, midi, 0x50,
+        0x00, 0x90, midi, Math.max(1, Math.min(127, velocity)),
         ...vlq(ticks), 0x80, midi, 0x00,
         0x00, 0xff, 0x2f, 0x00,
     ];
@@ -240,14 +255,14 @@ async function prepareSf2(key, refresh) {
     return sf2;
 }
 
-async function renderSf2Note(sf2Key, sf2, note, program, refresh) {
+async function renderSf2Note(sf2Key, sf2, note, program, velocity, refresh) {
     const dir = join(CACHE, sf2Key, "rendered");
-    const target = join(dir, `${note}_p${program}.wav`);
+    const target = join(dir, `${note}_p${program}_v${velocity}.wav`);
     if (!refresh && existsSync(target)) return target;
     await mkdir(dir, { recursive: true });
-    const midi = join(dir, `${note}_p${program}.mid`);
-    await writeFile(midi, midiForNote(note, program));
-    console.log(`  FluidSynth 渲染 ${SF2_SOURCES[sf2Key].label} ${note}`);
+    const midi = join(dir, `${note}_p${program}_v${velocity}.mid`);
+    await writeFile(midi, midiForNote(note, program, 10, velocity));
+    console.log(`  FluidSynth 渲染 ${SF2_SOURCES[sf2Key].label} ${note} v${velocity}`);
     await run(FLUIDSYNTH, [
         "-ni", "-F", target, "-T", "wav", "-r", "48000", "-g", "1.0",
         "-o", "synth.reverb.active=0", "-o", "synth.chorus.active=0",
@@ -257,14 +272,15 @@ async function renderSf2Note(sf2Key, sf2, note, program, refresh) {
 }
 
 /** 返回源文件与构建期需要预变调的半音数（VCSL 全音采样补缺键）。 */
-async function sourcePath(timbreId, note, refresh, sf2Paths) {
+async function sourcePath(timbreId, note, layer, refresh, sf2Paths) {
     const dir = join(CACHE, timbreId);
     const definition = TIMBRES[timbreId];
     if (definition.sf2) {
         const sf2 = sf2Paths[definition.sf2];
-        return { file: await renderSf2Note(definition.sf2, sf2, note, definition.program, refresh), transpose: 0 };
+        const velocity = VELOCITY_LAYER_VELOCITIES[layer] ?? VELOCITY_LAYER_VELOCITIES[0];
+        return { file: await renderSf2Note(definition.sf2, sf2, note, definition.program, velocity, refresh), transpose: 0 };
     }
-    const source = definition.source(note);
+    const source = definition.source(note, layer);
     if (source.local) {
         if (!existsSync(source.local)) {
             throw new Error(`缺少本地采样 ${source.local}。Salamander 母带不随仓库分发，请先把 30 个源采样放入 tools/piano_source/`);
@@ -285,8 +301,8 @@ async function maxVolumeDb(file) {
 
 /**
  * 固定分析窗口的积分响度。
- * 不跟随音长档：短音只看 0.5s 会把音头权重放大，长音看 4s 又会把衰减算进去，
- * 同一键在三档里会得到不同增益。统一取音头 + 早期延音 1.5s，三档共用同一个键增益。
+ * 不跟随采样长度或力度层：统一取音头 + 早期延音 1.2s，
+ * 同一键的所有力度层共用同一个键增益。
  */
 async function integratedLoudnessDb(file, seconds = ANALYSIS_SECONDS, transpose = 0) {
     const filters = [];
@@ -369,78 +385,118 @@ function robustTrend(xs, ys) {
  *    且最多 6 dB。缓慢的音区走向不会被压平。
  */
 async function analyzeTimbre(timbreId, sources) {
+    const layers = timbreLayers(timbreId);
     const rows = [];
     for (const note of BASE_NOTES) {
-        const source = sources.get(note);
-        rows.push({
-            note,
-            file: source.file,
-            transpose: source.transpose,
-            lufs: await integratedLoudnessDb(source.file, ANALYSIS_SECONDS, source.transpose ?? 0),
-            peak: await maxVolumeDb(source.file),
-        });
+        for (const layer of layers) {
+            const source = sources.get(note).get(layer);
+            rows.push({
+                note,
+                layer,
+                file: source.file,
+                transpose: source.transpose,
+                lufs: await integratedLoudnessDb(source.file, ANALYSIS_SECONDS, source.transpose ?? 0),
+                peak: await maxVolumeDb(source.file),
+            });
+        }
     }
     // 邻域/趋势必须按音高排序；BASE_NOTES 是按音名分组（A0…A7、C1…），直接取下标会串到别的音区。
-    rows.sort((a, b) => noteToMidi(a.note) - noteToMidi(b.note));
+    rows.sort((a, b) => noteToMidi(a.note) - noteToMidi(b.note) || a.layer - b.layer);
 
-    const valid = rows.filter((row) => row.lufs > MIN_VALID_LUFS);
-    if (!valid.length) throw new Error(`${timbreId} 没有可用采样`);
-    for (const row of rows) {
-        if (row.lufs > MIN_VALID_LUFS) continue;
-        const target = noteToMidi(row.note);
-        const nearest = valid.reduce((best, candidate) =>
-            Math.abs(noteToMidi(candidate.note) - target) < Math.abs(noteToMidi(best.note) - target)
-                ? candidate : best);
-        row.repairedFrom = nearest.note;
-        row.file = nearest.file;
-        row.transpose = (nearest.transpose ?? 0) + (target - noteToMidi(nearest.note));
-        row.lufs = nearest.lufs;
-        row.peak = nearest.peak;
+    // 每层单独修补缺键：SF2 音域不足或源缺该力度时，用同层最近的键变调补上。
+    for (const layer of layers) {
+        const layerRows = rows.filter((row) => row.layer === layer);
+        const valid = layerRows.filter((row) => row.lufs > MIN_VALID_LUFS);
+        if (!valid.length) throw new Error(`${timbreId} 第 ${layer + 1} 层没有可用采样`);
+        for (const row of layerRows) {
+            if (row.lufs > MIN_VALID_LUFS) continue;
+            const target = noteToMidi(row.note);
+            const nearest = valid.reduce((best, candidate) =>
+                Math.abs(noteToMidi(candidate.note) - target) < Math.abs(noteToMidi(best.note) - target)
+                    ? candidate : best);
+            row.repairedFrom = nearest.note;
+            row.file = nearest.file;
+            row.transpose = (nearest.transpose ?? 0) + (target - noteToMidi(nearest.note));
+            row.lufs = nearest.lufs;
+            row.peak = nearest.peak;
+        }
     }
 
-    const globalGain = TIMBRE_TARGET_LUFS - median(rows.map((row) => row.lufs));
-    const residuals = robustTrend(rows.map((row) => noteToMidi(row.note)), rows.map((row) => row.lufs));
-    rows.forEach((row, index) => {
-        row.reference = row.lufs - residuals[index];
-        row.residual = residuals[index];
+    // 参考层 = 中间层（三层取 vl3，两层取 vH，一层取唯一样本）；音区曲线和异常修正都以它为准。
+    const referenceLayer = Math.min(1, layers.length - 1);
+    const referenceRows = rows.filter((row) => row.layer === referenceLayer);
+    const globalGain = TIMBRE_TARGET_LUFS - median(referenceRows.map((row) => row.lufs));
+    const residuals = robustTrend(
+        referenceRows.map((row) => noteToMidi(row.note)),
+        referenceRows.map((row) => row.lufs),
+    );
+
+    const corrections = new Map();
+    const referenceByNote = new Map();
+    let worstResidual = 0;
+    referenceRows.forEach((row, index) => {
+        const residual = residuals[index];
+        worstResidual = Math.max(worstResidual, Math.abs(residual));
         let correction = 0;
-        if (Math.abs(row.residual) > OUTLIER_THRESHOLD_DB) {
+        if (Math.abs(residual) > OUTLIER_THRESHOLD_DB) {
             const excess = Math.min(
-                Math.abs(row.residual) - OUTLIER_THRESHOLD_DB,
+                Math.abs(residual) - OUTLIER_THRESHOLD_DB,
                 OUTLIER_MAX_CORRECTION_DB,
             );
-            correction = -Math.sign(row.residual) * excess;
+            correction = -Math.sign(residual) * excess;
         }
-        row.correction = correction;
-        row.gain = globalGain + correction;
-        row.calibratedLufs = row.lufs + row.gain;
-        row.calibratedPeak = row.peak + row.gain;
+        corrections.set(row.note, correction);
+        referenceByNote.set(row.note, row.lufs - residual);
+    });
+    // 变调补齐的键必须与它的来源键使用同一个修正，否则同一个采样会被改成不同响度。
+    for (const row of referenceRows) {
+        if (!row.repairedFrom) continue;
+        corrections.set(row.note, corrections.get(row.repairedFrom) ?? 0);
+    }
+
+    // 把每层整体响度对齐到参考层；保留层内/音区自然差异，不做逐键拉平。
+    const layerOffsets = layers.map((layer) => {
+        if (layer === referenceLayer) return 0;
+        const diffs = BASE_NOTES.map((note) => {
+            const reference = referenceRows.find((row) => row.note === note);
+            const row = rows.find((candidate) => candidate.note === note && candidate.layer === layer);
+            return reference.lufs - row.lufs;
+        });
+        return median(diffs);
     });
 
-    // 变调补齐的键必须与它的来源键使用同一个修正，否则同一个采样会被改成不同响度。
     for (const row of rows) {
-        if (!row.repairedFrom) continue;
-        const source = rows.find((candidate) => candidate.note === row.repairedFrom);
-        if (!source) continue;
-        row.correction = source.correction;
-        row.gain = globalGain + row.correction;
+        row.correction = corrections.get(row.note) ?? 0;
+        row.layerOffset = layerOffsets[row.layer];
+        row.reference = referenceByNote.get(row.note) ?? row.lufs;
+        row.residual = row.reference !== undefined ? row.lufs - row.reference : 0;
+        row.gain = globalGain + row.correction + row.layerOffset;
         row.calibratedLufs = row.lufs + row.gain;
         row.calibratedPeak = row.peak + row.gain;
     }
 
-    return { timbreId, globalGain, shift: 0, rows };
+    return {
+        timbreId,
+        globalGain,
+        shift: 0,
+        referenceLayer,
+        layerOffsets,
+        worstResidual,
+        rows,
+        layers,
+    };
 }
 
 async function convertTimbre(timbreId, analysis) {
     const timbre = PIANO_TIMBRES.find((t) => t.id === timbreId);
     if (!timbre) throw new Error(`@piano/core 中缺少音色定义: ${timbreId}`);
-    for (const layer of LAYERS) {
+    for (const layer of analysis.layers) {
         const dir = join(SOUNDS, pianoSoundId(timbre.value, layer));
         await rm(dir, { recursive: true, force: true });
-        for (const row of analysis.rows) {
-            await convertTier(row.file, join(dir, `${row.note}.ogg`), layer, row.gain, row.transpose);
+        for (const row of analysis.rows.filter((row) => row.layer === layer)) {
+            await convertSample(row.file, join(dir, `${row.note}.ogg`), row.gain, row.transpose);
         }
-        console.log(`  ${layer} → ${dir}`);
+        console.log(`  第 ${layer + 1} 层 → ${dir}`);
     }
 }
 
@@ -467,37 +523,39 @@ async function writeCalibrationReport(analyses, mode, peakShift) {
         "# 钢琴音色响度校准报告",
         "",
         `- 生成时间：${new Date().toISOString()}`,
-        `- 模式：${mode}（整体响度目标 ${TIMBRE_TARGET_LUFS} LUFS，异常键阈值 ${OUTLIER_THRESHOLD_DB} dB，单键修正上限 ${OUTLIER_MAX_CORRECTION_DB} dB）`,
-        `- 分析窗口：每键固定 ${ANALYSIS_SECONDS}s（音头 + 早期延音），三档音长共用同一键增益`,
+        `- 模式：${mode}（参考层响度目标 ${TIMBRE_TARGET_LUFS} LUFS，异常键阈值 ${OUTLIER_THRESHOLD_DB} dB，单键修正上限 ${OUTLIER_MAX_CORRECTION_DB} dB）`,
+        `- 分析窗口：每键固定 ${ANALYSIS_SECONDS}s（音头 + 早期延音），单档长音与所有力度层共用同一键增益`,
+        `- 力度层：各层整体对齐到参考层（中间层），保留层内与音区自然差异，不做逐键拉平`,
         `- 全局峰值余量调整：${fmt(peakShift)} dB（所有音色等量平移，保持相互响度关系）`,
         "",
         "## 总览",
         "",
-        "| 音色 | 整体增益 | 修正键数 | 校准前中位 | 校准后中位 | 原始最差偏差 | 预计最大峰值 |",
-        "|---|---|---|---|---|---|---|",
+        "| 音色 | 层数 | 整体增益 | 层偏移 | 修正键数 | 校准前中位 | 校准后中位 | 最差偏差 | 预计最大峰值 |",
+        "|---|---|---|---|---|---|---|---|---|",
     ];
     for (const analysis of ordered) {
         const corrected = analysis.rows.filter((row) => Math.abs(row.correction) > 0.05);
         const before = median(analysis.rows.map((row) => row.lufs));
         const after = median(analysis.rows.map((row) => row.calibratedLufs));
-        const worst = Math.max(...analysis.rows.map((row) => Math.abs(row.residual)));
+        const worst = analysis.worstResidual ?? Math.max(...analysis.rows.map((row) => Math.abs(row.residual)));
         const peak = Math.max(...analysis.rows.map((row) => row.calibratedPeak));
         const label = PIANO_TIMBRES.find((timbre) => timbre.id === analysis.timbreId)?.label ?? analysis.timbreId;
-        lines.push(`| ${label} | ${fmt(analysis.globalGain)} dB | ${corrected.length} | ${before.toFixed(1)} LUFS | ${after.toFixed(1)} LUFS | ${worst.toFixed(1)} dB | ${peak.toFixed(1)} dBFS |`);
+        const offsets = analysis.layerOffsets.map((offset, layer) => `v${layer + 1} ${fmt(offset)}`).join(" / ");
+        lines.push(`| ${label} | ${analysis.layers.length} | ${fmt(analysis.globalGain)} dB | ${offsets} | ${corrected.length} | ${before.toFixed(1)} LUFS | ${after.toFixed(1)} LUFS | ${worst.toFixed(1)} dB | ${peak.toFixed(1)} dBFS |`);
     }
     lines.push("");
     for (const analysis of ordered) {
         const label = PIANO_TIMBRES.find((timbre) => timbre.id === analysis.timbreId)?.label ?? analysis.timbreId;
         lines.push(`## ${label}（${analysis.timbreId}）`, "");
-        lines.push("| 键 | 源响度 | 邻域参考 | 偏差 | 异常修正 | 实际增益 | 校准后响度 | 校准后峰值 |");
-        lines.push("|---|---|---|---|---|---|---|---|");
+        lines.push("| 键 | 层 | 源响度 | 邻域参考 | 偏差 | 异常修正 | 层偏移 | 实际增益 | 校准后响度 | 校准后峰值 |");
+        lines.push("|---|---|---|---|---|---|---|---|---|---|");
         for (const row of analysis.rows) {
             const flag = Math.abs(row.correction) > 0.05 ? "**" : "";
             const note = row.repairedFrom ? `${flag}${row.note}${flag} †` : `${flag}${row.note}${flag}`;
-            lines.push(`| ${note} | ${row.lufs.toFixed(1)} | ${row.reference.toFixed(1)} | ${fmt(row.residual)} | ${fmt(row.correction)} | ${fmt(row.gain)} | ${row.calibratedLufs.toFixed(1)} | ${row.calibratedPeak.toFixed(1)} |`);
+            lines.push(`| ${note} | v${row.layer + 1} | ${row.lufs.toFixed(1)} | ${row.reference.toFixed(1)} | ${fmt(row.residual)} | ${fmt(row.correction)} | ${fmt(row.layerOffset)} | ${fmt(row.gain)} | ${row.calibratedLufs.toFixed(1)} | ${row.calibratedPeak.toFixed(1)} |`);
         }
         if (analysis.rows.some((row) => row.repairedFrom)) {
-            lines.push("", "† = 源音色在该键没有采样，使用最近键变调补齐（与来源键共用同一增益）。");
+            lines.push("", "† = 源音色在该键/该力度层没有采样，使用同层最近键变调补齐（与来源键共用同一增益）。");
         }
         lines.push("");
     }
@@ -507,9 +565,9 @@ async function writeCalibrationReport(analyses, mode, peakShift) {
     console.log(`校准数据：${jsonTarget}`);
 }
 
-async function convertTier(source, target, layer, gainDb, transpose = 0) {
+async function convertSample(source, target, gainDb, transpose = 0) {
     await mkdir(dirname(target), { recursive: true });
-    const { duration, fadeStart, fade } = LAYER_OPTIONS[layer];
+    const { duration, fadeStart, fade } = SAMPLE_OPTIONS;
     const filters = [];
     if (transpose) {
         // 构建期把源音变调到目标键（VCSL 全音采样 → 本项目的每 3 半音基准键）。
@@ -526,7 +584,7 @@ async function convertTier(source, target, layer, gainDb, transpose = 0) {
         "-t", String(duration),
         "-af", filters.join(","),
         "-ar", "48000",
-        "-c:a", "libvorbis", "-q:a", "2",
+        "-c:a", "libvorbis", "-q:a", process.env.VORBIS_Q ?? "2",
         "-map_metadata", "-1",
         target,
     ], { quiet: true });
@@ -534,7 +592,14 @@ async function convertTier(source, target, layer, gainDb, transpose = 0) {
 
 /** web 试听页只内嵌默认音色（标准钢琴），保持副本与资源包一致（文件名 # → sharp）。 */
 async function syncWebPreview() {
-    for (const layer of LAYERS) {
+    const expected = new Set(pianoSoundLayers(0).map((layer) => pianoSoundId(0, layer)));
+    for (const entry of await readdir(WEB_PUBLIC, { withFileTypes: true })) {
+        if (entry.isDirectory() && !expected.has(entry.name)) {
+            await rm(join(WEB_PUBLIC, entry.name), { recursive: true, force: true });
+            console.log(`移除旧 Web 试听目录 ${entry.name}`);
+        }
+    }
+    for (const layer of pianoSoundLayers(0)) {
         const dir = pianoSoundId(0, layer);
         const targetDir = join(WEB_PUBLIC, dir);
         await mkdir(targetDir, { recursive: true });
@@ -548,7 +613,7 @@ async function syncWebPreview() {
 async function writeSoundDefinitions() {
     const definitions = {};
     for (const timbre of PIANO_TIMBRES) {
-        for (const layer of LAYERS) {
+        for (const layer of pianoSoundLayers(timbre.value)) {
             const dir = pianoSoundId(timbre.value, layer);
             if (!existsSync(join(SOUNDS, dir))) {
                 throw new Error(`缺少采样目录 ${dir}，请先完整生成该音色（不带参数运行本脚本）`);
@@ -638,7 +703,11 @@ for (const timbreId of timbreIds) {
     console.log(`\n[${timbreId}] ${TIMBRES[timbreId].label}`);
     const sources = new Map();
     for (const note of BASE_NOTES) {
-        sources.set(note, await sourcePath(timbreId, note, refresh, sf2Paths));
+        const layerSources = new Map();
+        for (const layer of timbreLayers(timbreId)) {
+            layerSources.set(layer, await sourcePath(timbreId, note, layer, refresh, sf2Paths));
+        }
+        sources.set(note, layerSources);
     }
     sourcesByTimbre.set(timbreId, sources);
 }
@@ -650,11 +719,13 @@ for (const [timbreId, sources] of sourcesByTimbre) {
     if (calibrationMode === "off") {
         for (const row of analysis.rows) {
             row.correction = 0;
+            row.layerOffset = 0;
             row.gain = 0;
             row.calibratedLufs = row.lufs;
             row.calibratedPeak = row.peak;
         }
         analysis.globalGain = 0;
+        analysis.layerOffsets = analysis.layers.map(() => 0);
     }
     analyses.push(analysis);
     console.log(`  分析完成：整体增益 ${fmt(analysis.globalGain)} dB，修正 ${analysis.rows.filter((row) => Math.abs(row.correction) > 0.05).length} 个键`);
@@ -692,8 +763,8 @@ for (const analysis of analyses) {
 if (timbreIds.includes("piano")) await syncWebPreview();
 
 // 清掉已下线的音色目录（旧版本的 meta_piano / upright_kw / ydp_grand 等）。
-const expectedDirs = new Set(LAYERS.flatMap((layer) =>
-    PIANO_TIMBRES.map((timbre) => pianoSoundId(timbre.value, layer))));
+const expectedDirs = new Set(PIANO_TIMBRES.flatMap((timbre) =>
+    pianoSoundLayers(timbre.value).map((layer) => pianoSoundId(timbre.value, layer))));
 for (const entry of await readdir(SOUNDS, { withFileTypes: true })) {
     if (entry.isDirectory() && !expectedDirs.has(entry.name)) {
         await rm(join(SOUNDS, entry.name), { recursive: true, force: true });
@@ -705,7 +776,7 @@ await writeSoundDefinitions();
 
 const totalFiles = (await Promise.all(timbreIds.map(async (id) => {
     const value = PIANO_TIMBRES.find((t) => t.id === id).value;
-    const counts = await Promise.all(LAYERS.map(async (layer) =>
+    const counts = await Promise.all(pianoSoundLayers(value).map(async (layer) =>
         (await readdir(join(SOUNDS, pianoSoundId(value, layer)))).length));
     return counts.reduce((a, b) => a + b, 0);
 }))).reduce((a, b) => a + b, 0);

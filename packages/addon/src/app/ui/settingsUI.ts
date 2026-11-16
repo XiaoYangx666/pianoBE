@@ -6,7 +6,7 @@ import {
     PIANO_SETTINGS_LIMITS,
     type PianoSettings,
 } from "@domain/piano/settings";
-import { soundLayerAt, soundLayerIndexOf, soundTypes } from "@domain/piano/soundTypes";
+import { manualVelocityAt, manualVelocityIndexOf, manualVelocityPresets } from "@domain/piano/soundTypes";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { settingsEditor } from "./pianoSettings";
 import { ParticleSettingsPage } from "./particleSettingsUI";
@@ -39,10 +39,10 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
 
     const volume = field("volume", ui.number(settings.volume));
     const timbre = field("timbre", ui.number(settings.timbre));
-    const soundLayer = ui.number(soundLayerIndexOf(settings.soundLayer));
-    ui.onChange(soundLayer, (index) => {
-        const layer = soundLayerAt(index);
-        if (layer) apply({ soundLayer: layer });
+    const manualVelocity = ui.number(manualVelocityIndexOf(settings.manualVelocity));
+    ui.onChange(manualVelocity, (index) => {
+        const velocity = manualVelocityAt(index);
+        if (velocity) apply({ manualVelocity: velocity });
     });
 
     const spatialAudio = ui.boolean(settings.soundMode === "3d");
@@ -54,7 +54,7 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
         AVAILABLE_PIANO_TIMBRES.map(({ label, value, description }) => ({ label, value, description })));
     ui.slider("钢琴音量（%）", volume, ...PIANO_SETTINGS_LIMITS.volume, { step: 1 });
     ui.toggle("3D 定位", spatialAudio, { description: "开：有方位与距离衰减。" });
-    ui.dropdown("手动弹奏音长", soundLayer, soundTypes.map(({ name }, value) => ({ label: name, value })));
+    ui.dropdown("手动弹奏力度", manualVelocity, manualVelocityPresets.map(({ name }, value) => ({ label: name, value })));
 
     ui.divider();
     ui.button("粒子设置", () => ui.push(ParticleSettingsPage, { piano }));

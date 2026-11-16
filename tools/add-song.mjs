@@ -84,7 +84,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         status = "新增";
         added++;
     }
-    const pbe2 = encodePbe2(song);
+    const pbe2 = encodePbe2(song, { includeVelocity: true });
     fs.writeFileSync(path.join(libDir, `${song.id}.bin`), pbe2);
     fs.writeFileSync(path.join(jsDir, `${song.id}.js`), pbe2ToAddonModule(pbe2), "utf-8");
     console.log(`  [${status}] ${song.name} (${song.id})`);

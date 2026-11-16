@@ -87,7 +87,7 @@ for (const meta of index) {
         skipped++;
     } else {
         const song = decodeLegacyV1(bytes);
-        pbe2 = encodePbe2(song);
+        pbe2 = encodePbe2(song, { includeVelocity: true });
         fs.writeFileSync(binPath, pbe2);
         meta.noteCount = collectNoteCount(song);
         migrated++;

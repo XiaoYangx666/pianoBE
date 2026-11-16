@@ -2,12 +2,12 @@ import { NativeTextSurface, textRotationForHeading } from "@begame/tabletop/mine
 import { hostScope, textPort } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
-import { type Entity, Vector3, system } from "@minecraft/server";
+import { type Entity, type SoundInstance, Vector3, system } from "@minecraft/server";
 import { grandDefinition } from "@domain/instrument/definition";
 import { inspectInstrument, instrumentCenter, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
-import { pianoSoundId, getSoundLayerByDuration, formatBytes, type MusicRef, type SongHandle, type PianoSoundLayer } from "@piano/core";
+import { pianoSoundId, velocityLayerIndex, velocityVolume, formatBytes, type MusicRef, type SongHandle } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
@@ -16,7 +16,7 @@ import { PianoDisplay, readCardFromDisplay, recoverScoreStand, removeScoreStand,
 import { digitalPianoHitModel, grandPianoHitModel, pianoModelOffset } from "@domain/geometry/keyRay";
 import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@domain/piano/settings";
 import { AVAILABLE_SCORES, scoreIndexOf, scorePages } from "@domain/score/score";
-import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL } from "@app/pianoConfig";
+import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL, NOTE_RELEASE_SECONDS } from "@app/pianoConfig";
 import { PianoMusic } from "@app/music/pianoMusic";
 import { DynamicPropertyKv } from "@platform/storage/dynamicKv";
 import { DynamicMusicStorage, PIANO_STORAGE_PREFIX } from "@platform/storage/musicStorage";
@@ -24,6 +24,7 @@ import { CardSlot } from "@platform/storage/cardSlot";
 import { CardAccess } from "@platform/storage/cardItem";
 import { currentPbeSettings } from "@platform/storage/settingsProvider";
 import type { MusicStorage } from "@domain/music/storage";
+import { SoundReleaseQueue } from "@domain/playback/soundRelease";
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -77,6 +78,7 @@ export class PianoRuntime {
     private cardSlotBinding?: { entityId: string; slot: CardSlot };
     /** 钢琴内置 + 存储卡的统一读取入口（每架钢琴一个，缓存按内容指纹隔离）。 */
     readonly music = new PianoMusic(() => this.storage, () => this.cardStorage);
+    private readonly soundReleases = new SoundReleaseQueue(NOTE_RELEASE_SECONDS);
     lastNearby = system.currentTick;
 
     constructor(readonly location: InstrumentLocation, private activate: () => void) {
@@ -268,8 +270,9 @@ export class PianoRuntime {
         return this.midi ??= new MidiPlayer(
             { acquire: (ref: MusicRef) => this.music.acquire(ref) },
             {
-                note: (note, duration) => this.playNote(note, getSoundLayerByDuration(duration), duration),
+                note: (note, duration, velocity) => this.playNote(note, velocity, duration),
                 playing: value => {
+                    if (!value) this.soundReleases.stopAll();
                     if (value) this.activate();
                     this.checkpoint();
                     this.refreshText();
@@ -278,8 +281,9 @@ export class PianoRuntime {
         );
     }
 
-    playKey(midi: number, layer: PianoSoundLayer = "short") {
-        this.playNote(processNote(midi, false), layer, .15);
+    /** 手动敲键：默认中等力度，可由玩家设置覆盖。 */
+    playKey(midi: number, velocity: number = DEFAULT_PIANO_SETTINGS.manualVelocity) {
+        this.playNote(processNote(midi, false), velocity, .15);
     }
 
     turnScore(spread: 0 | 1) {
@@ -298,15 +302,24 @@ export class PianoRuntime {
         return this.display?.isKeyDown(midi) ?? false;
     }
 
-    playNote(note: NoteInfo, layer: PianoSoundLayer, duration: number) {
+    playNote(note: NoteInfo, velocity: number, duration: number) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
         const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
         const settings = this.settings ?? DEFAULT_PIANO_SETTINGS;
-        // 100% → 1.0（正常响度）；200% → 2.0，采样峰值已限制在 -6 dB，正好不削波。
-        const volume = settings.volume / 100;
+        // 100% → 1.0（正常响度）；再乘力度音量倍数。采样峰值已限制在 -6 dB。
+        const volume = (settings.volume / 100) * velocityVolume(velocity);
         const stereo = settings.soundMode !== "3d";
-        if (volume > 0) dimension.playSound(`${pianoSoundId(settings.timbre, layer, stereo)}.${note.sample}`, this.center, { pitch: note.pitch, volume });
+        if (volume > 0) {
+            const layer = velocityLayerIndex(velocity, settings.timbre);
+            const instance: SoundInstance | undefined = dimension.playSound(
+                `${pianoSoundId(settings.timbre, layer, stereo)}.${note.sample}`,
+                this.center,
+                { pitch: note.pitch, volume: Math.min(10, volume) }
+            );
+            // Note Off 后统一淡出；不再依赖采样自身的尾音。
+            if (instance) this.soundReleases.add(instance, note.midi, duration, system.currentTick);
+        }
         this.display?.strike(note.midi, duration);
         this.noteSignal.publish({ midi: note.midi, duration });
         this.activate();
@@ -355,11 +368,15 @@ export class PianoRuntime {
 
     tick(tick: number, now: number) {
         this.tickSignal.publish(tick);
+        this.soundReleases.update(tick);
         this.midi?.tick(now);
         const playing = this.midi?.isPlaying() === true;
-        if (!this.display?.entity.isValid) return playing;
+        // 释放队列里还有实例时必须继续 tick，否则淡出后的 stop() 永远不会执行，
+        // 手动敲键的最后一个实例会一直留在队列里。
+        const sounding = this.soundReleases.size > 0;
+        if (!this.display?.entity.isValid) return playing || sounding;
         this.display.setLight(playing);
-        return this.display.tick(tick) || playing;
+        return this.display.tick(tick) || playing || sounding;
     }
 
     holdPlaybackClock(now: number) { this.midi?.holdClock(now); }
@@ -375,6 +392,7 @@ export class PianoRuntime {
     dispose(removeVisual: boolean) {
         if (this.disposed) return;
         this.disposed = true;
+        this.soundReleases.stopAll();
         for (const cleanup of [...this.disposeCleanups]) {
             try { cleanup(); } catch (error) { console.warn("[piano] 运行时清理回调失败", error); }
         }
@@ -417,7 +435,7 @@ export class PianoRuntime {
         const usage = this.storage?.usage();
         const card = this.cardSlot?.occupied ? "inserted" : "empty";
         return `[${info?.state ?? "ready"}] ${instrumentKey(dimension, pos)} ${info?.midiName ?? ""} ` +
-            `store=${usage?.songs ?? 0}/${formatBytes(usage?.usedBytes ?? 0)} card=${card} ` +
+            `store=${usage?.songs ?? 0}/${formatBytes(usage?.usedBytes ?? 0)} card=${card} snd=${this.soundReleases.size} ` +
             `scope(s=${stats.scopes} sub=${stats.subscriptions} t=${stats.timers} j=${stats.jobs} d=${stats.disposables} pending=${this.scope.pending})`;
     }
 }

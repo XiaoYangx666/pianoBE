@@ -8,7 +8,7 @@ import type { PlaybackRecord } from "@domain/playback/playbackRecord";
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
 
 interface MidiOutput {
-    note(note: NoteInfo, duration: number): void;
+    note(note: NoteInfo, duration: number, velocity: number): void;
     playing(value: boolean): void;
 }
 
@@ -251,7 +251,7 @@ export class MidiPlayer {
             if (time > ticks || time === Infinity) break;
             const note = cursor.next();
             if (!note) break;
-            this.playNote(processNote(note.midi, false), note.duration / OTHER_SCALE);
+            this.playNote(processNote(note.midi, false), note.duration / OTHER_SCALE, note.velocity);
         }
     }
 
@@ -289,8 +289,8 @@ export class MidiPlayer {
         song?.release();
     }
 
-    private playNote(info: NoteInfo, duration: number) {
-        this.output.note(info, duration);
+    private playNote(info: NoteInfo, duration: number, velocity: number) {
+        this.output.note(info, duration, velocity);
     }
 
     /* ================== 状态判断 ================== */

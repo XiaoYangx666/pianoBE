@@ -25,7 +25,7 @@ import { midiBufferToSong } from "@piano/core/convert";
         new Uint8Array(fs.readFileSync("midis/files/Beyond - 海阔天空.mid")),
         "Beyond - 海阔天空"
     );
-    const pbe2 = encodePbe2(song);
+    const pbe2 = encodePbe2(song, { includeVelocity: true });
     const header = readPbe2Header(pbe2);
     assert.equal(header.id, song.id);
     assert.equal(header.noteCount, song.tracks.reduce((s, t) => s + t.notes.length / 4, 0));

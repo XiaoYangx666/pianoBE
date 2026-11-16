@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeAddonArchiveFile } from "@bepack/addon/node";
-import { PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
+import { PIANO_SAMPLE_KEYS, PIANO_TIMBRES, pianoSoundLayers, pianoSoundId } from "@piano/core";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const soundsRoot = path.resolve(here, "../../addon/rp/sounds");
@@ -18,8 +18,9 @@ let totalBytes = 0;
 let optionalCount = 0;
 
 for (const timbre of PIANO_TIMBRES) {
+    const layers = pianoSoundLayers(timbre.value);
     const dirs = Object.fromEntries(
-        PIANO_SOUND_LAYERS.map((layer) => [layer, pianoSoundId(timbre.value, layer)])
+        layers.map((layer) => [`v${layer + 1}`, pianoSoundId(timbre.value, layer)])
     );
     const bundled = timbre.id === "piano";
     const entry = {
@@ -31,7 +32,7 @@ for (const timbre of PIANO_TIMBRES) {
         bundled,
         dirs,
         notes: PIANO_SAMPLE_KEYS,
-        layers: PIANO_SOUND_LAYERS,
+        layers: layers.map((layer) => `v${layer + 1}`),
         size: 0,
         file: null,
     };
@@ -44,8 +45,8 @@ for (const timbre of PIANO_TIMBRES) {
     const entries = [];
     const definitions = {};
     const encoder = new TextEncoder();
-    for (const layer of PIANO_SOUND_LAYERS) {
-        const dir = dirs[layer];
+    for (const layer of layers) {
+        const dir = dirs[`v${layer + 1}`];
         const stereoDir = pianoSoundId(timbre.value, layer, true);
         for (const note of PIANO_SAMPLE_KEYS) {
             const file = path.join(soundsRoot, dir, `${note}.ogg`);
@@ -82,7 +83,7 @@ for (const timbre of PIANO_TIMBRES) {
                 id: timbre.id,
                 dirs,
                 notes: PIANO_SAMPLE_KEYS,
-                layers: PIANO_SOUND_LAYERS,
+                layers: layers.map((layer) => `v${layer + 1}`),
             })
         ),
     });

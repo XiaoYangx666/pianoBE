@@ -1,7 +1,7 @@
-import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES, type PianoSoundLayer } from "@piano/core";
+import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES } from "@piano/core";
 import { DEFAULT_SCORE_ID, isValidScoreId } from "@domain/score/score";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
-import { isSoundLayer, soundLayerAt } from "./soundTypes";
+import { DEFAULT_MANUAL_VELOCITY, isManualVelocity } from "./soundTypes";
 
 /** 按启用列表过滤音色；空列表回退到默认音色，保证设置里至少有一个选项。 */
 export function availablePianoTimbres(enabled: readonly string[]) {
@@ -44,7 +44,8 @@ export const DEFAULT_PIANO_SETTINGS = {
     particlePalette: 0,
     volume: 100,
     timbre: DEFAULT_PIANO_TIMBRE as number,
-    soundLayer: "standard" as PianoSoundLayer,
+    /** 手动敲键力度（1~127）；谱面播放使用 MIDI 自带力度。 */
+    manualVelocity: DEFAULT_MANUAL_VELOCITY as number,
     /** stereo = 立体声（无 3D 定位）；3d = 有距离衰减/定位（单声道） */
     soundMode: "stereo" as PianoSoundMode,
     textVisible: true,
@@ -75,10 +76,15 @@ export function normalizePianoColor(value: unknown) {
     return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toUpperCase()}` : undefined;
 }
 
-/** 音长存稳定字符串；兼容早期版本存的下标。 */
-function normalizeSoundLayer(value: unknown): PianoSoundLayer | undefined {
-    if (isSoundLayer(value)) return value;
-    return typeof value === "number" ? soundLayerAt(value) : undefined;
+/** 手动力度：优先读新字段，旧存档的 soundLayer 按 短/标准/长 迁移到 轻/标准/强。 */
+function normalizeManualVelocity(saved: Record<string, unknown>, fallback: number): number {
+    const value = saved.manualVelocity;
+    if (isManualVelocity(value)) return value;
+    const legacy = saved.soundLayer;
+    if (legacy === "short") return 64;
+    if (legacy === "standard") return 96;
+    if (legacy === "long") return 116;
+    return fallback;
 }
 
 /** 声音模式只接受两个稳定字符串；旧存档缺字段时回退到默认立体声。 */
@@ -120,7 +126,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         volume: number("volume"),
         timbre: AVAILABLE_PIANO_TIMBRES.find(timbre => timbre.value === saved.timbre)?.value
             ?? defaults.timbre,
-        soundLayer: normalizeSoundLayer(saved.soundLayer) ?? defaults.soundLayer,
+        manualVelocity: normalizeManualVelocity(saved, defaults.manualVelocity),
         soundMode: normalizeSoundMode(saved.soundMode) ?? defaults.soundMode,
         textVisible: typeof saved.textVisible === "boolean" ? saved.textVisible : defaults.textVisible,
         titleColor: normalizePianoColor(saved.titleColor) ?? defaults.titleColor,

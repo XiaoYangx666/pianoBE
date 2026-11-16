@@ -1,5 +1,5 @@
 import {
-    getSoundLayerByDuration,
+    velocityLayerIndex,
     pianoSoundId,
     processNote,
 } from "@piano/core/note";
@@ -215,7 +215,10 @@ export class LabAudioEngine {
                 layerIndex,
             };
         }
-        const dir = pianoSoundId(0, getSoundLayerByDuration(note.duration));
+        const layer = config.velocityMode === "single"
+            ? 1
+            : velocityLayerIndex(Math.max(1, Math.round(note.velocity * 127)), 0);
+        const dir = pianoSoundId(0, layer);
         return {
             note,
             url: fluidr3SampleUrl(dir, info.sample),

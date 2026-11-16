@@ -4,7 +4,7 @@ import { SCORE_RESOURCE_PACK_ID } from "@data/scorePack";
 import { AVAILABLE_SCORES, scoreAt } from "@domain/score/score";
 import { NoteInfo } from "@domain/types";
 import { processNote } from "@domain/util/note";
-import { soundTypes, FOLLOW_PIANO_LAYER } from "@domain/piano/soundTypes";
+import { manualVelocityPresets, FOLLOW_PIANO_VELOCITY } from "@domain/piano/soundTypes";
 import { keyMaps } from "@domain/piano/keymap";
 import { PIANO_LAYOUT } from "@domain/piano/layout";
 import type { PianoState, PianoView } from "./pianoState";
@@ -25,7 +25,7 @@ export function switchComMode(state: PianoState, p: Player) {
 /** 面板里的音长按钮：跟随钢琴 → 长音 → 标准音 → 短音 → 跟随钢琴 */
 export function switchSoundType(state: PianoState, p: Player) {
     const next = state.sound.getData() + 1;
-    const idx = next >= soundTypes.length ? FOLLOW_PIANO_LAYER : next;
+    const idx = next >= manualVelocityPresets.length ? FOLLOW_PIANO_VELOCITY : next;
     state.sound.setData(idx);
     p.setDynamicProperty("piano:sound", idx);
 }
@@ -99,7 +99,7 @@ export function updatePianoUI(
     view.write(view.modeLabel, state.mode.getData() ? "模式: 单音模式" : "模式: 连音模式");
     view.write(
         view.soundLabel,
-        sound < 0 ? "音长: 跟随钢琴" : `音长: ${soundTypes[sound]?.name ?? soundTypes[0].name}`
+        sound < 0 ? "力度: 跟随钢琴" : `力度: ${manualVelocityPresets[sound]?.name ?? manualVelocityPresets[0].name}`
     );
 
     if (last) {

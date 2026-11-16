@@ -35,7 +35,7 @@ SR = 48000
 NOTE_ORDER = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
 MIDI_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 BASE_INDEXES = [0, 3, 6, 9]
-STANDARD = {"duration": 2.0, "fadeStart": 1.4, "fade": 0.6}
+STANDARD = {"duration": 4.0, "fadeStart": 3.5, "fade": 0.5}
 TIMBRE_LABELS = {
     "piano": "标准钢琴",
     "classic_grand": "经典三角",
@@ -43,9 +43,6 @@ TIMBRE_LABELS = {
     "upright": "原声立式",
     "electric_piano": "复古电钢",
 }
-# 构建目录：默认音色沿用历史目录名 piano，其余与 id 相同。
-TIMBRE_DIRS = {timbre_id: ("piano" if index == 0 else timbre_id)
-               for index, timbre_id in enumerate(TIMBRE_LABELS)}
 
 # 同一段试听：音阶 → 和弦 → 低音 → 高音
 DEMO = [
@@ -230,12 +227,12 @@ def clean_outputs():
             os.remove(os.path.join(OUT_DIR, name))
 
 
-def measure_curve(rows, timbre_id, temp_dir):
+def measure_curve(rows, dir_name, temp_dir):
     """构建结果与源采样的逐键宽带 RMS（变调不改变 RMS；避免 Vorbis 噪声影响 LUFS 门限）。"""
     built_curve, source_curve, gains = [], [], []
     for note in sorted(rows, key=midi_of):
         row = rows[note]
-        built = f"{SOUNDS}/{TIMBRE_DIRS[timbre_id]}/{note}.ogg"
+        built = f"{SOUNDS}/{dir_name}/{note}.ogg"
         reference = reference_note(row, temp_dir) if row.get("transpose") else row["file"]
         source_curve.append(rms_db(decode(reference, 1.2)))
         built_curve.append(rms_db(decode(built, 1.2)))
@@ -244,14 +241,14 @@ def measure_curve(rows, timbre_id, temp_dir):
     return deviation, float(np.corrcoef(built_curve, source_curve)[0, 1])
 
 
-def measure_attack_stereo(rows, timbre_id, temp_dir):
+def measure_attack_stereo(rows, dir_name, temp_dir):
     """同一变调链下，构建结果与 0 dB 参考的差异应只剩下增益。"""
     attack_deviation = 0.0
     stereo_deviation = 0.0
     for note in ("A2", "C4", "A4", "C6"):
         row = rows[note]
         reference = reference_note(row, temp_dir)
-        built_audio = decode(f"{SOUNDS}/{TIMBRE_DIRS[timbre_id]}/{note}.ogg")
+        built_audio = decode(f"{SOUNDS}/{dir_name}/{note}.ogg")
         reference_audio = decode(reference)
         built_peak = db(np.max(np.abs(built_audio[: int(0.03 * SR)])))
         reference_peak = db(np.max(np.abs(reference_audio[: int(0.03 * SR)])))
@@ -296,7 +293,7 @@ def main():
         "",
         f"- 校准数据：`{os.path.relpath(CALIBRATION, ROOT)}`",
         f"- 试听：`{os.path.relpath(OUT_DIR, ROOT)}/`（每套音色 `-A` 校准版 / `-B` 原始版，同一段 `demo.mid`）",
-        "- 分析窗口 1.2s（避开 standard 档 1.4s 起淡出）；A/B 均为 standard 档（2s，1.4s 起 0.6s 淡出）",
+        "- 分析窗口 1.2s（音头 + 早期延音）；A/B 均为单档长音（4s，3.5s 起 0.5s 淡出）",
         "",
         "## 指标",
         "",
@@ -306,10 +303,16 @@ def main():
 
     for timbre in calibration["timbres"]:
         timbre_id = timbre["timbreId"]
-        rows = {row["note"]: row for row in timbre["rows"]}
+        reference_layer = timbre.get("referenceLayer", 0)
+        rows = {
+            row["note"]: row
+            for row in timbre["rows"]
+            if row["layer"] == reference_layer
+        }
+        dir_name = f"{timbre_id}_v{reference_layer + 1}"
         gains = {note: row["gain"] for note, row in rows.items()}
-        deviation, correlation = measure_curve(rows, timbre_id, temp_dir)
-        attack_deviation, stereo_deviation = measure_attack_stereo(rows, timbre_id, temp_dir)
+        deviation, correlation = measure_curve(rows, dir_name, temp_dir)
+        attack_deviation, stereo_deviation = measure_attack_stereo(rows, dir_name, temp_dir)
         peak_a = render_ab(rows, gains, timbre_id)
         dense = render(rows, DENSE, gains)
         corrected = sum(1 for row in timbre["rows"] if abs(row["correction"]) > 0.05)
@@ -323,7 +326,7 @@ def main():
         "",
         "## 说明",
         "",
-        "- 曲线最大偏差：standard 档 1.2s 宽带 RMS 与「源 RMS + 校准增益」的最大差（Vorbis 编码约 0.2–0.3 dB）。",
+        "- 曲线最大偏差：参考层 1.2s 宽带 RMS 与「源 RMS + 校准增益」的最大差（Vorbis 编码约 0.2–0.3 dB）。",
         "- 曲线相关：校准后 RMS 曲线与原始 RMS 曲线的相关系数，越接近 1 说明自然音区走势保留得越好。",
         "- 音头最大偏差：源与构建结果前 30ms 峰值差减去增益后的残差，应为 0（增益是纯线性缩放）。",
         "- 立体声最大偏差：源与构建结果的侧/中比之差，应为 0（左右声道等量缩放）。",

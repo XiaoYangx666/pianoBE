@@ -7,7 +7,7 @@
         "packages/*"
     ],
     "overrides": {
-        "@minecraft/server": "2.10.0",
+        "@minecraft/server": "2.11.0",
         "@minecraft/server-ui": "2.2.0",
         "@minecraft/server-net": "1.0.0-beta.1.26.50-stable",
         "@minecraft/server-admin": "1.0.0-beta.1.26.50-stable"
@@ -44,11 +44,12 @@
         "audio-lab:assets": "node tools/build-audio-lab-assets.mjs",
         "audio-lab:render": "node tools/audio-lab-render.mjs",
         "audio-lab:report": "python tools/audio-lab-analyze.py",
+        "analyze:voices": "node tools/analyze-voice-load.mjs",
         "vendor:tabletop": "node tools/pack-tabletop.mjs",
         "vendor:sapipro": "node tools/sync-sapipro.mjs"
     },
     "devDependencies": {
-        "@minecraft/server": "2.10.0",
+        "@minecraft/server": "2.11.0",
         "@minecraft/server-ui": "2.2.0",
         "typescript": "^5.5.0"
     },

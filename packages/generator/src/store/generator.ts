@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import {
     PIANO_SAMPLE_KEYS,
-    PIANO_SOUND_LAYERS,
     PIANO_TIMBRES,
+    pianoSoundLayers,
     pianoSoundId,
     planImportChunks,
 } from "@piano/core";
@@ -40,21 +40,24 @@ function notifyError(title: string, error: unknown, fallback = "请稍后重试"
 
 /** 音色清单加载失败时的兜底：只有默认音色可直接使用，但仍知道可选目录以便裁剪旧模板。 */
 function fallbackTimbreIndex(): TimbreIndexEntry[] {
-    return PIANO_TIMBRES.map((timbre) => ({
-        id: timbre.id,
-        value: timbre.value,
-        label: timbre.label,
-        description: timbre.description,
-        required: timbre.id === "piano",
-        bundled: timbre.id === "piano",
-        dirs: Object.fromEntries(
-            PIANO_SOUND_LAYERS.map((layer) => [layer, pianoSoundId(timbre.value, layer)])
-        ),
-        notes: [...PIANO_SAMPLE_KEYS],
-        layers: [...PIANO_SOUND_LAYERS],
-        size: 0,
-        file: null,
-    }));
+    return PIANO_TIMBRES.map((timbre) => {
+        const layers = pianoSoundLayers(timbre.value);
+        return {
+            id: timbre.id,
+            value: timbre.value,
+            label: timbre.label,
+            description: timbre.description,
+            required: timbre.id === "piano",
+            bundled: timbre.id === "piano",
+            dirs: Object.fromEntries(
+                layers.map((layer) => [`v${layer + 1}`, pianoSoundId(timbre.value, layer)])
+            ),
+            notes: [...PIANO_SAMPLE_KEYS],
+            layers: layers.map((layer) => `v${layer + 1}`),
+            size: 0,
+            file: null,
+        };
+    });
 }
 
 function bytesToMB(bytes: number) {

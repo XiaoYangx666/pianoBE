@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
 import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, readPianoSettings } from "../src/domain/piano/settings";
 import { AVAILABLE_SCORES, DEFAULT_SCORE_ID } from "../src/domain/score/score";
-import { FOLLOW_PIANO_LAYER, resolveSoundLayer, soundLayerAt, soundLayerIndexOf, soundTypes } from "../src/domain/piano/soundTypes";
+import { DEFAULT_MANUAL_VELOCITY, FOLLOW_PIANO_VELOCITY, manualVelocityAt, manualVelocityIndexOf, manualVelocityPresets, resolveManualVelocity } from "../src/domain/piano/soundTypes";
 
 test("old pianos start with the score off and the former peach selection becomes sakura", () => {
     const old = readPianoSettings('{"particleStyle":5}');
@@ -83,44 +83,47 @@ describe("piano sound mode settings", () => {
     });
 });
 
-describe("piano sound layer settings", () => {
-    test("默认音长是标准音", () => {
-        expect(DEFAULT_PIANO_SETTINGS.soundLayer).toBe("standard");
+describe("piano manual velocity settings", () => {
+    test("默认手动力度是标准力度", () => {
+        expect(DEFAULT_PIANO_SETTINGS.manualVelocity).toBe(DEFAULT_MANUAL_VELOCITY);
     });
 
-    test("合法音长字符串原样保留", () => {
-        for (const { layer } of soundTypes) {
-            expect(normalizePianoSettings({ soundLayer: layer }).soundLayer).toBe(layer);
+    test("合法力度原样保留", () => {
+        for (const { velocity } of manualVelocityPresets) {
+            expect(normalizePianoSettings({ manualVelocity: velocity }).manualVelocity).toBe(velocity);
         }
     });
 
-    test("旧版存的下标迁移成音长字符串", () => {
-        expect(normalizePianoSettings({ soundLayer: 0 }).soundLayer).toBe("long");
-        expect(normalizePianoSettings({ soundLayer: 2 }).soundLayer).toBe("short");
+    test("旧版音长档位迁移成力度", () => {
+        expect(normalizePianoSettings({ soundLayer: "short" }).manualVelocity).toBe(64);
+        expect(normalizePianoSettings({ soundLayer: "standard" }).manualVelocity).toBe(96);
+        expect(normalizePianoSettings({ soundLayer: "long" }).manualVelocity).toBe(116);
     });
 
-    test("非法音长回退默认值", () => {
-        expect(normalizePianoSettings({ soundLayer: "bass" }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
-        expect(normalizePianoSettings({ soundLayer: 9 }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
-        expect(normalizePianoSettings({ soundLayer: null }).soundLayer).toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
+    test("非法力度回退默认值", () => {
+        expect(normalizePianoSettings({ manualVelocity: -3 }).manualVelocity).toBe(DEFAULT_MANUAL_VELOCITY);
+        expect(normalizePianoSettings({ manualVelocity: 300 }).manualVelocity).toBe(DEFAULT_MANUAL_VELOCITY);
+        expect(normalizePianoSettings({ manualVelocity: null }).manualVelocity).toBe(DEFAULT_MANUAL_VELOCITY);
+        expect(normalizePianoSettings({ soundLayer: "bass" }).manualVelocity).toBe(DEFAULT_MANUAL_VELOCITY);
+        expect(normalizePianoSettings({ soundLayer: 9 }).manualVelocity).toBe(DEFAULT_MANUAL_VELOCITY);
     });
 
-    test("旧版设置没有 soundLayer 时平滑迁移", () => {
-        expect(readPianoSettings(JSON.stringify({ volume: 80 })).soundLayer)
-            .toBe(DEFAULT_PIANO_SETTINGS.soundLayer);
+    test("旧版设置没有力度字段时平滑迁移", () => {
+        expect(readPianoSettings(JSON.stringify({ volume: 80 })).manualVelocity)
+            .toBe(DEFAULT_MANUAL_VELOCITY);
     });
 
-    test("音长下标与设置值可以互转", () => {
-        for (const [index, { layer }] of soundTypes.entries()) {
-            expect(soundLayerAt(index)).toBe(layer);
-            expect(soundLayerIndexOf(layer)).toBe(index);
+    test("力度下标与设置值可以互转", () => {
+        for (const [index, { velocity }] of manualVelocityPresets.entries()) {
+            expect(manualVelocityAt(index)).toBe(velocity);
+            expect(manualVelocityIndexOf(velocity)).toBe(index);
         }
     });
 
     test("玩家覆盖优先，跟随钢琴时用钢琴设置", () => {
-        expect(resolveSoundLayer(2, "long")).toBe("short");
-        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, "long")).toBe("long");
-        expect(resolveSoundLayer(FOLLOW_PIANO_LAYER, "standard")).toBe("standard");
-        expect(resolveSoundLayer(99, "short")).toBe("short");
+        expect(resolveManualVelocity(2, 116)).toBe(manualVelocityPresets[2].velocity);
+        expect(resolveManualVelocity(FOLLOW_PIANO_VELOCITY, 116)).toBe(116);
+        expect(resolveManualVelocity(FOLLOW_PIANO_VELOCITY, 96)).toBe(96);
+        expect(resolveManualVelocity(99, 64)).toBe(64);
     });
 });

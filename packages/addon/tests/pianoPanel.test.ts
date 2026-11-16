@@ -91,12 +91,12 @@ const { openPiano, PianoPanelPage } = await import("../src/app/ui/piano");
 const { PianoSettingsPage } = await import("../src/app/ui/settingsUI");
 const { MidiPlayerPage } = await import("../src/app/ui/midi/playerUI");
 
-type PlayedNote = { midi: number; layer: unknown; duration: number };
+type PlayedNote = { midi: number; velocity: unknown; duration: number };
 
 function makePiano() {
     const played: PlayedNote[] = [];
     const piano: any = {
-        settings: { soundLayer: "standard", scoreId: undefined, scoreMounted: false },
+        settings: { manualVelocity: 96, scoreId: undefined, scoreMounted: false },
         hasScreen: true,
         location: { dimension: { id: "overworld" } },
         center: { x: 0, y: 0, z: 0 },
@@ -105,8 +105,8 @@ function makePiano() {
         disposedSignal: new Signal(),
         isAlive: () => true,
         verify: () => "complete",
-        playNote: (note: any, layer: unknown, duration: number) => {
-            played.push({ midi: note.midi, layer, duration });
+        playNote: (note: any, velocity: unknown, duration: number) => {
+            played.push({ midi: note.midi, velocity, duration });
         },
         getMidiPlayer: () => ({ isAlive: () => false }),
         played,

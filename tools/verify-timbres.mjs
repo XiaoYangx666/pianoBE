@@ -47,7 +47,11 @@ async function build(selected, enabledIds) {
 }
 
 function hasDir(addon, dir) {
-    return addon.entries().some((file) => file.path.includes(`/sounds/${dir}/`));
+    return addon.entries().some((file) => file.path.includes(`/sounds/${dir}`));
+}
+function expectedDefinitionCount(ids) {
+    const byId = new Map(index.map((entry) => [entry.id, entry]));
+    return ids.reduce((sum, id) => sum + (byId.get(id)?.layers.length ?? 0) * 30 * 2, 0);
 }
 function parseDefinitions(addon) {
     const definitionsPath = `${addon.packs.rp.root}sounds/sound_definitions.json`;
@@ -68,7 +72,7 @@ assert(!hasDir(onlyDefault, "bright_grand"), "仅默认：不包含 Bright Grand
 assert(!hasDir(onlyDefault, "upright"), "仅默认：不包含 Upright 采样");
 assert(!hasDir(onlyDefault, "electric_piano"), "仅默认：不包含 Electric Piano 采样");
 const defaultDefs = parseDefinitions(onlyDefault);
-assert(Object.keys(defaultDefs).length === 180, `仅默认：有效定义 180 条（实际 ${Object.keys(defaultDefs).length}）`);
+assert(Object.keys(defaultDefs).length === expectedDefinitionCount(["piano"]), `仅默认：有效定义条数正确（实际 ${Object.keys(defaultDefs).length}）`);
 assert(
     onlyDefault.readTextSync(TIMBRES_MODULE).includes('["piano"]'),
     "仅默认：timbres.js 只启用钢琴"
@@ -79,7 +83,7 @@ assert(hasDir(withClassic, "classic_grand"), "默认 + 经典三角：包含 Cla
 assert(!hasDir(withClassic, "upright"), "默认 + 经典三角：不包含 Upright 采样");
 assert(!hasDir(withClassic, "electric_piano"), "默认 + 经典三角：不包含 Electric Piano 采样");
 const classicDefs = parseDefinitions(withClassic);
-assert(Object.keys(classicDefs).length === 360, `默认 + 经典三角：有效定义 360 条（实际 ${Object.keys(classicDefs).length}）`);
+assert(Object.keys(classicDefs).length === expectedDefinitionCount(["piano", "classic_grand"]), `默认 + 经典三角：有效定义条数正确（实际 ${Object.keys(classicDefs).length}）`);
 assert(
     withClassic.readTextSync(TIMBRES_MODULE).includes('"classic_grand"'),
     "默认 + 经典三角：timbres.js 包含 Classic Grand"
@@ -89,7 +93,7 @@ const allPacks = await Promise.all(optional.map(loadPack));
 const withAll = await build(allPacks, ["piano", ...optional.map((t) => t.id)]);
 assert(optional.every((t) => hasDir(withAll, t.id)), "全选：包含全部可选音色目录");
 const allDefs = parseDefinitions(withAll);
-assert(Object.keys(allDefs).length === 900, `全选：有效定义 900 条（实际 ${Object.keys(allDefs).length}）`);
+assert(Object.keys(allDefs).length === expectedDefinitionCount(["piano", ...optional.map((t) => t.id)]), `全选：有效定义条数正确（实际 ${Object.keys(allDefs).length}）`);
 const allTimbres = withAll.readTextSync(TIMBRES_MODULE);
 assert(optional.every((t) => allTimbres.includes(`"${t.id}"`)), "全选：timbres.js 包含全部音色");
 

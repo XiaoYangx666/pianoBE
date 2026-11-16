@@ -156,7 +156,7 @@ export class SqliteSongPort implements SongPort {
             }
         }
         try {
-            const pbe2 = encodePbe2(song);
+            const pbe2 = encodePbe2(song, { includeVelocity: true });
             this.cachePbe2(id, pbe2);
             return pbe2;
         } catch {

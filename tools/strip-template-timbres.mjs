@@ -7,14 +7,14 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readAddonFile, writeAddonFile } from "@bepack/addon/node";
-import { PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
+import { pianoSoundLayers, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const templatePath = resolve(root, process.argv[2] ?? "packages/addon/dist/template.mcaddon");
 const optional = PIANO_TIMBRES.filter((timbre) => timbre.id !== "piano");
 const optionalDirs = new Set(
     optional.flatMap((timbre) =>
-        PIANO_SOUND_LAYERS.flatMap((layer) => {
+        pianoSoundLayers(timbre.value).flatMap((layer) => {
             const dir = pianoSoundId(timbre.value, layer);
             return [dir, `${dir}_stereo`];
         })

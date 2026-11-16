@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PIANO_SAMPLE_KEYS, PIANO_SOUND_LAYERS, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
+import { PIANO_SAMPLE_KEYS, PIANO_TIMBRES, pianoSoundLayers, pianoSoundId } from "@piano/core";
 
 interface SoundEntry {
     name: string;
@@ -24,7 +24,7 @@ const definitions = JSON.parse(
 function expectedSoundIds() {
     const ids: string[] = [];
     for (const timbre of PIANO_TIMBRES) {
-        for (const layer of PIANO_SOUND_LAYERS) {
+        for (const layer of pianoSoundLayers(timbre.value)) {
             const dir = pianoSoundId(timbre.value, layer);
             const stereoDir = pianoSoundId(timbre.value, layer, true);
             for (const note of PIANO_SAMPLE_KEYS) {
@@ -38,7 +38,7 @@ function expectedSoundIds() {
 describe("piano timbre assets", () => {
     test("每个音色、档位、基础音都有 3D 与立体声音效定义和采样文件", () => {
         for (const timbre of PIANO_TIMBRES) {
-            for (const layer of PIANO_SOUND_LAYERS) {
+            for (const layer of pianoSoundLayers(timbre.value)) {
                 const dir = pianoSoundId(timbre.value, layer);
                 const stereoDir = pianoSoundId(timbre.value, layer, true);
                 for (const note of PIANO_SAMPLE_KEYS) {

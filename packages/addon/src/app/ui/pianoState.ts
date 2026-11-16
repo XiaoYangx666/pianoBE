@@ -1,7 +1,7 @@
 import type { Player } from "@minecraft/server";
 import type { ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import type { DDUIContext, ObservableLike } from "sapi-pro";
-import { FOLLOW_PIANO_LAYER, soundTypes } from "@domain/piano/soundTypes";
+import { FOLLOW_PIANO_VELOCITY, manualVelocityPresets } from "@domain/piano/soundTypes";
 
 /**
  * 单个玩家面板的私有状态。
@@ -45,7 +45,7 @@ export function createPianoState(player: Player, ui: DDUIContext<any>): PianoSta
     const mode = (player.getDynamicProperty("piano:comMode") as boolean) ?? true;
     const storedSound = player.getDynamicProperty("piano:sound");
     const sound =
-        typeof storedSound === "number" && soundTypes[storedSound] ? storedSound : FOLLOW_PIANO_LAYER;
+        typeof storedSound === "number" && manualVelocityPresets[storedSound] ? storedSound : FOLLOW_PIANO_VELOCITY;
     const compact = player.getDynamicProperty("piano:compact") === true;
     const showScore = player.getDynamicProperty("piano:scorePreview") === true;
     const octave = player.getDynamicProperty("piano:octave") === true;
