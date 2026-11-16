@@ -8,6 +8,11 @@ import {
     DEFAULT_PIANO_TIMBRE,
     PIANO_SAMPLE_KEYS,
 } from "./note.js";
+import {
+    NORMALIZE_MAX_GAIN_DB,
+    NORMALIZE_TARGET_DB,
+    computeNormalizationGainDbFromNotes,
+} from "./normalize.js";
 
 /**
  * WebAudio 采样播放引擎（前端播放器共享核心：管理端 web 与独立生成器共用）。
@@ -88,9 +93,10 @@ interface CompLike {
 interface SourceLike {
     buffer: unknown;
     playbackRate: { value: number };
+    onended: (() => void) | null;
     connect(g: unknown): void;
     start(t: number): void;
-    stop(t: number): void;
+    stop(t?: number): void;
 }
 interface BufferLike {
     duration: number;
@@ -116,6 +122,37 @@ function createAudioContext(): CtxLike {
 }
 
 /**
+ * 预览播放器的基础增益。
+ * 游戏内 100% 音量 = 1.0，这里保持对齐；之前是 1.6（+4.1 dB），
+ * 会让网页试听明显比游戏和普通视频更响。
+ */
+const PLAYER_MASTER_GAIN = 1.0;
+
+/** 逐曲响度归一化的目标值（基于音符能量的相对 dB，不是标准 LUFS）。 */
+export { NORMALIZE_MAX_GAIN_DB, NORMALIZE_TARGET_DB } from "./normalize.js";
+
+/**
+ * 估算一首曲子的相对响度并返回归一化增益（dB）。
+ * WebAudio 播放器的 NoteEvent 是秒制、0~1 力度，这里转换成共享模型的 0~127。
+ */
+export function computeNormalizationGainDb(
+    events: readonly NoteEvent[],
+    durationSec: number,
+    targetDb = NORMALIZE_TARGET_DB,
+    maxGainDb = NORMALIZE_MAX_GAIN_DB
+): number {
+    return computeNormalizationGainDbFromNotes(
+        events.map((event) => ({
+            velocity: event.velocity * 127,
+            durationSeconds: event.duration,
+        })),
+        durationSec,
+        targetDb,
+        maxGainDb
+    );
+}
+
+/**
  * 采样播放引擎基类：调度循环 / 音符播放 / 力度包络 / 采样缓存 / 变调兜底。
  * 子类只需提供 sampleSource 与事件来源，再暴露自己的播放入口。
  */
@@ -134,6 +171,8 @@ export abstract class SampledMidiPlayer {
     private lastEmitTime = 0;
     /** seek/重播代数：使 seek 前已排定的异步音符失效 */
     private seekGen = 0;
+    /** 已启动的采样源；seek/stop 时用于立即静音，避免旧音符继续播放 */
+    private activeSources = new Set<SourceLike>();
 
     /** 采样加载器；未设置时不可播放（available = false） */
     sampleSource: SampleSource | null = null;
@@ -142,6 +181,12 @@ export abstract class SampledMidiPlayer {
 
     /** 上一次设置的音量：换曲/换 AudioContext 后沿用 */
     private volumeValue = 1;
+
+    /** 是否启用逐曲响度归一化（默认关闭，由 UI 开关控制）。 */
+    private normalizeLoudnessValue = false;
+    /** 当前曲目的归一化线性增益与 dB 值。 */
+    private songGain = 1;
+    private songGainDb = 0;
 
     private state: PlayerState = {
         status: "idle",
@@ -195,17 +240,18 @@ export abstract class SampledMidiPlayer {
     ): Promise<void> {
         this.stop();
         if (!this.sampleSource) throw new Error("采样源未就绪，无法播放");
+        this.seekGen++;
 
         const ctx = createAudioContext();
         this.ctx = ctx;
         const master = ctx.createGain();
-        master.gain.value = 1.6 * this.volumeValue;
-        // 压缩器：多音符叠加时限幅，防止削波失真，同时整体响度更足
+        master.gain.value = PLAYER_MASTER_GAIN * this.volumeValue;
+        // 轻量限幅：只削掉多音符叠加的峰值，不再用高压缩比把密集段落压得更响。
         const comp = ctx.createDynamicsCompressor();
-        comp.threshold.value = -16;
-        comp.knee.value = 24;
-        comp.ratio.value = 12;
-        comp.attack.value = 0.003;
+        comp.threshold.value = -10;
+        comp.knee.value = 8;
+        comp.ratio.value = 4;
+        comp.attack.value = 0.005;
         comp.release.value = 0.25;
         comp.connect(ctx.destination);
         master.connect(comp);
@@ -223,6 +269,8 @@ export abstract class SampledMidiPlayer {
             duration: durationSec,
             volume: this.volumeValue,
         };
+        this.recomputeSongGain();
+        this.applyMasterGain();
         this.emit();
 
         await ctx.resume();
@@ -260,8 +308,9 @@ export abstract class SampledMidiPlayer {
 
         const t = Math.max(0, Math.min(time, this.state.duration));
         this.state.currentTime = t;
-        // seek 使旧调度失效，防止 seek 前已排定的音符与新的叠加
+        // seek 使旧调度失效，并立即停掉已经发声的采样
         this.seekGen++;
+        this.stopActiveSources();
         // 定位到首个起始时间 >= t 的音符；从 t 继续调度
         this.nextIndex = this.events.findIndex((n) => n.time >= t);
         if (this.nextIndex === -1) this.nextIndex = this.events.length;
@@ -272,6 +321,8 @@ export abstract class SampledMidiPlayer {
 
     stop() {
         this.clearTimer();
+        this.seekGen++;
+        this.stopActiveSources();
         if (this.ctx) {
             this.ctx.close().catch(() => {});
             this.ctx = null;
@@ -279,6 +330,8 @@ export abstract class SampledMidiPlayer {
         }
         this.events = [];
         this.nextIndex = 0;
+        this.songGain = 1;
+        this.songGainDb = 0;
         this.state = {
             status: "idle",
             songId: null,
@@ -302,12 +355,50 @@ export abstract class SampledMidiPlayer {
         return this.volumeValue;
     }
 
+    /** 当前是否启用逐曲响度归一化。 */
+    get normalizeLoudness() {
+        return this.normalizeLoudnessValue;
+    }
+
+    /**
+     * 开关逐曲响度归一化；播放中切换会立即生效，方便 A/B。
+     * 默认关闭，不做任何强制处理。
+     */
+    setNormalizeLoudness(enabled: boolean) {
+        if (this.normalizeLoudnessValue === enabled) return;
+        this.normalizeLoudnessValue = enabled;
+        this.recomputeSongGain();
+        this.applyMasterGain();
+        this.emit();
+    }
+
+    /** 当前曲目的归一化增益（dB，仅用于展示/调试）。 */
+    get normalizationGainDb() {
+        return this.songGainDb;
+    }
+
+    private recomputeSongGain() {
+        if (!this.normalizeLoudnessValue || this.events.length === 0) {
+            this.songGainDb = 0;
+            this.songGain = 1;
+            return;
+        }
+        this.songGainDb = computeNormalizationGainDb(this.events, this.state.duration);
+        this.songGain = 10 ** (this.songGainDb / 20);
+    }
+
+    private applyMasterGain() {
+        if (this.master) {
+            this.master.gain.value = PLAYER_MASTER_GAIN * this.volumeValue * this.songGain;
+        }
+    }
+
     /** 调整音量；立即作用于正在播放的 master gain，并对之后的播放生效。 */
     setVolume(volume: number) {
         const next = Math.max(0, Math.min(1, volume));
         this.volumeValue = next;
         this.state.volume = next;
-        if (this.master) this.master.gain.value = 1.6 * next;
+        this.applyMasterGain();
         this.emit();
     }
 
@@ -390,8 +481,22 @@ export abstract class SampledMidiPlayer {
         }
     }
 
+    /** 立即停止所有已启动的采样源（seek/换曲/停止时调用）。 */
+    private stopActiveSources() {
+        for (const source of this.activeSources) {
+            try {
+                source.stop();
+            } catch {
+                // 已经自然结束
+            }
+        }
+        this.activeSources.clear();
+    }
+
     /** 播放单个音符：core 映射选采样 + 变调（playbackRate），与 addon 一致 */
     private async playNote(ctx: CtxLike, master: GainLike, note: NoteEvent, when: number) {
+        // 必须在任何 await 之前捕获：采样加载完成后才能判断期间是否发生了 seek/换曲。
+        const gen = this.seekGen;
         const info = processNote(note.midi, false);
         const velocity = Math.max(1, Math.round(note.velocity * 127));
         const dir = pianoSoundId(this.timbreValue, velocityLayerIndex(velocity, this.timbreValue));
@@ -404,8 +509,7 @@ export abstract class SampledMidiPlayer {
             buffer = alt.buffer;
             pitch = Math.pow(2, (note.midi - alt.midi) / 12);
         }
-        const gen = this.seekGen;
-        if (gen !== this.seekGen) return; // seek 后旧音符失效
+        if (gen !== this.seekGen) return; // seek/换曲后旧音符失效
         this.playBuffer(ctx, master, buffer, pitch, note.velocity, when, note.duration);
     }
 
@@ -468,6 +572,8 @@ export abstract class SampledMidiPlayer {
         const src = ctx.createBufferSource();
         src.buffer = buffer;
         src.playbackRate.value = pitch;
+        src.onended = () => this.activeSources.delete(src);
+        this.activeSources.add(src);
 
         const gain = ctx.createGain();
         // 力度 → 音量倍数；参考力度 90 为 1，强奏最高约 1.67 倍。

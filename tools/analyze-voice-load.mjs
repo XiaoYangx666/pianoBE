@@ -149,8 +149,8 @@ function simulate(notes, releaseSeconds) {
 
 function loadIndex() {
     const meta = JSON.parse(readFileSync(join(LIBRARY, "index.json"), "utf8"));
-    const files = new Set(readdirSync(LIBRARY).filter((name) => name.endsWith(".bin")));
-    return meta.filter((song) => files.has(`${song.id}.bin`));
+    const files = new Set(readdirSync(LIBRARY).filter((name) => name.endsWith(".pbe2")));
+    return meta.filter((song) => files.has(`${song.id}.pbe2`));
 }
 
 function summarize(releaseSeconds) {
@@ -158,7 +158,7 @@ function summarize(releaseSeconds) {
     const results = [];
     for (const meta of index) {
         try {
-            const notes = loadSong(`${meta.id}.bin`);
+            const notes = loadSong(`${meta.id}.pbe2`);
             const stats = simulate(notes, releaseSeconds);
             results.push({ id: meta.id, name: meta.name, ...stats });
         } catch (error) {

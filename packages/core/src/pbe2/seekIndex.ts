@@ -63,7 +63,8 @@ export class EventCursor {
     constructor(
         private readonly events: Uint8Array,
         private readonly index: readonly SeekIndexEntry[],
-        private readonly hasVelocity = false
+        private readonly hasVelocity = false,
+        private readonly velocityMax = 127
     ) {}
 
     /** 全部事件是否已经取完 */
@@ -109,6 +110,7 @@ export class EventCursor {
             readVarUint(this.events, this.pos, this.out);
             velocity = this.out.value;
             this.pos = this.out.next;
+            if (this.velocityMax !== 127) velocity = Math.round((velocity * 127) / this.velocityMax);
         }
         this.groupCount--;
         this.notesRead++;

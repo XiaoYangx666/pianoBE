@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Piano, Volume2, VolumeX, X } from "lucide-react";
+import { AudioLines, Piano, Volume2, VolumeX, X } from "lucide-react";
 import { Menu } from "../primitives";
 import { PianoKeys } from "../components/PianoKeys";
 
@@ -37,6 +37,11 @@ export interface PlayerExtras {
     timbres?: PlayerTimbre[];
     timbreId?: string;
     onTimbreChange?: (id: string) => void;
+    /** 可选的逐曲响度归一化开关；不传则不显示。 */
+    normalize?: {
+        enabled: boolean;
+        onToggle: (enabled: boolean) => void;
+    };
     /** 额外控件，放在桌面播放条最右侧 */
     extra?: ReactNode;
 }
@@ -315,6 +320,29 @@ function TimbreControl({ extras, compact = false }: { extras?: PlayerExtras; com
     );
 }
 
+/** 逐曲响度归一化开关：默认关闭，由用户决定是否拉平曲目间响度。 */
+function NormalizeControl({ extras }: { extras?: PlayerExtras }) {
+    const normalize = extras?.normalize;
+    if (!normalize) return null;
+    return (
+        <button
+            type="button"
+            aria-pressed={normalize.enabled}
+            title={normalize.enabled ? "逐曲响度归一化：开" : "逐曲响度归一化：关（保持原始动态）"}
+            onClick={() => normalize.onToggle(!normalize.enabled)}
+            className={cx(
+                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-colors",
+                normalize.enabled
+                    ? "border-brand/50 bg-brand/10 text-[color:var(--pb-primary-light)]"
+                    : "border-ore-border text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text"
+            )}
+        >
+            <AudioLines size={14} className="shrink-0" />
+            <span>归一化</span>
+        </button>
+    );
+}
+
 /** 桌面端底部播放条；空闲时不渲染。 */
 export function PlayerBar({ player, extras }: { player: PlayerLike; extras?: PlayerExtras }) {
     const state = usePlayerState(player);
@@ -365,6 +393,7 @@ export function PlayerBar({ player, extras }: { player: PlayerLike; extras?: Pla
 
                 <div className="flex items-center justify-end gap-2 border-l border-ore-divider pl-5">
                     <TimbreControl extras={extras} />
+                    <NormalizeControl extras={extras} />
                     <span className="h-5 w-px bg-ore-divider" />
                     <VolumeControl player={player} state={state} />
                     {extras?.extra}
@@ -486,13 +515,16 @@ export function MiniPlayer({ player, extras }: { player: PlayerLike; extras?: Pl
                                     <div className="justify-self-start">
                                         <StopButton player={player} />
                                     </div>
-                                    <PlayButton player={player} state={state} size="lg" />
-                                    <div className="justify-self-end">
-                                        <TimbreControl extras={extras} compact />
+                                    <div className="justify-self-center">
+                                        <PlayButton player={player} state={state} size="lg" />
                                     </div>
                                 </div>
 
                                 <div className="mt-5 border-t border-ore-divider pt-3">
+                                    <div className="mb-3 flex items-center justify-between gap-2">
+                                        <TimbreControl extras={extras} compact />
+                                        <NormalizeControl extras={extras} />
+                                    </div>
                                     <VolumeControl player={player} state={state} wide />
                                 </div>
                             </div>

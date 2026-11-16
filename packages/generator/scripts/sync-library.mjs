@@ -13,7 +13,7 @@ if (fs.existsSync(srcDir)) {
     fs.cpSync(srcDir, dstDir, { recursive: true });
     const bins = fs
         .readdirSync(dstDir)
-        .filter((f) => f.endsWith(".bin")).length;
+        .filter((f) => f.endsWith(".pbe2")).length;
     const index = JSON.parse(fs.readFileSync(path.join(dstDir, "index.json"), "utf8"));
     const size = fs.readdirSync(dstDir).reduce(
         (s, f) => s + fs.statSync(path.join(dstDir, f)).size,

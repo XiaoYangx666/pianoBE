@@ -138,7 +138,7 @@ function makeMidi() {
                 };
             },
         },
-        { note() {}, playing() {} }
+        { note() {}, playing() {}, stopNotes() {} }
     );
 }
 

@@ -5,7 +5,7 @@
  * - 元信息可不解压直接读取（列表/搜索不触发曲目解码）；
  * - 事件流按时间分组 + VarInt + 差分，紧凑且可增量读取；
  * - 事件流可选用 Raw DEFLATE 二次压缩，加载时只解压一次；
- * - 不兼容旧版曲库二进制（旧 `.bin` 仅作为离线迁移输入）。
+ * - 不兼容旧版曲库二进制（旧 `.bin` 仅作为离线迁移输入；现行曲库统一为 `.pbe2`）。
  */
 
 /** 文件头魔数（ASCII "PBE2"） */
@@ -17,6 +17,11 @@ export const PBE2_VERSION = 1;
 export const PBE2_FLAG_COMPRESSED = 1 << 0;
 /** 事件流包含力度字段（默认播放编码省略） */
 export const PBE2_FLAG_VELOCITY = 1 << 1;
+/**
+ * 力度字段按 MIDI 标准 0~127 编码。
+ * 旧版 PBE2（只有 PBE2_FLAG_VELOCITY）的力度是历史 0~100 编码，读取时按比例换算。
+ */
+export const PBE2_FLAG_VELOCITY_127 = 1 << 2;
 
 /** 头部固定字段之后的内容 */
 export interface Pbe2Header {
@@ -36,6 +41,8 @@ export interface Pbe2Header {
     compressed: boolean;
     /** 事件流是否带力度 */
     hasVelocity: boolean;
+    /** 力度字段的最大值：127（标准）或 100（旧版编码）；无力度字段时恒为 127 */
+    velocityMax: number;
     /** 压缩数据在整份 PBE2 中的起始偏移 */
     eventOffset: number;
     /** 整份 PBE2 字节数 */
@@ -47,7 +54,7 @@ export interface Pbe2Note {
     /** 绝对起始时间（40 tick/秒） */
     time: number;
     midi: number;
-    /** 持续时长（100/秒） */
+    /** 持续时长（100/秒）；已包含延音踏板（CC64）烘焙后的延长 */
     duration: number;
     /** 力度 0~127（未编码时回退为 100） */
     velocity: number;

@@ -64,6 +64,13 @@ describe("piano timbre settings", () => {
         expect(readPianoSettings(JSON.stringify({ volume: 250 })).volume).toBe(200);
         expect(readPianoSettings(JSON.stringify({ volume: 37 })).volume).toBe(37);
     });
+
+    test("响度归一化默认关闭，布尔值可持久化", () => {
+        expect(DEFAULT_PIANO_SETTINGS.normalizeLoudness).toBe(false);
+        expect(readPianoSettings(JSON.stringify({ normalizeLoudness: true })).normalizeLoudness).toBe(true);
+        expect(readPianoSettings(JSON.stringify({ normalizeLoudness: false })).normalizeLoudness).toBe(false);
+        expect(normalizePianoSettings({ normalizeLoudness: "yes" }).normalizeLoudness).toBe(false);
+    });
 });
 
 describe("piano sound mode settings", () => {

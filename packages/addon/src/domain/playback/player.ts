@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { EventCursor, OTHER_SCALE, TIME_SCALE, type MusicRef, type SongHandle } from "@piano/core";
+import { EventCursor, OTHER_SCALE, TIME_SCALE, readAllPbe2Notes, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -8,8 +8,10 @@ import type { PlaybackRecord } from "@domain/playback/playbackRecord";
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
 
 interface MidiOutput {
-    note(note: NoteInfo, duration: number, velocity: number): void;
+    note(note: NoteInfo, duration: number, velocity: number, gain: number): void;
     playing(value: boolean): void;
+    /** 立即停止所有正在发声/释放的实例（seek、暂停、销毁）；正常播放结束不调用。 */
+    stopNotes(): void;
 }
 
 /** 播放器只需要“按引用获取共享曲目”，缓存策略由存储层/SongCache 统一负责。 */
@@ -30,6 +32,11 @@ export class MidiPlayer {
 
     private isLoading = false;
     private generation = 0;
+
+    /** 逐曲响度归一化（默认关闭，由钢琴设置控制）。 */
+    private normalizeLoudnessValue = false;
+    private normalizationGain = 1;
+    private normalizationDb = 0;
 
     readonly queue = new PlayQueue();
     readonly signal: Signal<void>;
@@ -76,6 +83,7 @@ export class MidiPlayer {
 
     async play() {
         if (!this.isAlive()) return;
+        this.output.stopNotes();
         const generation = ++this.generation;
         const info = this.queue.current();
         if (!info) {
@@ -103,6 +111,7 @@ export class MidiPlayer {
     pause() {
         if (this.state !== "playing") return;
         this.state = "paused";
+        this.output.stopNotes();
         this.output.playing(false);
     }
 
@@ -135,6 +144,8 @@ export class MidiPlayer {
         const target = Math.max(0, Math.min(positionSec, durationSec || positionSec));
 
         this.currentTime = target;
+        // 先收掉跳转前的所有实例，避免旧音符继续发声到原定释放时间。
+        this.output.stopNotes();
         this.cursor.seek(target * TIME_SCALE);
 
         if (this.state === "idle" || this.state === "stopped") {
@@ -149,6 +160,7 @@ export class MidiPlayer {
     end() {
         this.generation++;
         this.state = "stopped";
+        this.output.stopNotes();
         this.output.playing(false);
         this.releaseSong();
         this.currentTime = 0;
@@ -158,6 +170,36 @@ export class MidiPlayer {
         this.signal.dispose();
         this.disposedSignal.publish();
         this.disposedSignal.dispose();
+    }
+
+    /** 开关逐曲响度归一化；播放中切换从后续音符开始生效。 */
+    setNormalizeLoudness(enabled: boolean) {
+        if (this.normalizeLoudnessValue === enabled) return;
+        this.normalizeLoudnessValue = enabled;
+        this.updateNormalizationGain();
+    }
+
+    /** 当前曲目的归一化增益（dB，仅用于展示/调试）。 */
+    get normalizationGainDb() {
+        return this.normalizationDb;
+    }
+
+    private updateNormalizationGain() {
+        if (!this.normalizeLoudnessValue || !this.song) {
+            this.normalizationDb = 0;
+            this.normalizationGain = 1;
+            return;
+        }
+        const { header, events } = this.song.song;
+        const notes = readAllPbe2Notes(events, header.hasVelocity, header.velocityMax);
+        this.normalizationDb = computeNormalizationGainDbFromNotes(
+            notes.map((note) => ({
+                velocity: note.velocity,
+                durationSeconds: note.duration / OTHER_SCALE,
+            })),
+            header.duration / TIME_SCALE
+        );
+        this.normalizationGain = 10 ** (this.normalizationDb / 20);
     }
 
     /* ================== 调度 ================== */
@@ -269,9 +311,11 @@ export class MidiPlayer {
             this.cursor = new EventCursor(
                 song.song.events,
                 song.song.index,
-                song.song.header.hasVelocity
+                song.song.header.hasVelocity,
+                song.song.header.velocityMax
             );
             this.totalNotes = song.song.noteCount;
+            this.updateNormalizationGain();
         } catch (e) {
             if (generation !== this.generation) return;
             console.error(`加载 MIDI 失败: ${info.name}`, e);
@@ -287,10 +331,11 @@ export class MidiPlayer {
         const song = this.song;
         this.song = undefined;
         song?.release();
+        this.updateNormalizationGain();
     }
 
     private playNote(info: NoteInfo, duration: number, velocity: number) {
-        this.output.note(info, duration, velocity);
+        this.output.note(info, duration, velocity, this.normalizationGain);
     }
 
     /* ================== 状态判断 ================== */

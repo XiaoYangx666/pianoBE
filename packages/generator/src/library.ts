@@ -99,7 +99,7 @@ export async function recordLibraryAdd(id: string): Promise<boolean> {
 export async function loadLibrarySong(meta: LibraryMeta): Promise<Uint8Array> {
     const hit = songCache.get(meta.id);
     if (hit) return hit;
-    const res = await fetch(`./library/${meta.id}.bin`);
+    const res = await fetch(`./library/${meta.id}.pbe2`);
     if (!res.ok) throw new Error(`曲目二进制加载失败: HTTP ${res.status}`);
     const data = new Uint8Array(await res.arrayBuffer());
     songCache.set(meta.id, data);

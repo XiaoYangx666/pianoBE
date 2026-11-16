@@ -29,7 +29,7 @@ let maxPacked = 0;
 let maxPackedName = "";
 
 for (const meta of index) {
-    const pbe2 = new Uint8Array(fs.readFileSync(path.join(libDir, `${meta.id}.bin`)));
+    const pbe2 = new Uint8Array(fs.readFileSync(path.join(libDir, `${meta.id}.pbe2`)));
     const header = readPbe2Header(pbe2);
     const inflateStart = performance.now();
     const { events } = readPbe2Events(pbe2);
@@ -92,7 +92,7 @@ console.log(`释放引用后常驻  : ${(cache.bytes / 1048576).toFixed(2)} MB�
 const big = rows.reduce((a, b) => (a.pbe2.length >= b.pbe2.length ? a : b));
 const shared = await cache.acquire(big.meta.id);
 const cursors = Array.from({ length: 10 }, () =>
-    new EventCursor(shared.song.events, shared.song.index, shared.song.header.hasVelocity)
+    new EventCursor(shared.song.events, shared.song.index, shared.song.header.hasVelocity, shared.song.header.velocityMax)
 );
 const playStart = performance.now();
 let played = 0;

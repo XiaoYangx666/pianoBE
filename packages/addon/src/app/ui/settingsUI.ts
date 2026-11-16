@@ -48,12 +48,18 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
     const spatialAudio = ui.boolean(settings.soundMode === "3d");
     ui.onChange(spatialAudio, (enabled) => apply({ soundMode: enabled ? "3d" : "stereo" }));
 
+    const normalizeLoudness = ui.boolean(settings.normalizeLoudness);
+    ui.onChange(normalizeLoudness, (enabled) => apply({ normalizeLoudness: enabled }));
+
     ui.label(settings.particles ? "§7粒子：§a开" : "§7粒子：§c关")
         .label(settings.textVisible ? "§7琴面文字：§a显示" : "§7琴面文字：§c隐藏");
     ui.dropdown("钢琴音色", timbre,
         AVAILABLE_PIANO_TIMBRES.map(({ label, value, description }) => ({ label, value, description })));
     ui.slider("钢琴音量（%）", volume, ...PIANO_SETTINGS_LIMITS.volume, { step: 1 });
     ui.toggle("3D 定位", spatialAudio, { description: "开：有方位与距离衰减。" });
+    ui.toggle("响度归一化", normalizeLoudness, {
+        description: "开：自动拉平不同曲目的响度；关：保持原始 MIDI 动态（默认关）。",
+    });
     ui.dropdown("手动弹奏力度", manualVelocity, manualVelocityPresets.map(({ name }, value) => ({ label: name, value })));
 
     ui.divider();

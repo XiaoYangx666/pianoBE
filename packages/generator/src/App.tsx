@@ -35,6 +35,23 @@ export default function App() {
     const setPreviewTimbre = useGenerator((state) => state.setPreviewTimbre);
     const { pathname } = useLocation();
 
+    const [normalizeLoudness, setNormalizeLoudness] = useState(() => {
+        try {
+            return localStorage.getItem("pbe:normalize-loudness") === "1";
+        } catch {
+            return false;
+        }
+    });
+
+    useEffect(() => {
+        previewPlayer.setNormalizeLoudness(normalizeLoudness);
+        try {
+            localStorage.setItem("pbe:normalize-loudness", normalizeLoudness ? "1" : "0");
+        } catch {
+            // 隐私模式下 localStorage 可能不可用，不影响播放。
+        }
+    }, [normalizeLoudness]);
+
     useEffect(() => {
         void init();
     }, [init]);
@@ -68,6 +85,7 @@ export default function App() {
                     timbres: timbres.map((item) => ({ id: item.id, label: item.label })),
                     timbreId: previewTimbreId,
                     onTimbreChange: (id) => void setPreviewTimbre(id),
+                    normalize: { enabled: normalizeLoudness, onToggle: setNormalizeLoudness },
                 }}
                 repoUrl="https://github.com/XiaoYangx666/pianoBE"
                 mobileFlush={pathname !== "/convert"}

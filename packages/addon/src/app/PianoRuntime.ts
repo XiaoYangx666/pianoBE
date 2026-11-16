@@ -178,6 +178,9 @@ export class PianoRuntime {
     updateSettings(previous: PianoSettings, next: PianoSettings) {
         if (this.disposed || !this.display || this.settings !== previous) return false;
         this.display.updateSettings(next);
+        if (previous.normalizeLoudness !== next.normalizeLoudness) {
+            this.midi?.setNormalizeLoudness(next.normalizeLoudness);
+        }
         if (TEXT_SETTINGS.some(key => previous[key] !== next[key])) this.textValue = undefined;
         if (previous.scoreMounted !== next.scoreMounted || previous.scoreId !== next.scoreId) {
             this.scoreRetryAt = 0;
@@ -267,18 +270,23 @@ export class PianoRuntime {
 
     getMidiPlayer() {
         if (this.disposed) throw new Error("Piano runtime disposed");
-        return this.midi ??= new MidiPlayer(
-            { acquire: (ref: MusicRef) => this.music.acquire(ref) },
-            {
-                note: (note, duration, velocity) => this.playNote(note, velocity, duration),
-                playing: value => {
-                    if (!value) this.soundReleases.stopAll();
-                    if (value) this.activate();
-                    this.checkpoint();
-                    this.refreshText();
-                },
-            }
-        );
+        if (!this.midi) {
+            this.midi = new MidiPlayer(
+                { acquire: (ref: MusicRef) => this.music.acquire(ref) },
+                {
+                    note: (note, duration, velocity, gain) => this.playNote(note, velocity, duration, gain),
+                    playing: value => {
+                        if (value) this.activate();
+                        this.checkpoint();
+                        this.refreshText();
+                    },
+                    // 正常播放结束时不调用 stopNotes：释放队列的 600ms 尾音交给 tick 自然走完。
+                    stopNotes: () => this.soundReleases.stopAll(),
+                }
+            );
+        }
+        this.midi.setNormalizeLoudness((this.settings ?? DEFAULT_PIANO_SETTINGS).normalizeLoudness);
+        return this.midi;
     }
 
     /** 手动敲键：默认中等力度，可由玩家设置覆盖。 */
@@ -302,13 +310,13 @@ export class PianoRuntime {
         return this.display?.isKeyDown(midi) ?? false;
     }
 
-    playNote(note: NoteInfo, velocity: number, duration: number) {
+    playNote(note: NoteInfo, velocity: number, duration: number, gain = 1) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
         const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
         const settings = this.settings ?? DEFAULT_PIANO_SETTINGS;
-        // 100% → 1.0（正常响度）；再乘力度音量倍数。采样峰值已限制在 -6 dB。
-        const volume = (settings.volume / 100) * velocityVolume(velocity);
+        // 100% → 1.0（正常响度）；再乘力度音量倍数与可选的逐曲归一化增益。采样峰值已限制在 -6 dB。
+        const volume = (settings.volume / 100) * velocityVolume(velocity) * gain;
         const stereo = settings.soundMode !== "3d";
         if (volume > 0) {
             const layer = velocityLayerIndex(velocity, settings.timbre);

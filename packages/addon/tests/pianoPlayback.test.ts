@@ -51,10 +51,11 @@ const record = readPlaybackRecord(JSON.stringify({
 function fixture() {
     const notes: number[] = [];
     const playing = mock(() => {});
+    const stopNotes = mock(() => {});
     const midi = new MidiPlayer(loader, {
-        note: info => notes.push(info.midi), playing,
+        note: info => notes.push(info.midi), playing, stopNotes,
     });
-    return { midi, notes, playing };
+    return { midi, notes, playing, stopNotes };
 }
 
 test("loaded piano resumes the saved song and skips earlier notes", async () => {
@@ -108,12 +109,11 @@ test("two pianos keep independent playback state", async () => {
 });
 
 test("plays through the final note tail before switching songs", async () => {
-    // 最后一个音 1s 起、持续 2s；文件头时长 = 3s（与音尾一致）。
     const tailNotes = [60, 40, 200, 90];
     const tailMeta = { id: "tail", name: "Tail", duration: 120 };
     const midi = new MidiPlayer(
         { acquire: async () => handleFor(tailMeta, tailNotes) },
-        { note: () => {}, playing: () => {} }
+        { note: () => {}, playing: () => {}, stopNotes: () => {} }
     );
     midi.queue.enqueue(tailMeta);
     midi.queue.enqueue({ ...tailMeta, id: "next", name: "Next" });
@@ -134,4 +134,62 @@ test("plays through the final note tail before switching songs", async () => {
     advance(200);
     expect(midi.getInfo().queueIndex).toBe(1);
     expect(midi.getInfo().midiName).toBe("Next");
+});
+
+test("seek stops current voices before repositioning", async () => {
+    const { midi, stopNotes } = fixture();
+    await midi.restore(record);
+    stopNotes.mockClear();
+    midi.seek(1);
+    expect(stopNotes.mock.calls.length).toBe(1);
+});
+
+test("pause stops voices immediately", async () => {
+    const { midi, stopNotes } = fixture();
+    await midi.restore(record);
+    stopNotes.mockClear();
+    midi.pause();
+    expect(stopNotes.mock.calls.length).toBe(1);
+});
+
+test("natural end lets the release tail finish instead of hard-stopping", async () => {
+    const meta = { id: "single", name: "Single", duration: 40 };
+    const stopNotes = mock(() => {});
+    const midi = new MidiPlayer(
+        { acquire: async () => handleFor(meta, [60, 0, 20, 90]) },
+        { note: () => {}, playing: () => {}, stopNotes }
+    );
+    midi.queue.enqueue(meta);
+    await midi.play();
+    stopNotes.mockClear();
+
+    let now = Date.now();
+    for (let i = 0; i < 12; i++) {
+        now += 100;
+        midi.tick(now);
+    }
+    expect(midi.getState()).toBe("idle");
+    expect(stopNotes.mock.calls.length).toBe(0);
+});
+
+test("响度归一化开启后 MIDI 音符带增益，关闭后回到 1", async () => {
+    const gains: number[] = [];
+    const midi = new MidiPlayer(loader, {
+        note: (_note, _duration, _velocity, gain) => gains.push(gain),
+        playing: () => {},
+        stopNotes: () => {},
+    });
+    midi.setNormalizeLoudness(true);
+    midi.queue.enqueue(song);
+    await midi.play();
+    midi.tick(Date.now() + 25);
+
+    expect(gains.length).toBeGreaterThan(0);
+    expect(gains[0]).toBeCloseTo(10 ** (midi.normalizationGainDb / 20));
+    expect(gains[0]).toBeGreaterThan(1);
+
+    midi.setNormalizeLoudness(false);
+    midi.seek(0);
+    midi.tick(Date.now() + 50);
+    expect(gains.at(-1)).toBe(1);
 });

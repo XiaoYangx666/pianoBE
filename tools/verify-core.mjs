@@ -29,8 +29,11 @@ import { midiBufferToSong } from "@piano/core/convert";
     const header = readPbe2Header(pbe2);
     assert.equal(header.id, song.id);
     assert.equal(header.noteCount, song.tracks.reduce((s, t) => s + t.notes.length / 4, 0));
-    const notes = readAllPbe2Notes(readPbe2Events(pbe2).events);
+    const notes = readAllPbe2Notes(readPbe2Events(pbe2).events, header.hasVelocity, header.velocityMax);
     assert.equal(notes.length, header.noteCount);
+    // 力度保持 MIDI 0~127：必须与源文件一致，而不是被 x100 缩放。
+    const sourceVelocity = song.tracks[0].notes[3];
+    assert.equal(notes[0].velocity, sourceVelocity, "PBE2 力度必须与源 MIDI 一致");
     assert.equal(pbe2ToAddonModule(pbe2), existing);
 }
 

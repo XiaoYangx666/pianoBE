@@ -168,7 +168,7 @@ export class ImportedSongs implements MidiSourceLike {
         }
         // 实际解压并校验 CRC32 / 事件结构，避免损坏数据进入世界存储。
         const { events } = readPbe2Events(pbe2);
-        if (readAllPbe2Notes(events, header.hasVelocity).length !== header.noteCount) {
+        if (readAllPbe2Notes(events, header.hasVelocity, header.velocityMax).length !== header.noteCount) {
             throw new Error("曲目音符数量校验失败");
         }
 

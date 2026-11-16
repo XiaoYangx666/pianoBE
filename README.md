@@ -143,7 +143,7 @@ npm run dev:generator    # 生成器开发模式（predev 自动同步底包与�
 
 ### Cloudflare 生成器播放统计
 
-生成器的网页、`library/index.json` 与 `library/{id}.bin` 仍由 **Workers Static Assets** 托管；
+生成器的网页、`library/index.json` 与 `library/{id}.pbe2` 仍由 **Workers Static Assets** 托管；
 D1 只保存可变的播放量与防刷状态，不引入传统后端，也不改变现有加歌/构建流程。
 
 首次启用统计需要在 `packages/generator` 下执行一次：
@@ -204,7 +204,7 @@ docker compose -f docker-compose.dev.yml up
 |---|---|---|
 | `midis/files/` | 原始 `.mid` 源文件 | 不入库 |
 | `midis/js/` | addon 运行时模块（PBE2 的 Base64URL 文本） | 不入库（构建期生成） |
-| `midis/library/` | PBE2 曲库 `<id>.bin` + `index.json` | **入库**（生成器数据源） |
+| `midis/library/` | PBE2 曲库 `<id>.pbe2` + `index.json` | **入库**（生成器数据源） |
 
 原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
 
@@ -224,12 +224,13 @@ npm run show-song -- <关键词>
 命令说明：
 
 - **内容寻址防重复**：曲目 ID 为 MIDI 内容的 CRC32，内容相同的文件自动识别并跳过（输出 `跳过(重复)`）；同名但内容不同的文件打印警告并分别入库，不会互相覆盖
-- **最小改动**：`add-song` 仅新增/更新指定曲目，`git diff` 只包含对应的 `<id>.bin`（PBE2）与 `index.json` 两项变更，便于审查
+- **最小改动**：`add-song` 仅新增/更新指定曲目，`git diff` 只包含对应的 `<id>.pbe2`（PBE2）与 `index.json` 两项变更，便于审查
 - **转换确定性**：同一文件重复转换结果一致；曲名取自文件名，无需了解二进制格式
 
 ### PBE2 与游戏内导入
 
 - `PBE2` 是唯一运行时格式：头部含 id/名称/时长/音符数/解压长度/CRC32，事件流由 `@piano/core` 的 `PianoBinaryCodec` 编解码。
+- 转换阶段会把 MIDI CC64 延音踏板烘焙进音符时长（Note Off 后踏板仍按下则延长到抬起，单音最多延长 8 秒），因此 PBE2 本身不需要携带控制器事件。
 - addon 只解压一次并在 `SongCache` 中共享；每架钢琴持有独立 `EventCursor`，跳转使用 5 秒稀疏索引。
 - 在线生成器曲目条目上的「码」按钮可导出分段导入码；游戏内钢琴面板 →「导入 MIDI」逐段粘贴。
 - 普通玩家导入权限由管理员命令 `/pbe:pbe_setting` 控制（默认关闭，管理员始终允许）。

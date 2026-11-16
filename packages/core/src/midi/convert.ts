@@ -1,6 +1,7 @@
 import * as toneMidi from "@tonejs/midi";
-import { OTHER_SCALE, TIME_SCALE } from "../constants.js";
+import { OTHER_SCALE, TIME_SCALE, VELOCITY_SCALE } from "../constants.js";
 import { crc32Hex } from "./crc32.js";
+import { collectSustainSegments, sustainExtensionSeconds } from "./pedal.js";
 import type { MidiSong, MidiTrack, MidiTrackInstrument } from "../types.js";
 
 type MidiCtor = typeof import("@tonejs/midi").Midi;
@@ -36,15 +37,21 @@ const Midi = resolveMidiCtor();
 export function midiBufferToSong(buffer: Uint8Array, name: string): MidiSong {
     const midi = new Midi(buffer);
     const id = crc32Hex(new Uint8Array(buffer));
+    // 踏板在 PBE2 里没有独立事件，转换时烘焙进音符时长。
+    const sustainSegments = collectSustainSegments(midi.tracks);
+    let maxEnd = 0;
 
     const tracks: MidiTrack[] = midi.tracks.map((track) => {
         const notes: number[] = [];
         for (const n of track.notes) {
+            const end = n.time + n.duration;
+            const duration = n.duration + sustainExtensionSeconds(end, sustainSegments);
+            maxEnd = Math.max(maxEnd, n.time + duration);
             notes.push(
                 n.midi,
                 Math.floor(n.time * TIME_SCALE),
-                Math.round(n.duration * OTHER_SCALE),
-                Math.round(n.velocity * OTHER_SCALE)
+                Math.round(duration * OTHER_SCALE),
+                Math.round(n.velocity * VELOCITY_SCALE)
             );
         }
         return {
@@ -56,7 +63,8 @@ export function midiBufferToSong(buffer: Uint8Array, name: string): MidiSong {
     return {
         id,
         name,
-        duration: Math.round(midi.duration * TIME_SCALE),
+        // 踏板可能把最后一个音延长到原文件时长之外，这里取两者较大值。
+        duration: Math.round(Math.max(midi.duration, maxEnd) * TIME_SCALE),
         tracks,
     };
 }

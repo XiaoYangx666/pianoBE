@@ -5,6 +5,7 @@ import {
     MAX_PBE2_EVENT_BYTES,
     PBE2_FLAG_COMPRESSED,
     PBE2_FLAG_VELOCITY,
+    PBE2_FLAG_VELOCITY_127,
     PBE2_MAGIC,
     PBE2_VERSION,
     type Pbe2Header,
@@ -164,7 +165,7 @@ export function encodePbe2(song: MidiSong, options: EncodePbe2Options = {}): Uin
     const writer = new ByteWriter(256 + payload.length);
     writer.bytes(Uint8Array.from(PBE2_MAGIC));
     writer.put(PBE2_VERSION);
-    writer.put((compressed ? PBE2_FLAG_COMPRESSED : 0) | (includeVelocity ? PBE2_FLAG_VELOCITY : 0));
+    writer.put((compressed ? PBE2_FLAG_COMPRESSED : 0) | (includeVelocity ? PBE2_FLAG_VELOCITY | PBE2_FLAG_VELOCITY_127 : 0));
     pushString(writer, song.id);
     pushString(writer, song.name);
     pushU32(writer, song.duration);
@@ -231,6 +232,7 @@ export function readPbe2Header(data: Uint8Array): Pbe2Header {
         flags,
         compressed: (flags & PBE2_FLAG_COMPRESSED) !== 0,
         hasVelocity: (flags & PBE2_FLAG_VELOCITY) !== 0,
+        velocityMax: (flags & PBE2_FLAG_VELOCITY) !== 0 && (flags & PBE2_FLAG_VELOCITY_127) === 0 ? 100 : 127,
         eventOffset,
         byteLength: data.length,
     };
@@ -272,10 +274,14 @@ export function readPbe2Events(
     return { header, events };
 }
 
-/** 顺序扫描事件流（解码/测试/服务端校验使用；运行时播放器用 EventCursor） */
+/**
+ * 顺序扫描事件流（解码/测试/服务端校验使用；运行时播放器用 EventCursor）。
+ * velocityMax < 127 表示旧版 0~100 力度编码，返回前统一换算到 MIDI 0~127。
+ */
 export function readAllPbe2Notes(
     events: Uint8Array,
-    hasVelocity = false
+    hasVelocity = false,
+    velocityMax = 127
 ): Pbe2Note[] {
     const notes: Pbe2Note[] = [];
     const out: VarintResult = { value: 0, next: 0 };
@@ -299,6 +305,7 @@ export function readAllPbe2Notes(
                 readVarUint(events, pos, out);
                 velocity = out.value;
                 pos = out.next;
+                if (velocityMax !== 127) velocity = Math.round((velocity * 127) / velocityMax);
             }
             notes.push({ time, midi, duration, velocity });
         }
@@ -310,7 +317,7 @@ export function readAllPbe2Notes(
 export function decodePbe2(data: Uint8Array): MidiSong {
     const { header, events } = readPbe2Events(data);
     const notes: number[] = [];
-    for (const note of readAllPbe2Notes(events, header.hasVelocity)) {
+    for (const note of readAllPbe2Notes(events, header.hasVelocity, header.velocityMax)) {
         notes.push(note.midi, note.time, note.duration, note.velocity);
     }
     return {
@@ -329,15 +336,16 @@ export function decodePbe2(data: Uint8Array): MidiSong {
 /** PBE2 → 秒制音符事件（Web/生成器试听） */
 export function pbe2ToNoteEvents(data: Uint8Array): Pbe2NoteEvent[] {
     const { header, events } = readPbe2Events(data);
-    return pbe2EventsToNoteEvents(events, header.hasVelocity);
+    return pbe2EventsToNoteEvents(events, header.hasVelocity, header.velocityMax);
 }
 
 /** 已解压事件流 → 秒制音符事件 */
 export function pbe2EventsToNoteEvents(
     events: Uint8Array,
-    hasVelocity = false
+    hasVelocity = false,
+    velocityMax = 127
 ): Pbe2NoteEvent[] {
-    return readAllPbe2Notes(events, hasVelocity).map((note) => ({
+    return readAllPbe2Notes(events, hasVelocity, velocityMax).map((note) => ({
         midi: note.midi,
         time: note.time / 40,
         duration: note.duration / 100,

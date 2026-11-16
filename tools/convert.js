@@ -61,21 +61,21 @@ fs.mkdirSync(libDir, { recursive: true });
 
 // ===== 3. 转换（解析逻辑统一在 @piano/core） =====
 // 每首同时产出：
-//   midis/js/<id>.js        addon 运行时模块（PBE2 的 Base64URL 文本，构建期拷入，不入库）
-//   midis/library/<id>.bin  PBE2 曲库二进制（入库；生成器按需加载）
+//   midis/js/<id>.js          addon 运行时模块（PBE2 的 Base64URL 文本，构建期拷入，不入库）
+//   midis/library/<id>.pbe2   PBE2 曲库二进制（入库；生成器按需加载）
 const metas = [];
 let notes = 0;
 let jsBytes = 0;
-let binBytes = 0;
+let pbe2Bytes = 0;
 
 for (const file of files) {
     const buffer = fs.readFileSync(path.join(inputDir, file));
     const song = midiBufferToSong(buffer, file.replace(/\.midi?$/i, ""));
-    const pbe2 = encodePbe2(song);
+    const pbe2 = encodePbe2(song, { includeVelocity: true });
     const moduleText = pbe2ToAddonModule(pbe2);
 
     fs.writeFileSync(path.join(jsDir, `${song.id}.js`), moduleText, "utf-8");
-    fs.writeFileSync(path.join(libDir, `${song.id}.bin`), pbe2);
+    fs.writeFileSync(path.join(libDir, `${song.id}.pbe2`), pbe2);
 
     metas.push({
         id: song.id,
@@ -85,7 +85,7 @@ for (const file of files) {
     });
     notes += collectNoteCount(song);
     jsBytes += moduleText.length;
-    binBytes += pbe2.length;
+    pbe2Bytes += pbe2.length;
 }
 
 // ===== 4. index.js（addon 运行时）+ index.json（生成器曲库目录） =====
@@ -98,5 +98,5 @@ fs.writeFileSync(path.join(libDir, "index.json"), JSON.stringify(sorted, null, 1
 console.log(`✅ 已转换 ${files.length} 个 MIDI 文件（共 ${Math.round(notes).toLocaleString()} 音符）`);
 console.log(`📥 输入: ${inputArg}`);
 console.log(`📤 addon 模块: ${jsDir}（${(jsBytes / 1048576).toFixed(1)} MB，不入库）`);
-console.log(`📦 曲库二进制: ${libDir}（${(binBytes / 1048576).toFixed(2)} MB，入库）`);
-console.log(`💾 压缩比: ${(jsBytes / binBytes).toFixed(1)}×`);
+console.log(`📦 曲库二进制: ${libDir}（${(pbe2Bytes / 1048576).toFixed(2)} MB，入库）`);
+console.log(`💾 压缩比: ${(jsBytes / pbe2Bytes).toFixed(1)}×`);

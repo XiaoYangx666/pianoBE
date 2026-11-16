@@ -54,6 +54,33 @@ describe("PBE2 编解码", () => {
         ]);
     });
 
+    it("力度按 MIDI 0~127 编码，并写入 VELOCITY_127 标记", () => {
+        const pbe2 = encodePbe2(song, { includeVelocity: true });
+        const header = readPbe2Header(pbe2);
+        expect(header.hasVelocity).toBe(true);
+        expect(header.velocityMax).toBe(127);
+        const notes = readAllPbe2Notes(
+            readPbe2Events(pbe2).events,
+            header.hasVelocity,
+            header.velocityMax
+        );
+        expect(notes.map((note) => note.velocity)).toEqual([90, 60, 80, 50, 70]);
+    });
+
+    it("旧版 0~100 力度字段读取时换算到 0~127", () => {
+        const legacy = encodePbe2(song, { includeVelocity: true, compress: false });
+        legacy[5] &= ~4; // 去掉 VELOCITY_127，模拟旧版编码
+        const header = readPbe2Header(legacy);
+        expect(header.hasVelocity).toBe(true);
+        expect(header.velocityMax).toBe(100);
+        const notes = readAllPbe2Notes(
+            readPbe2Events(legacy).events,
+            header.hasVelocity,
+            header.velocityMax
+        );
+        expect(notes.map((note) => note.velocity)).toEqual([114, 76, 102, 64, 89]);
+    });
+
     it("体积较小时按 auto 策略保留未压缩事件流", () => {
         const pbe2 = encodePbe2(song);
         const header = readPbe2Header(pbe2);

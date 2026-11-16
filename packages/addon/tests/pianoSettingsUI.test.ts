@@ -117,6 +117,17 @@ describe("钢琴设置（拆分为多个表单）", () => {
         expect(form.components.filter(item => item.type === "textField")).toHaveLength(0);
     });
 
+    test("响度归一化开关写回钢琴设置", () => {
+        const { piano, getSettings } = makePiano();
+        const form = open(PianoSettingsPage, { piano });
+        const toggle = form.components.find(
+            item => item.type === "toggle" && String(item.label).includes("响度归一化")
+        );
+        expect(toggle).toBeDefined();
+        (toggle!.value as FakeObservable<boolean>).setData(true);
+        expect(getSettings().normalizeLoudness).toBe(true);
+    });
+
     test("三个子页都用 push 进入，返回时回到主表单", () => {
         const { piano } = makePiano();
         const form = open(PianoSettingsPage, { piano });

@@ -3,7 +3,7 @@
 //   npm run add-song -- <文件或目录> [<文件或目录>...]
 //   例: npm run add-song -- ~/Desktop/新歌.mid
 //       npm run add-song -- ./my-midis/ ./one.mid ./two.mid
-// 效果: 每首生成/更新 midis/library/<id>.bin，合并进 index.json，
+// 效果: 每首生成/更新 midis/library/<id>.pbe2，合并进 index.json，
 //       同步 midis/js/<id>.js 与 index.js（addon 构建源，不入库）。
 // 防重复: id = crc32(midi 内容)，内容相同自动幂等；同名不同内容会警告。
 import fs from "node:fs";
@@ -85,7 +85,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         added++;
     }
     const pbe2 = encodePbe2(song, { includeVelocity: true });
-    fs.writeFileSync(path.join(libDir, `${song.id}.bin`), pbe2);
+    fs.writeFileSync(path.join(libDir, `${song.id}.pbe2`), pbe2);
     fs.writeFileSync(path.join(jsDir, `${song.id}.js`), pbe2ToAddonModule(pbe2), "utf-8");
     console.log(`  [${status}] ${song.name} (${song.id})`);
 }

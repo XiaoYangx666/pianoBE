@@ -23,7 +23,7 @@ if (items.length === 0) {
     process.exit(0);
 }
 for (const m of items) {
-    const binPath = path.join(libDir, `${m.id}.bin`);
+    const binPath = path.join(libDir, `${m.id}.pbe2`);
     const size = fs.existsSync(binPath) ? fs.statSync(binPath).size : 0;
     const sec = (m.duration / 40).toFixed(0);
     console.log(

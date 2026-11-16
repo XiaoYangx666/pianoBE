@@ -1,5 +1,6 @@
 import * as toneMidi from "@tonejs/midi";
 import { SampledMidiPlayer, type NoteEvent, type PlayerState } from "@piano/core/player";
+import { collectSustainSegments, sustainExtensionSeconds } from "@piano/core/convert";
 
 export type { PlayerState, NoteEvent } from "@piano/core/player";
 
@@ -36,14 +37,17 @@ const SAMPLE_BASE = "/piano";
 export function parseMidi(buffer: ArrayBuffer): NoteEvent[] {
     const midi = new Midi(buffer);
     const events: NoteEvent[] = [];
+    // 与 server 的 midiBufferToSong 一致：把 CC64 踏板烘焙进音符时长。
+    const sustainSegments = collectSustainSegments(midi.tracks);
     for (const track of midi.tracks) {
         for (const n of track.notes) {
             const velocity = Math.max(0, Math.min(1, n.velocity));
             if (velocity === 0) continue;
+            const end = n.time + n.duration;
             events.push({
                 midi: n.midi,
                 time: n.time,
-                duration: n.duration,
+                duration: n.duration + sustainExtensionSeconds(end, sustainSegments),
                 velocity,
             });
         }

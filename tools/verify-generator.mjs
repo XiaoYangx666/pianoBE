@@ -121,7 +121,7 @@ const libIndex = JSON.parse(readFileSync("midis/library/index.json", "utf8"));
 assert(libIndex.length >= 225, `曲库目录 ${libIndex.length} 首`);
 const libMeta = libIndex[0];
 assert(!!libMeta.id && !!libMeta.name, "曲库 index 条目结构正确");
-const libBytes = new Uint8Array(readFileSync(`midis/library/${libMeta.id}.bin`));
+const libBytes = new Uint8Array(readFileSync(`midis/library/${libMeta.id}.pbe2`));
 const libSong = decodePbe2(libBytes);
 assert(
     libSong.id === libMeta.id &&
