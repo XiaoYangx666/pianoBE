@@ -58,7 +58,7 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
     ui.slider("钢琴音量（%）", volume, ...PIANO_SETTINGS_LIMITS.volume, { step: 1 });
     ui.toggle("3D 定位", spatialAudio, { description: "开：有方位与距离衰减。" });
     ui.toggle("响度归一化", normalizeLoudness, {
-        description: "开：自动拉平不同曲目的响度；关：保持原始 MIDI 动态（默认关）。",
+        description: "开：拉平曲目响度；关：保留原动态。",
     });
     ui.dropdown("手动弹奏力度", manualVelocity, manualVelocityPresets.map(({ name }, value) => ({ label: name, value })));
 

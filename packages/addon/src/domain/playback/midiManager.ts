@@ -4,13 +4,14 @@ import { SongCache, type SongHandle } from "@piano/core";
 /**
  * 曲库管理器：
  * - 元信息注册表（同步可查，列表/搜索不加载单曲模块）；
- * - 主来源（内嵌 / 远程）+ 附加来源（本地导入）统一路由；
+ * - 主来源（内嵌 / 远程）+ 公共附加来源（世界全局曲库）统一路由；
  * - 所有来源的 PBE2 数据进入同一个 SongCache（引用计数 + LRU + 内存预算）。
  */
 export class MidiManager {
+    /** 主来源元信息（不包含公共附加来源，供 reset 重建索引）。 */
     private metas: MidiSongMeta[] = [];
     private readonly metaMap = new Map<string, MidiSongMeta>();
-    private readonly extraSources: MidiSourceLike[] = [];
+    private readonly publicSources: MidiSourceLike[] = [];
     private readonly cache: SongCache;
 
     constructor(private source: MidiSourceLike, maxCacheBytes?: number) {
@@ -25,12 +26,22 @@ export class MidiManager {
         void this.refresh();
     }
 
-    /** 注册附加来源（本地导入曲库）；元信息并入查找表，但不混入主曲库列表 */
-    addSource(source: MidiSourceLike): void {
-        if (!this.extraSources.includes(source)) this.extraSources.push(source);
+    /**
+     * 注册公共附加来源（世界全局曲库）。
+     * 元信息进入查找表，并参与公共曲库搜索/分页；不占用主来源列表。
+     */
+    addPublicSource(source: MidiSourceLike): void {
+        if (!this.publicSources.includes(source)) this.publicSources.push(source);
         const list = source.list();
         if (Array.isArray(list)) this.registerAll(list, false);
         else list.then((items) => this.registerAll(items, false)).catch(() => {});
+    }
+
+    /** 公共附加来源内容变化后重建元信息索引（不重新请求远程主来源）。 */
+    refreshPublicIndex(): void {
+        this.reset(this.metas.slice());
+        // 删除/替换后不要继续从旧缓存加载；活跃播放引用由 SongCache 保护。
+        this.cache.clearUnused();
     }
 
     /** 获取曲目引用（播放器按 id 获取，持有期间不会被 LRU 淘汰） */
@@ -66,7 +77,7 @@ export class MidiManager {
         this.metas = [];
         this.metaMap.clear();
         this.registerAll(metas, true);
-        for (const source of this.extraSources) {
+        for (const source of this.publicSources) {
             const list = source.list();
             if (Array.isArray(list)) this.registerAll(list, false);
         }
@@ -120,15 +131,15 @@ export class MidiManager {
         for (const meta of metas) this.register(meta, includeInList);
     }
 
-    /** 加载 PBE2 数据：主来源优先，附加来源兜底（未找到返回 undefined） */
+    /** 加载 PBE2 数据：主来源优先，公共附加来源兜底（未找到返回 undefined） */
     private async load(id: string): Promise<Uint8Array | undefined> {
         try {
             const primary = await this.source.get(id);
             if (primary) return primary;
         } catch {
-            // 主来源网络失败时继续尝试本地导入来源
+            // 主来源网络失败时继续尝试公共附加来源
         }
-        for (const source of this.extraSources) {
+        for (const source of this.publicSources) {
             try {
                 const data = await source.get(id);
                 if (data) return data;
@@ -147,37 +158,101 @@ export class MidiManager {
     }
 
     /**
-     * 分页查询（远程源走服务端分页 + q 服务端搜索；内嵌源回退本地快照过滤）。
-     * 返回该页 items 与匹配总数，供列表 UI 按需取页。
+     * 分页查询：主来源与公共附加来源各自取窗口后合并。
+     *
+     * 远程主来源仍走服务端分页 + 服务端搜索；世界全局曲库只查内存索引。
+     * 合并顺序为主来源在前、公共附加来源在后，保持现有曲库排序行为。
      */
     async page(
         page: number,
         pageSize: number,
         q?: string
     ): Promise<{ items: MidiSongMeta[]; total: number }> {
-        if (this.source.page) {
-            return this.source.page(page, pageSize, q);
+        const current = Math.max(1, Math.floor(page));
+        const size = Math.max(1, Math.floor(pageSize));
+        const sources = [this.source, ...this.publicSources];
+        const items: MidiSongMeta[] = [];
+        let cursor = (current - 1) * size;
+        let remaining = size;
+        let total = 0;
+
+        for (const source of sources) {
+            const slice = await this.sourceSlice(source, cursor, remaining, q);
+            total += slice.total;
+            if (remaining <= 0) continue;
+            if (cursor >= slice.total) {
+                cursor -= slice.total;
+                continue;
+            }
+            items.push(...slice.items);
+            remaining -= slice.items.length;
+            cursor = 0;
         }
-        const list = this.list();
-        const filtered = q
-            ? list.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()))
-            : list;
-        const start = (page - 1) * pageSize;
-        return {
-            items: filtered.slice(start, start + pageSize),
-            total: filtered.length,
-        };
+        return { items: items.slice(0, size), total };
     }
 
-    /** 批量取全部（远程源后端过滤；内嵌源本地过滤），"一键添加"等批量操作用 */
+    /** 批量取全部（远程源后端过滤；本地源内存过滤），"一键添加"等批量操作用 */
     async metaAll(q?: string): Promise<MidiSongMeta[]> {
-        if (this.source.metaAll) {
-            return this.source.metaAll(q);
+        const all: MidiSongMeta[] = [];
+        for (const source of [this.source, ...this.publicSources]) {
+            if (source.metaAll) {
+                all.push(...await source.metaAll(q));
+                continue;
+            }
+            all.push(...this.filter(await source.list(), q));
         }
-        const list = this.list();
-        return q
-            ? list.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()))
-            : list;
+        return all;
+    }
+
+    /**
+     * 从来源取 [start, start+count) 范围的条目。
+     *
+     * 远程来源直接请求包含 start 的服务端页，只读取需要的块，避免为了
+     * 合并分页而从第 1 页全量拉取。总条数取自同一次响应。
+     */
+    private async sourceSlice(
+        source: MidiSourceLike,
+        start: number,
+        count: number,
+        q?: string
+    ): Promise<{ items: MidiSongMeta[]; total: number }> {
+        if (!source.page) {
+            const all = this.filter(await source.list(), q);
+            const from = Math.max(0, start);
+            return { items: all.slice(from, from + Math.max(0, count)), total: all.length };
+        }
+
+        // 远程接口单页上限 100；本地来源也按块读取，避免一次取过多。
+        const chunk = 100;
+        const firstPage = Math.floor(Math.max(0, start) / chunk) + 1;
+        let page = firstPage;
+        let local = Math.max(0, start) % chunk;
+        let need = Math.max(0, count);
+        if (need === 0) {
+            // 仍需要总数用于合并分页的总量统计。
+            const head = await source.page(1, 1, q);
+            return { items: [], total: head.total };
+        }
+
+        const items: MidiSongMeta[] = [];
+        let total = 0;
+        while (need > 0) {
+            const result = await source.page(page, chunk, q);
+            if (page === firstPage) total = result.total;
+            const available = result.items.slice(local);
+            const take = available.slice(0, need);
+            items.push(...take);
+            need -= take.length;
+            local = 0;
+            page++;
+            if (take.length === 0 || page > 100_000) break;
+        }
+        return { items, total };
+    }
+
+    private filter(list: MidiSongMeta[], q?: string): MidiSongMeta[] {
+        const keyword = q?.trim().toLowerCase();
+        return keyword ? list.filter(meta => meta.name.toLowerCase().includes(keyword)) : list;
     }
 }
 

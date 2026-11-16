@@ -61,6 +61,9 @@ export class SongCache {
     private readonly indexStepTicks: number;
     private readonly verify: (key: string, header: Pbe2Header) => boolean;
     private totalBytes = 0;
+    private hits = 0;
+    private misses = 0;
+    private evictions = 0;
 
     constructor(
         private readonly load: (key: string) => Promise<Uint8Array | undefined>,
@@ -78,12 +81,19 @@ export class SongCache {
      */
     async acquire(id: string): Promise<SongHandle | undefined> {
         const existing = this.loaded.get(id);
-        if (existing) return this.acquireExisting(existing);
+        if (existing) {
+            this.hits++;
+            return this.acquireExisting(existing);
+        }
 
         let promise = this.pending.get(id);
         if (!promise) {
+            this.misses++;
             promise = this.loadSong(id);
             this.pending.set(id, promise);
+        } else {
+            // 并发请求合并到同一次加载：对调用方仍算一次命中。
+            this.hits++;
         }
         let song: LoadedSong | undefined;
         try {
@@ -133,11 +143,23 @@ export class SongCache {
     }
 
     stats() {
+        let activeSongs = 0;
+        let activeBytes = 0;
+        for (const song of this.loaded.values()) {
+            if (song.refCount <= 0) continue;
+            activeSongs++;
+            activeBytes += song.byteSize;
+        }
         return {
             songs: this.loaded.size,
             bytes: this.totalBytes,
             maxBytes: this.maxBytes,
             loading: this.pending.size,
+            activeSongs,
+            activeBytes,
+            evictions: this.evictions,
+            hits: this.hits,
+            misses: this.misses,
         };
     }
 
@@ -213,6 +235,7 @@ export class SongCache {
         for (const song of candidates) {
             if (this.totalBytes <= this.maxBytes) break;
             this.remove(song.key, song);
+            this.evictions++;
         }
     }
 

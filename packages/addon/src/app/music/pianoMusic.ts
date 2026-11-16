@@ -7,6 +7,7 @@ import {
 } from "@piano/core";
 import type { MusicStorage } from "@domain/music/storage";
 import { midiManager } from "@app/midiManager";
+import { PIANO_LOCAL_CACHE_BYTES } from "@app/pianoConfig";
 
 export type TrackAvailability = "ok" | "missing" | "unknown";
 
@@ -25,7 +26,7 @@ export class PianoMusic {
         private readonly cardUidProvider: () => string | undefined
     ) {
         this.cache = new SongCache((key) => this.load(key), {
-            maxBytes: 2 * 1024 * 1024,
+            maxBytes: PIANO_LOCAL_CACHE_BYTES,
             // key = source:id:checksum；id 不含冒号。
             verify: (key, header) => key.split(":")[1] === header.id,
         });
@@ -80,6 +81,11 @@ export class PianoMusic {
         if (ref.checksum && entry.checksum !== ref.checksum) return "missing";
         if (ref.bytes && entry.bytes !== ref.bytes) return "missing";
         return "ok";
+    }
+
+    /** 缓存诊断：驻留/活跃/淘汰统计。 */
+    cacheStats() {
+        return this.cache.stats();
     }
 
     /** 释放本地缓存中无引用的曲目（拆琴/换卡后调用）。 */

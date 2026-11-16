@@ -15,6 +15,8 @@ export interface MusicStorage {
     save(pbe2: Uint8Array): StoredMusicEntry;
     remove(id: string): boolean;
     rename(id: string, name: string): StoredMusicEntry | undefined;
+    /** 调整曲目在存储中的顺序（存储卡播放列表）。 */
+    move?(id: string, delta: number): boolean;
     usage(): StorageUsage;
     setLimit(limitBytes: number): void;
     /** 容量上限是否仍可写入（管理员下调后禁止新增，但允许读取/删除） */

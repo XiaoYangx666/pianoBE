@@ -185,4 +185,51 @@ describe("钢琴卡槽（真实 ItemStack 容器）", () => {
         expect(result.ok).toBe(false);
         expect(slot.occupied).toBe(false);
     });
+
+    test("存储卡播放顺序持久化、移动、追加与删除保持一致", () => {
+        const entity = new FakeEntity();
+        const slot = new CardSlot(entity as any);
+        slot.insert(card("顺序卡"));
+        const access = slot.access()!;
+        const storage = access.storage(1024 * 1024);
+        storage.save(music("a1", 8));
+        storage.save(music("b2", 8));
+        storage.save(music("c3", 8));
+
+        expect(storage.list().map(entry => entry.id)).toEqual(["a1", "b2", "c3"]);
+        expect(storage.move?.("c3", -1)).toBe(true);
+        expect(storage.list().map(entry => entry.id)).toEqual(["a1", "c3", "b2"]);
+
+        // 重新打开同一张卡，顺序仍然保留。
+        const reopened = CardAccess.open(containerItemSlot(entity.inventory as any, 0))!;
+        expect(reopened.storage().list().map(entry => entry.id)).toEqual(["a1", "c3", "b2"]);
+
+        // 新增歌曲追加到末尾，删除歌曲从顺序中移除。
+        storage.save(music("d4", 8));
+        expect(storage.list().map(entry => entry.id)).toEqual(["a1", "c3", "b2", "d4"]);
+        expect(storage.remove("c3")).toBe(true);
+        expect(storage.list().map(entry => entry.id)).toEqual(["a1", "b2", "d4"]);
+        expect(storage.move?.("a1", -1)).toBe(false);
+        expect(storage.move?.("d4", 1)).toBe(false);
+    });
+
+    test("不同存储卡的播放顺序互不影响", () => {
+        const first = new FakeEntity();
+        const firstSlot = new CardSlot(first as any);
+        firstSlot.insert(card("卡一"));
+        const firstStorage = firstSlot.access()!.storage();
+        firstStorage.save(music("a1", 8));
+        firstStorage.save(music("b2", 8));
+        firstStorage.move?.("b2", -1);
+
+        const second = new FakeEntity();
+        const secondSlot = new CardSlot(second as any);
+        secondSlot.insert(card("卡二"));
+        const secondStorage = secondSlot.access()!.storage();
+        secondStorage.save(music("a1", 8));
+        secondStorage.save(music("b2", 8));
+
+        expect(firstStorage.list().map(entry => entry.id)).toEqual(["b2", "a1"]);
+        expect(secondStorage.list().map(entry => entry.id)).toEqual(["a1", "b2"]);
+    });
 });

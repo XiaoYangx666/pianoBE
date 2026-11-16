@@ -218,6 +218,37 @@ describe("SongCache", () => {
         expect(await cache.acquire("bad")).toBeUndefined();
         expect(cache.size).toBe(0);
     });
+
+    it("预算不是单曲大小限制：播放中的超预算歌曲不会被淘汰", async () => {
+        const pbe2 = encodePbe2(song);
+        const cache = new SongCache(async () => pbe2, { maxBytes: 1 });
+        const handle = await cache.acquire(song.id);
+        expect(handle).toBeDefined();
+        expect(cache.size).toBe(1);
+        expect(cache.stats().activeSongs).toBe(1);
+
+        handle?.release();
+        expect(cache.size).toBe(0);
+        expect(cache.stats().evictions).toBe(1);
+        expect(cache.stats().activeSongs).toBe(0);
+    });
+
+    it("统计命中、未命中与活跃引用，释放后活跃数归零", async () => {
+        const pbe2 = encodePbe2(song);
+        const cache = new SongCache(async () => pbe2);
+        const first = await cache.acquire(song.id);
+        const second = await cache.acquire(song.id);
+        const stats = cache.stats();
+        expect(stats.misses).toBe(1);
+        expect(stats.hits).toBe(1);
+        expect(stats.activeSongs).toBe(1);
+        expect(stats.activeBytes).toBeGreaterThan(0);
+
+        first?.release();
+        expect(cache.stats().activeSongs).toBe(1);
+        second?.release();
+        expect(cache.stats().activeSongs).toBe(0);
+    });
 });
 
 describe("DDUI 分段导入码", () => {

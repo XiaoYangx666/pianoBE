@@ -137,6 +137,17 @@ export class MidiPlayer {
         return this.queue.enqueueUnique(ref);
     }
 
+    /** 按给定顺序把一组曲目加入队列；重复项自动跳过。 */
+    addCollectionToQueue(refs: readonly MusicRef[]): { added: number; exists: number } {
+        let added = 0;
+        let exists = 0;
+        for (const ref of refs) {
+            if (this.addToQueue(ref) === "added") added++;
+            else exists++;
+        }
+        return { added, exists };
+    }
+
     /**
      * 立即播放指定曲目：
      * - 已在队列中 → 跳转到已有条目；
@@ -148,6 +159,20 @@ export class MidiPlayer {
         if (existing >= 0) this.queue.jump(existing);
         else this.queue.insertBack(ref);
         await this.play();
+    }
+
+    /**
+     * 播放一组按顺序排列的曲目（存储卡播放列表）：
+     * 先移除队列中的同组旧条目，再按卡片顺序追加为连续块并播放第一首。
+     * 不清空其他队列歌曲，也不产生重复条目。
+     */
+    async playCollection(refs: readonly MusicRef[]): Promise<{ added: number; exists: number } | undefined> {
+        const first = refs[0];
+        if (!first) return undefined;
+        this.queue.removeRefs(refs);
+        const result = this.addCollectionToQueue(refs);
+        await this.playNow(first);
+        return result;
     }
 
     /**

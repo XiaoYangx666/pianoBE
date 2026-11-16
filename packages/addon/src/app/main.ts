@@ -4,8 +4,10 @@ import { MusicCardComponent } from "@app/components/musicCard";
 import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
+import { openAdminLibrary } from "@app/ui/adminLibraryUI";
 import { midiManager } from "@app/midi";
 import { loadPbeSettings } from "@platform/storage/pbeSettingsStore";
+import { worldLibrary } from "@platform/storage/worldLibrary";
 import { system, world } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
 
@@ -34,6 +36,13 @@ system.run(() => {
     } catch (error) {
         console.warn("[piano] 读取管理员设置失败", error);
     }
+    // 世界级全局曲库：启动时扫描一次元数据，之后搜索/分页只查内存索引。
+    try {
+        worldLibrary.reload();
+        midiManager.addPublicSource(worldLibrary);
+    } catch (error) {
+        console.warn("[piano] 加载世界全局曲库失败", error);
+    }
 });
 
 // 玩家离开时清空 MIDI 导入进度；其它表单实例会随各自 show() 结束自动释放。
@@ -58,8 +67,9 @@ pcommand.registerNative(
     new Command("midilist", "查看 MIDI 缓存与钢琴运行时诊断", true, (player) => {
         const stats = midiManager.cacheStats();
         player.sendMessage(
-            `[SongCache] ${stats.songs} 首 / ${(stats.bytes / 1048576).toFixed(2)} MB ` +
-                `(预算 ${(stats.maxBytes / 1048576).toFixed(0)} MB, 加载中 ${stats.loading})`
+            `[SongCache] ${stats.songs} 首 / ${(stats.bytes / 1024).toFixed(0)} KB ` +
+                `(预算 ${(stats.maxBytes / 1024).toFixed(0)} KB, 活跃 ${stats.activeSongs}, ` +
+                `加载中 ${stats.loading}, 淘汰 ${stats.evictions}, 命中 ${stats.hits}/${stats.hits + stats.misses})`
         );
         player.sendMessage(pianoWorld.debugDump());
     })
@@ -69,6 +79,13 @@ pcommand.registerNative(
 pcommand.registerNative(
     new Command("pbe_setting", "PianoBE 管理员设置", true, (player) => {
         openPbeSettings(player);
+    })
+);
+
+// 管理员全局曲库：/pbe:pbe_library（无需存储卡）
+pcommand.registerNative(
+    new Command("pbe_library", "PianoBE 全局曲库管理", true, (player) => {
+        openAdminLibrary(player);
     })
 );
 

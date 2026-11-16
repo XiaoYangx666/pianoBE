@@ -426,9 +426,10 @@ export class PianoRuntime {
         const info = this.midi?.getInfo();
         const { dimension, pos } = this.location;
         const stats = this.scope.stats;
+        const cache = this.music.cacheStats();
         const card = this.cardSlot?.occupied ? "inserted" : "empty";
         return `[${info?.state ?? "ready"}] ${instrumentKey(dimension, pos)} ${info?.midiName ?? ""} ` +
-            `card=${card} snd=${this.soundReleases.size} ` +
+            `card=${card} cache=${cache.songs}/${cache.activeSongs} snd=${this.soundReleases.size} ` +
             `scope(s=${stats.scopes} sub=${stats.subscriptions} t=${stats.timers} j=${stats.jobs} d=${stats.disposables} pending=${this.scope.pending})`;
     }
 }

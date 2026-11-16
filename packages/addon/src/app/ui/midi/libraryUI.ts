@@ -214,10 +214,6 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         syncSearch();
         refresh();
     }, { visible: nextVisible });
-    ui.button("刷新", () => {
-        notice.setData("");
-        refresh();
-    });
     ui.closeButton();
 
     refresh();

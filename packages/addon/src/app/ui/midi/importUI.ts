@@ -10,6 +10,8 @@ import {
 } from "@piano/core";
 import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import type { PianoRuntime } from "@app/PianoRuntime";
+import { midiManager } from "@app/midi";
+import { worldLibrary } from "@platform/storage/worldLibrary";
 
 /** 同一玩家两次成功入库之间的最小间隔（毫秒） */
 const SUBMIT_COOLDOWN_MS = 5_000;
@@ -77,11 +79,13 @@ function progressText(progress: ImportProgress): string {
 
 export interface MidiImportArgs {
     piano?: PianoRuntime;
+    /** 默认写入当前存储卡；管理员管理页可显式导入世界全局曲库。 */
+    target?: "card" | "world";
 }
 
 /**
  * DDUI MIDI 导入：
- * - 唯一保存目标为当前卡槽内的存储卡；
+ * - 普通玩家只写入当前卡槽内的存储卡；管理员可显式写入世界全局曲库；
  * - 每段一次粘贴（单段建议 ≤4800 字符）；
  * - ImportAssembler 自动识别任务、支持乱序/重复/中断续传。
  *
@@ -89,8 +93,11 @@ export interface MidiImportArgs {
  */
 export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args) => {
     const player = ui.player;
-    if (!canImportMidi(player)) {
-        player.sendMessage("§e管理员未开放玩家导入 MIDI。");
+    const target = args.target === "world" ? "world" : "card";
+    if (target === "world" ? !isPbeAdmin(player) : !canImportMidi(player)) {
+        player.sendMessage(target === "world"
+            ? "§c只有管理员可以导入全局曲库。"
+            : "§e管理员未开放玩家导入 MIDI。");
         ui.close();
         return;
     }
@@ -100,9 +107,9 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
     const progress = ui.string("", { clientWritable: false });
     const input = ui.string("");
 
-    // 打开时检查插卡，并绑定这张卡的写句柄。
-    const access = args.piano?.cardAccess;
-    if (!args.piano || !access) {
+    // 存储卡导入在打开时检查并绑定卡片；全局曲库只允许管理员，无需插卡。
+    const access = target === "card" ? args.piano?.cardAccess : undefined;
+    if (target === "card" && (!args.piano || !access)) {
         status.setData("§c卡槽为空，请先插入音乐存储卡");
         ui.label(status)
             .label("§7MIDI 只能导入到当前钢琴卡槽内的存储卡。")
@@ -110,32 +117,44 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
             .closeButton();
         return;
     }
-    const storage = access.storage();
-    const cardLabel = storage.label;
+    const cardStorage = access?.storage();
+    const targetLabel = target === "world"
+        ? `${worldLibrary.label}（管理员）`
+        : `${cardStorage!.label}（当前卡槽）`;
 
     const clearInput = () => ui.timeout(() => ui.set(input, ""), 1);
 
     const commit = (payload: Uint8Array) => {
         // 提交环节再次校验权限：关闭玩家导入后，未完成的任务也不能继续入库。
-        if (!canImportMidi(player)) {
-            status.setData("§c管理员已关闭玩家导入，本次数据不会保存（可开启后重试）");
+        if (target === "world" ? !isPbeAdmin(player) : !canImportMidi(player)) {
+            status.setData("§c权限已变化，本次数据不会保存（可恢复后重试）");
             return;
         }
-        if (!args.piano?.isAlive()) {
+        if (target === "card" && !args.piano?.isAlive()) {
             status.setData("§c钢琴已不可用，本次数据不会保存");
             return;
         }
-        const rate = checkRate(player);
-        if (rate) {
-            status.setData(`§c${rate}（数据已保留，可稍后重试保存）`);
-            return;
+        if (target === "card") {
+            const rate = checkRate(player);
+            if (rate) {
+                status.setData(`§c${rate}（数据已保留，可稍后重试保存）`);
+                return;
+            }
         }
 
         try {
-            const entry = storage.save(payload);
-            access.refreshLore();
-            let message = `§a已保存到存储卡 §f${cardLabel}§a：§f${entry.name}` +
-                `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(storage.usage().usedBytes)}`;
+            const entry = target === "world" ? worldLibrary.save(payload) : cardStorage!.save(payload);
+            if (target === "world") {
+                midiManager.refreshPublicIndex();
+            } else {
+                access!.refreshLore();
+            }
+            const usedBytes = target === "world" ? worldLibrary.usage().usedBytes : cardStorage!.usage().usedBytes;
+            let message = target === "world"
+                ? `§a已保存到全局曲库：§f${entry.name}` +
+                    `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 曲库已用 §f${formatBytes(usedBytes)}`
+                : `§a已保存到存储卡 §f${targetLabel}§a：§f${entry.name}` +
+                    `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(usedBytes)}`;
             // 导入时顺带用离线模型估算同时发声峰值，超过引擎上限就提示（不阻止导入）。
             try {
                 const warning = formatVoiceLoadWarning(estimatePbe2VoiceLoad(payload));
@@ -217,7 +236,7 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
 
     ui.onChange(input, onInput);
 
-    ui.label(`§7目标：§f${cardLabel}（当前卡槽）`);
+    ui.label(`§7目标：§f${targetLabel}`);
     ui.label(status)
         .label(progress)
         .label("§7把生成器导出的分段逐段粘贴到下面（可乱序，重复段会自动忽略）")

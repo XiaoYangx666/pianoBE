@@ -83,6 +83,18 @@ export class PlayQueue {
         return "added";
     }
 
+    /** 移除指定引用（按来源/id/指纹匹配）；用于整卡播放前整理重复项。 */
+    removeRefs(refs: readonly MusicRef[]): number {
+        let removed = 0;
+        for (const ref of refs) {
+            const index = this.indexOf(ref);
+            if (index < 0) continue;
+            this.remove(index);
+            removed++;
+        }
+        return removed;
+    }
+
     /** 调整顺序；当前播放位置跟随被移动的曲目。 */
     move(from: number, to: number): boolean {
         if (from < 0 || from >= this.list.length || to < 0 || to >= this.list.length || from === to) return false;

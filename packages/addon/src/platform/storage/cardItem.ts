@@ -14,7 +14,9 @@ export const MUSIC_CARD_ID = "xypiano:music_card";
 const CARD_UID = `${CARD_META_PREFIX}uid`;
 const CARD_REV = `${CARD_META_PREFIX}rev`;
 const CARD_NAME = `${CARD_META_PREFIX}name`;
+const CARD_ORDER = `${CARD_META_PREFIX}order`;
 export const CARD_NAME_MAX = 32;
+export const CARD_ORDER_MAX = 500;
 export const DEFAULT_CARD_NAME = "音乐存储卡";
 
 /** 可读写的物品槽位（容器格 / 玩家手部）。ItemStack 是快照，必须写回。 */
@@ -81,6 +83,28 @@ export function cardRevision(item: ItemStack): number {
         return typeof value === "number" && Number.isFinite(value) ? value : 0;
     } catch {
         return 0;
+    }
+}
+
+/** 卡片持久化的播放顺序（只保存歌曲 id，正文仍在音乐命名空间）。 */
+export function readCardOrder(item: ItemStack | undefined): string[] {
+    if (!item) return [];
+    const raw = stringProperty(item, CARD_ORDER);
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        const ids: string[] = [];
+        const seen = new Set<string>();
+        for (const value of parsed) {
+            if (typeof value !== "string" || seen.has(value)) continue;
+            seen.add(value);
+            ids.push(value);
+            if (ids.length >= CARD_ORDER_MAX) break;
+        }
+        return ids;
+    } catch {
+        return [];
     }
 }
 
@@ -179,6 +203,14 @@ export class CardAccess {
         });
     }
 
+    /** 持久化整张卡的播放顺序；顺序变化才写回。 */
+    setOrder(ids: readonly string[]): void {
+        const next = [...new Set(ids)].slice(0, CARD_ORDER_MAX);
+        const current = readCardOrder(this.item);
+        if (next.length === current.length && next.every((id, index) => id === current[index])) return;
+        this.mutate((item) => item.setDynamicProperty(CARD_ORDER, JSON.stringify(next)));
+    }
+
     /** 卡片正文存储（每次操作都绑定当前槽位内容）。 */
     storage(limitBytes?: number): DynamicMusicStorage {
         const kv = {
@@ -209,7 +241,11 @@ export class CardAccess {
             kv,
             CARD_STORAGE_PREFIX,
             () => limitBytes ?? currentPbeSettings().cardStorageBytes,
-            () => (this.item ? cardName(this.item) : DEFAULT_CARD_NAME)
+            () => (this.item ? cardName(this.item) : DEFAULT_CARD_NAME),
+            {
+                read: () => readCardOrder(this.item),
+                write: ids => this.setOrder(ids),
+            }
         );
         return storage;
     }

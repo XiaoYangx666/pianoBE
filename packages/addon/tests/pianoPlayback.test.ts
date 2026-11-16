@@ -217,6 +217,36 @@ test("立即播放插入当前曲目之后，已有歌曲只跳转不重复", as
     expect(midi.queue.current()?.id).toBe("b");
 });
 
+test("整卡加入队列不中断播放，并按去重结果统计", () => {
+    const { midi } = fixture();
+    const current = { id: "current", name: "Current", duration: 40 };
+    midi.queue.enqueue(current);
+    const refs = [
+        { id: "a", name: "A", duration: 40, source: "card" as const, cardUid: "c1", checksum: "11" },
+        { id: "b", name: "B", duration: 40, source: "card" as const, cardUid: "c1", checksum: "22" },
+        { id: "a", name: "A", duration: 40, source: "card" as const, cardUid: "c1", checksum: "11" },
+    ];
+    const result = midi.addCollectionToQueue(refs);
+    expect(result).toEqual({ added: 2, exists: 1 });
+    expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["current", "a", "b"]);
+    expect(midi.queue.getIndex()).toBe(0);
+});
+
+test("播放整张存储卡：按顺序补入队列并从第一首开始播放", async () => {
+    const { midi } = fixture();
+    const original = { id: "original", name: "Original", duration: 40 };
+    const a = { id: "a", name: "A", duration: 40, source: "card" as const, cardUid: "c1", checksum: "11" };
+    const b = { id: "b", name: "B", duration: 40, source: "card" as const, cardUid: "c1", checksum: "22" };
+    midi.queue.enqueue(original);
+    // 队列中已有卡片歌曲：整卡播放时去重并重新排成连续块。
+    midi.queue.enqueue(b);
+    const result = await midi.playCollection([a, b]);
+    expect(result).toEqual({ added: 2, exists: 0 });
+    expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["original", "a", "b"]);
+    expect(midi.queue.current()?.id).toBe("a");
+    expect(midi.getState()).toBe("playing");
+});
+
 test("加入队列按来源/ID/指纹去重", () => {
     const { midi } = fixture();
     const ref = { id: "a", name: "A", duration: 40, source: "library" as const, checksum: "1111" };

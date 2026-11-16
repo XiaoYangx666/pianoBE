@@ -18,6 +18,9 @@ mock.module("@minecraft/server", () => ({
     world: {
         afterEvents: { worldLoad: { subscribe: () => () => {} } },
         getPlayers: () => [],
+        getDynamicPropertyIds: () => [],
+        getDynamicProperty: () => undefined,
+        setDynamicProperty: () => {},
     },
     Block: class {},
     MolangVariableMap: class {
@@ -66,7 +69,11 @@ let pageImpl: (page: number, pageSize: number, q?: string) => Promise<{ items: a
 mock.module("@app/midi", () => createMidiAppMock({
     page: (...args: any[]) => pageImpl(args[0], args[1], args[2]),
 }));
-mock.module("@app/permissions", () => ({ canImportMidi: () => true, isPbeAdmin: () => true }));
+let isAdmin = true;
+mock.module("@app/permissions", () => ({
+    canImportMidi: () => true,
+    isPbeAdmin: () => isAdmin,
+}));
 mock.module("@app/PianoWorld", () => ({ pianoWorld: { get: () => undefined } }));
 
 const { MusicLibraryPage } = await import("../src/app/ui/midi/libraryUI");
@@ -75,6 +82,7 @@ const { PlayQueuePage } = await import("../src/app/ui/midi/queueUI");
 const { TrackActionsPage } = await import("../src/app/ui/midi/trackActions");
 const { MidiPlayerPage } = await import("../src/app/ui/midi/playerUI");
 const { MidiImportPage } = await import("../src/app/ui/midi/importUI");
+const { openAdminLibrary } = await import("../src/app/ui/adminLibraryUI");
 
 function makeEntry(id: string, name: string): StoredMusicEntry {
     return {
@@ -198,6 +206,7 @@ const libraryMetas = [
 beforeEach(() => {
     host.reset();
     pageImpl = async () => ({ items: [], total: 0 });
+    isAdmin = true;
 });
 
 describe("公共曲库与管理/添加模式", () => {
@@ -327,6 +336,61 @@ describe("存储卡页面", () => {
         expect(empty.labelTexts().some(text => text.includes("未插卡"))).toBe(true);
         expect(empty.buttonLabels()).not.toContain("插入手中的卡");
     });
+
+    test("有歌曲时显示整卡播放/入队/排序，空卡时隐藏", () => {
+        const entries = [makeEntry("c1", "卡上歌")];
+        const { piano } = makePiano({ cardAccess: cardAccess(entries) });
+        const form = open(MusicCardPage, { piano });
+        expect(form.buttonLabels()).toContain("▶ 播放整张存储卡");
+        expect(form.buttonLabels()).toContain("＋ 整卡加入播放队列");
+        expect(form.buttonLabels()).toContain("调整歌曲顺序");
+
+        const emptyPiano = makePiano({ cardAccess: cardAccess([]) }).piano;
+        const empty = open(MusicCardPage, { piano: emptyPiano });
+        expect(empty.buttonLabels()).not.toContain("▶ 播放整张存储卡");
+        expect(empty.buttonLabels()).not.toContain("＋ 整卡加入播放队列");
+        expect(empty.buttonLabels()).not.toContain("调整歌曲顺序");
+    });
+
+    test("整卡加入队列按卡片顺序去重，不触发播放", () => {
+        const entries = [makeEntry("c1", "第一首"), makeEntry("c2", "第二首")];
+        const { piano, midi } = makePiano({
+            cardAccess: cardAccess(entries),
+            cardStorage: fakeStorage(entries),
+        });
+        let played = false;
+        piano.getMidiPlayer = () => ({
+            queue: midi.queue,
+            addCollectionToQueue: (refs: any[]) => {
+                let added = 0;
+                for (const ref of refs) if (midi.addToQueue(ref) === "added") added++;
+                return { added, exists: refs.length - added };
+            },
+            playCollection: () => { played = true; return Promise.resolve(undefined); },
+            getInfo: () => ({ state: "idle" }),
+        });
+        const form = open(MusicCardPage, { piano });
+        form.click("＋ 整卡加入播放队列");
+        expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["c1", "c2"]);
+        expect(played).toBe(false);
+
+        form.click("＋ 整卡加入播放队列");
+        expect(midi.queue.getLength()).toBe(2);
+    });
+
+    test("整卡播放调用播放业务层，不直接清空队列", () => {
+        const entries = [makeEntry("c1", "第一首")];
+        const { piano } = makePiano({ cardAccess: cardAccess(entries), cardStorage: fakeStorage(entries) });
+        let received: any[] = [];
+        piano.getMidiPlayer = () => ({
+            queue: { getRefs: () => [], indexOf: () => -1, getLength: () => 0 },
+            playCollection: (refs: any[]) => { received = refs; return Promise.resolve({ added: 1, exists: 0 }); },
+            getInfo: () => ({ state: "idle" }),
+        });
+        const form = open(MusicCardPage, { piano });
+        form.click("▶ 播放整张存储卡");
+        expect(received.map(ref => ref.id)).toEqual(["c1"]);
+    });
 });
 
 describe("播放队列页面", () => {
@@ -349,6 +413,27 @@ describe("播放队列页面", () => {
         form.click("＋ 添加歌曲");
         expect(host.nav.pushed.at(-1)!.form).toBe(MusicLibraryPage);
         expect((host.nav.pushed.at(-1)!.args as any).mode).toBe("add");
+    });
+
+    test("歌曲操作页可以跳转到队列中的歌曲并播放", async () => {
+        const { piano, midi } = makePiano();
+        const ref = { id: "q1", name: "队列歌", duration: 800, source: "library" as const };
+        midi.queue.enqueue(ref);
+        let played: any;
+        piano.getMidiPlayer = () => ({
+            queue: midi.queue,
+            getInfo: () => ({ state: "playing" }),
+            playNow: (target: any) => { played = target; return Promise.resolve(); },
+        });
+
+        const list = open(PlayQueuePage, { piano });
+        list.click(list.buttonLabels().find(label => label.includes("队列歌"))!);
+        const pushed = host.nav.pushed.at(-1)!;
+        host.DDUI.open(makePlayer("queue"), pushed.form, pushed.args);
+        host.lastForm().click("▶ 跳转播放");
+        await settle();
+        expect(played?.id).toBe("q1");
+        expect(host.lastForm().labelTexts().some(text => text.includes("已跳转并开始播放"))).toBe(true);
     });
 });
 
@@ -423,6 +508,48 @@ describe("MIDI 导入页面", () => {
         expect(form.components.some(component => component.type === "textField")).toBe(true);
         expect(form.components.some(component => component.type === "dropdown")).toBe(false);
         expect(form.labelTexts().some(text => text.includes("当前卡槽"))).toBe(true);
+    });
+
+    test("管理员可无需存储卡导入世界全局曲库", () => {
+        const form = open(MidiImportPage, { target: "world" });
+        expect(form.components.some(component => component.type === "textField")).toBe(true);
+        expect(form.components.some(component => component.type === "dropdown")).toBe(false);
+        expect(form.labelTexts().some(text => text.includes("世界公共曲库"))).toBe(true);
+    });
+
+    test("普通玩家不能导入世界全局曲库", () => {
+        isAdmin = false;
+        const messages: string[] = [];
+        host.DDUI.open(makePlayer("not-admin", messages), MidiImportPage, { target: "world" });
+        expect(messages.some(message => message.includes("只有管理员"))).toBe(true);
+        expect(host.lastForm().components.some(component => component.type === "textField")).toBe(false);
+    });
+});
+
+describe("管理员全局曲库入口", () => {
+    test("普通玩家被拒绝且不会打开管理页面", () => {
+        isAdmin = false;
+        const messages: string[] = [];
+        const formCount = host.forms().length;
+        openAdminLibrary(makePlayer("member", messages));
+        expect(messages.some(message => message.includes("只有管理员"))).toBe(true);
+        expect(host.forms()).toHaveLength(formCount);
+    });
+
+    test("管理员入口显示容量与导入/浏览按钮", () => {
+        openAdminLibrary(makePlayer("op"));
+        const form = host.lastForm();
+        expect(form.labelTexts().some(text => text.includes("世界动态属性"))).toBe(true);
+        expect(form.labelTexts().some(text => text.includes("500"))).toBe(true);
+        expect(form.buttonLabels()).toContain("导入全局歌曲");
+        expect(form.buttonLabels()).toContain("浏览与删除歌曲");
+    });
+
+    test("管理员从入口打开全局导入，目标不是存储卡", () => {
+        openAdminLibrary(makePlayer("op"));
+        host.lastForm().click("导入全局歌曲");
+        expect(host.nav.pushed.at(-1)!.form).toBe(MidiImportPage);
+        expect((host.nav.pushed.at(-1)!.args as any).target).toBe("world");
     });
 });
 

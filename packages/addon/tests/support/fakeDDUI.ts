@@ -532,7 +532,8 @@ export function createMidiAppMock(overrides: { page?: unknown } = {}) {
             metaAll: async () => [],
             infoOf: async () => undefined,
             getInfo: () => undefined,
-            addSource: () => {},
+            addPublicSource: () => {},
+            refreshPublicIndex: () => {},
         },
     };
 }

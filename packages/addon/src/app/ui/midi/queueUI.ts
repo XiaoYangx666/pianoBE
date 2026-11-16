@@ -78,7 +78,6 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
     ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
     ui.button("下一页 ▶", () => { if (state.page < state.maxPage) { state.page++; refresh(); } }, { visible: nextVisible });
     ui.button("清空队列", () => ui.push(ClearQueuePage, { piano }));
-    ui.button("刷新", refresh);
     ui.closeButton();
 
     refresh();
@@ -106,6 +105,17 @@ const QueueItemPage = DDUI.page<QueueItemArgs>("队列操作", (ui, args) => {
         status.setData(delta < 0 ? "§a已上移" : "§a已下移");
     };
 
+    ui.button("▶ 跳转播放", () => {
+        if (!piano.isAlive()) return ui.close();
+        const target = queue();
+        if (target.indexOf(ref) < 0) return status.setData("§e曲目已不在队列中");
+        if (piano.music.availability(ref) !== "ok") {
+            return status.setData("§c曲目当前不可用（来源可能已被移除）");
+        }
+        void piano.getMidiPlayer().playNow(ref)
+            .then(() => status.setData("§a已跳转并开始播放"))
+            .catch(error => status.setData(`§c播放失败：${(error as Error)?.message ?? error}`));
+    });
     ui.button("上移", () => move(-1));
     ui.button("下移", () => move(1));
     ui.button("从队列移除", () => {
