@@ -32,6 +32,8 @@ export interface AppLayoutProps {
     padded?: boolean;
     /** 手机端去掉页面内边距，让列表贴边。 */
     mobileFlush?: boolean;
+    /** 手机端是否显示抽屉导航（默认 true）；底栏已覆盖全部入口时可关掉。 */
+    mobileDrawer?: boolean;
     pageClassName?: string;
     /** 兼容旧接口：OreUI 只有深色主题，此参数已无效。 */
     withColorSchemeToggle?: boolean;
@@ -98,6 +100,7 @@ export function AppLayout({
     children,
     padded = true,
     mobileFlush = false,
+    mobileDrawer = true,
     pageClassName,
 }: AppLayoutProps) {
     const [mobileOpened, setMobileOpened] = useState(false);
@@ -146,14 +149,16 @@ export function AppLayout({
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 {/* 移动端顶栏：窄、安静，只保留导航与少量操作 */}
                 <header className="flex h-12 shrink-0 items-center gap-1 border-b border-ore-divider bg-ore-sunken/95 px-2 lg:hidden">
-                    <button
-                        type="button"
-                        className="grid h-8 w-8 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
-                        aria-label="打开导航"
-                        onClick={() => setMobileOpened(true)}
-                    >
-                        <MenuIcon size={18} />
-                    </button>
+                    {mobileDrawer && (
+                        <button
+                            type="button"
+                            className="grid h-8 w-8 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
+                            aria-label="打开导航"
+                            onClick={() => setMobileOpened(true)}
+                        >
+                            <MenuIcon size={18} />
+                        </button>
+                    )}
                     <div className="min-w-0 px-1">
                         <Brand brand={brand} compact />
                     </div>
@@ -182,7 +187,7 @@ export function AppLayout({
 
             {player && <PlayerBar player={player} extras={playerExtras} />}
 
-            {mobileOpened && (
+            {mobileDrawer && mobileOpened && (
                 <div
                     className="fixed inset-0 z-50 animate-[pbFadeIn_140ms_ease-out] bg-black/55 lg:hidden"
                     onClick={() => setMobileOpened(false)}

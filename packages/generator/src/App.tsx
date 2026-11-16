@@ -1,31 +1,20 @@
 import { memo, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AppLayout, IconButton, PianoMark, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
-import { AudioWaveform, History, LibraryBig, PackageOpen } from "lucide-react";
+import { AppLayout, PianoMark, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { AudioWaveform, Info, LibraryBig, PackageOpen } from "lucide-react";
 import { previewPlayer } from "./player";
 import { useGenerator } from "./store/generator";
 import { LibraryPage } from "./pages/LibraryPage";
 import { AddonPage } from "./pages/AddonPage";
+import { AboutPage } from "./pages/AboutPage";
 import { ConvertPlaceholderPage } from "./pages/ConvertPlaceholderPage";
-import { ChangelogModal } from "./components/ChangelogModal";
+import { ChangelogButton } from "./components/ChangelogButton";
 
 // 页面自身订阅 store，App 的局部状态（弹窗、loading、导出中）不应连带重渲染整个页面树
 const MemoLibraryPage = memo(LibraryPage);
 const MemoAddonPage = memo(AddonPage);
+const MemoAboutPage = memo(AboutPage);
 const MemoConvertPlaceholderPage = memo(ConvertPlaceholderPage);
-
-/** 更新日志按钮自带弹窗状态：点开时只重渲染按钮本身，不牵动页面 */
-function ChangelogButton() {
-    const [opened, setOpened] = useState(false);
-    return (
-        <>
-            <IconButton type="button" aria-label="更新日志" title="更新日志" onClick={() => setOpened(true)}>
-                <History size={15} />
-            </IconButton>
-            <ChangelogModal opened={opened} onClose={() => setOpened(false)} />
-        </>
-    );
-}
 
 export default function App() {
     const init = useGenerator((state) => state.init);
@@ -66,6 +55,7 @@ export default function App() {
             disabled: true,
             badge: <SongBadge tone="brand">规划中</SongBadge>,
         },
+        { to: "/about", label: "关于", icon: <Info size={18} /> },
     ];
 
     return (
@@ -79,7 +69,12 @@ export default function App() {
                 }}
                 nav={nav}
                 navLabel="工作区"
-                bottomNav={nav.slice(0, 2)}
+                bottomNav={[
+                    nav[0],
+                    nav[1],
+                    nav[3],
+                ]}
+                mobileDrawer={false}
                 player={previewPlayer}
                 playerExtras={{
                     timbres: timbres.map((item) => ({ id: item.id, label: item.label })),
@@ -105,6 +100,7 @@ export default function App() {
                 <Routes>
                     <Route path="/" element={<MemoLibraryPage />} />
                     <Route path="/addon" element={<MemoAddonPage />} />
+                    <Route path="/about" element={<MemoAboutPage />} />
                     <Route path="/convert" element={<MemoConvertPlaceholderPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
