@@ -4,6 +4,8 @@ import {
     MusicValidationError,
     StorageBudget,
     validateMusic,
+    worldPublicId,
+    worldRawId,
     type MidiSongMeta,
     type MusicStorageKv,
     type StoredMusicEntry,
@@ -91,7 +93,8 @@ export class WorldMusicLibrary {
 
     /** 重新扫描持久化元数据，重建内存索引与容量统计。 */
     reload(): void {
-        this.collection.pruneOrphans();
+        // 首次恢复时清理遗留分片；普通管理页不重复进行全量清理。
+        if (!this.initialized) this.collection.pruneOrphans();
         const entries = this.collection.entries();
         this.entriesCache = entries;
         this.byId = new Map(entries.map(entry => [entry.id, entry]));
@@ -201,6 +204,20 @@ export class WorldMusicLibrary {
     stats(): StorageUsage & { maxSongs: number } {
         return { ...this.usage(), maxSongs: WORLD_LIBRARY_MAX_SONGS };
     }
+
+    /** 普通公共曲库使用独立命名空间；管理员接口继续使用原始 PBE2 ID。 */
+    readonly publicSource = {
+        list: (): MidiSongMeta[] => this.list().map(meta => ({ ...meta, id: worldPublicId(meta.id) })),
+        get: (publicId: string): Promise<Uint8Array | undefined> => {
+            const id = worldRawId(publicId);
+            return id === undefined ? Promise.resolve(undefined) : this.get(id);
+        },
+        page: async (page: number, pageSize: number, query?: string) => {
+            const result = this.pageSync(page, pageSize, query);
+            return { total: result.total, items: result.items.map(meta => ({ ...meta, id: worldPublicId(meta.id) })) };
+        },
+        metaAll: async (query?: string) => this.metaAllSync(query).map(meta => ({ ...meta, id: worldPublicId(meta.id) })),
+    };
 }
 
 /** 世界级公共曲库单例；启动时由 main 在 system.run 中加载索引。 */

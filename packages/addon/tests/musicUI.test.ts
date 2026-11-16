@@ -526,6 +526,29 @@ describe("MIDI 导入页面", () => {
     });
 });
 
+describe("存储卡顺序页面的换卡保护", () => {
+    test("打开顺序详情后换卡，不能修改另一张卡的同 ID 歌曲", () => {
+        const entries = [makeEntry("a", "第一首"), makeEntry("b", "第二首")];
+        const first = cardAccess(entries, "card-a");
+        const second = cardAccess(entries, "card-b");
+        let active = first;
+        const { piano } = makePiano();
+        Object.defineProperty(piano, "cardAccess", { get: () => active });
+        Object.defineProperty(piano, "cardStorage", { get: () => active.storage() });
+        const card = open(MusicCardPage, { piano });
+        card.click("调整歌曲顺序");
+        const order = host.nav.pushed.at(-1)!;
+        host.DDUI.open(makePlayer(), order.form, order.args);
+        host.lastForm().click("1. 第一首");
+        const detail = host.nav.pushed.at(-1)!;
+        active = second;
+        host.DDUI.open(makePlayer(), detail.form, detail.args);
+        const item = host.lastForm();
+        item.click("下移");
+        expect(item.labelTexts().some(text => text.includes("已被替换"))).toBe(true);
+    });
+});
+
 describe("管理员全局曲库入口", () => {
     test("普通玩家被拒绝且不会打开管理页面", () => {
         isAdmin = false;

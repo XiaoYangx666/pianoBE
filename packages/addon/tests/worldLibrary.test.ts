@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { encodePbe2 } from "@piano/core";
+import { encodePbe2, worldPublicId } from "@piano/core";
 
 const properties = new Map<string, string>();
 const stats = { ids: 0, get: 0, set: 0 };
@@ -110,5 +110,18 @@ describe("世界全局曲库", () => {
         library.reload();
         expect(library.list()).toHaveLength(0);
         expect(library.remove("missing")).toBe(false);
+    });
+
+    test("公开索引使用世界命名空间，但管理员管理仍使用原始 ID", async () => {
+        const library = new WorldMusicLibrary();
+        library.reload();
+        library.save(music("same", "世界曲目"));
+        const publicId = worldPublicId("same");
+        expect(library.entry("same")?.id).toBe("same");
+        expect(library.publicSource.list().map(meta => meta.id)).toEqual([publicId]);
+        expect((await library.publicSource.page(1, 5)).items[0].id).toBe(publicId);
+        expect((await library.publicSource.metaAll())[0].id).toBe(publicId);
+        expect(await library.publicSource.get(publicId)).toEqual(music("same", "世界曲目"));
+        expect(await library.publicSource.get("same")).toBeUndefined();
     });
 });

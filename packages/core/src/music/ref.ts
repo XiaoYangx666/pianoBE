@@ -21,17 +21,25 @@ export interface MusicRef extends MidiSongMeta {
     cardUid?: string;
 }
 
-/** 缓存/去重键：来源 + id + 内容指纹。 */
-export function musicRefKey(ref: Pick<MusicRef, "source" | "id" | "checksum">): string {
-    return `${ref.source}:${ref.id}:${ref.checksum ?? ""}`;
+/** 世界公共曲库在索引和队列中使用独立 ID，PBE2 文件头仍使用原始 ID。 */
+export const WORLD_LIBRARY_PUBLIC_PREFIX = "world:";
+export function worldPublicId(id: string): string { return `${WORLD_LIBRARY_PUBLIC_PREFIX}${id}`; }
+export function worldRawId(id: string): string | undefined {
+    return id.startsWith(WORLD_LIBRARY_PUBLIC_PREFIX) ? id.slice(WORLD_LIBRARY_PUBLIC_PREFIX.length) : undefined;
 }
 
-/** 队列身份：同来源、同 id、同内容指纹才算同一首。 */
+/** 缓存键同时包含实体卡身份，避免不同卡片的缓存串用。 */
+export function musicRefKey(ref: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid">): string {
+    return `${ref.source}:${ref.id}:${ref.checksum ?? ""}:${ref.source === "card" ? ref.cardUid ?? "" : ""}`;
+}
+
+/** 卡片歌曲还必须属于同一张实体卡。 */
 export function sameMusicRef(
-    a: Pick<MusicRef, "source" | "id" | "checksum">,
-    b: Pick<MusicRef, "source" | "id" | "checksum">
+    a: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid">,
+    b: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid">
 ): boolean {
-    return a.id === b.id && a.source === b.source && (a.checksum ?? "") === (b.checksum ?? "");
+    return a.id === b.id && a.source === b.source && (a.checksum ?? "") === (b.checksum ?? "")
+        && (a.source !== "card" || (a.cardUid ?? "") === (b.cardUid ?? ""));
 }
 
 /** 把存储条目/曲库元信息统一转换为队列引用。 */

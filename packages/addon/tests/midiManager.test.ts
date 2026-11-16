@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { MidiSongMeta } from "@piano/core";
+import { encodePbe2, worldPublicId, type MidiSongMeta } from "@piano/core";
 import { MidiManager, type MidiSourceLike } from "../src/domain/playback/midiManager";
 
 const meta = (id: string, name = id): MidiSongMeta => ({ id, name, duration: 40 });
@@ -54,5 +54,35 @@ describe("MidiManager 公共附加来源", () => {
         expect(manager.getInfo("g1")).toBeUndefined();
         expect(manager.getInfo("g2")?.name).toBe("夜曲");
         expect((await manager.page(1, 10)).items.map(item => item.id)).toEqual(["a", "g2"]);
+    });
+
+    test("主曲库和世界曲库同 ID 时，播放数据与元信息分别对应", async () => {
+        const encode = (name: string) => encodePbe2({
+            id: "same", name, duration: 40,
+            tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 20, 90] }],
+        });
+        const primaryBytes = encode("主来源");
+        const worldBytes = encode("世界来源");
+        const primary: MidiSourceLike = {
+            list: () => [meta("same", "主来源")],
+            get: async id => id === "same" ? primaryBytes : undefined,
+        };
+        const worldId = worldPublicId("same");
+        const secondary: MidiSourceLike = {
+            list: () => [meta(worldId, "世界来源")],
+            get: async id => id === worldId ? worldBytes : undefined,
+        };
+        const manager = new MidiManager(primary);
+        manager.addPublicSource(secondary);
+        expect(manager.getInfo("same")?.name).toBe("主来源");
+        expect(manager.getInfo(worldId)?.name).toBe("世界来源");
+        expect((await manager.page(1, 5)).items.map(item => item.id)).toEqual(["same", worldId]);
+        const a = await manager.acquire("same");
+        const b = await manager.acquire(worldId);
+        expect(a?.song.name).toBe("主来源");
+        expect(b?.song.name).toBe("世界来源");
+        a?.release();
+        b?.release();
+        expect(await manager.read(worldId)).toEqual(worldBytes);
     });
 });

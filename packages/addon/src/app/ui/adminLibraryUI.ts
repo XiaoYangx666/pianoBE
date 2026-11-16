@@ -176,12 +176,26 @@ const AdminLibraryTrackPage = DDUI.page<AdminTrackArgs>("全局歌曲详情", (u
     ui.label(`§7校验：§f${entry.checksum}`);
     ui.label(status);
 
-    ui.button("删除全局歌曲", () => {
+    ui.button("删除全局歌曲", () => ui.push(AdminLibraryDeletePage, { id: entry.id }));
+    ui.button("返回", () => ui.back());
+    ui.closeButton();
+});
+
+/** 删除世界歌曲前二次确认；执行时重查管理员权限。 */
+const AdminLibraryDeletePage = DDUI.page<AdminTrackArgs>("确认删除全局歌曲", (ui, args) => {
+    if (!isPbeAdmin(ui.player)) {
+        ui.player.sendMessage("§c只有管理员可以删除全局歌曲。");
+        ui.close();
+        return;
+    }
+    const entry = worldLibrary.entry(args.id);
+    const status = ui.string("");
+    ui.label(entry ? `§e确定从世界公共曲库永久删除「${entry.name}」？` : "§e歌曲已不存在");
+    ui.label(status);
+    if (entry) ui.button("确认永久删除", () => {
+        if (!isPbeAdmin(ui.player)) return status.setData("§c管理员权限已失效");
         try {
-            if (!worldLibrary.remove(entry.id)) {
-                status.setData("§e歌曲已不存在");
-                return;
-            }
+            if (!worldLibrary.remove(args.id)) return status.setData("§e歌曲已不存在");
             midiManager.refreshPublicIndex();
             ui.player.sendMessage(`§a[全局曲库] 已删除：${entry.name}`);
             ui.back();
@@ -189,6 +203,6 @@ const AdminLibraryTrackPage = DDUI.page<AdminTrackArgs>("全局歌曲详情", (u
             status.setData(`§c删除失败：${(error as Error)?.message ?? error}`);
         }
     });
-    ui.button("返回", () => ui.back());
+    ui.button("取消", () => ui.back());
     ui.closeButton();
 });

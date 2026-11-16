@@ -161,17 +161,11 @@ export class MidiPlayer {
         await this.play();
     }
 
-    /**
-     * 播放一组按顺序排列的曲目（存储卡播放列表）：
-     * 先移除队列中的同组旧条目，再按卡片顺序追加为连续块并播放第一首。
-     * 不清空其他队列歌曲，也不产生重复条目。
-     */
+    /** 整卡播放：卡片歌曲在当前曲目后组成连续块，后续队列不会被跳过。 */
     async playCollection(refs: readonly MusicRef[]): Promise<{ added: number; exists: number } | undefined> {
-        const first = refs[0];
-        if (!first) return undefined;
-        this.queue.removeRefs(refs);
-        const result = this.addCollectionToQueue(refs);
-        await this.playNow(first);
+        if (!refs.length) return undefined;
+        const result = this.queue.insertCollectionAfterCurrent(refs);
+        await this.play();
         return result;
     }
 

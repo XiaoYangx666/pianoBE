@@ -58,7 +58,7 @@ export class PlayQueue {
             return midi;
         }
 
-        const insertIndex = this.index + 1;
+        const insertIndex = Math.min(this.list.length, this.index + 1);
         this.list.splice(insertIndex, 0, midi);
         this.index = insertIndex;
         return midi;
@@ -81,6 +81,31 @@ export class PlayQueue {
         if (this.indexOf(midi) >= 0) return "exists";
         this.enqueue(midi);
         return "added";
+    }
+
+    /** 在当前曲目之后插入整组歌曲并跳到第一首；其余歌曲保留在后面。 */
+    insertCollectionAfterCurrent(refs: readonly MusicRef[]): { added: number; exists: number } {
+        const unique: MusicRef[] = [];
+        for (const ref of refs) if (!unique.some(item => sameMusicRef(item, ref))) unique.push(ref);
+        if (!unique.length) return { added: 0, exists: 0 };
+        const selected = (ref: MusicRef) => unique.some(item => sameMusicRef(item, ref));
+        const previous = this.list;
+        const exists = unique.filter(ref => previous.some(item => sameMusicRef(item, ref))).length;
+        const currentIsSelected = this.current() !== undefined && selected(this.current()!);
+        const originalInsertAt = this.index < 0 ? 0
+            : Math.min(previous.length, this.index + (currentIsSelected ? 0 : 1));
+        let removedBefore = 0;
+        const kept: MusicRef[] = [];
+        for (let i = 0; i < previous.length; i++) {
+            if (selected(previous[i])) {
+                if (i < originalInsertAt) removedBefore++;
+            } else kept.push(previous[i]);
+        }
+        const insertAt = originalInsertAt - removedBefore;
+        kept.splice(insertAt, 0, ...unique);
+        this.list = kept;
+        this.index = insertAt;
+        return { added: unique.length - exists, exists };
     }
 
     /** 移除指定引用（按来源/id/指纹匹配）；用于整卡播放前整理重复项。 */

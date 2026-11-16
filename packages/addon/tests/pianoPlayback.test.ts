@@ -241,10 +241,34 @@ test("播放整张存储卡：按顺序补入队列并从第一首开始播放",
     // 队列中已有卡片歌曲：整卡播放时去重并重新排成连续块。
     midi.queue.enqueue(b);
     const result = await midi.playCollection([a, b]);
-    expect(result).toEqual({ added: 2, exists: 0 });
+    expect(result).toEqual({ added: 1, exists: 1 });
     expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["original", "a", "b"]);
     expect(midi.queue.current()?.id).toBe("a");
     expect(midi.getState()).toBe("playing");
+});
+
+test("整卡播放不会让队列里后续待播放歌曲被跳过", async () => {
+    const { midi } = fixture();
+    const ref = (id: string) => ({ id, name: id, duration: 40, source: "card" as const, cardUid: "card-a", checksum: "aa" });
+    midi.queue.enqueue({ id: "current", name: "current", duration: 40, source: "library" });
+    midi.queue.enqueue({ id: "next", name: "next", duration: 40, source: "library" });
+    midi.queue.enqueue(ref("b"));
+    midi.queue.enqueue({ id: "last", name: "last", duration: 40, source: "library" });
+    await midi.playCollection([ref("a"), ref("b")]);
+    expect(midi.queue.getRefs().map(item => item.id)).toEqual(["current", "a", "b", "next", "last"]);
+    expect(midi.queue.current()?.id).toBe("a");
+    expect(midi.queue.next()?.id).toBe("b");
+    expect(midi.queue.next()?.id).toBe("next");
+});
+
+test("队列自然结束后立即播放新歌曲不会产生越界索引", async () => {
+    const { midi } = fixture();
+    const ref = { id: "a", name: "A", duration: 40, source: "library" as const };
+    midi.queue.enqueue(ref);
+    expect(midi.queue.next()).toBeUndefined();
+    await midi.playNow({ ...ref, id: "b", name: "B" });
+    expect(midi.queue.current()?.id).toBe("b");
+    expect(midi.queue.getIndex()).toBeLessThan(midi.queue.getLength());
 });
 
 test("加入队列按来源/ID/指纹去重", () => {

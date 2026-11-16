@@ -118,6 +118,8 @@ const CardOrderPage = DDUI.page<CardOrderArgs>("存储卡顺序", (ui, args) => 
     const piano = args.piano;
     ui.subscribe(piano.disposedSignal, () => ui.close());
 
+    const openedUid = piano.cardAccess?.uid;
+    const matchesOpenedCard = () => !!openedUid && piano.cardAccess?.uid === openedUid;
     const state = { page: Math.max(1, args.page ?? 1), maxPage: 1 };
     const persist = () => { args.page = state.page; };
     persist();
@@ -127,7 +129,7 @@ const CardOrderPage = DDUI.page<CardOrderArgs>("存储卡顺序", (ui, args) => 
     const visible = Array.from({ length: PAGE_SIZE }, () => ui.boolean(false, { clientWritable: false }));
     const prevVisible = ui.boolean(false, { clientWritable: false });
     const nextVisible = ui.boolean(false, { clientWritable: false });
-    const entries = () => piano.cardStorage?.list() ?? [];
+    const entries = () => matchesOpenedCard() ? piano.cardStorage?.list() ?? [] : [];
 
     const refresh = () => {
         if (!piano.isAlive() || ui.closed) return;
@@ -138,7 +140,7 @@ const CardOrderPage = DDUI.page<CardOrderArgs>("存储卡顺序", (ui, args) => 
             state.page = state.maxPage;
             persist();
         }
-        head.setData(list.length ? "§7点击歌曲后调整上移/下移；顺序会保存到存储卡" : "§e卡槽为空或存储卡里没有歌曲");
+        head.setData(!matchesOpenedCard() ? "§e存储卡已被取出或替换，请重新打开此页面" : list.length ? "§7点击歌曲后调整上移/下移；顺序会保存到存储卡" : "§e存储卡里没有歌曲");
         const start = (state.page - 1) * PAGE_SIZE;
         for (let slot = 0; slot < PAGE_SIZE; slot++) {
             const index = start + slot;
@@ -155,8 +157,8 @@ const CardOrderPage = DDUI.page<CardOrderArgs>("存储卡顺序", (ui, args) => 
     for (let slot = 0; slot < PAGE_SIZE; slot++) {
         ui.button(labels[slot], () => {
             const entry = entries()[(state.page - 1) * PAGE_SIZE + slot];
-            if (!entry || !piano.isAlive()) return;
-            ui.push(CardOrderItemPage, { piano, id: entry.id });
+            if (!entry || !piano.isAlive() || !matchesOpenedCard()) return;
+            ui.push(CardOrderItemPage, { piano, id: entry.id, cardUid: openedUid! });
         }, { visible: visible[slot] });
     }
     ui.button("◀ 上一页", () => { if (state.page > 1) { state.page--; refresh(); } }, { visible: prevVisible });
@@ -170,10 +172,12 @@ const CardOrderPage = DDUI.page<CardOrderArgs>("存储卡顺序", (ui, args) => 
 interface CardOrderItemArgs {
     piano: PianoRuntime;
     id: string;
+    cardUid: string;
 }
 
 const CardOrderItemPage = DDUI.page<CardOrderItemArgs>("调整顺序", (ui, args) => {
     const { piano, id } = args;
+    const matchesOpenedCard = () => piano.cardAccess?.uid === args.cardUid;
     const status = ui.string("");
     ui.subscribe(piano.disposedSignal, () => ui.close());
     const name = ui.string("");
@@ -181,6 +185,11 @@ const CardOrderItemPage = DDUI.page<CardOrderItemArgs>("调整顺序", (ui, args
 
     const sync = () => {
         if (!piano.isAlive() || ui.closed) return;
+        if (!matchesOpenedCard()) {
+            name.setData("§e存储卡已被替换，请重新打开顺序管理");
+            position.setData("");
+            return;
+        }
         const list = piano.cardStorage?.list() ?? [];
         const index = list.findIndex(entry => entry.id === id);
         if (index < 0) {
@@ -193,6 +202,7 @@ const CardOrderItemPage = DDUI.page<CardOrderItemArgs>("调整顺序", (ui, args
     };
 
     const move = (delta: number) => {
+        if (!matchesOpenedCard()) return status.setData("§c存储卡已被替换，操作已取消");
         const storage = piano.cardStorage;
         if (!storage) return status.setData("§c存储卡已不在卡槽中");
         try {

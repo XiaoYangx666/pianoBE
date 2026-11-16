@@ -1,5 +1,5 @@
 import type { MidiSongMeta } from "@piano/core";
-import { SongCache, type SongHandle } from "@piano/core";
+import { SongCache, worldRawId, type SongHandle } from "@piano/core";
 
 /**
  * 曲库管理器：
@@ -15,7 +15,10 @@ export class MidiManager {
     private readonly cache: SongCache;
 
     constructor(private source: MidiSourceLike, maxCacheBytes?: number) {
-        this.cache = new SongCache((id) => this.load(id), { maxBytes: maxCacheBytes });
+        this.cache = new SongCache((id) => this.load(id), {
+            maxBytes: maxCacheBytes,
+            verify: (id, header) => header.id === (worldRawId(id) ?? id),
+        });
         this.refreshSync();
     }
 
@@ -103,7 +106,7 @@ export class MidiManager {
         const handle = await this.cache.acquire(id);
         if (!handle) return undefined;
         const meta: MidiSongMeta = {
-            id: handle.song.id,
+            id,
             name: handle.song.name,
             duration: handle.song.duration,
             noteCount: handle.song.noteCount,
@@ -133,6 +136,16 @@ export class MidiManager {
 
     /** 加载 PBE2 数据：主来源优先，公共附加来源兜底（未找到返回 undefined） */
     private async load(id: string): Promise<Uint8Array | undefined> {
+        // 命名空间歌曲只能读世界公共来源，不能被同 ID 的主曲库截获。
+        if (worldRawId(id) !== undefined) {
+            for (const source of this.publicSources) {
+                try {
+                    const bytes = await source.get(id);
+                    if (bytes) return bytes;
+                } catch { /* 尝试下一个来源 */ }
+            }
+            return undefined;
+        }
         try {
             const primary = await this.source.get(id);
             if (primary) return primary;

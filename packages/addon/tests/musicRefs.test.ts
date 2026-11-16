@@ -66,6 +66,15 @@ describe("播放队列（带来源）", () => {
         expect(queue.indexOf(fromLibrary)).toBe(0);
     });
 
+    test("同一曲目存放在不同实体卡中，队列不会错误去重", () => {
+        const queue = new PlayQueue();
+        const ref: MusicRef = { id: "x", name: "X", duration: 40, source: "card", checksum: "abc12345", cardUid: "card-a" };
+        queue.enqueue(ref);
+        expect(queue.enqueueUnique({ ...ref, cardUid: "card-b" })).toBe("added");
+        expect(queue.indexOf({ ...ref, cardUid: "card-b" })).toBe(1);
+        expect(queue.getLength()).toBe(2);
+    });
+
     test("快照/恢复保留来源，旧调用仍可按 id 查找", () => {
         const queue = new PlayQueue();
         queue.enqueue({ id: "a", name: "A", duration: 40, source: "card", checksum: "abcd" });
@@ -156,5 +165,33 @@ describe("钢琴音乐读取（PianoMusic）", () => {
         expect(source.availability(ref)).toBe("ok");
         cardPresent = false;
         expect(source.availability(ref)).toBe("missing");
+    });
+
+    test("缓存命中也必须检查卡片身份与曲目是否仍存在", async () => {
+        const bytes = music("abc");
+        const entry = stored(bytes);
+        let uid = "card-a";
+        let present = true;
+        let tracks = [entry];
+        const source = new PianoMusic(
+            () => present ? fakeStorage(tracks, new Map([["abc", bytes]])) : undefined,
+            () => uid
+        );
+        const ref: MusicRef = { id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes };
+        const first = await source.acquire(ref);
+        expect(first).toBeDefined();
+        first?.release();
+        present = false;
+        expect(await source.acquire(ref)).toBeUndefined();
+        present = true;
+        uid = "card-b";
+        expect(await source.acquire(ref)).toBeUndefined();
+        uid = "card-a";
+        tracks = [];
+        expect(await source.acquire(ref)).toBeUndefined();
+        tracks = [entry];
+        const again = await source.acquire(ref);
+        expect(again).toBeDefined();
+        again?.release();
     });
 });

@@ -56,6 +56,8 @@ export class PianoMusic {
 
     async acquire(ref: MusicRef): Promise<SongHandle | undefined> {
         if (ref.source === "library") return midiManager.acquire(ref.id);
+        // 命中 SongCache 时不会执行 readCard，故每次新播放都必须先确认卡片仍可用。
+        if (this.availability(ref) !== "ok") return undefined;
         const key = musicRefKey(ref);
         this.loaders.set(key, () => this.readCard(ref));
         try {

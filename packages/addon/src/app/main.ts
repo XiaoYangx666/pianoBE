@@ -39,7 +39,7 @@ system.run(() => {
     // 世界级全局曲库：启动时扫描一次元数据，之后搜索/分页只查内存索引。
     try {
         worldLibrary.reload();
-        midiManager.addPublicSource(worldLibrary);
+        midiManager.addPublicSource(worldLibrary.publicSource);
     } catch (error) {
         console.warn("[piano] 加载世界全局曲库失败", error);
     }
