@@ -53,7 +53,7 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
             opened={opened}
             onClose={onClose}
             title="游戏内导入码"
-            size="lg"
+            size="md"
         >
             <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2 text-xs leading-relaxed text-ore-dim">
@@ -72,7 +72,7 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
                     </Button>
                 </div>
 
-                <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                <div className="grid max-h-[min(52vh,360px)] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                     {chunks.map((chunk, index) => (
                         <div
                             key={index}
@@ -82,7 +82,7 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
                                 <div className="mb-1 text-[11px] text-ore-dim">
                                     第 {index + 1}/{chunks.length} 段 · {chunk.length} 字符
                                 </div>
-                                <code className="block truncate font-mono text-[11px] text-ore-dim">{chunk.slice(0, 96)}…</code>
+                                <code className="block truncate font-mono text-[11px] text-ore-dim">{chunk.slice(0, 48)}…</code>
                             </div>
                             <IconButton
                                 size="sm"
