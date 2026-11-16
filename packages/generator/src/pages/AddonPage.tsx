@@ -87,7 +87,7 @@ export function AddonPage() {
     const scoreChunks = useGenerator((state) => state.scoreChunks);
 
     const [tab, setTab] = useState<"tracks" | "timbres" | "scores" | "export">("tracks");
-    const [code, setCode] = useState<{ name: string; chunks: string[] } | null>(null);
+    const [code, setCode] = useState<{ name: string; chunks: string[]; bytes?: number } | null>(null);
     const [previewScore, setPreviewScore] = useState<ScoreEntry | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [pickerQuery, setPickerQuery] = useState("");
@@ -140,7 +140,7 @@ export function AddonPage() {
         (entry: SongEntry) => {
             const chunks = scoreChunks(entry);
             if (chunks.length === 0) return;
-            setCode({ name: entry.name, chunks });
+            setCode({ name: entry.name, chunks, bytes: entry.data?.byteLength });
         },
         [scoreChunks]
     );
@@ -700,6 +700,7 @@ export function AddonPage() {
                 onClose={() => setCode(null)}
                 songName={code?.name ?? ""}
                 chunks={code?.chunks ?? []}
+                bytes={code?.bytes}
             />
 
             <RenameSongDialog

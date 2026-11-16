@@ -72,7 +72,7 @@ export function LibraryPage() {
 
     const [tab, setTab] = useState<"online" | "mine">("online");
     const [query, setQuery] = useState("");
-    const [code, setCode] = useState<{ name: string; chunks: string[] } | null>(null);
+    const [code, setCode] = useState<{ name: string; chunks: string[]; bytes?: number } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<StoredSong | null>(null);
     const [renameTarget, setRenameTarget] = useState<StoredSong | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
@@ -125,7 +125,7 @@ export function LibraryPage() {
                 notifications.show({ title: "无法生成导入码", message: "该曲目没有可导出的 PBE2 数据", color: "red" });
                 return;
             }
-            setCode({ name: entry.name, chunks });
+            setCode({ name: entry.name, chunks, bytes: entry.data?.byteLength });
         },
         [scoreChunks]
     );
@@ -478,6 +478,7 @@ export function LibraryPage() {
                 onClose={() => setCode(null)}
                 songName={code?.name ?? ""}
                 chunks={code?.chunks ?? []}
+                bytes={code?.bytes}
             />
 
             <RenameSongDialog

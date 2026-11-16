@@ -24,10 +24,20 @@ export interface ImportCodeDialogProps {
     onClose: () => void;
     songName: string;
     chunks: string[];
+    /** 完整 PBE2 字节数；用于在弹窗里显示曲目大小 */
+    bytes?: number;
+}
+
+function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+    }
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** 游戏内导入码：逐段复制或一次复制全部；每段不超过 4800 字符。 */
-export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCodeDialogProps) {
+export function ImportCodeDialog({ opened, onClose, songName, chunks, bytes }: ImportCodeDialogProps) {
     const [copiedAll, setCopiedAll] = useState(false);
     const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -65,7 +75,14 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                    <div className="truncate text-sm font-semibold">{songName}</div>
+                    <div className="flex min-w-0 items-baseline gap-2">
+                        <div className="truncate text-sm font-semibold">{songName}</div>
+                        {bytes !== undefined && (
+                            <span className="shrink-0 font-mono text-[11px] tabular-nums text-ore-dim">
+                                {formatSize(bytes)}
+                            </span>
+                        )}
+                    </div>
                     <Button type="button" size="sm" onClick={() => void copyAll()}>
                         {copiedAll ? <Check size={13} /> : <Copy size={13} />}
                         复制全部
