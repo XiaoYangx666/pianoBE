@@ -66,6 +66,30 @@ test("loaded piano resumes the saved song and skips earlier notes", async () => 
     expect(notes).toEqual([62]);
 });
 
+test("nearest-tick scheduling fires up to half a game tick early", async () => {
+    const meta = { id: "near", name: "Near", duration: 40 };
+    const emitted: number[] = [];
+    const midi = new MidiPlayer(
+        { acquire: async () => handleFor(meta, [60, 40, 10, 90]) },
+        { note: (info) => emitted.push(info.midi), playing: () => {}, stopNotes: () => {} }
+    );
+    midi.queue.enqueue(meta);
+    await midi.play();
+
+    let now = Date.now();
+    for (let i = 0; i < 19; i++) {
+        now += 50;
+        midi.tick(now);
+    }
+    // 0.95s：还差 50ms，未进入半个游戏 tick 的提前量。
+    expect(emitted).toEqual([]);
+
+    now += 25;
+    midi.tick(now);
+    // 0.975s：音符在 1.0s，提前 25ms 触发（最近 tick 是 1.0s）。
+    expect(emitted).toEqual([60]);
+});
+
 test("paused piano retains its cursor until manually resumed", async () => {
     const { midi, notes } = fixture();
     await midi.restore({ ...record, state: "paused" });

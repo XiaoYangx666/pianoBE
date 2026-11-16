@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { EventCursor, OTHER_SCALE, TIME_SCALE, readAllPbe2Notes, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
+import { EventCursor, OTHER_SCALE, SCHEDULE_LEAD_TICKS, TIME_SCALE, readAllPbe2Notes, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -286,11 +286,13 @@ export class MidiPlayer {
     private processPlayback() {
         const cursor = this.cursor;
         if (!cursor) return;
-        const ticks = this.currentTime * TIME_SCALE;
+        // 20 TPS 下只能落在 50ms 网格；提前半个 tick 取“最近 tick”，
+        // 让量化误差围绕 0 而不是全部拖后（见 tools/audio-lab-report.md）。
+        const horizon = this.currentTime * TIME_SCALE + SCHEDULE_LEAD_TICKS;
 
         while (true) {
             const time = cursor.peekTime();
-            if (time > ticks || time === Infinity) break;
+            if (time > horizon || time === Infinity) break;
             const note = cursor.next();
             if (!note) break;
             this.playNote(processNote(note.midi, false), note.duration / OTHER_SCALE, note.velocity);
