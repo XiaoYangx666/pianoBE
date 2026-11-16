@@ -283,18 +283,6 @@ export function LibraryPage() {
                     onRemove={() => setDeleteTarget(song)}
                     removeLabel="从我的音乐删除"
                     trailing={addAction}
-                    menu={
-                        inAddon
-                            ? []
-                            : [
-                                  {
-                                      key: "add",
-                                      label: "加入附加包",
-                                      icon: <Plus size={13} />,
-                                      onSelect: () => addToAddon(song),
-                                  },
-                              ]
-                    }
                 />
             );
         },
