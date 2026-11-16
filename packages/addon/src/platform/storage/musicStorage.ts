@@ -7,8 +7,6 @@ import {
 } from "@piano/core";
 import type { MusicStorage } from "@domain/music/storage";
 
-/** 钢琴内置存储（显示实体动态属性）。 */
-export const PIANO_STORAGE_PREFIX = "pb.piano.";
 /** 存储卡正文（物品动态属性）。 */
 export const CARD_STORAGE_PREFIX = "pb.card.";
 /** 存储卡自身元数据（名称/UID/修订号），不占音乐容量。 */
@@ -17,8 +15,7 @@ export const CARD_META_PREFIX = "pb.cardmeta.";
 /**
  * 动态属性上的音乐存储实现。
  *
- * - 钢琴：键写在显示实体上，随实体区块保存；
- * - 存储卡：键写在 ItemStack 上，跟着物品走。
+ * 只有存储卡：键写在 ItemStack 上，跟着物品走。
  */
 export class DynamicMusicStorage implements MusicStorage {
     private readonly collection: MusicCollection;
@@ -27,7 +24,6 @@ export class DynamicMusicStorage implements MusicStorage {
     constructor(
         kv: MusicStorageKv,
         readonly prefix: string,
-        readonly kind: "piano" | "card",
         private readonly limitProvider: () => number,
         private readonly labelProvider: () => string
     ) {

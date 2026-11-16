@@ -52,10 +52,21 @@ function labelText(label: unknown): string {
     return String(label ?? "");
 }
 
+/** DDUI 的 visible 既可以是布尔值，也可以是 ObservableBoolean。 */
+function isVisible(options: unknown): boolean {
+    const visible = (options as { visible?: unknown } | undefined)?.visible;
+    if (visible === undefined) return true;
+    if (typeof visible === "boolean") return visible;
+    if (visible && typeof (visible as { getData?: unknown }).getData === "function") {
+        return (visible as { getData(): unknown }).getData() !== false;
+    }
+    return true;
+}
+
 export class FakeCustomForm {
     static forms: FakeCustomForm[] = [];
     readonly buttons = new Map<string, ButtonHandler>();
-    private readonly entries: Array<{ label: unknown; handler: ButtonHandler }> = [];
+    private readonly entries: Array<{ label: unknown; handler: ButtonHandler; options?: unknown }> = [];
     readonly sliders: { label: string; value: FakeObservable<number> }[] = [];
     components: Array<Record<string, unknown>> = [];
     showing = false;
@@ -111,7 +122,7 @@ export class FakeCustomForm {
         return this;
     }
     button(label: unknown, handler: ButtonHandler, options?: unknown) {
-        this.entries.push({ label, handler });
+        this.entries.push({ label, handler, options });
         this.buttons.set(labelText(label), handler);
         this.components.push({ type: "button", label, options });
         return this;
@@ -143,7 +154,7 @@ export class FakeCustomForm {
     }
 
     click(label: string) {
-        const entry = this.entries.find(item => labelText(item.label) === label);
+        const entry = this.entries.find(item => isVisible(item.options) && labelText(item.label) === label);
         if (entry) {
             entry.handler();
             return;
@@ -154,7 +165,7 @@ export class FakeCustomForm {
     }
 
     buttonLabels() {
-        return this.entries.map(entry => labelText(entry.label));
+        return this.entries.filter(entry => isVisible(entry.options)).map(entry => labelText(entry.label));
     }
 
     /** 当前所有标签的可见文本（Observable 取当前值）。 */
@@ -523,13 +534,5 @@ export function createMidiAppMock(overrides: { page?: unknown } = {}) {
             getInfo: () => undefined,
             addSource: () => {},
         },
-        importedMidiManager: {
-            page,
-            metaAll: async () => [],
-            infoOf: async () => undefined,
-            getInfo: () => undefined,
-            refresh: async () => {},
-        },
-        importedSongs: { save: () => ({}) },
     };
 }

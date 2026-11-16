@@ -3,8 +3,7 @@ import { Cardinal_Direction } from "@domain/types";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { Signal } from "@domain/util/signal";
 import { definitionForPart, grandDefinition, pianoDefinition, type InstrumentDefinition } from "@domain/instrument/definition";
-import { capturePianoPayload, clearPianoStorage, writePianoPayloadToItem, takeCardFromDisplay } from "@platform/storage/pianoItem";
-import { pianoDisplayEntity } from "@platform/display";
+import { pianoDisplayEntity, takeCardFromDisplay } from "@platform/display";
 import type { InstrumentLocation } from "@platform/instrumentLocation";
 
 export type { InstrumentLocation } from "@platform/instrumentLocation";
@@ -82,17 +81,8 @@ export function destroyInstrument(location: InstrumentLocation, drop: boolean, d
     if (inspectInstrument(location, definition) === "unloaded") return false;
     const center = instrumentCenter(location);
     const display = pianoDisplayEntity(location, center);
-    // 先搬运再拆：内置音乐写进掉落的钢琴物品，卡槽里的实体卡单独退还。
-    // 物品写失败时直接放弃本次拆除，宁可拆不掉也不能丢歌。
-    const payload = display ? capturePianoPayload(location, center) : undefined;
-    const carried = payload && payload.songs > 0 ? new ItemStack(definition.itemId) : undefined;
-    if (carried && !writePianoPayloadToItem(carried, payload!.raw)) {
-        console.warn("[piano] 拆琴前保存内置音乐失败，已取消本次拆除");
-        return false;
-    }
+    // 钢琴不再保存歌曲：拆琴前只需摘下卡槽里的实体卡，随方块一起退还。
     const card = display ? takeCardFromDisplay(display) : undefined;
-    // 数据已经安全进入掉落物：清空源实体，后续任何清理都不会再复制一份。
-    if (carried && display) clearPianoStorage(display);
 
     let removed = false;
     for (const part of definition.parts) {
@@ -105,9 +95,7 @@ export function destroyInstrument(location: InstrumentLocation, drop: boolean, d
     if (!removed) return false;
     instrumentDestroyed.publish({ ...location, definition });
     const spawn = { x: location.pos.x + .5, y: location.pos.y + .5, z: location.pos.z + .5 };
-    // drop=false（创造模式/活塞）本来不掉落物品；但只要钢琴里有音乐，仍然
-    // 掉落带数据的钢琴物品，保证内容不会凭空消失。卡永远退还。
-    if (drop || carried) location.dimension.spawnItem(carried ?? new ItemStack(definition.itemId), spawn);
+    if (drop) location.dimension.spawnItem(new ItemStack(definition.itemId), spawn);
     if (card) {
         try {
             location.dimension.spawnItem(card, spawn);

@@ -132,6 +132,24 @@ export class MidiPlayer {
         if (this.queue.current()) await this.play();
     }
 
+    /** 加入队列（去重）；返回是否真的新增。 */
+    addToQueue(ref: MusicRef): "added" | "exists" {
+        return this.queue.enqueueUnique(ref);
+    }
+
+    /**
+     * 立即播放指定曲目：
+     * - 已在队列中 → 跳转到已有条目；
+     * - 不在队列中 → 插入当前曲目之后；
+     * 不清理原队列，也不产生重复条目。
+     */
+    async playNow(ref: MusicRef) {
+        const existing = this.queue.indexOf(ref);
+        if (existing >= 0) this.queue.jump(existing);
+        else this.queue.insertBack(ref);
+        await this.play();
+    }
+
     /**
      * 快进/回退：跳转到指定秒数（0 ≤ t ≤ 曲目时长），从该位置继续。
      * 不改变播放/暂停状态；idle/stopped 时恢复为播放。

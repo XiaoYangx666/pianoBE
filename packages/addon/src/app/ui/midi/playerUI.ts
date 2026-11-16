@@ -120,7 +120,7 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
         }
         ui.button("导入 MIDI", () => {
             if (!alive() || !block.isValid) return ui.close();
-            ui.push(MidiImportPage, { piano, target: piano.cardStorage ? "card" : "piano" });
+            ui.push(MidiImportPage, { piano });
         });
         ui.closeButton();
     }

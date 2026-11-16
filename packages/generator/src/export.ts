@@ -78,7 +78,13 @@ export async function generateAddonZip(
     }
     addon.writeText(
         `${midisDir}index.js`,
-        metasToAddonIndex(songs.map((s) => ({ id: s.id, name: s.name, duration: s.duration })))
+        metasToAddonIndex(songs.map((s) => ({
+            id: s.id,
+            name: s.name,
+            duration: s.duration,
+            noteCount: s.noteCount,
+            bytes: s.data?.length,
+        })))
     );
 
     if (opts.timbres) applyTimbres(addon, bpPath, rpPath, opts.timbres);

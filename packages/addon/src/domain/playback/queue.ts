@@ -76,6 +76,28 @@ export class PlayQueue {
         }
     }
 
+    /** 去重加入尾部；已存在时不产生第二条。 */
+    enqueueUnique(midi: MusicRef): "added" | "exists" {
+        if (this.indexOf(midi) >= 0) return "exists";
+        this.enqueue(midi);
+        return "added";
+    }
+
+    /** 调整顺序；当前播放位置跟随被移动的曲目。 */
+    move(from: number, to: number): boolean {
+        if (from < 0 || from >= this.list.length || to < 0 || to >= this.list.length || from === to) return false;
+        const [item] = this.list.splice(from, 1);
+        this.list.splice(to, 0, item);
+        if (this.index === from) {
+            this.index = to;
+        } else if (from < this.index && to >= this.index) {
+            this.index--;
+        } else if (from > this.index && to <= this.index) {
+            this.index++;
+        }
+        return true;
+    }
+
     remove(index: number): MusicRef | undefined {
         if (index < 0 || index >= this.list.length) return;
 

@@ -1,20 +1,19 @@
-import type { MusicRef, StoredMusicEntry } from "@piano/core";
+import type { MidiSongMeta, MusicRef, StoredMusicEntry } from "@piano/core";
 import { toMusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { importedMidiManager, midiManager } from "@app/midi";
+import { midiManager } from "@app/midi";
+import { storageRef } from "@domain/music/storage";
 
-export const PAGE_SIZE = 8;
+export const PAGE_SIZE = 5;
 
-export type LibraryTab = "piano" | "card" | "library" | "imported";
+export type LibraryTab = "library" | "card";
 
 export const TAB_LABELS: Record<LibraryTab, string> = {
-    piano: "当前钢琴",
+    library: "公共曲库",
     card: "当前存储卡",
-    library: "内置/远程曲库",
-    imported: "旧导入曲库",
 };
 
-export const TAB_ORDER: LibraryTab[] = ["piano", "card", "library", "imported"];
+export const TAB_ORDER: LibraryTab[] = ["library", "card"];
 
 export interface TabPage {
     refs: MusicRef[];
@@ -32,48 +31,60 @@ function filterEntries(entries: StoredMusicEntry[], query: string): StoredMusicE
     return q ? entries.filter(entry => entry.name.toLowerCase().includes(q)) : entries;
 }
 
-/** 按来源取一页曲目引用（钢琴/卡为同步，曲库为异步分页）。 */
+/** 解析搜索框：末尾独立的 `p数字` 是页码指令，其余部分作为关键词。 */
+export function parseLibrarySearch(raw: string): { query: string; page?: number } {
+    const text = raw.trim();
+    const match = /(^|\s)[pP](\d+)\s*$/.exec(text);
+    if (!match) return { query: text };
+    const page = Number(match[2]);
+    return {
+        query: text.slice(0, match.index).trim(),
+        page: Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1,
+    };
+}
+
+/** 搜索框显示文本：关键词 + 当前页码（第 1 页不显示页码）。 */
+export function formatLibrarySearch(query: string, page: number): string {
+    const keyword = query.trim();
+    return page > 1 ? `${keyword} p${page}`.trim() : keyword;
+}
+
+/** 远程曲库条目可能带 dataSize，将它归一化为统一的 bytes 字段。 */
+function libraryRef(meta: MidiSongMeta & { dataSize?: number }): MusicRef {
+    return toMusicRef("library", {
+        ...meta,
+        bytes: meta.bytes ?? meta.dataSize,
+    });
+}
+
+/** 按来源取一页曲目引用（存储卡为同步，公共曲库为异步分页）。 */
 export async function listTab(
     piano: PianoRuntime,
     tab: LibraryTab,
     page: number,
     query: string
 ): Promise<TabPage> {
-    if (tab === "piano") {
-        const storage = piano.storage;
-        if (!storage) return { refs: [], total: 0, note: "钢琴存储暂不可用" };
-        const entries = filterEntries(storage.list(), query);
-        const start = (page - 1) * PAGE_SIZE;
-        return {
-            refs: entries.slice(start, start + PAGE_SIZE).map(entry => toMusicRef("piano", entry)),
-            total: entries.length,
-        };
-    }
     if (tab === "card") {
         const storage = piano.cardStorage;
         if (!storage) return { refs: [], total: 0, note: "§e卡槽为空，先插入一张音乐存储卡" };
         const entries = filterEntries(storage.list(), query);
         const start = (page - 1) * PAGE_SIZE;
+        const uid = piano.cardUid;
         return {
-            refs: entries.slice(start, start + PAGE_SIZE).map(entry => toMusicRef("card", entry)),
+            refs: entries.slice(start, start + PAGE_SIZE).map(entry => storageRef(entry, uid)),
             total: entries.length,
         };
     }
-    const manager = tab === "imported" ? importedMidiManager : midiManager;
-    const result = await manager.page(page, PAGE_SIZE, query || undefined);
+    const result = await midiManager.page(page, PAGE_SIZE, query || undefined);
     return {
-        refs: result.items.map(meta => toMusicRef("library", meta)),
+        refs: result.items.map(libraryRef),
         total: result.total,
     };
 }
 
 /** 队列条目的来源标记（按钮文本不支持颜色符号，只用纯文本前缀）。 */
 export function sourceMark(ref: MusicRef): string {
-    switch (ref.source) {
-        case "piano": return "[琴]";
-        case "card": return "[卡]";
-        default: return "[库]";
-    }
+    return ref.source === "card" ? "[卡]" : "[库]";
 }
 
 export function availabilityMark(state: "ok" | "missing" | "unknown"): string {

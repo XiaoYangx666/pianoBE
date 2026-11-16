@@ -18,6 +18,8 @@ export function metasToAddonIndex(metas: MidiSongMeta[]): string {
             `id:${JSON.stringify(item.id)},` +
             `name:${JSON.stringify(item.name)},` +
             `duration:${item.duration},` +
+            (item.noteCount !== undefined ? `noteCount:${item.noteCount},` : "") +
+            (item.bytes !== undefined ? `bytes:${item.bytes},` : "") +
             `value:async()=> (await import("./${item.id}.js")).default` +
             `},`;
     }

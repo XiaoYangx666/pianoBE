@@ -1,4 +1,5 @@
 import { DDUI } from "sapi-pro";
+import { formatBytes, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { MusicLibraryPage } from "./libraryUI";
 import { PAGE_SIZE, availabilityMark, pageCount, sourceMark } from "./shared";
@@ -9,10 +10,9 @@ export interface QueueArgs {
     page?: number;
 }
 
-/** 播放队列：只负责顺序，不管理歌单。来源与可用性直接标在条目上。 */
+/** 播放队列：只负责顺序，播放控制统一保留在 MIDI 播放器主页面。 */
 export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => {
     const piano = args.piano;
-    const player = ui.player;
     ui.subscribe(piano.disposedSignal, () => ui.close());
 
     const state = { page: Math.max(1, args.page ?? 1), maxPage: 1, index: -1 };
@@ -40,8 +40,8 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
         }
         const current = queue.current();
         head.setData(
-            `§7队列 §f${refs.length} §7首 · 状态 §f${info.state}` +
-            (current ? `\n§7当前：§b${current.name}` : "")
+            `§7队列 §f${refs.length} §7首` +
+            (current ? `\n§7当前：§b${current.name}` : "\n§7队列为空，点“添加歌曲”开始")
         );
         const start = (state.page - 1) * PAGE_SIZE;
         for (let slot = 0; slot < PAGE_SIZE; slot++) {
@@ -61,30 +61,17 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
         nextVisible.setData(state.page < state.maxPage);
     };
 
-    const playCurrent = () => {
-        const midi = piano.getMidiPlayer();
-        void midi.play().catch((error) => player.sendMessage(`§c播放失败：${(error as Error)?.message ?? error}`));
-        refresh();
-    };
-
     ui.label(head).label(pageText);
-    ui.button("▶ 播放 / 继续", playCurrent);
-    ui.button("⏮ 上一首", () => {
-        piano.getMidiPlayer().queue.prev();
-        playCurrent();
-    });
-    ui.button("⏭ 下一首", () => {
-        piano.getMidiPlayer().queue.next();
-        playCurrent();
-    });
-    ui.button("＋ 添加歌曲", () => ui.push(MusicLibraryPage, { piano, tab: "piano" }));
+    ui.label(`§7播放控制请回到 MIDI 播放器主页面（状态：§f${piano.getMidiPlayer().getInfo().state}§7）`);
+    ui.button("＋ 添加歌曲", () => ui.push(MusicLibraryPage, { piano, mode: "add", tab: "library" }));
 
     for (let slot = 0; slot < PAGE_SIZE; slot++) {
         ui.button(labels[slot], () => {
             const queue = piano.getMidiPlayer().queue;
             const index = (state.page - 1) * PAGE_SIZE + slot;
-            if (index >= queue.getLength()) return;
-            ui.push(QueueItemPage, { piano, index });
+            const ref = queue.getRefs()[index];
+            if (!ref) return;
+            ui.push(QueueItemPage, { piano, ref });
         }, { visible: visible[slot] });
     }
 
@@ -97,22 +84,35 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
     refresh();
 });
 
-const QueueItemPage = DDUI.page<{ piano: PianoRuntime; index: number }>("队列操作", (ui, args) => {
-    const { piano, index } = args;
-    const queue = piano.getMidiPlayer().queue;
-    const ref = queue.getRefs()[index];
+interface QueueItemArgs {
+    piano: PianoRuntime;
+    ref: MusicRef;
+}
+
+const QueueItemPage = DDUI.page<QueueItemArgs>("队列操作", (ui, args) => {
+    const { piano, ref } = args;
     const status = ui.string("");
-    ui.label(ref ? `§b${ref.name}` : "§7（已不在队列中）");
+    const queue = () => piano.getMidiPlayer().queue;
+    ui.label(`§b${ref.name}`);
+    ui.label(`§7来源：${sourceMark(ref)} §7时长：${Math.floor(ref.duration / 40 / 60)}:${String(Math.floor(ref.duration / 40) % 60).padStart(2, "0")}`);
+    ui.label(`§7音符：${ref.noteCount !== undefined ? ref.noteCount : "未知"} §7大小：${ref.bytes !== undefined ? formatBytes(ref.bytes) : "未知"}`);
     ui.label(status);
-    ui.button("▶ 播放这首", () => {
-        if (!ref) return status.setData("§e曲目已不存在");
-        const midi = piano.getMidiPlayer();
-        midi.queue.jump(index);
-        void midi.play().catch((error) => status.setData(`§c播放失败：${(error as Error)?.message ?? error}`));
-        status.setData("§a已开始播放");
-    });
+
+    const move = (delta: number) => {
+        const target = queue();
+        const at = target.indexOf(ref);
+        if (at < 0) return status.setData("§e曲目已不在队列中");
+        if (!target.move(at, at + delta)) return status.setData("§e已经到边界了");
+        status.setData(delta < 0 ? "§a已上移" : "§a已下移");
+    };
+
+    ui.button("上移", () => move(-1));
+    ui.button("下移", () => move(1));
     ui.button("从队列移除", () => {
-        piano.getMidiPlayer().queue.remove(index);
+        const target = queue();
+        const at = target.indexOf(ref);
+        if (at < 0) return status.setData("§e曲目已不在队列中");
+        target.remove(at);
         ui.back();
     });
     ui.closeButton();

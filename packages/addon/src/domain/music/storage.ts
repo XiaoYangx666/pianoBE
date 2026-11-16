@@ -1,15 +1,13 @@
 import type { MusicRef, StoredMusicEntry, StorageUsage } from "@piano/core";
 
 /**
- * 一份音乐存储（钢琴内置 / 存储卡）。
+ * 一份可写音乐存储。
  *
- * 领域层只描述能力，不关心背后是实体动态属性还是物品动态属性；
- * 实现在 platform/storage 中，将来换成方块容器只需替换适配层。
+ * 当前唯一实现是音乐存储卡；领域层只描述能力，不关心背后是物品动态属性
+ * 还是将来的容器，实现位于 platform/storage。
  */
 export interface MusicStorage {
-    /** 存储归属：钢琴内置或存储卡 */
-    readonly kind: "piano" | "card";
-    /** 可展示的存储名称（钢琴名/卡名） */
+    /** 可展示的存储名称（卡名） */
     readonly label: string;
     list(): StoredMusicEntry[];
     has(id: string): boolean;
@@ -23,33 +21,17 @@ export interface MusicStorage {
     readonly limitBytes: number;
 }
 
-/** 存储摘要（DDUI 头部展示用，避免重复计算）。 */
-export interface MusicStorageView {
-    songs: number;
-    usedBytes: number;
-    limitBytes: number;
-    remainingBytes: number;
-}
-
-export function storageView(storage: MusicStorage): MusicStorageView {
-    const usage = storage.usage();
-    return {
-        songs: usage.songs,
-        usedBytes: usage.usedBytes,
-        limitBytes: usage.limitBytes,
-        remainingBytes: usage.remainingBytes,
-    };
-}
-
-/** 把存储条目转换成队列引用。 */
-export function storageRef(source: "piano" | "card", entry: StoredMusicEntry): MusicRef {
-    return {
+/** 把存储卡条目转换成队列引用；cardUid 用于区分不同实体卡。 */
+export function storageRef(entry: StoredMusicEntry, cardUid?: string): MusicRef {
+    const ref: MusicRef = {
         id: entry.id,
         name: entry.name,
         duration: entry.duration,
         noteCount: entry.noteCount,
         bytes: entry.bytes,
         checksum: entry.checksum,
-        source,
+        source: "card",
     };
+    if (cardUid) ref.cardUid = cardUid;
+    return ref;
 }

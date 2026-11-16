@@ -1,1 +1,1 @@
-export { midiManager, importedMidiManager, importedSongs } from "./midiManager";
+export { midiManager } from "./midiManager";

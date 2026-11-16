@@ -208,7 +208,6 @@ export class CardAccess {
         const storage = new DynamicMusicStorage(
             kv,
             CARD_STORAGE_PREFIX,
-            "card",
             () => limitBytes ?? currentPbeSettings().cardStorageBytes,
             () => (this.item ? cardName(this.item) : DEFAULT_CARD_NAME)
         );

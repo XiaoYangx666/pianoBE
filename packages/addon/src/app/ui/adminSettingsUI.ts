@@ -36,13 +36,6 @@ export const PbeSettingsForm = CommonForm.ConfigForm<PbeSettingsArgs>().create(
             tooltip: "关闭后普通玩家不能创建或提交导入任务；管理员始终允许。已导入曲目仍可播放。",
             defaultValue: DEFAULT_PBE_SETTINGS.allowPlayerImport,
         },
-        pianoStorageBytes: {
-            type: FieldType.Number,
-            label: "每架钢琴内置存储上限（字节）",
-            tooltip: `默认 ${formatBytes(DEFAULT_PBE_SETTINGS.pianoStorageBytes)}。只降低上限不会删除已有歌曲，但会禁止继续新增。`,
-            defaultValue: DEFAULT_PBE_SETTINGS.pianoStorageBytes,
-            validators: [storageValidator("钢琴存储上限")],
-        },
         cardStorageBytes: {
             type: FieldType.Number,
             label: "每张存储卡容量上限（字节）",
@@ -63,13 +56,12 @@ export const PbeSettingsForm = CommonForm.ConfigForm<PbeSettingsArgs>().create(
             const next = normalizePbeSettings({
                 ...DEFAULT_PBE_SETTINGS,
                 allowPlayerImport: result.allowPlayerImport,
-                pianoStorageBytes: result.pianoStorageBytes,
                 cardStorageBytes: result.cardStorageBytes,
             });
             savePbeSettings(next);
             player.sendMessage(
                 `§a[PianoBE] 玩家导入已${next.allowPlayerImport ? "开启" : "关闭"}；` +
-                `钢琴存储 ${formatBytes(next.pianoStorageBytes)}，存储卡 ${formatBytes(next.cardStorageBytes)}`
+                `存储卡 ${formatBytes(next.cardStorageBytes)}`
             );
         },
     }

@@ -84,8 +84,21 @@ export class RemoteMidiSource {
         const res = await this.opts.fetch(url, { headers: this.headers() });
         console.log(`[netSource] 第 ${page} 页响应状态: ${res.status}`);
         if (res.status !== 200) throw new Error(`songs 接口返回 ${res.status}`);
-        const data = (await res.json()) as { items?: MidiSongMeta[]; total?: number };
-        const items = data.items ?? [];
+        const data = (await res.json()) as {
+            items?: Array<MidiSongMeta & { dataSize?: number }>;
+            total?: number;
+        };
+        const items: MidiSongMeta[] = (data.items ?? []).map((item) => {
+            const meta: MidiSongMeta = {
+                id: item.id,
+                name: item.name,
+                duration: item.duration,
+            };
+            if (typeof item.noteCount === "number") meta.noteCount = item.noteCount;
+            const bytes = item.bytes ?? item.dataSize;
+            if (typeof bytes === "number") meta.bytes = bytes;
+            return meta;
+        });
         const total = typeof data.total === "number" ? data.total : items.length;
         console.log(`[netSource] 第 ${page} 页 ${items.length} 首（共 ${total} 首）`);
         return { items, total };

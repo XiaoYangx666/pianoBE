@@ -2,21 +2,18 @@ import {
     SongCache,
     crc32Hex,
     musicRefKey,
-    toMusicRef,
     type MusicRef,
     type SongHandle,
-    type StoredMusicEntry,
 } from "@piano/core";
 import type { MusicStorage } from "@domain/music/storage";
-import { storageRef } from "@domain/music/storage";
 import { midiManager } from "@app/midiManager";
 
 export type TrackAvailability = "ok" | "missing" | "unknown";
 
 /**
  * 一架钢琴的音乐读取入口：
- * - 钢琴内置 / 存储卡：按内容指纹（长度 + CRC32）校验后才交给播放器；
- * - 内置/远程曲库：复用 midiManager 的共享 SongCache；
+ * - 存储卡：绑定卡片身份，按内容指纹（长度 + CRC32）校验后才交给播放器；
+ * - 公共曲库：复用 midiManager 的共享 SongCache；
  * - 本地缓存键包含来源与指纹，同 id 不同内容不会互相污染。
  */
 export class PianoMusic {
@@ -24,8 +21,8 @@ export class PianoMusic {
     private readonly loaders = new Map<string, () => Uint8Array | undefined>();
 
     constructor(
-        private readonly pianoStorageProvider: () => MusicStorage | undefined,
-        private readonly cardStorageProvider: () => MusicStorage | undefined
+        private readonly cardStorageProvider: () => MusicStorage | undefined,
+        private readonly cardUidProvider: () => string | undefined
     ) {
         this.cache = new SongCache((key) => this.load(key), {
             maxBytes: 2 * 1024 * 1024,
@@ -38,7 +35,15 @@ export class PianoMusic {
         return this.loaders.get(key)?.();
     }
 
-    private read(storage: MusicStorage | undefined, ref: MusicRef): Uint8Array | undefined {
+    /** 卡片身份必须与队列条目一致，避免换卡后误读另一张卡上的同 id 曲目。 */
+    private cardMatches(ref: MusicRef): boolean {
+        if (ref.source !== "card" || ref.cardUid === undefined) return true;
+        return this.cardUidProvider() === ref.cardUid;
+    }
+
+    private readCard(ref: MusicRef): Uint8Array | undefined {
+        if (!this.cardMatches(ref)) return undefined;
+        const storage = this.cardStorageProvider();
         if (!storage) return undefined;
         const bytes = storage.get(ref.id);
         if (!bytes) return undefined;
@@ -51,10 +56,7 @@ export class PianoMusic {
     async acquire(ref: MusicRef): Promise<SongHandle | undefined> {
         if (ref.source === "library") return midiManager.acquire(ref.id);
         const key = musicRefKey(ref);
-        this.loaders.set(key, () => this.read(
-            ref.source === "piano" ? this.pianoStorageProvider() : this.cardStorageProvider(),
-            ref
-        ));
+        this.loaders.set(key, () => this.readCard(ref));
         try {
             return await this.cache.acquire(key);
         } finally {
@@ -62,7 +64,7 @@ export class PianoMusic {
         }
     }
 
-    /** 曲库来源的原始 PBE2（跨存储复制用）。 */
+    /** 曲库来源的原始 PBE2（复制到存储卡用）。 */
     readLibrary(id: string): Promise<Uint8Array | undefined> {
         return midiManager.read(id);
     }
@@ -70,23 +72,14 @@ export class PianoMusic {
     /** 队列 UI 用：这首歌现在还能不能读到。 */
     availability(ref: MusicRef): TrackAvailability {
         if (ref.source === "library") return midiManager.getInfo(ref.id) ? "ok" : "unknown";
-        const storage = ref.source === "piano" ? this.pianoStorageProvider() : this.cardStorageProvider();
+        if (!this.cardMatches(ref)) return "missing";
+        const storage = this.cardStorageProvider();
         if (!storage) return "missing";
         const entry = storage.list().find(item => item.id === ref.id);
         if (!entry) return "missing";
         if (ref.checksum && entry.checksum !== ref.checksum) return "missing";
         if (ref.bytes && entry.bytes !== ref.bytes) return "missing";
         return "ok";
-    }
-
-    /** 从存储条目生成队列引用。 */
-    static track(storage: MusicStorage, entry: StoredMusicEntry): MusicRef {
-        return storageRef(storage.kind, entry);
-    }
-
-    /** 曲库条目 → 队列引用。 */
-    static libraryTrack(meta: { id: string; name: string; duration: number }): MusicRef {
-        return toMusicRef("library", meta);
     }
 
     /** 释放本地缓存中无引用的曲目（拆琴/换卡后调用）。 */

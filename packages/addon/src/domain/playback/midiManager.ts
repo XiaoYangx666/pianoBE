@@ -95,6 +95,7 @@ export class MidiManager {
             id: handle.song.id,
             name: handle.song.name,
             duration: handle.song.duration,
+            noteCount: handle.song.noteCount,
         };
         handle.release();
         this.register(meta, false);
@@ -107,6 +108,8 @@ export class MidiManager {
         if (current) {
             current.name = meta.name;
             current.duration = meta.duration;
+            if (meta.noteCount !== undefined) current.noteCount = meta.noteCount;
+            if (meta.bytes !== undefined) current.bytes = meta.bytes;
             return;
         }
         this.metaMap.set(meta.id, meta);

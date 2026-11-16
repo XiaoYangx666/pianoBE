@@ -7,7 +7,7 @@ import { grandDefinition } from "@domain/instrument/definition";
 import { inspectInstrument, instrumentCenter, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
-import { pianoSoundId, velocityLayerIndex, velocityVolume, formatBytes, type MusicRef, type SongHandle } from "@piano/core";
+import { pianoSoundId, velocityLayerIndex, velocityVolume, type MusicRef, type SongHandle } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
@@ -18,11 +18,8 @@ import { DEFAULT_PIANO_SETTINGS, pianoTextColor, type PianoSettings } from "@dom
 import { AVAILABLE_SCORES, scoreIndexOf, scorePages } from "@domain/score/score";
 import { SWEEP_INTERVAL, TEXT_SETTINGS, VERIFY_INTERVAL, NOTE_RELEASE_SECONDS } from "@app/pianoConfig";
 import { PianoMusic } from "@app/music/pianoMusic";
-import { DynamicPropertyKv } from "@platform/storage/dynamicKv";
-import { DynamicMusicStorage, PIANO_STORAGE_PREFIX } from "@platform/storage/musicStorage";
 import { CardSlot } from "@platform/storage/cardSlot";
 import { CardAccess } from "@platform/storage/cardItem";
-import { currentPbeSettings } from "@platform/storage/settingsProvider";
 import type { MusicStorage } from "@domain/music/storage";
 import { SoundReleaseQueue } from "@domain/playback/soundRelease";
 
@@ -74,10 +71,9 @@ export class PianoRuntime {
     private removeVisualOnDispose = false;
     private disposed = false;
     private readonly disposeCleanups = new Set<() => void>();
-    private storageBinding?: { entityId: string; storage: DynamicMusicStorage };
     private cardSlotBinding?: { entityId: string; slot: CardSlot };
-    /** 钢琴内置 + 存储卡的统一读取入口（每架钢琴一个，缓存按内容指纹隔离）。 */
-    readonly music = new PianoMusic(() => this.storage, () => this.cardStorage);
+    /** 存储卡歌曲的统一读取入口（每架钢琴一个，缓存按内容指纹隔离）。 */
+    readonly music = new PianoMusic(() => this.cardStorage, () => this.cardAccess?.uid);
     private readonly soundReleases = new SoundReleaseQueue(NOTE_RELEASE_SECONDS);
     lastNearby = system.currentTick;
 
@@ -119,26 +115,6 @@ export class PianoRuntime {
     get hasScreen() { return this.location.definition !== grandDefinition; }
     get settings() { return this.display?.entity.isValid ? this.display.settings : undefined; }
 
-    /** 这架钢琴的内置音乐存储（挂在显示实体上，随区块保存）。 */
-    get storage(): DynamicMusicStorage | undefined {
-        const entity = this.displayEntity;
-        if (!entity) return undefined;
-        if (this.storageBinding?.entityId !== entity.id) {
-            const label = this.location.definition === grandDefinition ? "三角钢琴" : "电子钢琴";
-            this.storageBinding = {
-                entityId: entity.id,
-                storage: new DynamicMusicStorage(
-                    new DynamicPropertyKv(() => (this.display?.entity.isValid ? this.display.entity : undefined), PIANO_STORAGE_PREFIX),
-                    PIANO_STORAGE_PREFIX,
-                    "piano",
-                    () => currentPbeSettings().pianoStorageBytes,
-                    () => label
-                ),
-            };
-        }
-        return this.storageBinding.storage;
-    }
-
     /** 真实卡槽（显示实体容器）；未加载时 undefined。 */
     get cardSlot(): CardSlot | undefined {
         const entity = this.displayEntity;
@@ -158,11 +134,16 @@ export class PianoRuntime {
         return this.cardAccess?.storage();
     }
 
-    /** 读取原始 PBE2（跨存储复制/导出用；曲库来源会走远端/内嵌）。 */
+    /** 当前卡槽内存储卡的稳定身份。 */
+    get cardUid(): string | undefined {
+        return this.cardAccess?.uid;
+    }
+
+    /** 读取原始 PBE2（曲库复制到存储卡用；曲库来源会走远端/内嵌）。 */
     readBytes(ref: MusicRef): Promise<Uint8Array | undefined> | Uint8Array | undefined {
         if (ref.source === "library") return this.music.readLibrary(ref.id);
-        const storage = ref.source === "piano" ? this.storage : this.cardStorage;
-        return storage?.get(ref.id);
+        if (ref.cardUid !== undefined && ref.cardUid !== this.cardUid) return undefined;
+        return this.cardStorage?.get(ref.id);
     }
 
     /** 队列条目 → 可播放的共享曲目引用。 */
@@ -431,7 +412,6 @@ export class PianoRuntime {
         } catch (error) {
             console.warn("[piano] 释放音乐缓存失败", error);
         }
-        this.storageBinding = undefined;
         this.cardSlotBinding = undefined;
         // activate 闭包捕获了 runtime 自身；不清理就是一个永久自环。
         this.activate = noop;
@@ -446,10 +426,9 @@ export class PianoRuntime {
         const info = this.midi?.getInfo();
         const { dimension, pos } = this.location;
         const stats = this.scope.stats;
-        const usage = this.storage?.usage();
         const card = this.cardSlot?.occupied ? "inserted" : "empty";
         return `[${info?.state ?? "ready"}] ${instrumentKey(dimension, pos)} ${info?.midiName ?? ""} ` +
-            `store=${usage?.songs ?? 0}/${formatBytes(usage?.usedBytes ?? 0)} card=${card} snd=${this.soundReleases.size} ` +
+            `card=${card} snd=${this.soundReleases.size} ` +
             `scope(s=${stats.scopes} sub=${stats.subscriptions} t=${stats.timers} j=${stats.jobs} d=${stats.disposables} pending=${this.scope.pending})`;
     }
 }

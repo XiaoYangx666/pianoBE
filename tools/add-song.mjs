@@ -63,7 +63,14 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         new Uint8Array(fs.readFileSync(file)),
         path.basename(file).replace(/\.midi?$/i, "")
     );
-    const entry = { id: song.id, name: song.name, duration: song.duration, noteCount: collectNoteCount(song) };
+    const pbe2 = encodePbe2(song, { includeVelocity: true });
+    const entry = {
+        id: song.id,
+        name: song.name,
+        duration: song.duration,
+        noteCount: collectNoteCount(song),
+        bytes: pbe2.length,
+    };
     const pos = index.findIndex((m) => m.id === song.id);
     let status;
     const sameName = index.some((m) => m.name === song.name && m.id !== song.id);
@@ -84,7 +91,6 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         status = "新增";
         added++;
     }
-    const pbe2 = encodePbe2(song, { includeVelocity: true });
     fs.writeFileSync(path.join(libDir, `${song.id}.pbe2`), pbe2);
     fs.writeFileSync(path.join(jsDir, `${song.id}.js`), pbe2ToAddonModule(pbe2), "utf-8");
     console.log(`  [${status}] ${song.name} (${song.id})`);
@@ -93,7 +99,14 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
 // ---------- 3. 统一写 index（按名称排序，便于 git diff 审查） ----------
 index.sort((a, b) => a.name.localeCompare(b.name, "zh"));
 fs.writeFileSync(indexPath, JSON.stringify(index, null, 1) + "\n", "utf-8");
-fs.writeFileSync(path.join(jsDir, "index.js"), metasToAddonIndex(index), "utf-8");
+const addonMetas = index.map((meta) => {
+    try {
+        return { ...meta, bytes: fs.statSync(path.join(libDir, `${meta.id}.pbe2`)).size };
+    } catch {
+        return meta;
+    }
+});
+fs.writeFileSync(path.join(jsDir, "index.js"), metasToAddonIndex(addonMetas), "utf-8");
 
 // ---------- 4. 汇总 ----------
 console.log(`\n✅ 完成：新增 ${added} · 更新 ${updated} · 跳过(重复) ${skipped} · 曲库现有 ${index.length} 首`);

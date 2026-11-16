@@ -4,6 +4,10 @@ export interface MidiSongMeta {
     name: string;
     /** 时长，已按 TIME_SCALE 缩放（与 addon 模块中的 duration 字段同值） */
     duration: number;
+    /** PBE2 音符总数（来源提供时用于歌曲详情展示） */
+    noteCount?: number;
+    /** PBE2 原始字节数（来源提供时用于歌曲详情展示与内容校验） */
+    bytes?: number;
 }
 
 export interface MidiTrackInstrument {

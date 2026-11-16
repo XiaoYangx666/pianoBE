@@ -196,6 +196,36 @@ test("natural end lets the release tail finish instead of hard-stopping", async 
     expect(stopNotes.mock.calls.length).toBe(0);
 });
 
+test("立即播放插入当前曲目之后，已有歌曲只跳转不重复", async () => {
+    const { midi } = fixture();
+    const first = { id: "a", name: "A", duration: 40 };
+    const second = { id: "b", name: "B", duration: 40 };
+    midi.queue.enqueue(first);
+    midi.queue.enqueue(second);
+    await midi.play();
+    expect(midi.queue.getIndex()).toBe(0);
+
+    const extra = { id: "c", name: "C", duration: 40 };
+    await midi.playNow(extra);
+    expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["a", "c", "b"]);
+    expect(midi.queue.getIndex()).toBe(1);
+    expect(midi.queue.current()?.id).toBe("c");
+
+    await midi.playNow(second);
+    expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["a", "c", "b"]);
+    expect(midi.queue.getIndex()).toBe(2);
+    expect(midi.queue.current()?.id).toBe("b");
+});
+
+test("加入队列按来源/ID/指纹去重", () => {
+    const { midi } = fixture();
+    const ref = { id: "a", name: "A", duration: 40, source: "library" as const, checksum: "1111" };
+    expect(midi.addToQueue(ref)).toBe("added");
+    expect(midi.addToQueue({ ...ref })).toBe("exists");
+    expect(midi.addToQueue({ ...ref, source: "card" as const, cardUid: "c1" })).toBe("added");
+    expect(midi.queue.getLength()).toBe(2);
+});
+
 test("响度归一化开启后 MIDI 音符带增益，关闭后回到 1", async () => {
     const gains: number[] = [];
     const midi = new MidiPlayer(loader, {

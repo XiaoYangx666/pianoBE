@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { encodePbe2, type StoredMusicEntry } from "@piano/core";
 import { MidiPlayer } from "../src/domain/playback/player";
 import { Signal } from "../src/domain/util/signal";
-import { createDDUIHost, createMidiAppMock, createSapiProMock, FakeObservable } from "./support/fakeDDUI";
+import { createDDUIHost, createMidiAppMock, createSapiProMock, FakeObservable, type FakeCustomForm } from "./support/fakeDDUI";
 
 const host = createDDUIHost();
 
@@ -60,7 +60,12 @@ mock.module("@begame/tabletop/minecraft", () => ({
     createBlockResourceEvents: () => ({ register: () => {}, start: () => {} }),
     createNativeDropSuppression: () => () => {},
 }));
-mock.module("@app/midi", () => createMidiAppMock());
+
+let pageImpl: (page: number, pageSize: number, q?: string) => Promise<{ items: any[]; total: number }> =
+    async () => ({ items: [], total: 0 });
+mock.module("@app/midi", () => createMidiAppMock({
+    page: (...args: any[]) => pageImpl(args[0], args[1], args[2]),
+}));
 mock.module("@app/permissions", () => ({ canImportMidi: () => true, isPbeAdmin: () => true }));
 mock.module("@app/PianoWorld", () => ({ pianoWorld: { get: () => undefined } }));
 
@@ -69,6 +74,7 @@ const { MusicCardPage } = await import("../src/app/ui/midi/cardUI");
 const { PlayQueuePage } = await import("../src/app/ui/midi/queueUI");
 const { TrackActionsPage } = await import("../src/app/ui/midi/trackActions");
 const { MidiPlayerPage } = await import("../src/app/ui/midi/playerUI");
+const { MidiImportPage } = await import("../src/app/ui/midi/importUI");
 
 function makeEntry(id: string, name: string): StoredMusicEntry {
     return {
@@ -85,7 +91,7 @@ function makeEntry(id: string, name: string): StoredMusicEntry {
     };
 }
 
-function fakeStorage(entries: StoredMusicEntry[], kind: "piano" | "card" = "piano") {
+function fakeStorage(entries: StoredMusicEntry[], label = "测试卡") {
     const data = new Map<string, Uint8Array>();
     for (const entry of entries) {
         data.set(entry.id, encodePbe2({
@@ -96,8 +102,7 @@ function fakeStorage(entries: StoredMusicEntry[], kind: "piano" | "card" = "pian
         }));
     }
     return {
-        kind,
-        label: kind === "piano" ? "电子钢琴" : "测试卡",
+        label,
         list: () => entries,
         has: (id: string) => entries.some(entry => entry.id === id),
         get: (id: string) => data.get(id),
@@ -121,7 +126,7 @@ function fakeStorage(entries: StoredMusicEntry[], kind: "piano" | "card" = "pian
 }
 
 function makeMidi() {
-    return new MidiPlayer({ acquire: async () => undefined }, { note() {}, playing() {} });
+    return new MidiPlayer({ acquire: async () => undefined }, { note() {}, playing() {}, stopNotes() {} });
 }
 
 function makePiano(overrides: Record<string, unknown> = {}) {
@@ -135,11 +140,22 @@ function makePiano(overrides: Record<string, unknown> = {}) {
         storage,
         cardStorage: undefined,
         cardAccess: undefined,
+        cardUid: undefined,
         readBytes: () => undefined,
         refreshCardIndicator: () => {},
         ...overrides,
     };
     return { piano, midi, storage };
+}
+
+function cardAccess(entries: StoredMusicEntry[], uid = "card-a") {
+    const storage = fakeStorage(entries);
+    return {
+        uid,
+        item: {},
+        storage: () => storage,
+        refreshLore: () => {},
+    };
 }
 
 function makePlayer(id = "p1", messages: string[] = []) {
@@ -159,76 +175,153 @@ function open(page: unknown, args: unknown) {
     return lastForm();
 }
 
-function dropdown(form: ReturnType<typeof lastForm>) {
+function dropdown(form: FakeCustomForm) {
     const component = form.components.find(item => item.type === "dropdown") as { value: FakeObservable<number> };
     return component.value;
 }
 
+function searchField(form: FakeCustomForm) {
+    return form.components.find(item => item.type === "textField")!.value as FakeObservable<string>;
+}
+
+async function settle() {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+}
+
+const libraryMetas = [
+    { id: "l1", name: "晴天", duration: 800, noteCount: 120, bytes: 2048 },
+    { id: "l2", name: "夜曲", duration: 900, noteCount: 140, bytes: 3072 },
+];
+
 beforeEach(() => {
     host.reset();
+    pageImpl = async () => ({ items: [], total: 0 });
 });
 
-describe("音乐曲库页面", () => {
-    test("默认展示钢琴内置歌曲，点击进入歌曲操作", async () => {
-        const { piano } = makePiano();
-        const form = open(MusicLibraryPage, { piano });
-        await Promise.resolve();
-
-        expect(form.buttonLabels()).toContain("小星星");
-        form.click("小星星");
-        expect(host.nav.pushed.at(-1)!.form).toBe(TrackActionsPage);
-        expect((host.nav.pushed.at(-1)!.args as any).ref.source).toBe("piano");
-    });
-
-    test("切到存储卡来源时若未插卡给出明确状态", async () => {
-        const { piano } = makePiano();
-        const form = open(MusicLibraryPage, { piano });
-        await Promise.resolve();
-
-        dropdown(form).setData(1);
-        await Promise.resolve();
-        await Promise.resolve();
-
-        const labels = form.labelTexts();
-        expect(labels.some(text => text.includes("卡槽为空"))).toBe(true);
-        expect(form.buttonLabels()).not.toContain("小星星");
-    });
-
-    test("来源/搜索/页码写回页面上下文，返回后重建保持", async () => {
+describe("公共曲库与管理/添加模式", () => {
+    test("管理模式默认展示公共曲库，点击歌曲进入详情", async () => {
+        pageImpl = async () => ({ items: libraryMetas, total: 2 });
         const { piano } = makePiano();
         const args: any = { piano };
         const form = open(MusicLibraryPage, args);
-        await Promise.resolve();
+        await settle();
 
-        dropdown(form).setData(2); // 内置/远程曲库
-        await Promise.resolve();
-        await Promise.resolve();
-
-        const search = form.components.find(item => item.type === "textField")!.value as FakeObservable<string>;
-        search.setData("星");
-        form.click("搜索");
-        await Promise.resolve();
-
+        expect(form.buttonLabels()).toContain("[库] 晴天");
+        form.click("[库] 晴天");
+        expect(host.nav.pushed.at(-1)!.form).toBe(TrackActionsPage);
+        expect((host.nav.pushed.at(-1)!.args as any).ref.source).toBe("library");
+        expect((host.nav.pushed.at(-1)!.args as any).ref.noteCount).toBe(120);
         expect(args.tab).toBe("library");
-        expect(args.query).toBe("星");
-        expect(args.page).toBe(1);
+    });
+
+    test("添加模式点击歌曲直接加入队列，留在当前页且不重复添加", async () => {
+        const entries = [makeEntry("c1", "卡上歌")];
+        const cardStorage = fakeStorage(entries);
+        const { piano, midi } = makePiano({
+            cardAccess: cardAccess(entries),
+            cardStorage,
+            cardUid: "card-a",
+        });
+        const form = open(MusicLibraryPage, { piano, tab: "card", mode: "add" });
+        await settle();
+
+        form.click("[卡] 卡上歌");
+        expect(midi.queue.getLength()).toBe(1);
+        expect(host.nav.pushed).toHaveLength(0);
+        expect(form.buttonLabels().some(label => label.startsWith("✓ "))).toBe(true);
+
+        form.click("✓ [卡] 卡上歌");
+        expect(midi.queue.getLength()).toBe(1);
+        expect(form.labelTexts().some(text => text.includes("队列中已有"))).toBe(true);
+    });
+
+    test("搜索框自动查询并解析末尾 p 页码；返回重建保持来源/搜索/页码", async () => {
+        const calls: Array<{ page: number; q?: string }> = [];
+        pageImpl = async (page, _size, q) => {
+            calls.push({ page, q });
+            return { items: libraryMetas, total: 40 };
+        };
+        const { piano } = makePiano();
+        const args: any = { piano };
+        const form = open(MusicLibraryPage, args);
+        await settle();
+
+        searchField(form).setData("周杰伦 p5");
+        await settle();
+
+        expect(args.query).toBe("周杰伦");
+        expect(args.page).toBe(5);
+        expect(calls.at(-1)).toEqual({ page: 5, q: "周杰伦" });
+        expect(form.labelTexts().some(text => text.includes("第 §f5"))).toBe(true);
 
         const rebuilt = open(MusicLibraryPage, args);
-        expect(dropdown(rebuilt).getData()).toBe(2);
-        const searchAgain = rebuilt.components.find(item => item.type === "textField")!.value as FakeObservable<string>;
-        expect(searchAgain.getData()).toBe("星");
+        expect(dropdown(rebuilt).getData()).toBe(0);
+        expect(searchField(rebuilt).getData()).toBe("周杰伦 p5");
+    });
+
+    test("手动翻页同步更新搜索框页码", async () => {
+        pageImpl = async () => ({ items: libraryMetas, total: 40 });
+        const { piano } = makePiano();
+        const form = open(MusicLibraryPage, { piano });
+        await settle();
+
+        form.click("下一页 ▶");
+        await settle();
+        expect(searchField(form).getData()).toBe("p2");
+
+        form.click("◀ 上一页");
+        await settle();
+        expect(searchField(form).getData()).toBe("");
+    });
+
+    test("每页固定 5 首，页码超出范围自动回到有效页", async () => {
+        const metas = Array.from({ length: 5 }, (_, index) => ({
+            id: `l${index}`,
+            name: `歌曲${index}`,
+            duration: 800,
+        }));
+        pageImpl = async () => ({ items: metas, total: 12 });
+        const { piano } = makePiano();
+        const args: any = { piano };
+        const form = open(MusicLibraryPage, args);
+        await settle();
+
+        const songButtons = form.buttonLabels().filter(label => label.startsWith("[库] "));
+        expect(songButtons).toHaveLength(5);
+
+        searchField(form).setData("p12");
+        await settle();
+        // 12 首 / 每页 5 首 = 3 页
+        expect(args.page).toBe(3);
+        expect(searchField(form).getData()).toBe("p3");
+    });
+
+    test("切换来源时未插卡给出明确状态", async () => {
+        const { piano } = makePiano();
+        const form = open(MusicLibraryPage, { piano });
+        await settle();
+
+        dropdown(form).setData(1);
+        await settle();
+
+        const labels = form.labelTexts();
+        expect(labels.some(text => text.includes("卡槽为空"))).toBe(true);
+        expect(form.buttonLabels()).not.toContain("[卡] 小星星");
     });
 });
 
 describe("存储卡页面", () => {
-    test("卡被弹出后页面进入空卡状态，且没有“插入”按钮", async () => {
-        const { piano } = makePiano({ cardAccess: { item: {}, storage: () => fakeStorage([], "card") } });
+    test("卡被弹出后页面进入空卡状态，只保留卡片自身操作", async () => {
+        const { piano } = makePiano({ cardAccess: cardAccess([makeEntry("c1", "卡上歌")], "card-a") });
         const form = open(MusicCardPage, { piano });
-        // 页面打开时卡还在，入口页负责判断是否显示本页
         expect(form.buttonLabels()).toContain("弹出存储卡");
-        expect(form.buttonLabels()).not.toContain("插入手中的卡");
+        expect(form.buttonLabels()).toContain("保存名称");
+        expect(form.buttonLabels()).not.toContain("导入 MIDI 到这张卡");
+        expect(form.buttonLabels()).not.toContain("在曲库中浏览这张卡");
+        expect(form.buttonLabels()).not.toContain("卡上歌");
 
-        // 模拟卡被取走后的重建状态
         piano.cardAccess = undefined;
         const empty = open(MusicCardPage, { piano });
         expect(empty.labelTexts().some(text => text.includes("未插卡"))).toBe(true);
@@ -237,28 +330,99 @@ describe("存储卡页面", () => {
 });
 
 describe("播放队列页面", () => {
-    test("卡来源的曲目在取卡后标记为不可用", () => {
+    test("不再包含播放控制，卡来源曲目在取卡后标记为不可用", () => {
         const { piano, midi } = makePiano({
             music: { availability: (ref: { source: string }) => ref.source === "card" ? "missing" : "ok" },
         });
-        midi.queue.enqueue({ id: "s1", name: "卡上的歌", duration: 1200, source: "card", checksum: "abcd1234" });
+        midi.queue.enqueue({ id: "s1", name: "卡上的歌", duration: 1200, source: "card", cardUid: "card-a", checksum: "abcd1234" });
         const form = open(PlayQueuePage, { piano });
 
         expect(form.buttonLabels().some(label => label.includes("⚠") && label.includes("卡上的歌"))).toBe(true);
+        expect(form.buttonLabels()).not.toContain("▶ 播放 / 继续");
+        expect(form.buttonLabels()).not.toContain("⏮ 上一首");
+        expect(form.buttonLabels()).not.toContain("⏭ 下一首");
+    });
+
+    test("添加歌曲直接进入曲库添加模式", () => {
+        const { piano } = makePiano();
+        const form = open(PlayQueuePage, { piano });
+        form.click("＋ 添加歌曲");
+        expect(host.nav.pushed.at(-1)!.form).toBe(MusicLibraryPage);
+        expect((host.nav.pushed.at(-1)!.args as any).mode).toBe("add");
     });
 });
 
-describe("歌曲操作页面", () => {
-    test("没有存储卡时“复制到存储卡”只提示，不写任何东西", () => {
+describe("歌曲详情页面", () => {
+    test("公共曲库且未插卡：只显示播放/加入队列，不显示复制或删除", () => {
         const { piano } = makePiano();
         const form = open(TrackActionsPage, {
             piano,
-            ref: { id: "s1", name: "小星星", duration: 1200, source: "piano" },
+            ref: { id: "l1", name: "晴天", duration: 1200, source: "library", noteCount: 10, bytes: 200 },
         });
 
-        form.click("复制到存储卡");
-        const labels = form.labelTexts();
-        expect(labels.some(text => text.includes("卡槽为空"))).toBe(true);
+        const buttons = form.buttonLabels();
+        expect(buttons).toContain("▶ 立即播放");
+        expect(buttons).toContain("＋ 加入播放队列");
+        expect(buttons).not.toContain("复制到存储卡");
+        expect(buttons).not.toContain("删除歌曲");
+        expect(buttons).not.toContain("复制到钢琴");
+        expect(form.labelTexts()).toContain("§7音符：§f10");
+        expect(form.labelTexts()).toContain("§7大小：§f200 B");
+    });
+
+    test("公共曲库已插卡显示复制；存储卡歌曲显示删除、不显示复制", () => {
+        const { piano } = makePiano({ cardAccess: cardAccess([]) });
+        const libraryForm = open(TrackActionsPage, {
+            piano,
+            ref: { id: "l1", name: "晴天", duration: 1200, source: "library" },
+        });
+        expect(libraryForm.buttonLabels()).toContain("复制到存储卡");
+        expect(libraryForm.buttonLabels()).not.toContain("删除歌曲");
+
+        const cardForm = open(TrackActionsPage, {
+            piano,
+            ref: { id: "c1", name: "卡上歌", duration: 1200, source: "card", cardUid: "card-a" },
+        });
+        expect(cardForm.buttonLabels()).toContain("删除歌曲");
+        expect(cardForm.buttonLabels()).not.toContain("复制到存储卡");
+    });
+
+    test("立即播放使用播放业务层接口，不直接清空队列", () => {
+        const { piano, midi } = makePiano();
+        const calls: string[] = [];
+        midi.queue.enqueue({ id: "keep", name: "保留", duration: 100, source: "library" });
+        piano.getMidiPlayer = () => ({
+            queue: midi.queue,
+            playNow: (ref: any) => { calls.push(`play:${ref.id}`); return Promise.resolve(); },
+            addToQueue: () => "added",
+            getInfo: () => ({ state: "idle" }),
+        });
+        const form = open(TrackActionsPage, {
+            piano,
+            ref: { id: "l1", name: "晴天", duration: 1200, source: "library" },
+        });
+        form.click("▶ 立即播放");
+        expect(calls).toEqual(["play:l1"]);
+        expect(midi.queue.getLength()).toBe(1);
+        expect(midi.queue.current()?.id).toBe("keep");
+    });
+});
+
+describe("MIDI 导入页面", () => {
+    test("未插卡时提示并禁止开始导入", () => {
+        const { piano } = makePiano();
+        const form = open(MidiImportPage, { piano });
+        expect(form.labelTexts().some(text => text.includes("卡槽为空"))).toBe(true);
+        expect(form.components.some(component => component.type === "textField")).toBe(false);
+    });
+
+    test("已插卡时直接以当前存储卡为目标，不再出现目标下拉框", () => {
+        const entries: StoredMusicEntry[] = [];
+        const { piano } = makePiano({ cardAccess: cardAccess(entries) });
+        const form = open(MidiImportPage, { piano });
+        expect(form.components.some(component => component.type === "textField")).toBe(true);
+        expect(form.components.some(component => component.type === "dropdown")).toBe(false);
+        expect(form.labelTexts().some(text => text.includes("当前卡槽"))).toBe(true);
     });
 });
 

@@ -82,6 +82,7 @@ for (const file of files) {
         name: song.name,
         duration: song.duration,
         noteCount: collectNoteCount(song),
+        bytes: pbe2.length,
     });
     notes += collectNoteCount(song);
     jsBytes += moduleText.length;

@@ -3,19 +3,22 @@ import type { MidiSongMeta } from "../types.js";
 /**
  * 音乐内容来源。
  *
- * 队列条目必须带上来源：同一份曲目可能同时存在于钢琴、存储卡与内置/远程曲库，
+ * 队列条目必须带上来源：同一份曲目可能同时存在于存储卡与公共曲库，
  * 只按 id 判断会把不同来源（甚至同 id 不同内容）混为一谈。
  */
-export type MusicSource = "piano" | "card" | "library";
+export type MusicSource = "card" | "library";
 
 export interface MusicRef extends MidiSongMeta {
     source: MusicSource;
-    /** PBE2 音符总数（来源提供时用于展示） */
-    noteCount?: number;
-    /** PBE2 原始字节数（来源提供时用于内容校验） */
-    bytes?: number;
     /** 整份 PBE2 的 CRC32（16 进制，来源提供时用于内容校验） */
     checksum?: string;
+    /**
+     * 存储卡身份（卡来源）。
+     *
+     * 队列条目绑定写入/播放时的实体卡；换卡后即使 id 与内容相同也不会
+     * 被误认为同一张卡上的曲目。
+     */
+    cardUid?: string;
 }
 
 /** 缓存/去重键：来源 + id + 内容指纹。 */
@@ -44,9 +47,8 @@ export function toMusicRef(
 }
 
 const SOURCE_LABELS: Record<MusicSource, string> = {
-    piano: "钢琴",
     card: "存储卡",
-    library: "曲库",
+    library: "公共曲库",
 };
 
 export function musicSourceLabel(source: MusicSource): string {
@@ -59,11 +61,12 @@ export function normalizeMusicRef(value: unknown): MusicRef | undefined {
     const raw = value as Record<string, unknown>;
     if (typeof raw.id !== "string" || typeof raw.name !== "string" ||
         typeof raw.duration !== "number" || !Number.isFinite(raw.duration)) return;
-    const source: MusicSource =
-        raw.source === "piano" || raw.source === "card" ? raw.source : "library";
+    // 已移除的 piano 来源按曲库处理；旧存储方案不做兼容迁移。
+    const source: MusicSource = raw.source === "card" ? "card" : "library";
     const ref: MusicRef = { id: raw.id, name: raw.name, duration: raw.duration, source };
     if (typeof raw.noteCount === "number" && Number.isFinite(raw.noteCount)) ref.noteCount = raw.noteCount;
     if (typeof raw.bytes === "number" && Number.isFinite(raw.bytes) && raw.bytes > 0) ref.bytes = raw.bytes;
     if (typeof raw.checksum === "string" && /^[0-9a-f]{1,8}$/i.test(raw.checksum)) ref.checksum = raw.checksum;
+    if (source === "card" && typeof raw.cardUid === "string" && raw.cardUid) ref.cardUid = raw.cardUid;
     return ref;
 }

@@ -41,8 +41,7 @@ function stored(bytes: Uint8Array): StoredMusicEntry {
 
 function fakeStorage(entries: StoredMusicEntry[], data: Map<string, Uint8Array>) {
     return {
-        kind: "piano" as const,
-        label: "测试钢琴",
+        label: "测试卡",
         list: () => entries,
         has: (id: string) => entries.some(entry => entry.id === id),
         get: (id: string) => data.get(id),
@@ -58,13 +57,13 @@ function fakeStorage(entries: StoredMusicEntry[], data: Map<string, Uint8Array>)
 describe("播放队列（带来源）", () => {
     test("同 id 不同来源不是同一首", () => {
         const queue = new PlayQueue();
-        const fromPiano: MusicRef = { id: "x", name: "X", duration: 40, source: "piano", checksum: "1111" };
+        const fromLibrary: MusicRef = { id: "x", name: "X", duration: 40, source: "library", checksum: "1111" };
         const fromCard: MusicRef = { id: "x", name: "X", duration: 40, source: "card", checksum: "1111" };
-        queue.enqueue(fromPiano);
+        queue.enqueue(fromLibrary);
         queue.enqueue(fromCard);
         expect(queue.getLength()).toBe(2);
         expect(queue.indexOf(fromCard)).toBe(1);
-        expect(queue.indexOf(fromPiano)).toBe(0);
+        expect(queue.indexOf(fromLibrary)).toBe(0);
     });
 
     test("快照/恢复保留来源，旧调用仍可按 id 查找", () => {
@@ -97,7 +96,7 @@ describe("播放快照兼容", () => {
     test("坏快照整份拒绝，而不是恢复到半份队列", () => {
         const raw = JSON.stringify({
             version: 2,
-            songs: [{ id: "ok", name: "好", duration: 40, source: "piano" }, { nope: true }],
+            songs: [{ id: "ok", name: "好", duration: 40, source: "card" }, { nope: true }],
             index: 0,
             mode: "sequence",
             state: "playing",
@@ -108,16 +107,18 @@ describe("播放快照兼容", () => {
 });
 
 describe("钢琴音乐读取（PianoMusic）", () => {
-    test("可用性按指纹判断：同 id 不同内容视为不可用", () => {
+    test("可用性按指纹与卡片身份判断：同 id 不同内容/不同卡视为不可用", () => {
         const bytes = music("abc");
         const entry = stored(bytes);
         const musicSource = new PianoMusic(
             () => fakeStorage([entry], new Map([["abc", bytes]])),
-            () => undefined
+            () => "card-a"
         );
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "piano", checksum: entry.checksum, bytes: entry.bytes })).toBe("ok");
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "piano", checksum: "deadbeef" })).toBe("missing");
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card" })).toBe("missing");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes })).toBe("ok");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: "deadbeef" })).toBe("missing");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-b", checksum: entry.checksum })).toBe("missing");
+        // 公共曲库：元信息未登记时返回 unknown，交给实际加载判断。
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "library" })).toBe("unknown");
     });
 
     test("读取时校验长度与 CRC，内容不符不会交给播放器", async () => {
@@ -125,27 +126,33 @@ describe("钢琴音乐读取（PianoMusic）", () => {
         const entry = stored(bytes);
         const source = new PianoMusic(
             () => fakeStorage([entry], new Map([["abc", bytes]])),
-            () => undefined
+            () => "card-a"
         );
 
-        const ok = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "piano", checksum: entry.checksum, bytes: entry.bytes });
+        const ok = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes });
         expect(ok?.song.id).toBe("abc");
         ok?.release();
 
-        const bad = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "piano", checksum: "00000000" });
+        const bad = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: "00000000" });
         expect(bad).toBeUndefined();
     });
 
-    test("存储卡被取走后，卡来源的队列条目不可用", () => {
+    test("存储卡被取走或被替换后，卡来源的队列条目不可用", () => {
         let cardPresent = true;
+        let cardUid = "card-a";
         const bytes = music("c1");
         const entry = stored(bytes);
         const cardStorage = fakeStorage([entry], new Map([["abc", bytes]]));
         const source = new PianoMusic(
-            () => undefined,
-            () => cardPresent ? cardStorage : undefined
+            () => cardPresent ? cardStorage : undefined,
+            () => cardUid
         );
-        const ref: MusicRef = { id: "abc", name: "测试", duration: 40, source: "card", checksum: entry.checksum };
+        const ref: MusicRef = { id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum };
+        expect(source.availability(ref)).toBe("ok");
+        // 换成另一张卡：即使 id/内容一致也不能当作同一张卡。
+        cardUid = "card-b";
+        expect(source.availability(ref)).toBe("missing");
+        cardUid = "card-a";
         expect(source.availability(ref)).toBe("ok");
         cardPresent = false;
         expect(source.availability(ref)).toBe("missing");

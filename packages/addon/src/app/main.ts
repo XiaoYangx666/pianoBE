@@ -4,7 +4,7 @@ import { MusicCardComponent } from "@app/components/musicCard";
 import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
-import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
+import { midiManager } from "@app/midi";
 import { loadPbeSettings } from "@platform/storage/pbeSettingsStore";
 import { system, world } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
@@ -27,19 +27,12 @@ system.beforeEvents.startup.subscribe((e) => {
 
 regEvents();
 
-// 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻加载配置与扫描导入曲库。
+// 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻加载配置。
 system.run(() => {
     try {
         loadPbeSettings();
     } catch (error) {
         console.warn("[piano] 读取管理员设置失败", error);
-    }
-    try {
-        importedSongs.reload();
-        midiManager.addSource(importedSongs);
-        void importedMidiManager.refresh();
-    } catch (error) {
-        console.warn("[piano] 扫描本地导入曲库失败", error);
     }
 });
 

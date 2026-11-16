@@ -8,11 +8,8 @@ import {
     parseImportChunk,
     type ImportProgress,
 } from "@piano/core";
-import type { MusicStorage } from "@domain/music/storage";
 import { canImportMidi, isPbeAdmin } from "@app/permissions";
-import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { CardAccess, isMusicCard, mainhandItemSlot } from "@platform/storage/cardItem";
 
 /** 同一玩家两次成功入库之间的最小间隔（毫秒） */
 const SUBMIT_COOLDOWN_MS = 5_000;
@@ -42,15 +39,6 @@ function recordSubmit(playerId: string) {
         [...(submitHistory.get(playerId) ?? []).filter((time) => now - time < RATE_WINDOW_MS), now]
     );
 }
-
-type ImportTarget = "piano" | "card" | "held" | "legacy";
-
-const TARGETS: { key: ImportTarget; label: string }[] = [
-    { key: "piano", label: "当前钢琴内置存储" },
-    { key: "card", label: "已插入的存储卡" },
-    { key: "held", label: "手中的存储卡" },
-    { key: "legacy", label: "旧世界导入曲库" },
-];
 
 /** 跨表单保留的导入进度：关闭表单后重新打开仍可继续粘贴剩余分段。 */
 interface ImportSession {
@@ -89,14 +77,15 @@ function progressText(progress: ImportProgress): string {
 
 export interface MidiImportArgs {
     piano?: PianoRuntime;
-    target?: ImportTarget;
 }
 
 /**
  * DDUI MIDI 导入：
+ * - 唯一保存目标为当前卡槽内的存储卡；
  * - 每段一次粘贴（单段建议 ≤4800 字符）；
- * - ImportAssembler 自动识别任务、支持乱序/重复/中断续传；
- * - 提交时按选择的真实存储写入（钢琴 / 卡槽卡 / 手持卡 / 旧导入曲库）。
+ * - ImportAssembler 自动识别任务、支持乱序/重复/中断续传。
+ *
+ * 打开页面时绑定当时的 CardAccess；导入过程中换卡/拔卡会被其 UID 校验拒绝。
  */
 export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args) => {
     const player = ui.player;
@@ -110,28 +99,19 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
     const status = ui.string("§7请粘贴第一段导入码", { clientWritable: false });
     const progress = ui.string("", { clientWritable: false });
     const input = ui.string("");
-    const target = ui.number(Math.max(0, TARGETS.findIndex(item => item.key === (args.target ?? "piano"))));
 
-    const currentTarget = () => TARGETS[target.getData()]?.key ?? "piano";
-
-    /** 解析目标存储；返回存储或可直接展示的错误。 */
-    const resolveStorage = (): { storage?: MusicStorage; label: string; refresh?: () => void } => {
-        const kind = currentTarget();
-        if (kind === "legacy") return { storage: undefined, label: "旧导入曲库" };
-        if (kind === "piano") {
-            const storage = args.piano?.storage;
-            return storage ? { storage, label: storage.label } : { label: "", };
-        }
-        if (kind === "card") {
-            const card = args.piano?.cardAccess;
-            const storage = card?.storage();
-            return storage ? { storage, label: `存储卡 ${storage.label}`, refresh: () => card?.refreshLore() } : { label: "" };
-        }
-        const slot = mainhandItemSlot(player);
-        const card = slot ? CardAccess.open(slot) : undefined;
-        if (!card || !isMusicCard(card.item)) return { label: "" };
-        return { storage: card.storage(), label: "手持存储卡", refresh: () => card.refreshLore() };
-    };
+    // 打开时检查插卡，并绑定这张卡的写句柄。
+    const access = args.piano?.cardAccess;
+    if (!args.piano || !access) {
+        status.setData("§c卡槽为空，请先插入音乐存储卡");
+        ui.label(status)
+            .label("§7MIDI 只能导入到当前钢琴卡槽内的存储卡。")
+            .label(session.pendingPayload ? "§e已接收但未保存的曲目仍保留，插卡后再打开即可重试。" : "§8插入存储卡后重新打开导入页面。")
+            .closeButton();
+        return;
+    }
+    const storage = access.storage();
+    const cardLabel = storage.label;
 
     const clearInput = () => ui.timeout(() => ui.set(input, ""), 1);
 
@@ -141,36 +121,21 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
             status.setData("§c管理员已关闭玩家导入，本次数据不会保存（可开启后重试）");
             return;
         }
+        if (!args.piano?.isAlive()) {
+            status.setData("§c钢琴已不可用，本次数据不会保存");
+            return;
+        }
         const rate = checkRate(player);
         if (rate) {
             status.setData(`§c${rate}（数据已保留，可稍后重试保存）`);
             return;
         }
 
-        const kind = currentTarget();
         try {
-            let message: string;
-            if (kind === "legacy") {
-                const record = importedSongs.save(payload);
-                midiManager.addSource(importedSongs);
-                void importedMidiManager.refresh();
-                message = `§a已存入旧导入曲库：§f${record.name}` +
-                    `\n§7大小 §f${formatBytes(record.bytes)}`;
-            } else {
-                const resolved = resolveStorage();
-                if (!resolved.storage) {
-                    status.setData(kind === "held"
-                        ? "§c手里没有音乐存储卡"
-                        : kind === "card"
-                            ? "§c卡槽为空，请先插入存储卡"
-                            : "§c钢琴存储暂不可用");
-                    return;
-                }
-                const entry = resolved.storage.save(payload);
-                resolved.refresh?.();
-                message = `§a已保存到 §f${resolved.label}§a：§f${entry.name}` +
-                    `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(resolved.storage.usage().usedBytes)}`;
-            }
+            const entry = storage.save(payload);
+            access.refreshLore();
+            let message = `§a已保存到存储卡 §f${cardLabel}§a：§f${entry.name}` +
+                `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(storage.usage().usedBytes)}`;
             // 导入时顺带用离线模型估算同时发声峰值，超过引擎上限就提示（不阻止导入）。
             try {
                 const warning = formatVoiceLoadWarning(estimatePbe2VoiceLoad(payload));
@@ -239,16 +204,6 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
         clearInput();
     };
 
-    const targetLabel = ui.computed([target], () => {
-        const kind = currentTarget();
-        if (kind === "piano") return args.piano?.storage
-            ? `§7目标：§f${args.piano.storage.label}`
-            : "§e目标：钢琴存储不可用";
-        if (kind === "card") return args.piano?.cardStorage ? "§7目标：§f已插入的存储卡" : "§e目标：卡槽为空";
-        if (kind === "held") return isMusicCard(mainhandItemSlot(player)?.read()) ? "§7目标：§f手中的存储卡" : "§e目标：手里没有存储卡";
-        return "§7目标：§f旧世界导入曲库（兼容入口）";
-    });
-
     // 恢复上次未完成的进度
     const received = session.assembler.progress();
     if (session.pendingPayload) {
@@ -262,8 +217,7 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
 
     ui.onChange(input, onInput);
 
-    ui.dropdown("保存到", target, TARGETS.map((item, index) => ({ label: item.label, value: index })));
-    ui.label(targetLabel);
+    ui.label(`§7目标：§f${cardLabel}（当前卡槽）`);
     ui.label(status)
         .label(progress)
         .label("§7把生成器导出的分段逐段粘贴到下面（可乱序，重复段会自动忽略）")

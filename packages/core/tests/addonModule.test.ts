@@ -47,4 +47,15 @@ describe("addonModule", () => {
                 "];"
         );
     });
+
+    it("index 文本可携带歌曲详情元数据", () => {
+        const text = metasToAddonIndex([
+            { id: "ccc", name: "C", duration: 300, noteCount: 42, bytes: 1024 },
+        ]);
+        expect(text).toBe(
+            "export const midis=[" +
+                '{id:"ccc",name:"C",duration:300,noteCount:42,bytes:1024,value:async()=> (await import("./ccc.js")).default},' +
+                "];"
+        );
+    });
 });

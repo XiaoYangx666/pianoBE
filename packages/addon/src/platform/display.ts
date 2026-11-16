@@ -8,7 +8,6 @@ import { grandDefinition } from "@domain/instrument/definition";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { scoreStandOffset } from "@domain/geometry/keyRay";
 import { isMusicCard, type ItemSlot, containerItemSlot } from "@platform/storage/cardItem";
-import { PIANO_STORAGE_PREFIX } from "@platform/storage/musicStorage";
 import { CARD_SLOT_INDEX } from "@platform/storage/cardSlot";
 
 export const PIANO_DISPLAY = "xypiano:piano_display";
@@ -70,6 +69,14 @@ export function cardSlotOf(entity: Entity): ItemSlot | undefined {
 export function readCardFromDisplay(entity: Entity) {
     const item = cardSlotOf(entity)?.read();
     return isMusicCard(item) ? item : undefined;
+}
+
+/** 从显示实体上摘走卡槽物品（拆琴/迁移用）。 */
+export function takeCardFromDisplay(entity: Entity) {
+    const card = readCardFromDisplay(entity);
+    if (!card) return undefined;
+    cardSlotOf(entity)?.write(undefined);
+    return card;
 }
 
 /** 插卡视觉反馈：实体属性驱动客户端表现。 */
@@ -167,19 +174,6 @@ export class PianoDisplay {
                 const migrated = candidates.map(candidate => candidate.getDynamicProperty(property))
                     .find(saved => typeof saved === "string");
                 if (migrated !== undefined) entity.setDynamicProperty(property, migrated);
-            }
-            // 内置音乐同样属于这架钢琴：重建实体时把旧实体上的整份存储迁过来，
-            // 否则“删掉并重建显示实体”会静默丢歌。
-            for (const candidate of candidates) {
-                if (candidate.id === entity.id) continue;
-                const ids = typeof candidate.getDynamicPropertyIds === "function"
-                    ? candidate.getDynamicPropertyIds()
-                    : [];
-                for (const key of ids) {
-                    if (!key.startsWith(PIANO_STORAGE_PREFIX) || entity.getDynamicProperty(key) !== undefined) continue;
-                    const value = candidate.getDynamicProperty(key);
-                    if (typeof value === "string") entity.setDynamicProperty(key, value);
-                }
             }
             // 卡槽里的实际物品也要跟着走，不能只迁移数据。
             if (!match) {

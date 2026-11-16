@@ -45,7 +45,7 @@ export async function loadTemplate(fileOrBlob: Blob | Uint8Array): Promise<Templ
 /**
  * 解析模板内嵌曲目。文件格式由 @piano/core 的 metasToAddonIndex /
  * pbe2ToAddonModule 生成：
- *   index.js: export const midis=[{id,name,duration,value:async()=> (await import("./<id>.js")).default},];
+ *   index.js: export const midis=[{id,name,duration,noteCount?,bytes?,value:async()=> (await import("./<id>.js")).default},];
  *   <id>.js:  export default "<Base64URL(PBE2)>";
  */
 export function parseExistingMidis(
@@ -56,7 +56,7 @@ export function parseExistingMidis(
     if (!content) return [];
 
     const regex =
-        /\{id:("(?:[^"\\]|\\.)*"),name:("(?:[^"\\]|\\.)*"),duration:([\d.]+),value:async\(\)=>\s*\(await\s*import\("\.\/([^"]+)\.js"\)\)\.default\}/g;
+        /\{id:("(?:[^"\\]|\\.)*"),name:("(?:[^"\\]|\\.)*"),duration:([\d.]+),(?:noteCount:\d+,)?(?:bytes:\d+,)?value:async\(\)=>\s*\(await\s*import\("\.\/([^"]+)\.js"\)\)\.default\}/g;
 
     const items: SongEntry[] = [];
     let match;

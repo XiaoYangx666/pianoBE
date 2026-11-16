@@ -1,14 +1,19 @@
 import { DDUI } from "sapi-pro";
-import type { MusicRef } from "@piano/core";
+import { formatBytes, musicSourceLabel, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { musicSourceLabel } from "@piano/core";
 
 export interface TrackActionArgs {
     piano: PianoRuntime;
     ref: MusicRef;
 }
 
-export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲操作", (ui, args) => {
+function formatDuration(duration: number): string {
+    const seconds = Math.max(0, Math.floor(duration / 40));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** 歌曲详情：展示元信息，并按来源动态提供有效操作。 */
+export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, args) => {
     const { piano, ref } = args;
     const player = ui.player;
     const status = ui.string("");
@@ -17,77 +22,49 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲操作", (ui, 
     const alive = () => piano.isAlive() && player.isValid;
     const fail = (error: unknown) => status.setData(`§c${(error as Error)?.message ?? error}`);
 
+    const canCopy = ui.boolean(ref.source === "library" && Boolean(piano.cardAccess), { clientWritable: false });
+    const canDelete = ui.boolean(ref.source === "card", { clientWritable: false });
+
     ui.label(`§b${ref.name}`);
-    ui.label(`§7来源：§f${musicSourceLabel(ref.source)}　§7时长：§f${Math.floor(ref.duration / 40 / 60)}:${String(Math.floor(ref.duration / 40) % 60).padStart(2, "0")}`);
+    ui.label(`§7来源：§f${musicSourceLabel(ref.source)}`);
+    ui.label(`§7时长：§f${formatDuration(ref.duration)}`);
+    ui.label(`§7音符：§f${ref.noteCount !== undefined ? ref.noteCount : "未知"}`);
+    ui.label(`§7大小：§f${ref.bytes !== undefined ? formatBytes(ref.bytes) : "未知"}`);
     ui.label(status);
 
     ui.button("▶ 立即播放", () => {
         if (!alive()) return ui.close();
-        const midi = piano.getMidiPlayer();
-        midi.queue.clear();
-        midi.queue.insertBack(ref);
-        void midi.play().catch(fail);
-        status.setData("§a开始播放");
+        void piano.getMidiPlayer().playNow(ref)
+            .then(() => status.setData("§a开始播放"))
+            .catch(fail);
     });
 
     ui.button("＋ 加入播放队列", () => {
         if (!alive()) return ui.close();
-        const queue = piano.getMidiPlayer().queue;
-        const existing = queue.indexOf(ref);
-        if (existing >= 0) {
-            status.setData("§e队列中已有这首歌");
-            return;
-        }
-        queue.enqueue(ref);
-        status.setData("§a已加入队列");
-    });
-
-    ui.button("复制到钢琴", () => {
-        if (!alive()) return ui.close();
-        if (ref.source === "piano") {
-            status.setData("§7这首歌已经在钢琴里");
-            return;
-        }
-        const storage = piano.storage;
-        if (!storage) {
-            status.setData("§c钢琴存储暂不可用");
-            return;
-        }
-        void Promise.resolve(piano.readBytes(ref)).then(bytes => {
-            if (!bytes) throw new Error("源曲目已不可用（存储卡可能已被取走）");
-            const entry = storage.save(bytes);
-            status.setData(`§a已复制到钢琴：${entry.name}`);
-        }).catch(fail);
+        const result = piano.getMidiPlayer().addToQueue(ref);
+        status.setData(result === "added" ? "§a已加入播放队列" : "§e队列中已有这首歌");
     });
 
     ui.button("复制到存储卡", () => {
         if (!alive()) return ui.close();
-        if (ref.source === "card") {
-            status.setData("§7这首歌已经在存储卡里");
-            return;
-        }
         const card = piano.cardAccess;
-        const storage = card?.storage();
-        if (!card || !storage) {
+        if (!card) {
             status.setData("§c卡槽为空，先插入一张音乐存储卡");
             return;
         }
         void Promise.resolve(piano.readBytes(ref)).then(bytes => {
             if (!bytes) throw new Error("源曲目已不可用");
+            const storage = card.storage();
             const entry = storage.save(bytes);
             card.refreshLore();
             status.setData(`§a已复制到存储卡：${entry.name}`);
         }).catch(fail);
-    });
+    }, { visible: canCopy });
 
-    ui.button("删除", () => {
+    ui.button("删除歌曲", () => {
         if (!alive()) return ui.close();
-        if (ref.source === "library") {
-            status.setData("§7曲库中的曲目不能在这里删除");
-            return;
-        }
         ui.push(ConfirmDeletePage, { piano, ref });
-    });
+    }, { visible: canDelete });
 
     ui.closeButton();
 });
@@ -95,17 +72,23 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲操作", (ui, 
 const ConfirmDeletePage = DDUI.page<TrackActionArgs>("确认删除", (ui, args) => {
     const { piano, ref } = args;
     const status = ui.string("");
-    ui.label(`§e确定从${ref.source === "card" ? "存储卡" : "钢琴"}删除：`);
+    ui.label("§e确定从存储卡删除：");
     ui.label(`§f${ref.name}`);
     ui.label(status);
     ui.button("确认删除", () => {
-        const storage = ref.source === "card" ? piano.cardStorage : piano.storage;
-        if (!storage) return status.setData("§c存储已不可用");
-        const removed = storage.remove(ref.id);
-        status.setData(removed ? "§a已删除" : "§e曲目已不存在");
-        const card = ref.source === "card" ? piano.cardAccess : undefined;
-        if (removed) card?.refreshLore();
-        ui.back();
+        const card = piano.cardAccess;
+        if (!card) return status.setData("§c存储卡已不在卡槽中");
+        if (ref.cardUid && card.uid && ref.cardUid !== card.uid) {
+            return status.setData("§c存储卡已被替换，已取消删除");
+        }
+        const removed = card.storage().remove(ref.id);
+        if (removed) {
+            card.refreshLore();
+            status.setData("§a已删除");
+            ui.back();
+            return;
+        }
+        status.setData("§e曲目已不存在");
     });
     ui.button("取消", () => ui.back());
 });

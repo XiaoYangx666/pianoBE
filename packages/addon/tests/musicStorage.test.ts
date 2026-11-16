@@ -184,7 +184,7 @@ describe("音乐存储：中断与恢复", () => {
 
 describe("队列引用身份", () => {
     test("同 id 不同来源/指纹使用不同缓存键", () => {
-        expect(musicRefKey({ source: "piano", id: "abc", checksum: "1111" }))
+        expect(musicRefKey({ source: "library", id: "abc", checksum: "1111" }))
             .not.toBe(musicRefKey({ source: "card", id: "abc", checksum: "1111" }));
         expect(musicRefKey({ source: "card", id: "abc", checksum: "1111" }))
             .not.toBe(musicRefKey({ source: "card", id: "abc", checksum: "2222" }));
