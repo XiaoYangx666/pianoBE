@@ -6,10 +6,94 @@
   "noteCount": 731
  },
  {
+  "id": "7e2d5eda",
+  "name": "爱乐之城 City of Stars",
+  "duration": 7012,
+  "noteCount": 793
+ },
+ {
+  "id": "89bad179",
+  "name": "爱乐之城 Mia & Sebastian",
+  "duration": 10894,
+  "noteCount": 1406
+ },
+ {
   "id": "837883ed",
   "name": "八三夭 - 想见你想见你想见你",
   "duration": 9256,
   "noteCount": 941
+ },
+ {
+  "id": "15fd523c",
+  "name": "巴赫 - G弦上的咏叹调",
+  "duration": 11997,
+  "noteCount": 1215
+ },
+ {
+  "id": "9929de6e",
+  "name": "坂本龙一 Merry Christmas Mr. Lawrence",
+  "duration": 10894,
+  "noteCount": 1321
+ },
+ {
+  "id": "2c7c4a44",
+  "name": "贝多芬 - 致爱丽丝",
+  "duration": 8473,
+  "noteCount": 919
+ },
+ {
+  "id": "fae77ceb",
+  "name": "贝多芬 月光奏鸣曲 第三乐章",
+  "duration": 18153,
+  "noteCount": 6333
+ },
+ {
+  "id": "1e4bfeea",
+  "name": "崩坏3 - 薪炎永燃",
+  "duration": 7715,
+  "noteCount": 1538
+ },
+ {
+  "id": "6bc219e9",
+  "name": "崩坏3 - 星与你消失之日",
+  "duration": 7690,
+  "noteCount": 1461
+ },
+ {
+  "id": "39040cd3",
+  "name": "崩坏3 - Rubia",
+  "duration": 7734,
+  "noteCount": 1441
+ },
+ {
+  "id": "c01ee499",
+  "name": "崩坏星穹铁道 - 不眠之夜",
+  "duration": 3569,
+  "noteCount": 1198
+ },
+ {
+  "id": "b21eb695",
+  "name": "崩坏星穹铁道 - 若我不曾见过太阳",
+  "duration": 5980,
+  "noteCount": 884
+ },
+ {
+  "id": "4a0548d4",
+  "name": "崩坏星穹铁道 - 使一颗心免于哀伤",
+  "duration": 8330,
+  "noteCount": 1594
+ },
+ {
+  "id": "5c128472",
+  "name": "崩坏星穹铁道 - 星间旅行",
+  "duration": 3599,
+  "noteCount": 1100
+ },
+ {
+  "id": "75c546f7",
+  "name": "勃拉姆斯 - 匈牙利舞曲第五号",
+  "duration": 5376,
+  "noteCount": 1717
  },
  {
   "id": "df64c336",
@@ -18,16 +102,82 @@
   "noteCount": 667
  },
  {
-  "id": "1bc889e8",
+  "id": "7367ece1",
   "name": "蔡依林 - 倒带",
-  "duration": 10607,
-  "noteCount": 476
+  "duration": 9148,
+  "noteCount": 1308
  },
  {
   "id": "30f10038",
   "name": "蔡依林 - 说爱你",
   "duration": 4755,
   "noteCount": 706
+ },
+ {
+  "id": "f4e342f0",
+  "name": "超级马里奥 - 主题曲",
+  "duration": 8802,
+  "noteCount": 3064
+ },
+ {
+  "id": "fb86548a",
+  "name": "超兽武装 - 主题曲",
+  "duration": 4102,
+  "noteCount": 896
+ },
+ {
+  "id": "fa78732b",
+  "name": "陈百强 - 偏偏喜欢你",
+  "duration": 5526,
+  "noteCount": 656
+ },
+ {
+  "id": "20139c0a",
+  "name": "陈百强 - 一生何求",
+  "duration": 9710,
+  "noteCount": 1665
+ },
+ {
+  "id": "311ace0b",
+  "name": "陈慧娴 - 飘雪",
+  "duration": 9325,
+  "noteCount": 1551
+ },
+ {
+  "id": "b1e63054",
+  "name": "陈慧娴 - 千千阙歌",
+  "duration": 6727,
+  "noteCount": 991
+ },
+ {
+  "id": "bcfb87a",
+  "name": "陈粒 - 奇妙能力歌",
+  "duration": 8172,
+  "noteCount": 994
+ },
+ {
+  "id": "c1743da1",
+  "name": "陈粒 - 小半",
+  "duration": 9036,
+  "noteCount": 1386
+ },
+ {
+  "id": "c18360dc",
+  "name": "陈淑桦 - 梦醒时分",
+  "duration": 7165,
+  "noteCount": 1209
+ },
+ {
+  "id": "b5b1c1f3",
+  "name": "陈小春 - 我爱的人",
+  "duration": 10612,
+  "noteCount": 1593
+ },
+ {
+  "id": "e6646f0f",
+  "name": "陈奕迅 - 爱情转移",
+  "duration": 7690,
+  "noteCount": 913
  },
  {
   "id": "d85df3aa",
@@ -54,6 +204,18 @@
   "noteCount": 1744
  },
  {
+  "id": "9aa87353",
+  "name": "陈奕迅 - 好久不见",
+  "duration": 12176,
+  "noteCount": 1228
+ },
+ {
+  "id": "3adaddb0",
+  "name": "陈奕迅 - 葡萄成熟时",
+  "duration": 11132,
+  "noteCount": 2671
+ },
+ {
   "id": "401daa0c",
   "name": "陈奕迅 - 圣诞结",
   "duration": 9122,
@@ -66,10 +228,16 @@
   "noteCount": 2276
  },
  {
-  "id": "a0ab4dd9",
+  "id": "605892",
+  "name": "陈奕迅 - 淘汰",
+  "duration": 11153,
+  "noteCount": 1941
+ },
+ {
+  "id": "48348a12",
   "name": "陈奕迅 - K歌之王",
-  "duration": 6728,
-  "noteCount": 725
+  "duration": 10063,
+  "noteCount": 1633
  },
  {
   "id": "5be9729c",
@@ -102,16 +270,106 @@
   "noteCount": 7343
  },
  {
+  "id": "f53e0ab9",
+  "name": "德彪西 - 月光",
+  "duration": 13978,
+  "noteCount": 1330
+ },
+ {
+  "id": "51bcbb04",
+  "name": "邓丽君 - 但愿人长久",
+  "duration": 5565,
+  "noteCount": 704
+ },
+ {
+  "id": "98153f59",
+  "name": "邓丽君 - 何日君再来",
+  "duration": 8477,
+  "noteCount": 1020
+ },
+ {
+  "id": "b8bfd1b4",
+  "name": "邓丽君 - 漫步人生路",
+  "duration": 9488,
+  "noteCount": 1655
+ },
+ {
+  "id": "23c33ed8",
+  "name": "邓丽君 - 甜蜜蜜",
+  "duration": 8695,
+  "noteCount": 1433
+ },
+ {
+  "id": "60273619",
+  "name": "邓丽君 - 小城故事",
+  "duration": 6408,
+  "noteCount": 818
+ },
+ {
+  "id": "b379db5a",
+  "name": "邓丽君 - 夜来香",
+  "duration": 6735,
+  "noteCount": 919
+ },
+ {
+  "id": "6594a482",
+  "name": "邓丽君 - 又见炊烟",
+  "duration": 6880,
+  "noteCount": 833
+ },
+ {
+  "id": "f211e83e",
+  "name": "邓丽君 - 月亮代表我的心",
+  "duration": 6748,
+  "noteCount": 426
+ },
+ {
+  "id": "1980644c",
+  "name": "邓紫棋 - 多远都要在一起",
+  "duration": 6671,
+  "noteCount": 1049
+ },
+ {
   "id": "d2893ad4",
   "name": "邓紫棋 - 光年之外",
   "duration": 8405,
   "noteCount": 1765
  },
  {
-  "id": "7fa90b34",
+  "id": "f5911cf1",
   "name": "邓紫棋 - 句号",
-  "duration": 8715,
-  "noteCount": 894
+  "duration": 9378,
+  "noteCount": 2409
+ },
+ {
+  "id": "75d132ca",
+  "name": "邓紫棋 - 泡沫",
+  "duration": 9847,
+  "noteCount": 1605
+ },
+ {
+  "id": "388fc34e",
+  "name": "迪迦奥特曼 - 奇迹再现",
+  "duration": 6818,
+  "noteCount": 1942
+ },
+ {
+  "id": "1a4c0883",
+  "name": "哆啦A梦 - 主题曲",
+  "duration": 9612,
+  "noteCount": 2339
+ },
+ {
+  "id": "5329df8a",
+  "name": "俄罗斯方块 - Korobeiniki",
+  "duration": 6497,
+  "noteCount": 1868
+ },
+ {
+  "id": "a85150d9",
+  "name": "高桥洋子 - 残酷天使的行动纲领",
+  "duration": 11535,
+  "noteCount": 3361
  },
  {
   "id": "c5e4f54c",
@@ -120,10 +378,16 @@
   "noteCount": 1913
  },
  {
-  "id": "bb033a9c",
+  "id": "1bcfaccb",
+  "name": "光良 - 第一次",
+  "duration": 10253,
+  "noteCount": 1524
+ },
+ {
+  "id": "6c4a4746",
   "name": "光良 - 童话",
-  "duration": 6487,
-  "noteCount": 511
+  "duration": 9192,
+  "noteCount": 1246
  },
  {
   "id": "36b70811",
@@ -168,16 +432,58 @@
   "noteCount": 738
  },
  {
+  "id": "10e11a8a",
+  "name": "华晨宇 - 好想爱这个世界啊",
+  "duration": 9774,
+  "noteCount": 1974
+ },
+ {
+  "id": "e1c2ec8f",
+  "name": "华晨宇 - 烟火里的尘埃",
+  "duration": 13031,
+  "noteCount": 2908
+ },
+ {
   "id": "26e8e431",
   "name": "黄霄雲 - 星辰大海",
   "duration": 8724,
   "noteCount": 1605
  },
  {
+  "id": "225f590",
+  "name": "加勒比海盗 He's a Pirate",
+  "duration": 5126,
+  "noteCount": 1659
+ },
+ {
+  "id": "83efdbbd",
+  "name": "久石让 - 风之谷",
+  "duration": 15031,
+  "noteCount": 2941
+ },
+ {
+  "id": "56306b7",
+  "name": "久石让 - 海边的街道",
+  "duration": 6741,
+  "noteCount": 1619
+ },
+ {
+  "id": "e7f084c7",
+  "name": "久石让 - 红猪",
+  "duration": 6408,
+  "noteCount": 684
+ },
+ {
   "id": "251c8236",
   "name": "久石让 - 菊次郎的夏天",
   "duration": 6250,
   "noteCount": 1223
+ },
+ {
+  "id": "24937f46",
+  "name": "久石让 - 邻家的龙猫",
+  "duration": 7153,
+  "noteCount": 1455
  },
  {
   "id": "64354004",
@@ -192,6 +498,12 @@
   "noteCount": 667
  },
  {
+  "id": "599d0905",
+  "name": "久石让 - 幽灵公主",
+  "duration": 6408,
+  "noteCount": 660
+ },
+ {
   "id": "3bdb531b",
   "name": "久石让 - Always With Me",
   "duration": 10431,
@@ -204,10 +516,28 @@
   "noteCount": 2154
  },
  {
+  "id": "7b5d758f",
+  "name": "铠甲勇士 - 战斗-通往胜利",
+  "duration": 3529,
+  "noteCount": 1223
+ },
+ {
+  "id": "e3572ee2",
+  "name": "筷子兄弟 - 老男孩",
+  "duration": 6938,
+  "noteCount": 1064
+ },
+ {
   "id": "3c3a033a",
   "name": "李佳薇 - 甲乙丙丁",
   "duration": 8271,
   "noteCount": 798
+ },
+ {
+  "id": "2d21ac31",
+  "name": "李佳薇 - 煎熬",
+  "duration": 8470,
+  "noteCount": 990
  },
  {
   "id": "92cf2cfd",
@@ -216,10 +546,34 @@
   "noteCount": 683
  },
  {
-  "id": "52d2da9",
+  "id": "be90881f",
+  "name": "李玖哲 - 夏天",
+  "duration": 8772,
+  "noteCount": 2011
+ },
+ {
+  "id": "b22a6cab",
+  "name": "李克勤 - 红日",
+  "duration": 7043,
+  "noteCount": 1243
+ },
+ {
+  "id": "79a98667",
+  "name": "李克勤 - 月半小夜曲",
+  "duration": 6985,
+  "noteCount": 654
+ },
+ {
+  "id": "871069",
   "name": "李荣浩 - 戒烟",
-  "duration": 8540,
-  "noteCount": 354
+  "duration": 11366,
+  "noteCount": 2111
+ },
+ {
+  "id": "dc8c3dbb",
+  "name": "李荣浩 - 老街",
+  "duration": 10453,
+  "noteCount": 1545
  },
  {
   "id": "a5649b27",
@@ -228,10 +582,28 @@
   "noteCount": 1576
  },
  {
+  "id": "c59279d7",
+  "name": "李荣浩 - 年少有为",
+  "duration": 10590,
+  "noteCount": 1258
+ },
+ {
   "id": "b856213",
   "name": "李闰珉 - 雨的印记",
   "duration": 10919,
   "noteCount": 1061
+ },
+ {
+  "id": "c7580ab8",
+  "name": "李斯特 - 钟",
+  "duration": 10799,
+  "noteCount": 4119
+ },
+ {
+  "id": "1276c5ea",
+  "name": "李玟 - 刀马旦",
+  "duration": 7597,
+  "noteCount": 1717
  },
  {
   "id": "8a95cf27",
@@ -240,16 +612,70 @@
   "noteCount": 1668
  },
  {
+  "id": "38f2746b",
+  "name": "理查德 - 梦中的婚礼",
+  "duration": 6698,
+  "noteCount": 1081
+ },
+ {
+  "id": "5f45b543",
+  "name": "理查德 - 秋日私语",
+  "duration": 7690,
+  "noteCount": 1093
+ },
+ {
+  "id": "2b6a2af4",
+  "name": "理查德 - 水边的阿狄丽娜",
+  "duration": 6717,
+  "noteCount": 865
+ },
+ {
+  "id": "333f9244",
+  "name": "梁静茹 - 崇拜",
+  "duration": 11674,
+  "noteCount": 1222
+ },
+ {
+  "id": "8799d825",
+  "name": "梁静茹 - 可惜不是你",
+  "duration": 13232,
+  "noteCount": 2041
+ },
+ {
+  "id": "8af410a0",
+  "name": "梁静茹 - 情歌",
+  "duration": 10382,
+  "noteCount": 1333
+ },
+ {
+  "id": "5dfcc21c",
+  "name": "梁静茹 - 燕尾蝶",
+  "duration": 6950,
+  "noteCount": 964
+ },
+ {
   "id": "aa0457e5",
   "name": "梁静茹 - 勇气",
   "duration": 6207,
   "noteCount": 696
  },
  {
-  "id": "857241ec",
+  "id": "c6703c32",
+  "name": "梁咏琪 - 短发",
+  "duration": 8867,
+  "noteCount": 925
+ },
+ {
+  "id": "94380cc1",
+  "name": "林俊杰 - 不为谁而作的歌",
+  "duration": 11276,
+  "noteCount": 2526
+ },
+ {
+  "id": "626b2594",
   "name": "林俊杰 - 曹操",
-  "duration": 3431,
-  "noteCount": 367
+  "duration": 9209,
+  "noteCount": 1920
  },
  {
   "id": "96870459",
@@ -258,16 +684,100 @@
   "noteCount": 682
  },
  {
+  "id": "1469b3d6",
+  "name": "林俊杰 - 可惜没如果",
+  "duration": 11755,
+  "noteCount": 2582
+ },
+ {
+  "id": "701f59b1",
+  "name": "林俊杰 - 那些你很冒险的梦",
+  "duration": 8806,
+  "noteCount": 1053
+ },
+ {
+  "id": "32e26606",
+  "name": "林俊杰 - 她说",
+  "duration": 13226,
+  "noteCount": 1952
+ },
+ {
+  "id": "60b415ad",
+  "name": "林俊杰 - 修炼爱情",
+  "duration": 11535,
+  "noteCount": 2593
+ },
+ {
+  "id": "da53d9d6",
+  "name": "林俊杰 - 学不会",
+  "duration": 8675,
+  "noteCount": 1472
+ },
+ {
+  "id": "908c0055",
+  "name": "林俊杰 - 一千年以后",
+  "duration": 8971,
+  "noteCount": 1144
+ },
+ {
+  "id": "4c454a0c",
+  "name": "林俊杰 - 醉赤壁",
+  "duration": 11525,
+  "noteCount": 1371
+ },
+ {
+  "id": "c935fe13",
+  "name": "刘德华 - 冰雨",
+  "duration": 8596,
+  "noteCount": 1262
+ },
+ {
   "id": "9ea0442f",
   "name": "刘德华 - 恭喜发财",
   "duration": 3517,
   "noteCount": 928
  },
  {
+  "id": "ce095b52",
+  "name": "刘若英 - 成全",
+  "duration": 12180,
+  "noteCount": 1973
+ },
+ {
+  "id": "381c5f8b",
+  "name": "刘若英 - 很爱很爱你",
+  "duration": 8989,
+  "noteCount": 1426
+ },
+ {
   "id": "22f40e40",
   "name": "刘若英 - 后来",
   "duration": 12221,
   "noteCount": 1487
+ },
+ {
+  "id": "f70a2daf",
+  "name": "刘若英 - 为爱痴狂",
+  "duration": 6449,
+  "noteCount": 753
+ },
+ {
+  "id": "810b3af1",
+  "name": "刘若英 - 原来你也在这里",
+  "duration": 6801,
+  "noteCount": 1383
+ },
+ {
+  "id": "4acae517",
+  "name": "罗大佑 - 恋曲1990",
+  "duration": 12019,
+  "noteCount": 2480
+ },
+ {
+  "id": "51b575d9",
+  "name": "罗大佑 - 童年",
+  "duration": 7044,
+  "noteCount": 1084
  },
  {
   "id": "555133b6",
@@ -300,10 +810,106 @@
   "noteCount": 728
  },
  {
+  "id": "74e97abf",
+  "name": "毛不易 - 平凡的一天",
+  "duration": 8401,
+  "noteCount": 890
+ },
+ {
+  "id": "dca7dd0b",
+  "name": "毛不易 - 像我这样的人",
+  "duration": 10100,
+  "noteCount": 1631
+ },
+ {
+  "id": "d17b9238",
+  "name": "毛不易 - 消愁",
+  "duration": 10894,
+  "noteCount": 1566
+ },
+ {
+  "id": "67fae963",
+  "name": "米津玄师 - 春雷",
+  "duration": 12102,
+  "noteCount": 2894
+ },
+ {
   "id": "ef086366",
   "name": "米津玄师 - 打上花火",
   "duration": 10885,
   "noteCount": 1967
+ },
+ {
+  "id": "7dbfa2cb",
+  "name": "米津玄师 - 地球儀",
+  "duration": 10682,
+  "noteCount": 1806
+ },
+ {
+  "id": "b5b86099",
+  "name": "米津玄师 - 感電",
+  "duration": 10220,
+  "noteCount": 2808
+ },
+ {
+  "id": "94c468ad",
+  "name": "米津玄师 - 海の幽霊",
+  "duration": 10419,
+  "noteCount": 2372
+ },
+ {
+  "id": "ce65c949",
+  "name": "米津玄师 - 灰色と青",
+  "duration": 14098,
+  "noteCount": 1731
+ },
+ {
+  "id": "7976c0f4",
+  "name": "米津玄师 - 馬と鹿",
+  "duration": 10535,
+  "noteCount": 3123
+ },
+ {
+  "id": "3b8ba168",
+  "name": "米津玄师 - 死神",
+  "duration": 6324,
+  "noteCount": 1209
+ },
+ {
+  "id": "a3ebdf5a",
+  "name": "米津玄师 - Flamingo",
+  "duration": 7960,
+  "noteCount": 1737
+ },
+ {
+  "id": "68b225db",
+  "name": "米津玄师 - Lemon",
+  "duration": 9170,
+  "noteCount": 1094
+ },
+ {
+  "id": "3289c528",
+  "name": "米津玄师 - Loser",
+  "duration": 9469,
+  "noteCount": 3555
+ },
+ {
+  "id": "5cc540e7",
+  "name": "米津玄师 - M八七",
+  "duration": 10622,
+  "noteCount": 1864
+ },
+ {
+  "id": "40b30fb5",
+  "name": "米津玄师 - orion",
+  "duration": 11224,
+  "noteCount": 3198
+ },
+ {
+  "id": "90ee4f77",
+  "name": "米津玄师 - アイネクライネ",
+  "duration": 11778,
+  "noteCount": 2662
  },
  {
   "id": "d9939081",
@@ -318,10 +924,58 @@
   "noteCount": 1353
  },
  {
+  "id": "117255ab",
+  "name": "魔兽世界 - 主题曲",
+  "duration": 11467,
+  "noteCount": 1518
+ },
+ {
+  "id": "14253df",
+  "name": "莫文蔚 - 慢慢喜欢你",
+  "duration": 10420,
+  "noteCount": 1420
+ },
+ {
+  "id": "cfec0ab6",
+  "name": "莫文蔚 - 盛夏的果实",
+  "duration": 10728,
+  "noteCount": 1490
+ },
+ {
+  "id": "18853fb",
+  "name": "莫扎特 - 土耳其进行曲",
+  "duration": 7510,
+  "noteCount": 2477
+ },
+ {
+  "id": "787551ae",
+  "name": "木村弓 - いつも何度でも",
+  "duration": 9678,
+  "noteCount": 1035
+ },
+ {
+  "id": "f24bcb2",
+  "name": "那英 - 默",
+  "duration": 12150,
+  "noteCount": 1784
+ },
+ {
+  "id": "ebcd0475",
+  "name": "南拳妈妈 - 瓦解",
+  "duration": 9078,
+  "noteCount": 1510
+ },
+ {
   "id": "ce698c86",
   "name": "南拳妈妈 - 下雨天",
   "duration": 9299,
   "noteCount": 949
+ },
+ {
+  "id": "13ca5573",
+  "name": "女神异闻录5 Life Will Change",
+  "duration": 4839,
+  "noteCount": 1535
  },
  {
   "id": "694de27b",
@@ -330,16 +984,58 @@
   "noteCount": 383
  },
  {
+  "id": "78374d64",
+  "name": "帕赫贝尔 - 卡农",
+  "duration": 13103,
+  "noteCount": 1483
+ },
+ {
+  "id": "9e0cc366",
+  "name": "朴树 - 白桦林",
+  "duration": 7089,
+  "noteCount": 1071
+ },
+ {
+  "id": "cc11d54a",
+  "name": "朴树 - 那些花儿",
+  "duration": 13987,
+  "noteCount": 1486
+ },
+ {
   "id": "6636a97e",
   "name": "朴树 - 平凡之路",
   "duration": 11991,
   "noteCount": 4330
  },
  {
+  "id": "7db53af5",
+  "name": "朴树 - 生如夏花",
+  "duration": 8573,
+  "noteCount": 1307
+ },
+ {
+  "id": "679c5e5b",
+  "name": "齐秦 - 外面的世界",
+  "duration": 12447,
+  "noteCount": 2170
+ },
+ {
+  "id": "c2bf0aa9",
+  "name": "千本樱",
+  "duration": 10253,
+  "noteCount": 4039
+ },
+ {
   "id": "d4ee29fc",
   "name": "青鸟飞鱼 - 此生不换",
   "duration": 10215,
   "noteCount": 1200
+ },
+ {
+  "id": "a520a19f",
+  "name": "晴天 - 钢琴版2026",
+  "duration": 10894,
+  "noteCount": 2205
  },
  {
   "id": "4e2e0292",
@@ -354,10 +1050,70 @@
   "noteCount": 548
  },
  {
+  "id": "509bf50b",
+  "name": "萨蒂 - 裸体歌舞",
+  "duration": 7438,
+  "noteCount": 431
+ },
+ {
+  "id": "17143c0e",
+  "name": "塞尔达传说 - 时之笛",
+  "duration": 10013,
+  "noteCount": 1607
+ },
+ {
+  "id": "ffac5457",
+  "name": "塞尔达传说 - 主题曲",
+  "duration": 5439,
+  "noteCount": 877
+ },
+ {
   "id": "2bfd3512",
   "name": "赛马娘 うまぴょい伝説",
   "duration": 10475,
   "noteCount": 4193
+ },
+ {
+  "id": "7a430260",
+  "name": "上古卷轴5 - Dragonborn",
+  "duration": 5767,
+  "noteCount": 717
+ },
+ {
+  "id": "b1d8c5cd",
+  "name": "石进 - 夜的钢琴曲六",
+  "duration": 8330,
+  "noteCount": 941
+ },
+ {
+  "id": "a3b582b",
+  "name": "石进 - 夜的钢琴曲五",
+  "duration": 10396,
+  "noteCount": 1424
+ },
+ {
+  "id": "c1286fd4",
+  "name": "宋冬野 - 安和桥",
+  "duration": 9366,
+  "noteCount": 1439
+ },
+ {
+  "id": "49b7185e",
+  "name": "宋冬野 - 董小姐",
+  "duration": 7809,
+  "noteCount": 787
+ },
+ {
+  "id": "804a69a7",
+  "name": "苏芮 - 一样的月光",
+  "duration": 9612,
+  "noteCount": 2620
+ },
+ {
+  "id": "c34ed329",
+  "name": "孙燕姿 - 绿光",
+  "duration": 6938,
+  "noteCount": 1216
  },
  {
   "id": "6dcaba50",
@@ -366,10 +1122,16 @@
   "noteCount": 1273
  },
  {
-  "id": "3705b213",
+  "id": "5b35c311",
+  "name": "孙燕姿 - 我怀念的",
+  "duration": 12595,
+  "noteCount": 1181
+ },
+ {
+  "id": "57601028",
   "name": "孙燕姿 - 遇见",
-  "duration": 7382,
-  "noteCount": 656
+  "duration": 8330,
+  "noteCount": 787
  },
  {
   "id": "ce59a914",
@@ -378,16 +1140,28 @@
   "noteCount": 2805
  },
  {
+  "id": "c4c47716",
+  "name": "陶喆 - 爱，很简单",
+  "duration": 7299,
+  "noteCount": 1044
+ },
+ {
+  "id": "70633892",
+  "name": "陶喆 - 黑色柳丁",
+  "duration": 10436,
+  "noteCount": 1197
+ },
+ {
   "id": "3a332f0d",
   "name": "陶喆 - 蝴蝶",
   "duration": 5720,
   "noteCount": 321
  },
  {
-  "id": "f17062c3",
+  "id": "46442eef",
   "name": "陶喆 - 就是爱你",
-  "duration": 9125,
-  "noteCount": 1182
+  "duration": 10253,
+  "noteCount": 2729
  },
  {
   "id": "6b5b8416",
@@ -396,16 +1170,34 @@
   "noteCount": 3398
  },
  {
-  "id": "4e47d543",
+  "id": "1c70f3ef",
   "name": "陶喆 - 找自己",
-  "duration": 10768,
-  "noteCount": 6790
+  "duration": 11576,
+  "noteCount": 3012
+ },
+ {
+  "id": "df458ffb",
+  "name": "藤岡藤巻 - 崖の上のポニョ",
+  "duration": 6301,
+  "noteCount": 1082
+ },
+ {
+  "id": "1715897a",
+  "name": "天使爱美丽 - 插曲",
+  "duration": 5905,
+  "noteCount": 1217
  },
  {
   "id": "9b8afc15",
   "name": "田馥甄 - 讽刺的情书",
   "duration": 9605,
   "noteCount": 1057
+ },
+ {
+  "id": "762a55c0",
+  "name": "田馥甄 - 魔鬼中的天使",
+  "duration": 9285,
+  "noteCount": 1283
  },
  {
   "id": "6315a382",
@@ -432,10 +1224,58 @@
   "noteCount": 1257
  },
  {
-  "id": "fa655c2",
+  "id": "111886ae",
+  "name": "王菲 - 传奇",
+  "duration": 6509,
+  "noteCount": 828
+ },
+ {
+  "id": "8142f775",
+  "name": "王菲 - 匆匆那年",
+  "duration": 5060,
+  "noteCount": 763
+ },
+ {
+  "id": "f0b183ec",
   "name": "王菲 - 红豆",
-  "duration": 9831,
-  "noteCount": 1315
+  "duration": 10012,
+  "noteCount": 1405
+ },
+ {
+  "id": "6880306c",
+  "name": "王菲 - 棋子",
+  "duration": 10154,
+  "noteCount": 1833
+ },
+ {
+  "id": "1e3ae0f8",
+  "name": "王菲 - 人间",
+  "duration": 11496,
+  "noteCount": 2062
+ },
+ {
+  "id": "641958de",
+  "name": "王菲 - 容易受伤的女人",
+  "duration": 10149,
+  "noteCount": 2445
+ },
+ {
+  "id": "89af34bb",
+  "name": "王菲 - 天空",
+  "duration": 9572,
+  "noteCount": 887
+ },
+ {
+  "id": "6c9ea24e",
+  "name": "王菲 - 我愿意",
+  "duration": 10700,
+  "noteCount": 1364
+ },
+ {
+  "id": "50d70726",
+  "name": "王国之心 - 光",
+  "duration": 9030,
+  "noteCount": 1584
  },
  {
   "id": "f3f42682",
@@ -448,6 +1288,60 @@
   "name": "王力宏 - 大城小爱",
   "duration": 4165,
   "noteCount": 526
+ },
+ {
+  "id": "e69d4205",
+  "name": "王力宏 - 花田错",
+  "duration": 9075,
+  "noteCount": 1478
+ },
+ {
+  "id": "c1062b68",
+  "name": "王力宏 - 你不知道的事",
+  "duration": 7132,
+  "noteCount": 1092
+ },
+ {
+  "id": "54aa6aa",
+  "name": "王力宏 - 唯一",
+  "duration": 10006,
+  "noteCount": 1613
+ },
+ {
+  "id": "e319b806",
+  "name": "王力宏 - 心中的日月",
+  "duration": 6033,
+  "noteCount": 994
+ },
+ {
+  "id": "4a361d62",
+  "name": "蔚蓝档案 Constant Moderato",
+  "duration": 7293,
+  "noteCount": 1371
+ },
+ {
+  "id": "e197c39d",
+  "name": "蔚蓝档案 Unwelcome School",
+  "duration": 8285,
+  "noteCount": 2922
+ },
+ {
+  "id": "dc2d0a97",
+  "name": "温岚 - 夏天的风",
+  "duration": 9646,
+  "noteCount": 1381
+ },
+ {
+  "id": "c7ec9b2a",
+  "name": "文明6 - 主题曲",
+  "duration": 8971,
+  "noteCount": 2277
+ },
+ {
+  "id": "bbd222a8",
+  "name": "巫师3 - 主题曲",
+  "duration": 6636,
+  "noteCount": 971
  },
  {
   "id": "d7ca5f0c",
@@ -498,16 +1392,16 @@
   "noteCount": 1419
  },
  {
-  "id": "39c044fb",
+  "id": "84ca62bd",
   "name": "五月天 - 突然好想你",
-  "duration": 10149,
-  "noteCount": 3932
+  "duration": 12419,
+  "noteCount": 2258
  },
  {
-  "id": "e46e9aef",
+  "id": "7ea94b45",
   "name": "五月天 - 温柔",
-  "duration": 9060,
-  "noteCount": 1175
+  "duration": 11030,
+  "noteCount": 2372
  },
  {
   "id": "58e38d48",
@@ -534,10 +1428,70 @@
   "noteCount": 2532
  },
  {
+  "id": "fd783395",
+  "name": "伍佰 - 突然的自我",
+  "duration": 8628,
+  "noteCount": 776
+ },
+ {
   "id": "e6ed80c9",
   "name": "伍佰 - Last Dance",
   "duration": 10363,
   "noteCount": 916
+ },
+ {
+  "id": "9c3fa55e",
+  "name": "喜羊羊 - 别看我只是一只羊",
+  "duration": 2833,
+  "noteCount": 495
+ },
+ {
+  "id": "128610ea",
+  "name": "仙剑奇侠传 - 偏爱",
+  "duration": 8634,
+  "noteCount": 1647
+ },
+ {
+  "id": "3f74abf7",
+  "name": "仙剑奇侠传 - 逍遥叹",
+  "duration": 12412,
+  "noteCount": 2324
+ },
+ {
+  "id": "a48892be",
+  "name": "仙剑奇侠传 - 雪见·落入凡尘",
+  "duration": 11661,
+  "noteCount": 2060
+ },
+ {
+  "id": "84f0b77f",
+  "name": "肖邦 - 大海练习曲",
+  "duration": 7111,
+  "noteCount": 2671
+ },
+ {
+  "id": "52a976b2",
+  "name": "肖邦 - 幻想即兴曲",
+  "duration": 14517,
+  "noteCount": 3044
+ },
+ {
+  "id": "2c7de42c",
+  "name": "肖邦 夜曲 Op.9 No.2",
+  "duration": 11535,
+  "noteCount": 1266
+ },
+ {
+  "id": "98c35b7e",
+  "name": "信乐团 - 离歌",
+  "duration": 8268,
+  "noteCount": 1713
+ },
+ {
+  "id": "88ee6317",
+  "name": "星际穿越 Cornfield Chase",
+  "duration": 11369,
+  "noteCount": 1469
  },
  {
   "id": "bec50797",
@@ -546,16 +1500,40 @@
   "noteCount": 644
  },
  {
+  "id": "4c7cc769",
+  "name": "许嵩 - 素颜",
+  "duration": 9437,
+  "noteCount": 1576
+ },
+ {
   "id": "b0690daf",
   "name": "许嵩 - 有何不可",
   "duration": 9136,
   "noteCount": 1451
  },
  {
-  "id": "79653e9e",
+  "id": "6c200398",
+  "name": "薛之谦 - 丑八怪",
+  "duration": 8679,
+  "noteCount": 1143
+ },
+ {
+  "id": "f976dc50",
+  "name": "薛之谦 - 刚刚好",
+  "duration": 9804,
+  "noteCount": 1202
+ },
+ {
+  "id": "d7166729",
+  "name": "薛之谦 - 绅士",
+  "duration": 10928,
+  "noteCount": 1539
+ },
+ {
+  "id": "3b7554d4",
   "name": "薛之谦 - 演员",
-  "duration": 10017,
-  "noteCount": 1623
+  "duration": 8814,
+  "noteCount": 763
  },
  {
   "id": "2ed914ce",
@@ -564,10 +1542,160 @@
   "noteCount": 1413
  },
  {
+  "id": "1b423661",
+  "name": "杨丞琳 - 雨爱",
+  "duration": 10218,
+  "noteCount": 2282
+ },
+ {
+  "id": "df7ed041",
+  "name": "杨宗纬 - 空白格",
+  "duration": 10382,
+  "noteCount": 1549
+ },
+ {
   "id": "a13d1f82",
   "name": "异环-钢琴改编《米格尔区-北区-白天》",
   "duration": 7268,
   "noteCount": 900
+ },
+ {
+  "id": "bef7ac51",
+  "name": "宇多田光 Beautiful World",
+  "duration": 11829,
+  "noteCount": 2632
+ },
+ {
+  "id": "e7f251d5",
+  "name": "宇多田光 First Love",
+  "duration": 9110,
+  "noteCount": 1284
+ },
+ {
+  "id": "6bc35ddd",
+  "name": "宇多田光 Flavor of Life",
+  "duration": 12510,
+  "noteCount": 1692
+ },
+ {
+  "id": "29a9a2f",
+  "name": "庾澄庆 - 春泥",
+  "duration": 10232,
+  "noteCount": 1870
+ },
+ {
+  "id": "2fc930ee",
+  "name": "郁可唯 - 时间煮雨",
+  "duration": 9612,
+  "noteCount": 1107
+ },
+ {
+  "id": "7dc39549",
+  "name": "原神 - 尘歌壶",
+  "duration": 6408,
+  "noteCount": 2219
+ },
+ {
+  "id": "7b1c6a1d",
+  "name": "原神 - 稻妻",
+  "duration": 9998,
+  "noteCount": 3624
+ },
+ {
+  "id": "691039dd",
+  "name": "原神 - 枫丹",
+  "duration": 11256,
+  "noteCount": 3034
+ },
+ {
+  "id": "43ac71e3",
+  "name": "原神 - 璃月",
+  "duration": 10253,
+  "noteCount": 3564
+ },
+ {
+  "id": "f80c61ad",
+  "name": "原神 - 蒙德",
+  "duration": 4237,
+  "noteCount": 206
+ },
+ {
+  "id": "f19122f5",
+  "name": "原神 - 纳塔",
+  "duration": 9984,
+  "noteCount": 3362
+ },
+ {
+  "id": "7a788e9b",
+  "name": "原神 - 轻涟",
+  "duration": 5767,
+  "noteCount": 1285
+ },
+ {
+  "id": "b6cfb16a",
+  "name": "原神 - 神女劈观",
+  "duration": 7049,
+  "noteCount": 1161
+ },
+ {
+  "id": "9ecbe8cc",
+  "name": "原神 - 须弥",
+  "duration": 3844,
+  "noteCount": 757
+ },
+ {
+  "id": "cc205a5b",
+  "name": "原神 层岩巨渊 激扬的韧战",
+  "duration": 10253,
+  "noteCount": 2726
+ },
+ {
+  "id": "fe794707",
+  "name": "原神 雪山 山巅雪国的记忆",
+  "duration": 12335,
+  "noteCount": 1595
+ },
+ {
+  "id": "b384fbd7",
+  "name": "原神 渊下宫 湮没的忆念",
+  "duration": 5767,
+  "noteCount": 386
+ },
+ {
+  "id": "45db532f",
+  "name": "泽野弘之 - 拔剑神曲",
+  "duration": 8922,
+  "noteCount": 2527
+ },
+ {
+  "id": "36a80b8a",
+  "name": "张碧晨 - 凉凉",
+  "duration": 9573,
+  "noteCount": 1383
+ },
+ {
+  "id": "cf4f00ed",
+  "name": "张碧晨 - 年轮",
+  "duration": 10884,
+  "noteCount": 1725
+ },
+ {
+  "id": "a904bead",
+  "name": "张国荣 - 沉默是金",
+  "duration": 6349,
+  "noteCount": 915
+ },
+ {
+  "id": "16a17d8d",
+  "name": "张国荣 - 倩女幽魂",
+  "duration": 5727,
+  "noteCount": 785
+ },
+ {
+  "id": "a30df3c3",
+  "name": "张惠妹 - 记得",
+  "duration": 12109,
+  "noteCount": 1173
  },
  {
   "id": "7e2404d3",
@@ -576,10 +1704,22 @@
   "noteCount": 1783
  },
  {
+  "id": "ebc743f6",
+  "name": "张惠妹 - 我可以抱你吗",
+  "duration": 6584,
+  "noteCount": 1092
+ },
+ {
   "id": "dadaec96",
   "name": "张杰 - 明天过后",
   "duration": 9360,
   "noteCount": 2196
+ },
+ {
+  "id": "f19ba39c",
+  "name": "张杰 - 三生三世",
+  "duration": 10301,
+  "noteCount": 2298
  },
  {
   "id": "7697090f",
@@ -594,6 +1734,12 @@
   "noteCount": 1464
  },
  {
+  "id": "672544b5",
+  "name": "张杰 - 这，就是爱",
+  "duration": 8024,
+  "noteCount": 938
+ },
+ {
   "id": "6b5ee113",
   "name": "张杰 & HOYO-MiX - 不眠之夜",
   "duration": 5400,
@@ -606,10 +1752,52 @@
   "noteCount": 2280
  },
  {
-  "id": "1a5bd15d",
+  "id": "f6c0d7",
+  "name": "张靓颖 - 画心",
+  "duration": 13263,
+  "noteCount": 1551
+ },
+ {
+  "id": "60726626",
+  "name": "张靓颖 - 终于等到你",
+  "duration": 11795,
+  "noteCount": 2345
+ },
+ {
+  "id": "880403c5",
+  "name": "张信哲 - 过火",
+  "duration": 11592,
+  "noteCount": 1996
+ },
+ {
+  "id": "580edae7",
+  "name": "张学友 - 每天爱你多一些",
+  "duration": 11614,
+  "noteCount": 1740
+ },
+ {
+  "id": "2e836d41",
   "name": "张学友 - 吻别",
-  "duration": 7588,
-  "noteCount": 722
+  "duration": 8107,
+  "noteCount": 1304
+ },
+ {
+  "id": "81a48cb1",
+  "name": "张学友 - 一千个伤心的理由",
+  "duration": 9108,
+  "noteCount": 1212
+ },
+ {
+  "id": "bc5027c6",
+  "name": "张学友 - 只想一生跟你走",
+  "duration": 6533,
+  "noteCount": 858
+ },
+ {
+  "id": "bc2a2fb5",
+  "name": "张雨生 - 大海",
+  "duration": 10894,
+  "noteCount": 2064
  },
  {
   "id": "50f1911e",
@@ -618,16 +1806,64 @@
   "noteCount": 1391
  },
  {
-  "id": "53856e12",
-  "name": "周杰伦 - 爱你没差",
-  "duration": 6385,
-  "noteCount": 646
+  "id": "d01c0751",
+  "name": "赵雷 - 成都",
+  "duration": 6201,
+  "noteCount": 661
  },
  {
-  "id": "3905902d",
+  "id": "9cff4527",
+  "name": "甄嬛传 - 凤凰于飞",
+  "duration": 6832,
+  "noteCount": 1139
+ },
+ {
+  "id": "94edb385",
+  "name": "甄嬛传 - 红颜劫",
+  "duration": 6639,
+  "noteCount": 796
+ },
+ {
+  "id": "8e580bd0",
+  "name": "周传雄 - 黄昏",
+  "duration": 6351,
+  "noteCount": 850
+ },
+ {
+  "id": "8195196",
+  "name": "周传雄 - 记事本",
+  "duration": 10749,
+  "noteCount": 1497
+ },
+ {
+  "id": "78587b90",
+  "name": "周华健 - 刀剑如梦",
+  "duration": 6634,
+  "noteCount": 1177
+ },
+ {
+  "id": "fc07885f",
+  "name": "周华健 - 让我欢喜让我忧",
+  "duration": 10174,
+  "noteCount": 1392
+ },
+ {
+  "id": "cfcce45e",
+  "name": "周杰伦 - 爱的飞行日记",
+  "duration": 9929,
+  "noteCount": 2248
+ },
+ {
+  "id": "877ece76",
+  "name": "周杰伦 - 爱你没差",
+  "duration": 11106,
+  "noteCount": 2166
+ },
+ {
+  "id": "54a328a0",
   "name": "周杰伦 - 爱琴海",
-  "duration": 8486,
-  "noteCount": 1425
+  "duration": 8606,
+  "noteCount": 1827
  },
  {
   "id": "6387ba08",
@@ -636,10 +1872,16 @@
   "noteCount": 1386
  },
  {
-  "id": "4b097b7b",
+  "id": "88a1488f",
+  "name": "周杰伦 - 爱情悬崖",
+  "duration": 10451,
+  "noteCount": 2200
+ },
+ {
+  "id": "1211dd03",
   "name": "周杰伦 - 爱在西元前",
-  "duration": 3998,
-  "noteCount": 573
+  "duration": 9362,
+  "noteCount": 1795
  },
  {
   "id": "58133c69",
@@ -654,16 +1896,28 @@
   "noteCount": 2184
  },
  {
-  "id": "a0968744",
+  "id": "908804dc",
   "name": "周杰伦 - 白色风车",
-  "duration": 8747,
-  "noteCount": 3445
+  "duration": 10831,
+  "noteCount": 2231
  },
  {
-  "id": "27a4dd04",
+  "id": "4427a878",
+  "name": "周杰伦 - 半岛铁盒",
+  "duration": 12660,
+  "noteCount": 2413
+ },
+ {
+  "id": "1ded66a4",
   "name": "周杰伦 - 半兽人",
-  "duration": 6206,
-  "noteCount": 1414
+  "duration": 9673,
+  "noteCount": 2577
+ },
+ {
+  "id": "2d139654",
+  "name": "周杰伦 - 本草纲目",
+  "duration": 7166,
+  "noteCount": 1027
  },
  {
   "id": "c862e616",
@@ -690,10 +1944,10 @@
   "noteCount": 1546
  },
  {
-  "id": "d0497a59",
+  "id": "9649e1fc",
   "name": "周杰伦 - 大笨钟",
-  "duration": 8345,
-  "noteCount": 475
+  "duration": 9108,
+  "noteCount": 1930
  },
  {
   "id": "4db807f",
@@ -702,16 +1956,28 @@
   "noteCount": 1444
  },
  {
-  "id": "45b75da7",
-  "name": "周杰伦 - 等你下课",
-  "duration": 10338,
-  "noteCount": 976
+  "id": "f84c9b32",
+  "name": "周杰伦 - 稻香",
+  "duration": 8491,
+  "noteCount": 1449
  },
  {
-  "id": "3b277c6f",
+  "id": "9745baac",
+  "name": "周杰伦 - 等你下课",
+  "duration": 10712,
+  "noteCount": 1923
+ },
+ {
+  "id": "6817df69",
   "name": "周杰伦 - 东风破",
-  "duration": 6556,
-  "noteCount": 660
+  "duration": 12584,
+  "noteCount": 2632
+ },
+ {
+  "id": "5003bc53",
+  "name": "周杰伦 - 斗牛",
+  "duration": 14238,
+  "noteCount": 2630
  },
  {
   "id": "c2981978",
@@ -720,10 +1986,16 @@
   "noteCount": 5604
  },
  {
-  "id": "f298ae8b",
+  "id": "f3004b7e",
   "name": "周杰伦 - 发如雪",
-  "duration": 11086,
-  "noteCount": 5155
+  "duration": 11444,
+  "noteCount": 2004
+ },
+ {
+  "id": "9d001450",
+  "name": "周杰伦 - 反方向的钟",
+  "duration": 10894,
+  "noteCount": 2220
  },
  {
   "id": "ca081c2c",
@@ -750,10 +2022,10 @@
   "noteCount": 1129
  },
  {
-  "id": "8c99cc6b",
+  "id": "5f9f75de",
   "name": "周杰伦 - 搁浅",
-  "duration": 9046,
-  "noteCount": 356
+  "duration": 9383,
+  "noteCount": 1515
  },
  {
   "id": "9e7f3036",
@@ -762,16 +2034,22 @@
   "noteCount": 1767
  },
  {
-  "id": "53454b61",
+  "id": "b207f750",
   "name": "周杰伦 - 轨迹",
-  "duration": 6372,
-  "noteCount": 620
+  "duration": 12713,
+  "noteCount": 2353
  },
  {
   "id": "e6a4d6d8",
   "name": "周杰伦 - 还在流浪",
   "duration": 8640,
   "noteCount": 1038
+ },
+ {
+  "id": "a2effb81",
+  "name": "周杰伦 - 好久不见",
+  "duration": 9910,
+  "noteCount": 2203
  },
  {
   "id": "671444e0",
@@ -786,16 +2064,22 @@
   "noteCount": 1197
  },
  {
-  "id": "6fa88fe1",
+  "id": "5ba0c77e",
   "name": "周杰伦 - 红尘客栈",
-  "duration": 9243,
-  "noteCount": 1396
+  "duration": 10942,
+  "noteCount": 1702
  },
  {
-  "id": "378ba0cb",
+  "id": "6d916547",
+  "name": "周杰伦 - 红模仿",
+  "duration": 7870,
+  "noteCount": 1806
+ },
+ {
+  "id": "23f736b0",
   "name": "周杰伦 - 红颜如霜",
-  "duration": 9556,
-  "noteCount": 1678
+  "duration": 10085,
+  "noteCount": 1629
  },
  {
   "id": "2f434124",
@@ -810,22 +2094,88 @@
   "noteCount": 1162
  },
  {
+  "id": "2ab7f637",
+  "name": "周杰伦 - 婚礼进行曲",
+  "duration": 4976,
+  "noteCount": 753
+ },
+ {
+  "id": "a8cba58",
+  "name": "周杰伦 - 火车叨位去",
+  "duration": 10571,
+  "noteCount": 2288
+ },
+ {
+  "id": "114affc6",
+  "name": "周杰伦 - 霍元甲",
+  "duration": 10300,
+  "noteCount": 3828
+ },
+ {
   "id": "4f1dd297",
   "name": "周杰伦 - 简单爱",
   "duration": 10282,
   "noteCount": 1491
  },
  {
-  "id": "bc7a5638",
-  "name": "周杰伦 - 浪漫手机",
-  "duration": 8816,
-  "noteCount": 394
+  "id": "39e12db8",
+  "name": "周杰伦 - 将军",
+  "duration": 7690,
+  "noteCount": 2166
  },
  {
-  "id": "28363d66",
+  "id": "8b7f0e1d",
+  "name": "周杰伦 - 借口",
+  "duration": 10244,
+  "noteCount": 2150
+ },
+ {
+  "id": "4eceb0a1",
+  "name": "周杰伦 - 菊花台",
+  "duration": 11789,
+  "noteCount": 1848
+ },
+ {
+  "id": "c48c1efe",
+  "name": "周杰伦 - 开不了口",
+  "duration": 11340,
+  "noteCount": 2337
+ },
+ {
+  "id": "73224518",
+  "name": "周杰伦 - 可爱女人",
+  "duration": 9596,
+  "noteCount": 2136
+ },
+ {
+  "id": "2f327c0a",
+  "name": "周杰伦 - 兰亭序",
+  "duration": 9913,
+  "noteCount": 1867
+ },
+ {
+  "id": "83603503",
+  "name": "周杰伦 - 浪漫手机",
+  "duration": 9555,
+  "noteCount": 1659
+ },
+ {
+  "id": "226716f5",
+  "name": "周杰伦 - 疗伤烧肉粽",
+  "duration": 7574,
+  "noteCount": 1799
+ },
+ {
+  "id": "ee2c3d3",
   "name": "周杰伦 - 龙卷风",
-  "duration": 2608,
-  "noteCount": 337
+  "duration": 9568,
+  "noteCount": 1852
+ },
+ {
+  "id": "e87eb40c",
+  "name": "周杰伦 - 龙拳",
+  "duration": 7640,
+  "noteCount": 2410
  },
  {
   "id": "c89bcf79",
@@ -840,16 +2190,40 @@
   "noteCount": 1169
  },
  {
+  "id": "8b73e333",
+  "name": "周杰伦 - 乱舞春秋",
+  "duration": 11065,
+  "noteCount": 2446
+ },
+ {
+  "id": "7a88ed5f",
+  "name": "周杰伦 - 麦芽糖",
+  "duration": 10253,
+  "noteCount": 2471
+ },
+ {
+  "id": "7afe3d66",
+  "name": "周杰伦 - 美人鱼",
+  "duration": 8200,
+  "noteCount": 1673
+ },
+ {
   "id": "b43b07d3",
   "name": "周杰伦 - 迷迭香",
   "duration": 9859,
   "noteCount": 2014
  },
  {
-  "id": "155808b0",
+  "id": "1834aedf",
+  "name": "周杰伦 - 米兰的小铁匠",
+  "duration": 9484,
+  "noteCount": 2252
+ },
+ {
+  "id": "7aea8a2",
   "name": "周杰伦 - 明明就",
-  "duration": 10234,
-  "noteCount": 864
+  "duration": 9589,
+  "noteCount": 1656
  },
  {
   "id": "49f65890",
@@ -864,10 +2238,46 @@
   "noteCount": 1263
  },
  {
+  "id": "56955b44",
+  "name": "周杰伦 - 你比从前快乐",
+  "duration": 7274,
+  "noteCount": 1319
+ },
+ {
+  "id": "1b57132e",
+  "name": "周杰伦 - 你好吗",
+  "duration": 8918,
+  "noteCount": 1138
+ },
+ {
   "id": "2eba0fa3",
   "name": "周杰伦 - 你听得到",
   "duration": 8933,
   "noteCount": 1237
+ },
+ {
+  "id": "2634b46f",
+  "name": "周杰伦 - 你怎么连话都说不清楚",
+  "duration": 9195,
+  "noteCount": 1508
+ },
+ {
+  "id": "dd3ab5aa",
+  "name": "周杰伦 - 逆鳞",
+  "duration": 9224,
+  "noteCount": 1955
+ },
+ {
+  "id": "e612db6b",
+  "name": "周杰伦 - 娘子",
+  "duration": 10909,
+  "noteCount": 2417
+ },
+ {
+  "id": "8d36e36e",
+  "name": "周杰伦 - 牛仔很忙",
+  "duration": 6802,
+  "noteCount": 1706
  },
  {
   "id": "36829088",
@@ -876,16 +2286,16 @@
   "noteCount": 5073
  },
  {
-  "id": "8a2b43ba",
+  "id": "4bfc4cff",
   "name": "周杰伦 - 蒲公英的约定",
-  "duration": 8914,
-  "noteCount": 2066
+  "duration": 9826,
+  "noteCount": 1629
  },
  {
-  "id": "128b99f",
+  "id": "e7439beb",
   "name": "周杰伦 - 七里香",
-  "duration": 9355,
-  "noteCount": 1027
+  "duration": 11467,
+  "noteCount": 2042
  },
  {
   "id": "30f4d05d",
@@ -900,10 +2310,16 @@
   "noteCount": 1395
  },
  {
-  "id": "e7cd0139",
+  "id": "28d56df3",
   "name": "周杰伦 - 千山万水",
-  "duration": 4794,
-  "noteCount": 578
+  "duration": 9668,
+  "noteCount": 1747
+ },
+ {
+  "id": "bdf9dcdf",
+  "name": "周杰伦 - 前世情人",
+  "duration": 7690,
+  "noteCount": 1966
  },
  {
   "id": "427a0a30",
@@ -912,10 +2328,22 @@
   "noteCount": 1167
  },
  {
-  "id": "18d8a23e",
+  "id": "f3b8fb2",
   "name": "周杰伦 - 青花瓷",
-  "duration": 9642,
-  "noteCount": 4024
+  "duration": 9324,
+  "noteCount": 1615
+ },
+ {
+  "id": "31761f1c",
+  "name": "周杰伦 - 晴天",
+  "duration": 10692,
+  "noteCount": 2022
+ },
+ {
+  "id": "ee09b647",
+  "name": "周杰伦 - 三年二班",
+  "duration": 12343,
+  "noteCount": 2468
  },
  {
   "id": "e8eb83e7",
@@ -936,16 +2364,22 @@
   "noteCount": 2211
  },
  {
-  "id": "19e7bff3",
+  "id": "45127624",
   "name": "周杰伦 - 圣诞星",
-  "duration": 7221,
-  "noteCount": 4103
+  "duration": 7203,
+  "noteCount": 1612
  },
  {
-  "id": "cd6ac976",
+  "id": "60cdc982",
+  "name": "周杰伦 - 时光机",
+  "duration": 12205,
+  "noteCount": 2681
+ },
+ {
+  "id": "550aa02c",
   "name": "周杰伦 - 世界末日",
-  "duration": 9139,
-  "noteCount": 1065
+  "duration": 9871,
+  "noteCount": 1741
  },
  {
   "id": "daabcd0",
@@ -960,28 +2394,40 @@
   "noteCount": 1672
  },
  {
-  "id": "6bf2b2fe",
+  "id": "95110a7b",
+  "name": "周杰伦 - 手语",
+  "duration": 11396,
+  "noteCount": 2270
+ },
+ {
+  "id": "4e8f469b",
   "name": "周杰伦 - 说好不哭",
-  "duration": 8155,
-  "noteCount": 730
+  "duration": 8922,
+  "noteCount": 1281
  },
  {
-  "id": "843fb072",
+  "id": "79f93352",
   "name": "周杰伦 - 说好的幸福呢",
-  "duration": 9940,
-  "noteCount": 1374
+  "duration": 9737,
+  "noteCount": 1684
  },
  {
-  "id": "b6990690",
+  "id": "b68b9420",
+  "name": "周杰伦 - 说了再见",
+  "duration": 11000,
+  "noteCount": 2068
+ },
+ {
+  "id": "d1e6fb1a",
   "name": "周杰伦 - 算什么男人",
-  "duration": 9770,
-  "noteCount": 1979
+  "duration": 11292,
+  "noteCount": 2235
  },
  {
-  "id": "8a17673f",
+  "id": "b0f1b232",
   "name": "周杰伦 - 她的睫毛",
-  "duration": 8554,
-  "noteCount": 1106
+  "duration": 9205,
+  "noteCount": 2055
  },
  {
   "id": "6eb3e385",
@@ -996,22 +2442,34 @@
   "noteCount": 592
  },
  {
-  "id": "a1494c7b",
+  "id": "8b84b9f0",
+  "name": "周杰伦 - 梯田",
+  "duration": 3764,
+  "noteCount": 545
+ },
+ {
+  "id": "cbd2b3de",
   "name": "周杰伦 - 天涯过客",
-  "duration": 9317,
-  "noteCount": 420
+  "duration": 9999,
+  "noteCount": 1882
  },
  {
-  "id": "190cf943",
+  "id": "95ecc288",
   "name": "周杰伦 - 甜甜的",
-  "duration": 5992,
-  "noteCount": 918
+  "duration": 9503,
+  "noteCount": 2255
  },
  {
-  "id": "3430c4a",
+  "id": "e7088c1f",
   "name": "周杰伦 - 听爸爸的话",
-  "duration": 10387,
-  "noteCount": 1258
+  "duration": 10406,
+  "noteCount": 1869
+ },
+ {
+  "id": "20254f89",
+  "name": "周杰伦 - 听见下雨的声音",
+  "duration": 10856,
+  "noteCount": 2235
  },
  {
   "id": "66145b60",
@@ -1020,16 +2478,16 @@
   "noteCount": 668
  },
  {
-  "id": "a062e6e2",
+  "id": "b2e6ae55",
   "name": "周杰伦 - 退后",
-  "duration": 8496,
-  "noteCount": 1129
+  "duration": 10253,
+  "noteCount": 1923
  },
  {
-  "id": "2e6ea025",
+  "id": "a59df960",
   "name": "周杰伦 - 外婆",
-  "duration": 9505,
-  "noteCount": 2128
+  "duration": 9612,
+  "noteCount": 1980
  },
  {
   "id": "b3e15c2a",
@@ -1038,22 +2496,40 @@
   "noteCount": 1741
  },
  {
-  "id": "518a6605",
+  "id": "dfb4d1df",
   "name": "周杰伦 - 蜗牛",
-  "duration": 7032,
-  "noteCount": 725
+  "duration": 8048,
+  "noteCount": 1286
  },
  {
-  "id": "b6565911",
+  "id": "310a8591",
   "name": "周杰伦 - 我不配",
-  "duration": 11373,
-  "noteCount": 1603
+  "duration": 11541,
+  "noteCount": 1986
+ },
+ {
+  "id": "11b845f7",
+  "name": "周杰伦 - 我的地盘",
+  "duration": 9485,
+  "noteCount": 2692
  },
  {
   "id": "a40ac115",
   "name": "周杰伦 - 我落泪情绪零碎",
   "duration": 9890,
   "noteCount": 1607
+ },
+ {
+  "id": "be3e46a2",
+  "name": "周杰伦 - 乌克丽丽",
+  "duration": 7049,
+  "noteCount": 1884
+ },
+ {
+  "id": "66b4ec79",
+  "name": "周杰伦 - 无双",
+  "duration": 8072,
+  "noteCount": 1520
  },
  {
   "id": "6833679b",
@@ -1074,34 +2550,52 @@
   "noteCount": 1186
  },
  {
-  "id": "2fa3009c",
+  "id": "ce886333",
+  "name": "周杰伦 - 鞋子特大号",
+  "duration": 8747,
+  "noteCount": 2331
+ },
+ {
+  "id": "c64113f",
   "name": "周杰伦 - 心雨",
-  "duration": 10669,
-  "noteCount": 1336
+  "duration": 10731,
+  "noteCount": 1857
  },
  {
-  "id": "61ec433b",
+  "id": "6cfbb3",
   "name": "周杰伦 - 星晴",
-  "duration": 7630,
-  "noteCount": 1115
+  "duration": 9775,
+  "noteCount": 1758
  },
  {
-  "id": "a41ab390",
+  "id": "76ee5372",
   "name": "周杰伦 - 烟花易冷",
-  "duration": 9558,
-  "noteCount": 1466
+  "duration": 10479,
+  "noteCount": 1833
  },
  {
-  "id": "da499c17",
+  "id": "e0bb8453",
   "name": "周杰伦 - 爷爷泡的茶",
-  "duration": 9725,
-  "noteCount": 5276
+  "duration": 9336,
+  "noteCount": 1970
  },
  {
-  "id": "e36fb131",
+  "id": "90fdcf17",
   "name": "周杰伦 - 夜的第七章",
-  "duration": 9334,
-  "noteCount": 1544
+  "duration": 9106,
+  "noteCount": 2041
+ },
+ {
+  "id": "d946140c",
+  "name": "周杰伦 - 夜曲",
+  "duration": 8971,
+  "noteCount": 2261
+ },
+ {
+  "id": "e925f918",
+  "name": "周杰伦 - 一点点",
+  "duration": 8708,
+  "noteCount": 1430
  },
  {
   "id": "effd527c",
@@ -1110,10 +2604,16 @@
   "noteCount": 1080
  },
  {
-  "id": "89fc5aff",
+  "id": "d42fa90",
+  "name": "周杰伦 - 伊斯坦堡",
+  "duration": 8532,
+  "noteCount": 1496
+ },
+ {
+  "id": "72398232",
   "name": "周杰伦 - 以父之名",
-  "duration": 8627,
-  "noteCount": 1521
+  "duration": 13378,
+  "noteCount": 2498
  },
  {
   "id": "aece1803",
@@ -1128,10 +2628,10 @@
   "noteCount": 1159
  },
  {
-  "id": "d525e8a5",
+  "id": "a6a110c6",
   "name": "周杰伦 - 止战之殇",
-  "duration": 10242,
-  "noteCount": 1589
+  "duration": 11139,
+  "noteCount": 2696
  },
  {
   "id": "a9c75995",
@@ -1146,16 +2646,22 @@
   "noteCount": 2615
  },
  {
-  "id": "7bccb10c",
-  "name": "周杰伦 - I Do",
-  "duration": 8585,
-  "noteCount": 1350
+  "id": "eb127521",
+  "name": "周杰伦 - 最长的电影",
+  "duration": 9414,
+  "noteCount": 1622
  },
  {
-  "id": "71d505e3",
+  "id": "eb36fa0a",
+  "name": "周杰伦 - I Do",
+  "duration": 8725,
+  "noteCount": 1829
+ },
+ {
+  "id": "2274c5a4",
   "name": "周杰伦 - Mojito",
-  "duration": 6398,
-  "noteCount": 992
+  "duration": 7290,
+  "noteCount": 1343
  },
  {
   "id": "e1563b03",
@@ -1170,28 +2676,316 @@
   "noteCount": 2045
  },
  {
-  "id": "b9be59e1",
+  "id": "275913a4",
   "name": "周杰伦 & 张惠妹 - 不该",
-  "duration": 6849,
-  "noteCount": 1081
+  "duration": 11520,
+  "noteCount": 2065
  },
  {
-  "id": "8841ae86",
+  "id": "d6e499ee",
+  "name": "周杰伦 断了的弦 无语伦比演唱会",
+  "duration": 11583,
+  "noteCount": 2108
+ },
+ {
+  "id": "6c67d01c",
+  "name": "周杰伦 费玉清 千里之外",
+  "duration": 10260,
+  "noteCount": 1665
+ },
+ {
+  "id": "8e6806e8",
+  "name": "周杰伦 梁心颐 珊瑚海",
+  "duration": 10141,
+  "noteCount": 2029
+ },
+ {
+  "id": "c0c2625f",
+  "name": "周杰伦 说了再见 钢琴版 (BV15bs7z9ECk)",
+  "duration": 11174,
+  "noteCount": 1984
+ },
+ {
+  "id": "3b56fc5b",
+  "name": "周杰伦 温岚 屋顶",
+  "duration": 12867,
+  "noteCount": 1668
+ },
+ {
+  "id": "b5421789",
+  "name": "周杰伦 温岚 祝我生日快乐",
+  "duration": 10150,
+  "noteCount": 1798
+ },
+ {
+  "id": "8639dd1b",
+  "name": "周杰伦 mine mine",
+  "duration": 10568,
+  "noteCount": 2138
+ },
+ {
+  "id": "b2ef5066",
   "name": "周深 - 大鱼",
-  "duration": 12000,
-  "noteCount": 1011
+  "duration": 12492,
+  "noteCount": 1744
  },
  {
-  "id": "4beea226",
+  "id": "140775f3",
+  "name": "猪猪侠 - 主题曲",
+  "duration": 4246,
+  "noteCount": 895
+ },
+ {
+  "id": "f194a732",
+  "name": "椎名豪 - 竈門炭治郎のうた",
+  "duration": 13730,
+  "noteCount": 2593
+ },
+ {
+  "id": "c793bb4c",
+  "name": "最终幻想 Eyes on Me",
+  "duration": 13875,
+  "noteCount": 1682
+ },
+ {
+  "id": "f01b311b",
+  "name": "最终幻想 To Zanarkand",
+  "duration": 11076,
+  "noteCount": 1348
+ },
+ {
+  "id": "2d1f308c",
+  "name": "Adele - Hello",
+  "duration": 11844,
+  "noteCount": 1728
+ },
+ {
+  "id": "47ee5cb9",
+  "name": "Adele Rolling in the Deep",
+  "duration": 9556,
+  "noteCount": 1999
+ },
+ {
+  "id": "9cc13bb",
+  "name": "Adele Someone Like You",
+  "duration": 12817,
+  "noteCount": 2322
+ },
+ {
+  "id": "922293ce",
+  "name": "Aimer - 残響散歌",
+  "duration": 4463,
+  "noteCount": 1496
+ },
+ {
+  "id": "b23e0523",
+  "name": "Aimer - 蝶々結び",
+  "duration": 6977,
+  "noteCount": 761
+ },
+ {
+  "id": "db088bee",
+  "name": "Aimer - 花の唄",
+  "duration": 13435,
+  "noteCount": 3688
+ },
+ {
+  "id": "bdba0009",
+  "name": "Aimer - 六等星の夜",
+  "duration": 13457,
+  "noteCount": 1333
+ },
+ {
+  "id": "a0d97ed2",
+  "name": "Aimer - Ref-rain",
+  "duration": 11491,
+  "noteCount": 2555
+ },
+ {
+  "id": "ff9c1534",
+  "name": "Animenz - 打上花火",
+  "duration": 11454,
+  "noteCount": 2700
+ },
+ {
+  "id": "b0cae095",
+  "name": "Animenz - 火花",
+  "duration": 15380,
+  "noteCount": 3521
+ },
+ {
+  "id": "d1aad05d",
+  "name": "Animenz - 前前前世",
+  "duration": 13737,
+  "noteCount": 3154
+ },
+ {
+  "id": "8064275e",
+  "name": "Animenz - 人生的旋转木马",
+  "duration": 12817,
+  "noteCount": 3185
+ },
+ {
+  "id": "b5c2de0",
+  "name": "Animenz - 若能绽放光芒",
+  "duration": 14008,
+  "noteCount": 3183
+ },
+ {
+  "id": "c4caea10",
+  "name": "Animenz - unravel",
+  "duration": 9612,
+  "noteCount": 3264
+ },
+ {
+  "id": "27096df5",
+  "name": "Animenz Call of Silence",
+  "duration": 14098,
+  "noteCount": 2460
+ },
+ {
+  "id": "c8159589",
+  "name": "Animenz secret base",
+  "duration": 12672,
+  "noteCount": 2026
+ },
+ {
+  "id": "fb471199",
+  "name": "Autumn Leaves",
+  "duration": 11535,
+  "noteCount": 2316
+ },
+ {
+  "id": "3d61db6",
+  "name": "Beyond - 光辉岁月",
+  "duration": 10010,
+  "noteCount": 1960
+ },
+ {
+  "id": "b642bb2d",
   "name": "Beyond - 海阔天空",
-  "duration": 14007,
-  "noteCount": 8701
+  "duration": 12033,
+  "noteCount": 2821
+ },
+ {
+  "id": "5b51d688",
+  "name": "Beyond - 喜欢你",
+  "duration": 9659,
+  "noteCount": 2305
+ },
+ {
+  "id": "ffcadb62",
+  "name": "Beyond - 真的爱你",
+  "duration": 10275,
+  "noteCount": 1808
+ },
+ {
+  "id": "451b37d5",
+  "name": "BiBiPiano - 夜的钢琴曲五",
+  "duration": 8330,
+  "noteCount": 639
+ },
+ {
+  "id": "3d6a6860",
+  "name": "BiBiPiano - Summer",
+  "duration": 5488,
+  "noteCount": 1187
+ },
+ {
+  "id": "aa4830c",
+  "name": "Bruno Mars Just the Way You Are",
+  "duration": 8971,
+  "noteCount": 1150
+ },
+ {
+  "id": "c4104125",
+  "name": "Celine Dion My Heart Will Go On",
+  "duration": 11041,
+  "noteCount": 1078
  },
  {
   "id": "da1e82ef",
   "name": "ChiliChill - 让风告诉你",
   "duration": 8218,
   "noteCount": 1151
+ },
+ {
+  "id": "2cc63fb0",
+  "name": "Christina Perri A Thousand Years",
+  "duration": 11137,
+  "noteCount": 1094
+ },
+ {
+  "id": "5cb0c517",
+  "name": "ClariS - コネクト",
+  "duration": 12176,
+  "noteCount": 2852
+ },
+ {
+  "id": "ab528005",
+  "name": "Coldplay Fix You",
+  "duration": 9760,
+  "noteCount": 1742
+ },
+ {
+  "id": "ebf69148",
+  "name": "Coldplay The Scientist",
+  "duration": 13276,
+  "noteCount": 1209
+ },
+ {
+  "id": "febd1879",
+  "name": "Coldplay Viva la Vida",
+  "duration": 5126,
+  "noteCount": 902
+ },
+ {
+  "id": "71be271d",
+  "name": "Ed Sheeran Photograph",
+  "duration": 10436,
+  "noteCount": 2037
+ },
+ {
+  "id": "973474ee",
+  "name": "Ed Sheeran Shape of You",
+  "duration": 10563,
+  "noteCount": 2111
+ },
+ {
+  "id": "2bd3197e",
+  "name": "Einaudi - Experience",
+  "duration": 8727,
+  "noteCount": 1870
+ },
+ {
+  "id": "a6b3d0c8",
+  "name": "Elton John Your Song",
+  "duration": 8099,
+  "noteCount": 1307
+ },
+ {
+  "id": "a256cfc2",
+  "name": "Elvis Can't Help Falling in Love",
+  "duration": 9700,
+  "noteCount": 853
+ },
+ {
+  "id": "57fb207a",
+  "name": "Evanescence My Immortal",
+  "duration": 10874,
+  "noteCount": 1359
+ },
+ {
+  "id": "9eaf9c27",
+  "name": "Eve - 廻廻奇譚",
+  "duration": 8762,
+  "noteCount": 1917
+ },
+ {
+  "id": "7ade6860",
+  "name": "Fly Me to the Moon",
+  "duration": 6408,
+  "noteCount": 716
  },
  {
   "id": "19c26183",
@@ -1254,6 +3048,18 @@
   "noteCount": 5982
  },
  {
+  "id": "248fea18",
+  "name": "Jimindor After You've Gone",
+  "duration": 9127,
+  "noteCount": 3180
+ },
+ {
+  "id": "655d3867",
+  "name": "John Lennon Imagine",
+  "duration": 7651,
+  "noteCount": 607
+ },
+ {
   "id": "2b0eaf8e",
   "name": "Justin Bieber - baby",
   "duration": 5390,
@@ -1278,10 +3084,40 @@
   "noteCount": 968
  },
  {
+  "id": "9a46a969",
+  "name": "Linked Horizon 红莲的弓矢",
+  "duration": 13198,
+  "noteCount": 4606
+ },
+ {
+  "id": "8a6c649f",
+  "name": "Linked Horizon 暁の鎮魂歌",
+  "duration": 10413,
+  "noteCount": 2518
+ },
+ {
+  "id": "190422a7",
+  "name": "Linked Horizon 心臓を捧げよ",
+  "duration": 13443,
+  "noteCount": 4311
+ },
+ {
+  "id": "a98f0b5",
+  "name": "Linkin Park In the End",
+  "duration": 8460,
+  "noteCount": 829
+ },
+ {
   "id": "8b4e2d8b",
   "name": "LiSA - Crossing Field",
   "duration": 10260,
   "noteCount": 2818
+ },
+ {
+  "id": "d98280ce",
+  "name": "LiSA - シルシ",
+  "duration": 11262,
+  "noteCount": 2028
  },
  {
   "id": "313e67b",
@@ -1290,10 +3126,64 @@
   "noteCount": 3328
  },
  {
+  "id": "f5ee32a3",
+  "name": "LiSA 炎 鬼灭之刃",
+  "duration": 10922,
+  "noteCount": 2252
+ },
+ {
+  "id": "aa5a0c57",
+  "name": "Mariah Carey Hero",
+  "duration": 10243,
+  "noteCount": 1622
+ },
+ {
+  "id": "88cd5000",
+  "name": "Michael Jackson Heal the World",
+  "duration": 14029,
+  "noteCount": 2107
+ },
+ {
   "id": "1bc8466c",
   "name": "Myth & Roid - STYX HELIX (从零开始的异世界)",
   "duration": 6741,
   "noteCount": 603
+ },
+ {
+  "id": "cac00b9b",
+  "name": "NieR - 主题曲",
+  "duration": 16353,
+  "noteCount": 2411
+ },
+ {
+  "id": "2e68e36f",
+  "name": "NieR Weight of the World",
+  "duration": 15262,
+  "noteCount": 2111
+ },
+ {
+  "id": "fc45977f",
+  "name": "oskarpianist One Summer's Day",
+  "duration": 10722,
+  "noteCount": 1413
+ },
+ {
+  "id": "8ef27c12",
+  "name": "Queen Bohemian Rhapsody",
+  "duration": 13475,
+  "noteCount": 3623
+ },
+ {
+  "id": "205371b3",
+  "name": "Queen Love of My Life",
+  "duration": 8125,
+  "noteCount": 993
+ },
+ {
+  "id": "1af092ba",
+  "name": "RADWIMPS - 没什么大不了",
+  "duration": 11402,
+  "noteCount": 2192
  },
  {
   "id": "ca2521dd",
@@ -1302,10 +3192,28 @@
   "noteCount": 2685
  },
  {
+  "id": "64704732",
+  "name": "Richard Marx Right Here Waiting",
+  "duration": 8611,
+  "noteCount": 848
+ },
+ {
   "id": "52166723",
   "name": "Rick Astley - Never Gonna Give You Up",
   "duration": 6737,
   "noteCount": 1186
+ },
+ {
+  "id": "bccf1f36",
+  "name": "S.H.E - 安静了",
+  "duration": 10886,
+  "noteCount": 2104
+ },
+ {
+  "id": "fd48bd7b",
+  "name": "S.H.E - 波斯猫",
+  "duration": 7878,
+  "noteCount": 1938
  },
  {
   "id": "3c2818a",
@@ -1320,6 +3228,18 @@
   "noteCount": 2486
  },
  {
+  "id": "fc1636da",
+  "name": "S.H.E - 候鸟",
+  "duration": 11274,
+  "noteCount": 1858
+ },
+ {
+  "id": "e6cc249b",
+  "name": "S.H.E - 记得要忘记",
+  "duration": 4877,
+  "noteCount": 448
+ },
+ {
   "id": "2b55238a",
   "name": "S.H.E - 恋人未满",
   "duration": 10605,
@@ -1332,10 +3252,16 @@
   "noteCount": 1403
  },
  {
-  "id": "4b9fe833",
+  "id": "3d91620",
   "name": "S.H.E - 热带雨林",
-  "duration": 10696,
-  "noteCount": 1249
+  "duration": 10671,
+  "noteCount": 2053
+ },
+ {
+  "id": "3e8af809",
+  "name": "S.H.E - 他还是不懂",
+  "duration": 10152,
+  "noteCount": 1103
  },
  {
   "id": "90669a3",
@@ -1344,28 +3270,202 @@
   "noteCount": 944
  },
  {
+  "id": "b41b5b4c",
+  "name": "S.H.E - 我爱你",
+  "duration": 6634,
+  "noteCount": 751
+ },
+ {
+  "id": "ff8d806c",
+  "name": "S.H.E - 五月天",
+  "duration": 9073,
+  "noteCount": 1356
+ },
+ {
+  "id": "b97898",
+  "name": "S.H.E - 一眼万年",
+  "duration": 9334,
+  "noteCount": 872
+ },
+ {
   "id": "2d1d2e85",
   "name": "S.H.E - 中国话",
   "duration": 6995,
   "noteCount": 1107
  },
  {
-  "id": "e296776f",
+  "id": "9454ffb1",
   "name": "S.H.E - Ring Ring Ring",
-  "duration": 3753,
-  "noteCount": 340
+  "duration": 7690,
+  "noteCount": 1917
  },
  {
-  "id": "f082ae6e",
+  "id": "233343f3",
   "name": "S.H.E - Super Star",
-  "duration": 6311,
-  "noteCount": 1483
+  "duration": 8074,
+  "noteCount": 1118
+ },
+ {
+  "id": "e61b5eba",
+  "name": "supercell - 君の知らない物語",
+  "duration": 13457,
+  "noteCount": 4479
+ },
+ {
+  "id": "ec0d4d28",
+  "name": "Taylor Swift All Too Well",
+  "duration": 12817,
+  "noteCount": 3036
+ },
+ {
+  "id": "d7b4998a",
+  "name": "Taylor Swift Anti-Hero",
+  "duration": 8008,
+  "noteCount": 1386
+ },
+ {
+  "id": "9974ab25",
+  "name": "Taylor Swift Blank Space",
+  "duration": 9144,
+  "noteCount": 2383
+ },
+ {
+  "id": "92a8ad6c",
+  "name": "Taylor Swift cardigan",
+  "duration": 9257,
+  "noteCount": 1990
+ },
+ {
+  "id": "64c1227e",
+  "name": "Taylor Swift Cruel Summer",
+  "duration": 7770,
+  "noteCount": 1377
+ },
+ {
+  "id": "326941e",
+  "name": "Taylor Swift Enchanted",
+  "duration": 9801,
+  "noteCount": 2298
+ },
+ {
+  "id": "b3b9e2b6",
+  "name": "Taylor Swift Love Story",
+  "duration": 9612,
+  "noteCount": 2075
+ },
+ {
+  "id": "8d9352f8",
+  "name": "Taylor Swift Lover",
+  "duration": 10350,
+  "noteCount": 1719
+ },
+ {
+  "id": "b626795a",
+  "name": "Taylor Swift Wildest Dreams",
+  "duration": 6721,
+  "noteCount": 1065
  },
  {
   "id": "df8823c9",
   "name": "TFBOYS - 青春修炼手册",
   "duration": 8321,
   "noteCount": 901
+ },
+ {
+  "id": "a13cab58",
+  "name": "TFBOYS - 剩下的盛夏",
+  "duration": 9612,
+  "noteCount": 1807
+ },
+ {
+  "id": "3471f0e5",
+  "name": "The Beatles Let It Be",
+  "duration": 10174,
+  "noteCount": 1604
+ },
+ {
+  "id": "c39541bf",
+  "name": "The Beatles Yesterday",
+  "duration": 12042,
+  "noteCount": 2360
+ },
+ {
+  "id": "606563bf",
+  "name": "TRUE - Sincerely",
+  "duration": 10894,
+  "noteCount": 2880
+ },
+ {
+  "id": "bf8dc1ab",
+  "name": "V.K克 - 镜夜",
+  "duration": 12141,
+  "noteCount": 2266
+ },
+ {
+  "id": "c5d5fec4",
+  "name": "V.K克 - 十亿光年的距离",
+  "duration": 10014,
+  "noteCount": 1367
+ },
+ {
+  "id": "ecc7eaf9",
+  "name": "Wiz Khalifa See You Again",
+  "duration": 9325,
+  "noteCount": 1433
+ },
+ {
+  "id": "67fb57a2",
+  "name": "Yiruma Kiss the Rain",
+  "duration": 9845,
+  "noteCount": 1026
+ },
+ {
+  "id": "b08c9071",
+  "name": "Yiruma River Flows in You",
+  "duration": 6408,
+  "noteCount": 846
+ },
+ {
+  "id": "c2dcbbb9",
+  "name": "YOASOBI - 怪物",
+  "duration": 9400,
+  "noteCount": 2672
+ },
+ {
+  "id": "754ee8e3",
+  "name": "YOASOBI - 群青",
+  "duration": 10072,
+  "noteCount": 3480
+ },
+ {
+  "id": "3c1687a6",
+  "name": "YOASOBI - 三原色",
+  "duration": 5537,
+  "noteCount": 1813
+ },
+ {
+  "id": "19a298ea",
+  "name": "YOASOBI - 夜に駆ける",
+  "duration": 10253,
+  "noteCount": 3280
+ },
+ {
+  "id": "38a64458",
+  "name": "YOASOBI - 祝福",
+  "duration": 7774,
+  "noteCount": 2652
+ },
+ {
+  "id": "c0c933d2",
+  "name": "YOASOBI - アイドル",
+  "duration": 8890,
+  "noteCount": 3101
+ },
+ {
+  "id": "2523a8b3",
+  "name": "YOASOBI - ハルジオン",
+  "duration": 9142,
+  "noteCount": 1643
  },
  {
   "id": "410aff3d",
@@ -1378,5 +3478,11 @@
   "name": "ZUN & Alstroemeria Records - Bad Apple",
   "duration": 6720,
   "noteCount": 784
+ },
+ {
+  "id": "46e2c648",
+  "name": "つじあやの - 風になる",
+  "duration": 10533,
+  "noteCount": 2673
  }
 ]
