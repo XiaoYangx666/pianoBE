@@ -1,43 +1,50 @@
-# 第三方钢琴采样声明
+# 第三方音频素材与授权
 
-本资源包包含以下免费钢琴采样；实际包含的音色以包内 `sounds/` 目录为准。各音色均由本站点重新裁剪、淡出并转码为 OGG Vorbis，未改变原始音高与音色特征。
+所有音源都在构建阶段重新裁剪、淡出、统一响度并转码为 OGG Vorbis，未改动的原始录音版权归原作者所有。实际打包的音色以 `sounds/` 目录为准。
 
-## Meta Piano
-
-- 音色目录：`sounds/meta_piano*`
-- 来源：Meta Open Sound — Meta Piano
-  https://github.com/facebookincubator/Meta-open-sound/tree/main/systems/instruments/meta-piano
-- 采样层：Vel03（mf）
-- 授权：CC0 1.0（公共领域贡献）
-  https://creativecommons.org/publicdomain/zero/1.0/
-
-## Upright Piano KW
-
-- 音色目录：`sounds/upright_kw*`
-- 来源：FreePats — Upright Piano KW（2022-02-21）
-  https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html#UprightKW
-- 采样层：优先高力度层（vH）；A2、C4 使用低力度层（vL）
-- 授权：CC0 1.0（公共领域贡献）
-  https://creativecommons.org/publicdomain/zero/1.0/
-
-## YDP Grand Piano
-
-- 音色目录：`sounds/ydp_grand*`
-- 来源：FreePats — YDP Grand Piano（2016-08-04），由 Zenph Studios 为 OLPC 录制的 Yamaha Disklavier Pro 多采样构建
-  https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html#YDPGrandPiano
-- 采样层：FluidSynth 离线渲染，单层（力度 80）
-- 授权：Creative Commons Attribution 3.0（CC BY 3.0）
-  https://creativecommons.org/licenses/by/3.0/
-- 署名：YDP Grand Piano soundfont by Roberto (FreePats), built from Zenph Studios
-  Yamaha Disklavier Pro Piano Multisamples for OLPC. Modifications: trimmed, faded,
-  and converted to OGG Vorbis for Minecraft Bedrock.
-
-## 默认 P-88 采样
+## 标准钢琴 Standard Piano
 
 - 音色目录：`sounds/piano*`
-- 来源：Salamander Grand Piano V3 — Alexander Holm
+- 来源：FluidR3 GM 的 Acoustic Grand（program 0），作者 Frank Wen
+  https://github.com/urish/cinto/blob/master/media/FluidR3%20GM.sf2
+- 处理：FluidSynth 渲染指定键位，裁剪、淡出、转码。
+- 授权：FluidR3 原 readme 允许自由使用与再分发并要求署名（Copyright 2000-2002 Frank Wen）。
+
+## 经典三角 Classic Grand
+
+- 音色目录：`sounds/classic_grand*`
+- 来源：VCSL（Versilian Community Sample Library）Grand Piano, Steinway B
+  https://github.com/sgossner/VCSL/tree/master/Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B
+- 处理：VCSL 按全音采样，构建时取最近源音并变调到项目基准键（每 3 个半音），再裁剪、淡出、转码。
+- 授权：CC0 1.0（公共领域）
+  https://creativecommons.org/publicdomain/zero/1.0/
+- 署名：VCSL by Versilian Studios LLC
+
+## 明亮三角 Bright Grand
+
+- 音色目录：`sounds/bright_grand*`
+- 来源：Salamander Grand Piano V3（Yamaha C5），作者 Alexander Holm
   https://archive.org/details/SalamanderGrandPianoV3
+- 处理：选取基准键、裁剪、淡出、逐键响度校准、转码。
 - 授权：Creative Commons Attribution 3.0（CC BY 3.0）
   https://creativecommons.org/licenses/by/3.0/
 - 署名：Salamander Grand Piano V3 by Alexander Holm. Modifications: selected
   pitches, trimmed, faded, and converted to OGG Vorbis for Minecraft Bedrock.
+
+## 原声立式 Upright Piano
+
+- 音色目录：`sounds/upright*`
+- 来源：FreePats Upright Piano KW（2022-02-21），Kawai 立式钢琴，立体声录音
+  https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html#UprightKW
+- 处理：优先使用高力度层（vH），A2 / C4 使用低力度层（vL），裁剪、淡出、转码。
+- 授权：CC0 1.0（公共领域）
+  https://creativecommons.org/publicdomain/zero/1.0/
+
+## 复古电钢 Electric Piano
+
+- 音色目录：`sounds/electric_piano*`
+- 来源：FreePats FM Synthesized Piano #1（2019-09-16），Hexter 模拟 Yamaha DX7 的 E.Piano 1
+  https://freepats.zenvoid.org/ElectricPiano/synthesized-piano.html
+- 处理：FluidSynth 渲染指定键位，裁剪、淡出、转码。
+- 授权：CC0 1.0（公共领域）
+  https://creativecommons.org/publicdomain/zero/1.0/

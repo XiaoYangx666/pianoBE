@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { Menu as MenuIcon, X } from "lucide-react";
 import { Sidebar, type AppNavItem } from "./Sidebar";
 import { BottomNav } from "./BottomNav";
 import { MiniPlayer, PlayerBar, type PlayerExtras, type PlayerLike } from "./PlayerBar";
@@ -30,25 +30,37 @@ export interface AppLayoutProps {
     children: ReactNode;
     /** 是否套用默认页面容器（最大宽度与内边距）。 */
     padded?: boolean;
-    /** 手机端去掉页面内边距，让内容贴边（列表页更省空间）。 */
+    /** 手机端去掉页面内边距，让列表贴边。 */
     mobileFlush?: boolean;
     pageClassName?: string;
     /** 兼容旧接口：OreUI 只有深色主题，此参数已无效。 */
     withColorSchemeToggle?: boolean;
 }
 
-function Brand({ brand }: { brand: BrandConfig }) {
+function Brand({ brand, compact, markOnly }: { brand: BrandConfig; compact?: boolean; markOnly?: boolean }) {
+    if (markOnly) {
+        return (
+            <span
+                className="grid h-8 w-8 place-items-center rounded-md bg-[var(--pb-brand-soft)] text-[12px] font-semibold text-[color:var(--pb-primary-light)]"
+                title={brand.name}
+            >
+                {brand.name.slice(0, 1)}
+            </span>
+        );
+    }
     const content = (
         <>
             {brand.mark && (
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-[#6b8afd] to-[#3f5edb] text-white">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-[var(--pb-brand-soft)] text-[color:var(--pb-primary-light)]">
                     {brand.mark}
                 </span>
             )}
             <span className="min-w-0">
-                <span className="block text-sm font-bold leading-tight">{brand.name}</span>
-                {brand.subtitle && (
-                    <span className="hidden text-[11px] text-ore-dim sm:block">{brand.subtitle}</span>
+                <span className={cx("block font-semibold leading-tight tracking-[-0.02em]", compact ? "text-[13px]" : "text-[14px]")}>
+                    {brand.name}
+                </span>
+                {brand.subtitle && !compact && (
+                    <span className="mt-0.5 block truncate text-[10.5px] text-ore-dimmer">{brand.subtitle}</span>
                 )}
             </span>
         </>
@@ -92,71 +104,74 @@ export function AppLayout({
     const [collapsed, setCollapsed] = useState(false);
     const playerActive = usePlayerActive(player);
     const hasBottomNav = Boolean(bottomNav && bottomNav.length > 0);
+    // 底部已承载常用工作区，抽屉只放其余入口与设置，避免两处重复。
+    const drawerNav = hasBottomNav
+        ? nav.filter((item) => !bottomNav!.some((bottom) => bottom.to === item.to))
+        : nav;
 
-    // 移动端底部是 fixed 的迷你播放器 + 导航，正文必须留出等高的内边距，
-    // 否则最后一行会被压住。桌面端只需避开 72px 的播放条。
+    // 移动端底部是固定导航与迷你播放器，正文需要等高的滚动余量。
     const mobilePad = hasBottomNav
         ? playerActive
-            ? "pb-[calc(136px+env(safe-area-inset-bottom))]"
-            : "pb-[calc(64px+env(safe-area-inset-bottom))]"
+            ? "h-[calc(128px+env(safe-area-inset-bottom))]"
+            : "h-[calc(60px+env(safe-area-inset-bottom))]"
         : playerActive
-          ? "pb-[64px]"
-          : "pb-4";
-    const desktopPad = playerActive ? "md:pb-[104px]" : "md:pb-6";
+          ? "h-16"
+          : "h-4";
+    const desktopPad = playerActive ? "lg:h-[88px]" : "lg:h-6";
 
     return (
-        <div className="flex h-dvh flex-col overflow-hidden bg-ore-sunken">
-            <header className="flex h-14 shrink-0 items-center gap-2 border-b border-ore-divider bg-ore-raised/95 px-3 backdrop-blur md:px-4">
-                <button
-                    type="button"
-                    className="grid h-8 w-8 place-items-center rounded-md text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text md:hidden"
-                    aria-label="打开导航"
-                    onClick={() => setMobileOpened((value) => !value)}
-                >
-                    <Menu size={17} />
-                </button>
-                <button
-                    type="button"
-                    className="hidden h-8 w-8 place-items-center rounded-md text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text md:grid"
-                    aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
-                    onClick={() => setCollapsed((value) => !value)}
-                >
-                    {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-                </button>
-                <Brand brand={brand} />
-                <div className="flex-1" />
-                <div className="flex items-center gap-1.5">{headerActions}</div>
-            </header>
+        <div className="flex h-dvh overflow-hidden bg-ore-sunken">
+            {/* 桌面侧栏：品牌、导航、次要操作全部收在一条 220px 的列里 */}
+            <aside
+                className={cx(
+                    "hidden shrink-0 border-r border-ore-divider bg-[var(--pb-sidebar)] transition-[width] duration-200 ease-out lg:block",
+                    collapsed ? "w-[64px]" : "w-[220px]",
+                    playerActive && "lg:pb-[76px]"
+                )}
+            >
+                <div className="h-full overflow-hidden">
+                    <Sidebar
+                        items={nav}
+                        collapsed={collapsed}
+                        label={navLabel}
+                        footer={sidebarFooter}
+                        header={<Brand brand={brand} compact={collapsed} markOnly={collapsed} />}
+                        actions={headerActions}
+                        repoUrl={repoUrl}
+                        onToggleCollapse={() => setCollapsed((value) => !value)}
+                    />
+                </div>
+            </aside>
 
-            <div className="flex min-h-0 flex-1">
-                <aside
-                    className={cx(
-                        "hidden shrink-0 overflow-hidden border-r border-ore-divider bg-ore-raised transition-[width] duration-200 ease-out md:block",
-                        collapsed ? "w-16" : "w-[216px]"
-                    )}
-                >
-                    <div className="sticky top-0 h-full overflow-y-auto">
-                        <Sidebar
-                            items={nav}
-                            collapsed={collapsed}
-                            label={navLabel}
-                            footer={sidebarFooter}
-                            repoUrl={repoUrl}
-                        />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                {/* 移动端顶栏：窄、安静，只保留导航与少量操作 */}
+                <header className="flex h-12 shrink-0 items-center gap-1 border-b border-ore-divider bg-ore-sunken/95 px-2 lg:hidden">
+                    <button
+                        type="button"
+                        className="grid h-8 w-8 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
+                        aria-label="打开导航"
+                        onClick={() => setMobileOpened(true)}
+                    >
+                        <MenuIcon size={18} />
+                    </button>
+                    <div className="min-w-0 px-1">
+                        <Brand brand={brand} compact />
                     </div>
-                </aside>
+                    <div className="flex-1" />
+                    <div className="flex items-center gap-0.5">{headerActions}</div>
+                </header>
 
-                <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+                <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
                     {padded ? (
                         <div
                             className={cx(
-                                "mx-auto flex min-h-0 w-full max-w-[1360px] flex-1 flex-col md:p-6",
-                                mobileFlush ? "p-0" : "p-4",
+                                "mx-auto flex h-full w-full max-w-[1240px] flex-1 flex-col",
+                                mobileFlush ? "p-0" : "px-4 py-4",
+                                "md:px-8 md:py-6",
                                 pageClassName
                             )}
                         >
                             {children}
-                            {/* 底部播放器/导航是 fixed 的，用真实占位块撑出滚动空间 */}
                             <div aria-hidden className={cx("shrink-0", mobilePad, desktopPad)} />
                         </div>
                     ) : (
@@ -169,17 +184,15 @@ export function AppLayout({
 
             {mobileOpened && (
                 <div
-                    className="fixed inset-0 z-50 animate-[pbFadeIn_140ms_ease-out] bg-black/60 md:hidden"
+                    className="fixed inset-0 z-50 animate-[pbFadeIn_140ms_ease-out] bg-black/55 lg:hidden"
                     onClick={() => setMobileOpened(false)}
                 >
                     <div
-                        className="h-full w-[248px] animate-[pbDrawerIn_200ms_ease-out] border-r border-ore-divider bg-ore-raised"
+                        className="h-full w-[260px] animate-[pbDrawerIn_200ms_ease-out] border-r border-ore-divider bg-[var(--pb-sidebar)]"
                         onClick={(event) => event.stopPropagation()}
                     >
-                        <div className="flex h-14 items-center justify-between border-b border-ore-divider px-3">
-                            <span className="text-xs font-semibold uppercase tracking-widest text-ore-dim">
-                                {navLabel}
-                            </span>
+                        <div className="flex h-12 items-center justify-between px-3">
+                            <Brand brand={brand} compact />
                             <button
                                 type="button"
                                 className="grid h-8 w-8 place-items-center rounded-md text-ore-dim hover:bg-[var(--pb-hover)]"
@@ -189,11 +202,12 @@ export function AppLayout({
                                 <X size={16} />
                             </button>
                         </div>
-                        <div className="h-[calc(100dvh-3.5rem)] overflow-y-auto">
+                        <div className="h-[calc(100dvh-3rem)] overflow-y-auto">
                             <Sidebar
-                                items={nav}
-                                label={navLabel}
+                                items={drawerNav}
+                                label={drawerNav.length > 0 ? "更多" : "设置"}
                                 footer={sidebarFooter}
+                                actions={headerActions}
                                 repoUrl={repoUrl}
                                 onNavigate={() => setMobileOpened(false)}
                             />
@@ -203,7 +217,7 @@ export function AppLayout({
             )}
 
             {(hasBottomNav || player) && (
-                <div className="fixed inset-x-0 bottom-0 z-30 md:hidden">
+                <div className="fixed inset-x-0 bottom-0 z-30 lg:hidden">
                     {player && <MiniPlayer player={player} extras={playerExtras} />}
                     {hasBottomNav && <BottomNav items={bottomNav!} />}
                 </div>

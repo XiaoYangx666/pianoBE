@@ -6,6 +6,7 @@ export * from "./layout/Sidebar";
 export * from "./layout/BottomNav";
 export * from "./layout/PlayerBar";
 export * from "./components/PageHeader";
+export * from "./components/PianoKeys";
 export * from "./components/SongRow";
 export * from "./components/EmptyState";
 export * from "./components/Dialog";

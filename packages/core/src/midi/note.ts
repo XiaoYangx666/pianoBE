@@ -24,10 +24,11 @@ const NOTE_ORDER = [
  * value 是设置中持久化的稳定编号，id 对应 rp/sounds 下的采样目录前缀。
  */
 export const PIANO_TIMBRES = [
-    { value: 0, id: "piano", label: "经典 P-88", description: "默认音色 · 明亮均衡" },
-    { value: 1, id: "meta_piano", label: "Meta 暖立式", description: "CC0 · 温暖柔和的立式钢琴" },
-    { value: 2, id: "upright_kw", label: "KW 居家立式", description: "CC0 · 温馨亲切的 Kawai 立式钢琴" },
-    { value: 3, id: "ydp_grand", label: "YDP 明亮三角", description: "CC BY 3.0 · 明亮清晰的 Yamaha 三角钢琴" },
+    { value: 0, id: "piano", label: "标准钢琴", description: "默认 · FluidR3 GM 大钢琴，熟悉的电子琴音色" },
+    { value: 1, id: "classic_grand", label: "经典三角", description: "CC0 · VCSL 施坦威 B，温暖圆润的古典独奏" },
+    { value: 2, id: "bright_grand", label: "明亮三角", description: "CC BY 3.0 · Salamander 雅马哈 C5，清晰通透" },
+    { value: 3, id: "upright", label: "原声立式", description: "CC0 · FreePats Kawai 立式，亲切柔和" },
+    { value: 4, id: "electric_piano", label: "复古电钢", description: "CC0 · FM 合成，80 年代 DX7 电钢" },
 ] as const;
 
 export type PianoTimbre = (typeof PIANO_TIMBRES)[number]["id"];
@@ -130,8 +131,8 @@ export function getSoundLayerByDuration(duration: number): PianoSoundLayer {
 
 /**
  * 音色编号 + 采样档位 → rp/sounds 音效 id 前缀。
- * 例如 (0, "short") → "piano_short"，(1, "standard") → "meta_piano"。
- * stereo=true 时返回立体声定义，例如 "piano_short_stereo" / "meta_piano_stereo"。
+ * 例如 (0, "short") → "piano_short"，(1, "standard") → "classic_grand"。
+ * stereo=true 时返回立体声定义，例如 "piano_short_stereo" / "classic_grand_stereo"。
  */
 export function pianoSoundId(timbre: number, layer: PianoSoundLayer, stereo = false): string {
     const id = getPianoTimbre(timbre).id;

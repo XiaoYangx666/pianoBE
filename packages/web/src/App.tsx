@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { KeyRound, LibraryBig, ListMusic, LogOut } from "lucide-react";
-import { AppLayout, Button, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { KeyRound, LibraryBig, ListMusic, LogOut, FlaskConical } from "lucide-react";
+import { AppLayout, IconButton, PianoMark, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { getToken, setToken } from "./api";
 import { Login } from "./Login";
 import { SongsPage } from "./SongsPage";
 import { PlaylistsPage } from "./PlaylistsPage";
 import { TokensPage } from "./TokensPage";
+import { AudioLabPage } from "./audioLab/AudioLabPage";
 import { midiPlayer } from "./midiPlayer";
 
 const nav: AppNavItem[] = [
     { to: "/", label: "曲目库", icon: <LibraryBig size={18} />, end: true },
     { to: "/playlists", label: "播放列表", icon: <ListMusic size={18} /> },
     { to: "/tokens", label: "令牌管理", icon: <KeyRound size={18} /> },
+    { to: "/lab", label: "音频实验室", icon: <FlaskConical size={18} /> },
 ];
 
 export default function App() {
@@ -30,7 +32,12 @@ export default function App() {
 
     return (
         <AppLayout
-            brand={{ name: "PianoBE", subtitle: "服务端控制台", to: "/" }}
+            brand={{
+                name: "PianoBE",
+                subtitle: "服务端控制台",
+                to: "/",
+                mark: <PianoMark size={17} />,
+            }}
             nav={nav}
             navLabel="管理"
             bottomNav={nav}
@@ -39,19 +46,17 @@ export default function App() {
             headerActions={
                 <>
                     <ThemeToggle />
-                    <Button
+                    <IconButton
                         type="button"
-                        color="secondary"
-                        size="sm"
                         title="退出登录"
+                        aria-label="退出登录"
                         onClick={() => {
                             setToken(null);
                             setTokenState(null);
                         }}
                     >
-                        <LogOut size={14} />
-                        <span className="hidden sm:inline">退出</span>
-                    </Button>
+                        <LogOut size={15} />
+                    </IconButton>
                 </>
             }
             sidebarFooter={
@@ -65,6 +70,7 @@ export default function App() {
                 <Route path="/" element={<SongsPage />} />
                 <Route path="/playlists" element={<PlaylistsPage />} />
                 <Route path="/tokens" element={<TokensPage />} />
+                <Route path="/lab" element={<AudioLabPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </AppLayout>

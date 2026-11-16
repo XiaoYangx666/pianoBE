@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, IconButton, Menu, Textfield } from "@piano/ui";
-import { MoreVertical, Pencil, RefreshCw, Trash2, Upload } from "lucide-react";
+import { MoreVertical, Pencil, RefreshCw, Search, Trash2, Upload } from "lucide-react";
 import {
     ConfirmDialog,
     Dialog,
@@ -165,10 +165,11 @@ export function SongsPage() {
                 onDrop={(files) => void upload(files)}
             />
 
-            <section className="overflow-hidden rounded-xl border border-ore-border bg-ore-raised">
-                <div className="flex flex-wrap items-center gap-2.5 border-b border-ore-divider p-3">
+            <section className="flex flex-col">
+                <div className="flex flex-wrap items-center gap-2.5 border-b border-ore-divider pb-2.5">
                     <Textfield
                         className="w-[240px] shrink-0"
+                        leading={<Search size={14} />}
                         placeholder="搜索曲名…"
                         value={q}
                         onInput={(event) => {
@@ -179,25 +180,25 @@ export function SongsPage() {
                             if (event.key === "Enter") void load(q, 1);
                         }}
                     />
-                    <Button type="button" color="secondary" size="sm" loading={busy} onClick={() => void load(q, 1)}>
+                    <Button type="button" color="ghost" size="sm" loading={busy} onClick={() => void load(q, 1)}>
                         搜索
                     </Button>
-                    <Button type="button" color="secondary" size="sm" loading={busy} onClick={() => void load("", 1)}>
+                    <Button type="button" color="ghost" size="sm" loading={busy} onClick={() => void load("", 1)}>
                         <RefreshCw size={13} /> 刷新
                     </Button>
                     <div className="flex-1" />
-                    <span className="text-[11px] text-ore-dim">
+                    <span className="text-[11px] tabular-nums text-ore-dim">
                         共 {total} 首 · 第 {page}/{totalPages} 页
                     </span>
                 </div>
 
                 {error && (
-                    <div className="m-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
+                    <div className="mt-3 rounded-md border px-3 py-2 text-xs pb-edge-danger pb-tint-danger">
                         请求失败：{error}
                     </div>
                 )}
 
-                <div className="p-1.5">
+                <div>
                     {list.length === 0 && !busy ? (
                         <EmptyState
                             compact
@@ -210,17 +211,35 @@ export function SongsPage() {
                             }
                         />
                     ) : (
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col">
                             {list.map((song, index) => {
                                 const isCurrent = player.songId === song.id && player.status !== "idle";
+                                const rowMenu = [
+                                    {
+                                        key: "rename",
+                                        label: "重命名",
+                                        icon: <Pencil size={13} />,
+                                        onSelect: () => {
+                                            setRenameTarget(song);
+                                            setRenameValue(song.name);
+                                        },
+                                    },
+                                    {
+                                        key: "delete",
+                                        label: "删除",
+                                        icon: <Trash2 size={13} />,
+                                        danger: true,
+                                        onSelect: () => setDeleteTarget(song),
+                                    },
+                                ];
                                 return (
                                     <SongRow
                                         key={song.id}
                                         index={(page - 1) * pageSize + index + 1}
                                         title={song.name}
                                         id={song.id}
+                                        duration={formatDuration(song.duration)}
                                         meta={[
-                                            <span key="dur">{formatDuration(song.duration)}</span>,
                                             <span key="notes">
                                                 {song.noteCount != null
                                                     ? `${song.noteCount.toLocaleString()} 音符`
@@ -238,32 +257,17 @@ export function SongsPage() {
                                                   : "idle"
                                         }
                                         onPlay={() => void play(song)}
+                                        menu={rowMenu}
                                         actions={
                                             <Menu
                                                 align="end"
+                                                minWidth={160}
                                                 trigger={
                                                     <IconButton size="sm" aria-label="更多操作" title="更多操作">
                                                         <MoreVertical size={15} />
                                                     </IconButton>
                                                 }
-                                                items={[
-                                                    {
-                                                        key: "rename",
-                                                        label: "重命名",
-                                                        icon: <Pencil size={13} />,
-                                                        onSelect: () => {
-                                                            setRenameTarget(song);
-                                                            setRenameValue(song.name);
-                                                        },
-                                                    },
-                                                    {
-                                                        key: "delete",
-                                                        label: "删除",
-                                                        icon: <Trash2 size={13} />,
-                                                        danger: true,
-                                                        onSelect: () => setDeleteTarget(song),
-                                                    },
-                                                ]}
+                                                items={rowMenu}
                                             />
                                         }
                                     />
@@ -274,10 +278,10 @@ export function SongsPage() {
                 </div>
 
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-1.5 border-t border-ore-divider p-3">
+                    <div className="flex items-center justify-center gap-1.5 border-t border-ore-divider py-3">
                         <button
                             type="button"
-                            className="rounded-md border border-ore-border px-2.5 py-1 text-xs text-ore-dim disabled:opacity-40"
+                            className="rounded-md border border-ore-border px-2.5 py-1 text-xs text-ore-dim transition-colors hover:bg-[var(--pb-hover)] disabled:opacity-40"
                             disabled={busy || page <= 1}
                             onClick={() => void load(q, page - 1)}
                         >
@@ -288,7 +292,7 @@ export function SongsPage() {
                         </span>
                         <button
                             type="button"
-                            className="rounded-md border border-ore-border px-2.5 py-1 text-xs text-ore-dim disabled:opacity-40"
+                            className="rounded-md border border-ore-border px-2.5 py-1 text-xs text-ore-dim transition-colors hover:bg-[var(--pb-hover)] disabled:opacity-40"
                             disabled={busy || page >= totalPages}
                             onClick={() => void load(q, page + 1)}
                         >

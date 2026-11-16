@@ -82,7 +82,7 @@ export function Dialog({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/65 p-4 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/50 p-4 animate-[pbFadeIn_120ms_ease-out]"
             onMouseDown={(event) => {
                 if (closeOnClickOutside && event.target === event.currentTarget) onClose();
             }}
@@ -92,22 +92,22 @@ export function Dialog({
                 role="dialog"
                 aria-modal="true"
                 tabIndex={-1}
-                className={`flex max-h-[86vh] w-full ${WIDTH[size]} flex-col overflow-hidden rounded-xl border border-ore-border bg-ore-raised shadow-2xl outline-none`}
+                className={`flex max-h-[86vh] w-full ${WIDTH[size]} flex-col overflow-hidden rounded-xl border border-ore-border bg-ore-raised shadow-[0_24px_64px_-16px_var(--pb-shadow)] outline-none animate-[pbDialogIn_160ms_ease-out]`}
             >
                 {title && (
                     <header className="flex flex-none items-center gap-3 border-b border-ore-divider px-4 py-3">
-                        <div className="min-w-0 flex-1 text-sm font-semibold">{title}</div>
+                        <div className="min-w-0 flex-1 text-[13px] font-semibold">{title}</div>
                         <button
                             type="button"
                             aria-label="关闭"
-                            className="rounded p-1 text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text"
+                            className="grid h-7 w-7 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
                             onClick={onClose}
                         >
                             <X size={16} />
                         </button>
                     </header>
                 )}
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
                 {footer && <footer className="flex flex-none justify-end gap-2 border-t border-ore-divider px-4 py-3">{footer}</footer>}
             </div>
         </div>,

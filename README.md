@@ -44,9 +44,8 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 2. 设置包名与描述，导出 `.mcaddon`
 3. 将包导入世界（需开启"测试版 API"），放置钢琴方块即可弹奏/播放内嵌曲目
 
-试听音色直接取自模板底包内的真实钢琴采样，无需额外音效文件。经典 P-88 采样来自
-Salamander Grand Piano V3（Alexander Holm，CC BY 3.0），各音色的来源与授权见
-`packages/addon/rp/THIRD_PARTY_NOTICES.md`。
+试听音色直接取自模板底包内的真实钢琴采样，无需额外音效文件。默认的标准钢琴来自
+FluidR3 GM，各音色的来源与授权见 `packages/addon/rp/THIRD_PARTY_NOTICES.md`。
 
 ### 2. BDS 服务器 + 自托管后端（远程曲库）
 
@@ -108,6 +107,7 @@ pianoBE/
 - 统一运行时格式 **PBE2**：40 tick/秒时间差分 + VarInt + 同时刻分组 + Raw DEFLATE，播放器用共享 `SongCache` + `EventCursor` 增量读取（README「曲目格式」）
 - 播放列表：meta 与 items 同记录原子更新，owner/public 视图派生（读取即修复，无需索引维护）
 - 双端存储驱动：addon 使用世界动态属性（DPDataBase），后端使用 SQLite（meta）+ 文件（内容），共享同一套 core 端口与契约测试
+- Audio Lab：`web` 的 `/lab` 实验页隔离对比力度层、50ms tick 量化与 Note Off 释放；纯逻辑在 `@piano/core/audioLab`，与正式播放器/游戏包解耦。结论见 `tools/audio-lab-report.md`
 
 ---
 

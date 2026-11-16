@@ -1,5 +1,5 @@
 /**
- * 将 template.mcaddon 裁剪为“基础模板”：只保留经典 P-88。
+ * 将 template.mcaddon 裁剪为“基础模板”：只保留标准钢琴。
  *
  * 生成器会把用户勾选的音色包按需合并进导出包；开发构建（npm run build）
  * 仍然直接从 rp/sounds 打包全部音色，不经过这里。

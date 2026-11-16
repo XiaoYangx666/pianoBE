@@ -57,7 +57,7 @@ describe("note.ts（采样映射，addon/前端共用）", () => {
             expect(pianoSoundId(timbre.value, "standard")).toBe(timbre.id);
             expect(pianoSoundId(timbre.value, "long")).toBe(`${timbre.id}_long`);
         }
-        expect(getSoundIdByDuration(2, 1)).toBe("meta_piano");
+        expect(getSoundIdByDuration(2, 1)).toBe("classic_grand");
     });
 
     it("立体声模式使用 _stereo 定义，默认仍为 3D 定义", () => {
@@ -66,8 +66,8 @@ describe("note.ts（采样映射，addon/前端共用）", () => {
         expect(pianoSoundId(0, "standard", true)).toBe("piano_stereo");
         expect(pianoSoundId(0, "short", true)).toBe("piano_short_stereo");
         expect(pianoSoundId(0, "long", true)).toBe("piano_long_stereo");
-        expect(pianoSoundId(1, "standard", true)).toBe("meta_piano_stereo");
-        expect(pianoSoundId(1, "short", true)).toBe("meta_piano_short_stereo");
+        expect(pianoSoundId(1, "standard", true)).toBe("classic_grand_stereo");
+        expect(pianoSoundId(1, "short", true)).toBe("classic_grand_short_stereo");
     });
 
     it("getSoundIdByDuration 的立体声参数默认关闭", () => {

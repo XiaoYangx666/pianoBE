@@ -102,7 +102,7 @@ export function PlaylistsPage() {
     };
 
     const errorBanner = error && (
-        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">{error}</div>
+        <div className="rounded-md border px-3 py-2 text-xs pb-edge-danger pb-tint-danger">{error}</div>
     );
 
     if (detail) {
@@ -134,7 +134,7 @@ export function PlaylistsPage() {
 
                 {errorBanner}
 
-                <section className="rounded-xl border border-ore-border bg-ore-raised p-4">
+                <section className="flex flex-col gap-4 border-b border-ore-divider pb-5">
                     <div className="flex flex-wrap items-end justify-between gap-3">
                         <Textfield
                             className="w-[280px]"
@@ -156,25 +156,25 @@ export function PlaylistsPage() {
                         </label>
                     </div>
 
-                    <div className="my-3 h-px bg-ore-divider" />
-
-                    <div className="mb-1.5 text-sm font-semibold">曲目（{detail.items.length}）</div>
-                    {detail.items.length === 0 ? (
-                        <EmptyState compact title="列表为空" description="从下方搜索并添加曲目" />
-                    ) : (
-                        <div className="flex flex-col gap-0.5">
-                            {detail.items.map((id, index) => (
-                                <SongRow
-                                    key={`${id}-${index}`}
-                                    index={index + 1}
-                                    title={songNames[id] ?? id}
-                                    id={id}
-                                    onRemove={() => void setItems(detail.items.filter((item) => item !== id))}
-                                    removeLabel="从列表移除"
-                                />
-                            ))}
-                        </div>
-                    )}
+                    <div>
+                        <div className="mb-1 text-[13px] font-semibold">曲目（{detail.items.length}）</div>
+                        {detail.items.length === 0 ? (
+                            <EmptyState compact title="列表为空" description="从下方搜索并添加曲目" />
+                        ) : (
+                            <div className="flex flex-col border-t border-ore-divider">
+                                {detail.items.map((id, index) => (
+                                    <SongRow
+                                        key={`${id}-${index}`}
+                                        index={index + 1}
+                                        title={songNames[id] ?? id}
+                                        id={id}
+                                        onRemove={() => void setItems(detail.items.filter((item) => item !== id))}
+                                        removeLabel="从列表移除"
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </section>
 
                 <AddSongPicker exclude={detail.items} onAdd={(ids) => void setItems([...detail.items, ...ids])} />
@@ -202,31 +202,29 @@ export function PlaylistsPage() {
 
             {errorBanner}
 
-            <section className="rounded-xl border border-ore-border bg-ore-raised p-4">
-                <div className="flex flex-wrap items-end gap-2.5">
-                    <Textfield
-                        className="w-[280px]"
-                        label="新建播放列表"
-                        placeholder="列表名称（2~24 字）"
-                        value={newName}
-                        onInput={(event) => {
-                            const target = event.target as unknown as { value?: unknown };
-                            if (typeof target?.value === "string") setNewName(target.value);
-                        }}
-                        onKeyDown={(event: React.KeyboardEvent) => {
-                            if (event.key === "Enter") void create();
-                        }}
-                    />
-                    <Button
-                        type="button"
-                        size="sm"
-                        loading={busy}
-                        disabled={newName.trim().length < 2}
-                        onClick={() => void create()}
-                    >
-                        <Plus size={14} /> 创建
-                    </Button>
-                </div>
+            <section className="flex flex-wrap items-end gap-2.5 border-b border-ore-divider pb-5">
+                <Textfield
+                    className="w-[280px]"
+                    label="新建播放列表"
+                    placeholder="列表名称（2~24 字）"
+                    value={newName}
+                    onInput={(event) => {
+                        const target = event.target as unknown as { value?: unknown };
+                        if (typeof target?.value === "string") setNewName(target.value);
+                    }}
+                    onKeyDown={(event: React.KeyboardEvent) => {
+                        if (event.key === "Enter") void create();
+                    }}
+                />
+                <Button
+                    type="button"
+                    size="sm"
+                    loading={busy}
+                    disabled={newName.trim().length < 2}
+                    onClick={() => void create()}
+                >
+                    <Plus size={14} /> 创建
+                </Button>
             </section>
 
             <PlaylistSection
@@ -274,22 +272,22 @@ function PlaylistSection({
     empty: string;
 }) {
     return (
-        <section className="overflow-hidden rounded-xl border border-ore-border bg-ore-raised">
-            <div className="border-b border-ore-divider px-4 py-3">
-                <div className="text-sm font-semibold">{title}</div>
-                <div className="mt-0.5 text-xs text-ore-dim">{description}</div>
+        <section className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-3">
+                <div className="text-[13px] font-semibold">{title}</div>
+                <div className="text-[11px] text-ore-dimmer">{description}</div>
             </div>
-            <div className="p-1.5">
+            <div className="border-t border-ore-divider">
                 {lists.length === 0 ? (
                     <EmptyState compact icon={<ListMusic size={20} />} title={empty} />
                 ) : (
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col">
                         {lists.map((playlist) => (
                             <SongRow
                                 key={playlist.id}
                                 leading={
-                                    <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg border border-brand/35 bg-brand/12 text-[color:var(--pb-primary-light)]">
-                                        <ListMusic size={17} />
+                                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand/10 text-[color:var(--pb-primary-light)]">
+                                        <ListMusic size={15} />
                                     </div>
                                 }
                                 title={playlist.name}
@@ -305,8 +303,8 @@ function PlaylistSection({
                                     <span key="updated">{new Date(playlist.updatedAt * 1000).toLocaleDateString()}</span>,
                                 ]}
                                 actions={
-                                    <div className="flex items-center gap-1.5">
-                                        <Button type="button" color="secondary" size="sm" onClick={() => void onOpen(playlist.id)}>
+                                    <div className="flex items-center gap-1">
+                                        <Button type="button" color="ghost" size="sm" onClick={() => void onOpen(playlist.id)}>
                                             打开
                                         </Button>
                                         {onRemove && (
@@ -314,13 +312,33 @@ function PlaylistSection({
                                                 size="sm"
                                                 aria-label="删除播放列表"
                                                 title="删除播放列表"
+                                                className="hover:bg-[var(--pb-danger-soft)] hover:text-[color:var(--pb-danger)]"
                                                 onClick={() => onRemove(playlist)}
                                             >
-                                                <Trash2 size={14} className="text-red-600 dark:text-red-400" />
+                                                <Trash2 size={14} />
                                             </IconButton>
                                         )}
                                     </div>
                                 }
+                                menu={[
+                                    {
+                                        key: "open",
+                                        label: "打开",
+                                        icon: <ListMusic size={13} />,
+                                        onSelect: () => void onOpen(playlist.id),
+                                    },
+                                    ...(onRemove
+                                        ? [
+                                              {
+                                                  key: "remove",
+                                                  label: "删除播放列表",
+                                                  icon: <Trash2 size={13} />,
+                                                  danger: true,
+                                                  onSelect: () => onRemove(playlist),
+                                              },
+                                          ]
+                                        : []),
+                                ]}
                             />
                         ))}
                     </div>
@@ -346,15 +364,16 @@ function AddSongPicker({ exclude, onAdd }: { exclude: string[]; onAdd: (ids: str
     };
 
     return (
-        <section className="rounded-xl border border-ore-border bg-ore-raised p-4">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <section className="flex flex-col gap-3 border-t border-ore-divider pt-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <div className="text-sm font-semibold">添加曲目</div>
-                    <div className="mt-0.5 text-xs text-ore-dim">搜索服务端曲目并加入当前播放列表</div>
+                    <div className="text-[13px] font-semibold">添加曲目</div>
+                    <div className="mt-0.5 text-[11.5px] text-ore-dim">搜索服务端曲目并加入当前播放列表</div>
                 </div>
                 <div className="flex items-center gap-2">
                     <Textfield
                         className="w-[220px]"
+                        leading={<Search size={14} />}
                         placeholder="搜索曲名"
                         value={q}
                         onInput={(event) => {
@@ -370,7 +389,7 @@ function AddSongPicker({ exclude, onAdd }: { exclude: string[]; onAdd: (ids: str
                     </Button>
                 </div>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col border-t border-ore-divider">
                 {result.map((song) => (
                     <SongRow
                         key={song.id}
@@ -380,7 +399,7 @@ function AddSongPicker({ exclude, onAdd }: { exclude: string[]; onAdd: (ids: str
                         actions={
                             <Button
                                 type="button"
-                                color="secondary"
+                                color="ghost"
                                 size="sm"
                                 onClick={() => {
                                     onAdd([song.id]);
@@ -390,10 +409,21 @@ function AddSongPicker({ exclude, onAdd }: { exclude: string[]; onAdd: (ids: str
                                 <Plus size={13} /> 添加
                             </Button>
                         }
+                        menu={[
+                            {
+                                key: "add",
+                                label: "加入播放列表",
+                                icon: <Plus size={13} />,
+                                onSelect: () => {
+                                    onAdd([song.id]);
+                                    setResult((current) => current.filter((item) => item.id !== song.id));
+                                },
+                            },
+                        ]}
                     />
                 ))}
                 {result.length === 0 && (
-                    <div className="py-4 text-center text-xs text-ore-dim">
+                    <div className="py-6 text-center text-[11.5px] text-ore-dim">
                         {searching ? "搜索中…" : "输入关键词后搜索"}
                     </div>
                 )}

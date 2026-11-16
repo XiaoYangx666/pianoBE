@@ -12,10 +12,10 @@ describe("audioPlayer 采样清单", () => {
     it("pianoSamples 按音色返回对应的 90 个目录/键组合", () => {
         const key = (s: { dir: string; sample: string }) => `${s.dir}/${s.sample}`;
         expect(new Set(pianoSamples(0).map(key))).toEqual(new Set(ALL_SAMPLES.map(key)));
-        const meta = pianoSamples(1);
-        expect(meta).toHaveLength(90);
-        expect(new Set(meta.map((s) => s.dir))).toEqual(
-            new Set(["meta_piano", "meta_piano_short", "meta_piano_long"])
+        const classic = pianoSamples(1);
+        expect(classic).toHaveLength(90);
+        expect(new Set(classic.map((s) => s.dir))).toEqual(
+            new Set(["classic_grand", "classic_grand_short", "classic_grand_long"])
         );
     });
 });

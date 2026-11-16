@@ -17,7 +17,7 @@ export interface TimbreIndexEntry {
 
 export interface LoadedTimbrePack {
     meta: TimbreIndexEntry;
-    /** 包内文件（相对 rp 根目录，如 sounds/meta_piano/C4.ogg） */
+    /** 包内文件（相对 rp 根目录，如 sounds/classic_grand/C4.ogg） */
     files: Map<string, Uint8Array>;
     soundDefinitions: Record<string, unknown>;
 }

@@ -67,7 +67,7 @@ interface GeneratorState {
     ready: boolean;
     loadingText: string | null;
     template: TemplateInfo | null;
-    /** 当前附加包工作区：模板曲目 + 从「我的音乐」加入的曲目 */
+    /** 当前附加包工作区：模板曲目 + 从在线曲库或「我的音乐」直接加入的曲目 */
     songs: SongEntry[];
     /** 本地持久音乐库：只存 PBE2，跨刷新保留 */
     myMusic: StoredSong[];
@@ -88,13 +88,15 @@ interface GeneratorState {
 
     init: () => Promise<void>;
     setLoading: (text: string | null) => void;
-    applyTemplate: (file: Blob) => Promise<void>;
+    applyTemplate: (file: Blob, options?: { silent?: boolean }) => Promise<void>;
     setAddonName: (value: string) => void;
     setAddonDesc: (value: string) => void;
     setRandomUuid: (value: boolean) => void;
 
     addMidiFiles: (files: File[], options?: { addToAddon?: boolean }) => Promise<void>;
     addLibrarySong: (id: string) => Promise<void>;
+    /** 把在线曲库曲目保存到本地「我的音乐」，不自动加入附加包 */
+    saveLibrarySong: (id: string) => Promise<void>;
     addToAddon: (entry: SongEntry) => void;
     removeMyMusicSong: (id: string) => Promise<void>;
     togglePreview: (entry: SongEntry) => Promise<void>;
@@ -202,7 +204,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             set({ loadingText: "下载模板包…" });
             const res = await fetch(`./template.mcaddon?v=${Date.now()}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            await get().applyTemplate(await res.blob());
+            await get().applyTemplate(await res.blob(), { silent: true });
         } catch (error) {
             notifyError("默认底包加载失败", error, "你仍然可以手动更换模板包");
         } finally {
@@ -210,7 +212,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         }
     },
 
-    applyTemplate: async (file) => {
+    applyTemplate: async (file, options) => {
         set({ loadingText: "解析 Addon 模板…" });
         try {
             const template = await loadTemplate(file);
@@ -240,11 +242,13 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                       ? version
                       : "Unknown",
             });
-            notifications.show({
-                title: "模板已加载",
-                message: `${header?.name ?? "PianoBE 模板"} · ${template.songs.length} 首内置曲目`,
-                color: "teal",
-            });
+            if (!options?.silent) {
+                notifications.show({
+                    title: "模板已加载",
+                    message: `${header?.name ?? "PianoBE 模板"} · ${template.songs.length} 首内置曲目`,
+                    color: "teal",
+                });
+            }
         } catch (error) {
             previewPlayer.bindTemplate(null);
             notifyError("模板加载失败", error);
@@ -317,6 +321,34 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         if (!library) return;
         const meta = library.find((item) => item.id === id);
         if (!meta) return;
+        if (get().songs.some((song) => song.id === id)) {
+            notifications.show({ title: "已在附加包中", message: meta.name, color: "gray" });
+            return;
+        }
+        set({ pendingAddId: id });
+        try {
+            const song = await get().loadLibraryEntry(meta);
+            set({ songs: [...get().songs, song] });
+            notifications.show({ title: "已加入附加包", message: meta.name, color: "teal" });
+            void recordLibraryAdd(id).then((counted) => {
+                if (!counted) return;
+                const current = get().library;
+                if (!current) return;
+                set({ library: current.map((item) => (item.id === id ? { ...item, adds: item.adds + 1 } : item)) });
+            });
+        } catch (error) {
+            notifyError("加入附加包失败", error);
+        } finally {
+            set({ pendingAddId: null });
+        }
+    },
+
+    saveLibrarySong: async (id) => {
+        if (get().pendingAddId === id) return;
+        const library = get().library;
+        if (!library) return;
+        const meta = library.find((item) => item.id === id);
+        if (!meta) return;
         if (get().myMusic.some((song) => song.id === id)) {
             notifications.show({ title: "已在我的音乐里", message: meta.name, color: "gray" });
             return;
@@ -327,15 +359,9 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             const stored: StoredSong = { ...song, fromLibrary: true, createdAt: Date.now() };
             await putLocalSongs([stored]);
             set({ myMusic: [stored, ...get().myMusic] });
-            notifications.show({ title: "已加入我的音乐", message: `${meta.name} · 可在「我的音乐」加入附加包`, color: "teal" });
-            void recordLibraryAdd(id).then((counted) => {
-                if (!counted) return;
-                const current = get().library;
-                if (!current) return;
-                set({ library: current.map((item) => (item.id === id ? { ...item, adds: item.adds + 1 } : item)) });
-            });
+            notifications.show({ title: "已保存到我的音乐", message: meta.name, color: "teal" });
         } catch (error) {
-            notifyError("加入我的音乐失败", error);
+            notifyError("保存到我的音乐失败", error);
         } finally {
             set({ pendingAddId: null });
         }

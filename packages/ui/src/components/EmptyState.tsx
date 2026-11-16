@@ -18,15 +18,11 @@ export function EmptyState({
     compact?: boolean;
 }) {
     return (
-        <div className={`flex flex-col items-center justify-center px-4 text-center ${compact ? "py-7" : "py-12"}`}>
-            {icon && (
-                <div className="mb-2.5 grid h-11 w-11 place-items-center rounded-xl border border-ore-border bg-[var(--pb-soft)] text-ore-dim">
-                    {icon}
-                </div>
-            )}
-            <div className="max-w-[420px] text-sm font-semibold">{title}</div>
-            {description && <div className="mt-1 max-w-[420px] text-xs text-ore-dim">{description}</div>}
-            {action && <div className="mt-3">{action}</div>}
+        <div className={`flex flex-col items-center justify-center px-4 text-center ${compact ? "py-8" : "py-14"}`}>
+            {icon && <div className="mb-3 text-ore-dimmer">{icon}</div>}
+            <div className="max-w-[420px] text-[13px] font-medium">{title}</div>
+            {description && <div className="mt-1 max-w-[420px] text-[11.5px] leading-relaxed text-ore-dim">{description}</div>}
+            {action && <div className="mt-3.5">{action}</div>}
         </div>
     );
 }

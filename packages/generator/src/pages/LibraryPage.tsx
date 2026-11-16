@@ -5,24 +5,34 @@ import {
     IconButton,
     ImportCodeDialog,
     Menu,
-    MenuTrigger,
-    RowPlayButton,
-    TabBar,
-    TabButton,
-    Tag,
+    PageHeader,
+    PianoKeys,
+    Segmented,
+    SongRow,
+    SongBadge,
     Textfield,
     VirtualSongList,
     notifications,
+    songTableGrid,
     usePlayingSongId,
 } from "@piano/ui";
-import { Check, ChevronDown, FolderOpen, Info, LibraryBig, Music2, Plus, Trash2, Upload } from "lucide-react";
+import {
+    ArrowUpDown,
+    BookmarkPlus,
+    Check,
+    ChevronDown,
+    FolderOpen,
+    Info,
+    Plus,
+    Search,
+    Upload,
+} from "lucide-react";
 import { previewPlayer } from "../player";
 import { useGenerator, type LibrarySort } from "../store/generator";
 import type { LibraryMeta } from "../library";
 import type { SongEntry } from "../types";
 import type { StoredSong } from "../localLibrary";
-
-const ROW_HEIGHT = 60;
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const SORT_LABELS: Record<LibrarySort, string> = {
     adds: "按添加量",
@@ -38,6 +48,7 @@ function formatDuration(scaled: number): string {
 }
 
 export function LibraryPage() {
+    const isMobile = useMediaQuery("(max-width: 47.99em)");
     const library = useGenerator((state) => state.library);
     const songs = useGenerator((state) => state.songs);
     const myMusic = useGenerator((state) => state.myMusic);
@@ -48,6 +59,7 @@ export function LibraryPage() {
     const pendingAddId = useGenerator((state) => state.pendingAddId);
     const addMidiFiles = useGenerator((state) => state.addMidiFiles);
     const addLibrarySong = useGenerator((state) => state.addLibrarySong);
+    const saveLibrarySong = useGenerator((state) => state.saveLibrarySong);
     const addToAddon = useGenerator((state) => state.addToAddon);
     const removeMyMusicSong = useGenerator((state) => state.removeMyMusicSong);
     const previewLibrarySong = useGenerator((state) => state.previewLibrarySong);
@@ -66,9 +78,16 @@ export function LibraryPage() {
     const activeId = usePlayingSongId(previewPlayer);
     const playDisabled = !template;
     const deferredQuery = useDeferredValue(query);
+    const rowHeight = isMobile ? 54 : 50;
 
     const addonIds = useMemo(() => new Set(songs.map((song) => song.id)), [songs]);
     const myMusicIds = useMemo(() => new Set(myMusic.map((song) => song.id)), [myMusic]);
+    // 在线曲库只有确实有统计数据时才显示「添加 / 播放」列，避免整列空占位。
+    const hasRanking = useMemo(
+        () => (library ?? []).some((meta) => meta.adds > 0 || meta.plays > 0),
+        [library]
+    );
+    const statsColumns = tab === "online" && hasRanking ? 3 : 1;
 
     const filteredLibrary = useMemo(() => {
         const list = (library ?? []).slice();
@@ -133,203 +152,257 @@ export function LibraryPage() {
     );
 
     const renderLibraryRow = useCallback(
-        (meta: LibraryMeta, index: number) => (
-            <div
-                className={`flex h-full items-center gap-3 rounded-lg px-3 ${
-                    activeId === meta.id ? "bg-brand/13 shadow-[inset_3px_0_0_var(--pb-primary)]" : "hover:bg-[var(--pb-hover)]"
-                }`}
-            >
-                <span className="w-[26px] shrink-0 text-center text-[13px] tabular-nums text-ore-dim">
-                    {index + 1}
+        (meta: LibraryMeta, index: number) => {
+            const inAddon = addonIds.has(meta.id);
+            const inMine = myMusicIds.has(meta.id);
+            const addAction = inAddon ? (
+                <span
+                    className="grid h-8 w-8 place-items-center rounded-md pb-tint-success"
+                    title="已在附加包中"
+                >
+                    <Check size={15} />
                 </span>
-                <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{meta.name}</div>
-                    <div className="mt-0.5 flex items-center gap-2 overflow-hidden whitespace-nowrap text-xs text-ore-dim">
-                        <span>{formatDuration(meta.duration)}</span>
-                        <span className="opacity-50">·</span>
-                        <span>{meta.noteCount.toLocaleString()} 音符</span>
-                        <span className="opacity-50">·</span>
-                        <span className="hidden sm:inline">{meta.adds.toLocaleString()} 添加</span>
-                        <span className="hidden opacity-50 sm:inline">·</span>
-                        <span className="hidden sm:inline">{meta.plays.toLocaleString()} 播放</span>
-                    </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                    <IconButton
-                        color="secondary"
-                        size="sm"
-                        aria-label="游戏内导入码"
-                        title="游戏内导入码"
-                        onClick={() => void openCodeForLibrary(meta)}
-                    >
-                        {"</>"}
-                    </IconButton>
-                    {myMusicIds.has(meta.id) ? (
-                        <span className="grid h-8 w-8 place-items-center text-emerald-600 dark:text-emerald-400" title="已在我的音乐中">
-                            <Check size={16} />
-                        </span>
-                    ) : (
-                        <IconButton
-                            color="secondary"
-                            size="sm"
-                            aria-label="加入我的音乐"
-                            title="加入我的音乐"
-                            loading={pendingAddId === meta.id}
-                            onClick={() => void addLibrarySong(meta.id)}
-                        >
-                            <Plus size={14} />
-                        </IconButton>
-                    )}
-                    <RowPlayButton
-                        playState={rowState(meta.id)}
-                        disabled={playDisabled}
-                        onPlay={() => void previewLibrarySong(meta)}
-                    />
-                </div>
-            </div>
-        ),
+            ) : (
+                <IconButton
+                    size="sm"
+                    color="ghost"
+                    aria-label="加入附加包"
+                    title="加入附加包"
+                    className="text-ore-dim hover:bg-brand/10 hover:text-brand"
+                    loading={pendingAddId === meta.id}
+                    onClick={() => void addLibrarySong(meta.id)}
+                >
+                    <Plus size={16} />
+                </IconButton>
+            );
+            const metaItems = [
+                meta.noteCount > 0 ? meta.noteCount.toLocaleString() : "",
+                meta.adds > 0 ? meta.adds.toLocaleString() : "",
+                meta.plays > 0 ? meta.plays.toLocaleString() : "",
+            ];
+
+            return (
+                <SongRow
+                    layout="table"
+                    statsColumns={statsColumns}
+                    index={index + 1}
+                    title={meta.name}
+                    meta={[<span key="notes">{meta.noteCount.toLocaleString()} 音符</span>]}
+                    stats={metaItems}
+                    duration={formatDuration(meta.duration)}
+                    active={activeId === meta.id}
+                    playState={rowState(meta.id)}
+                    onPlay={() => void previewLibrarySong(meta)}
+                    playDisabled={playDisabled}
+                    onOpenCode={() => void openCodeForLibrary(meta)}
+                    actions={
+                        inMine ? undefined : (
+                            <IconButton
+                                size="sm"
+                                aria-label="保存到我的音乐"
+                                title="保存到我的音乐"
+                                onClick={() => void saveLibrarySong(meta.id)}
+                            >
+                                <BookmarkPlus size={14} />
+                            </IconButton>
+                        )
+                    }
+                    trailing={addAction}
+                    menu={
+                        inMine
+                            ? []
+                            : [
+                                  {
+                                      key: "save",
+                                      label: "保存到我的音乐",
+                                      icon: <BookmarkPlus size={13} />,
+                                      onSelect: () => void saveLibrarySong(meta.id),
+                                  },
+                              ]
+                    }
+                />
+            );
+        },
         [
             activeId,
             addLibrarySong,
+            addonIds,
             myMusicIds,
             openCodeForLibrary,
             pendingAddId,
             playDisabled,
             previewLibrarySong,
             rowState,
+            saveLibrarySong,
+            statsColumns,
         ]
     );
 
     const renderMyRow = useCallback(
-        (song: StoredSong, index: number) => (
-            <div
-                className={`flex h-full items-center gap-3 rounded-lg px-3 ${
-                    activeId === song.id ? "bg-brand/13 shadow-[inset_3px_0_0_var(--pb-primary)]" : "hover:bg-[var(--pb-hover)]"
-                }`}
-            >
-                <span className="w-[26px] shrink-0 text-center text-[13px] tabular-nums text-ore-dim">
-                    {index + 1}
+        (song: StoredSong, index: number) => {
+            const inAddon = addonIds.has(song.id);
+            const addAction = inAddon ? (
+                <span
+                    className="grid h-8 w-8 place-items-center rounded-md pb-tint-success"
+                    title="已在附加包中"
+                >
+                    <Check size={15} />
                 </span>
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{song.name}</span>
-                        {song.fromLibrary ? <Tag>曲库</Tag> : <Tag>本地导入</Tag>}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 overflow-hidden whitespace-nowrap text-xs text-ore-dim">
-                        <span>{formatDuration(song.duration)}</span>
-                        <span className="opacity-50">·</span>
-                        <span>{(song.noteCount ?? 0).toLocaleString()} 音符</span>
-                        <span className="opacity-50">·</span>
-                        <span className="hidden sm:inline">PBE2</span>
-                    </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                    <IconButton
-                        color="secondary"
-                        size="sm"
-                        aria-label="游戏内导入码"
-                        title="游戏内导入码"
-                        onClick={() => openCodeForEntry(song)}
-                    >
-                        {"</>"}
-                    </IconButton>
-                    <IconButton
-                        color="secondary"
-                        size="sm"
-                        aria-label="从我的音乐删除"
-                        title="从我的音乐删除"
-                        onClick={() => setDeleteTarget(song)}
-                    >
-                        <Trash2 size={14} />
-                    </IconButton>
-                    {addonIds.has(song.id) ? (
-                        <span className="grid h-8 w-8 place-items-center text-emerald-600 dark:text-emerald-400" title="已在附加包中">
-                            <Check size={16} />
-                        </span>
-                    ) : (
-                        <IconButton
-                            color="secondary"
-                            size="sm"
-                            aria-label="加入附加包"
-                            title="加入附加包"
-                            onClick={() => addToAddon(song)}
-                        >
-                            <Plus size={14} />
-                        </IconButton>
-                    )}
-                    <RowPlayButton
-                        playState={rowState(song.id)}
-                        disabled={playDisabled}
-                        onPlay={() => void togglePreview(song)}
-                    />
-                </div>
-            </div>
-        ),
+            ) : (
+                <IconButton
+                    size="sm"
+                    color="ghost"
+                    aria-label="加入附加包"
+                    title="加入附加包"
+                    className="text-ore-dim hover:bg-brand/10 hover:text-brand"
+                    onClick={() => addToAddon(song)}
+                >
+                    <Plus size={16} />
+                </IconButton>
+            );
+
+            return (
+                <SongRow
+                    layout="table"
+                    statsColumns={1}
+                    index={index + 1}
+                    title={song.name}
+                    meta={[<span key="notes">{(song.noteCount ?? 0).toLocaleString()} 音符</span>]}
+                    stats={[(song.noteCount ?? 0).toLocaleString(), "", ""]}
+                    duration={formatDuration(song.duration)}
+                    badges={song.fromLibrary ? <SongBadge>曲库</SongBadge> : <SongBadge>本地</SongBadge>}
+                    active={activeId === song.id}
+                    playState={rowState(song.id)}
+                    onPlay={() => void togglePreview(song)}
+                    playDisabled={playDisabled}
+                    onOpenCode={() => openCodeForEntry(song)}
+                    onRemove={() => setDeleteTarget(song)}
+                    removeLabel="从我的音乐删除"
+                    trailing={addAction}
+                    menu={
+                        inAddon
+                            ? []
+                            : [
+                                  {
+                                      key: "add",
+                                      label: "加入附加包",
+                                      icon: <Plus size={13} />,
+                                      onSelect: () => addToAddon(song),
+                                  },
+                              ]
+                    }
+                />
+            );
+        },
         [activeId, addToAddon, addonIds, openCodeForEntry, playDisabled, rowState, togglePreview]
     );
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
-            <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-ore-raised md:rounded-xl md:border md:border-ore-border">
-                <header className="flex flex-none flex-wrap items-center gap-2.5 border-b border-ore-divider px-3 py-2">
-                    <TabBar>
-                        <TabButton type="button" selected={tab === "online"} onClick={() => setTab("online")}>
-                            <LibraryBig size={14} /> 在线曲库
-                            <Tag>{library?.length ?? "…"}</Tag>
-                        </TabButton>
-                        <TabButton type="button" selected={tab === "mine"} onClick={() => setTab("mine")}>
-                            <Music2 size={14} /> 我的音乐
-                            <Tag>{myMusic.length}</Tag>
-                        </TabButton>
-                    </TabBar>
-                    <div className="ml-auto flex items-center gap-1.5">
-                        {tab === "online" && (
-                            <span
-                                className="grid h-8 w-8 place-items-center rounded-md text-ore-dim hover:bg-[var(--pb-hover)]"
-                                title="曲库内歌曲仅供学习交流使用，版权归原作者所有；如涉及侵权，请联系我们删除。"
-                            >
-                                <Info size={16} />
+        <div className="mx-auto flex min-h-0 w-full max-w-[1040px] flex-1 flex-col">
+            <input
+                ref={fileRef}
+                type="file"
+                accept=".mid,.midi"
+                multiple
+                hidden
+                onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    event.target.value = "";
+                    if (files.length > 0) void addMidiFiles(files);
+                }}
+            />
+            <input
+                ref={folderRef}
+                type="file"
+                hidden
+                multiple
+                {...({ webkitdirectory: "", directory: "" } as unknown as InputHTMLAttributes<HTMLInputElement>)}
+                onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []).filter((file) => /\.(mid|midi)$/i.test(file.name));
+                    event.target.value = "";
+                    if (files.length > 0) void addMidiFiles(files);
+                    else
+                        notifications.show({
+                            title: "文件夹里没有 MIDI",
+                            message: "请选择包含 .mid / .midi 的文件夹",
+                            color: "gray",
+                        });
+                }}
+            />
+
+            <div className="px-4 pt-3 md:px-0 md:pt-0">
+                <PageHeader
+                    title="音乐库"
+                    description="在线曲库、本地曲目与附加包素材，都从这里开始。"
+                    actions={
+                        <button
+                            type="button"
+                            aria-label="曲库版权说明"
+                            className="grid h-8 w-8 place-items-center rounded-md text-ore-dimmer transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-dim"
+                            title="曲库内歌曲仅供学习交流使用，版权归原作者所有；如涉及侵权，请联系我们删除。"
+                            onClick={() =>
+                                notifications.show({
+                                    title: "关于在线曲库",
+                                    message: "曲库内歌曲仅供学习交流使用，版权归原作者所有；如涉及侵权，请联系我们删除。",
+                                    color: "gray",
+                                })
+                            }
+                        >
+                            <Info size={15} />
+                        </button>
+                    }
+                />
+
+                <div className="mt-3 flex flex-col gap-2.5 md:flex-row md:items-center md:gap-3">
+                    <Segmented
+                        ariaLabel="曲库视图"
+                        value={tab}
+                        onChange={setTab}
+                        options={[
+                            { value: "online", label: "在线曲库", count: library?.length ?? "…" },
+                            { value: "mine", label: "我的音乐", count: myMusic.length },
+                        ]}
+                    />
+
+                    <div className="flex items-center gap-2 md:ml-auto">
+                        <Textfield
+                            className="min-w-0 flex-1 md:w-[220px] md:flex-none"
+                            leading={<Search size={14} />}
+                            placeholder={tab === "online" ? "搜索歌曲或 ID…" : "搜索我的音乐…"}
+                            value={query}
+                            onInput={(event) => {
+                                const target = event.target as unknown as { value?: unknown };
+                                if (typeof target?.value === "string") setQuery(target.value);
+                            }}
+                        />
+                        {tab === "online" ? (
+                            <Menu
+                                align="end"
+                                trigger={
+                                    <Button type="button" color="ghost" size="sm" title="排序">
+                                        <ArrowUpDown size={13} />
+                                        <span className="hidden sm:inline">{SORT_LABELS[libSort]}</span>
+                                    </Button>
+                                }
+                                items={(Object.keys(SORT_LABELS) as LibrarySort[]).map((key) => ({
+                                    key,
+                                    label: SORT_LABELS[key],
+                                    selected: libSort === key,
+                                    onSelect: () => setLibSort(key),
+                                }))}
+                            />
+                        ) : (
+                            <span className="hidden shrink-0 text-[11px] text-ore-dimmer sm:inline">
+                                仅保存在本机浏览器
                             </span>
                         )}
-                        <input
-                            ref={fileRef}
-                            type="file"
-                            accept=".mid,.midi"
-                            multiple
-                            hidden
-                            onChange={(event) => {
-                                const files = Array.from(event.target.files ?? []);
-                                event.target.value = "";
-                                if (files.length > 0) void addMidiFiles(files);
-                            }}
-                        />
-                        <input
-                            ref={folderRef}
-                            type="file"
-                            hidden
-                            multiple
-                            {...({ webkitdirectory: "", directory: "" } as unknown as InputHTMLAttributes<HTMLInputElement>)}
-                            onChange={(event) => {
-                                const files = Array.from(event.target.files ?? []).filter((file) =>
-                                    /\.(mid|midi)$/i.test(file.name)
-                                );
-                                event.target.value = "";
-                                if (files.length > 0) void addMidiFiles(files);
-                                else notifications.show({
-                                    title: "文件夹里没有 MIDI",
-                                    message: "请选择包含 .mid / .midi 的文件夹",
-                                    color: "gray",
-                                });
-                            }}
-                        />
                         <Menu
                             align="end"
                             trigger={
-                                <Button type="button">
+                                <Button type="button" color="secondary" size="sm" title="导入 MIDI">
                                     <Upload size={14} />
                                     <span className="hidden sm:inline">导入 MIDI</span>
-                                    <span className="sm:hidden">导入</span>
-                                    <ChevronDown size={13} className="opacity-70" />
+                                    <ChevronDown size={12} className="text-ore-dimmer" />
                                 </Button>
                             }
                             items={[
@@ -348,63 +421,65 @@ export function LibraryPage() {
                             ]}
                         />
                     </div>
-                </header>
-
-                <div className="flex flex-none flex-wrap items-center gap-2.5 px-3 py-2">
-                    <Textfield
-                        className="min-w-0 flex-1 sm:w-[240px] sm:flex-none sm:shrink-0"
-                        placeholder={tab === "online" ? "搜索歌曲或 ID…" : "搜索我的曲目…"}
-                        value={query}
-                        onInput={(event) => {
-                            const target = event.target as unknown as { value?: unknown };
-                            if (typeof target?.value === "string") setQuery(target.value);
-                        }}
-                    />
-                    {tab === "online" && (
-                        <Menu
-                            trigger={<MenuTrigger>{SORT_LABELS[libSort]}</MenuTrigger>}
-                            items={(Object.keys(SORT_LABELS) as LibrarySort[]).map((key) => ({
-                                key,
-                                label: SORT_LABELS[key],
-                                selected: libSort === key,
-                                onSelect: () => setLibSort(key),
-                            }))}
-                        />
-                    )}
-                    <div className="flex-1" />
                 </div>
+            </div>
 
-                {tab === "online" ? (
-                    <VirtualSongList
-                        className="flex-1 px-1 pb-1"
-                        items={filteredLibrary}
-                        rowHeight={ROW_HEIGHT}
-                        getKey={(meta) => meta.id}
-                        renderItem={renderLibraryRow}
-                        empty={
-                            <p className="px-4 py-10 text-center text-sm text-ore-dim">
-                                {library ? "没有匹配的曲目" : "曲库加载中…"}
-                            </p>
-                        }
-                    />
-                ) : (
-                    <VirtualSongList
-                        className="flex-1 px-1 pb-1"
-                        items={filteredSongs}
-                        rowHeight={ROW_HEIGHT}
-                        getKey={(song) => song.id}
-                        renderItem={renderMyRow}
-                        empty={
-                            <div className="px-6 py-12 text-center">
-                                <p className="text-sm text-ore-dim">我的音乐还是空的</p>
-                                <p className="mt-1 text-xs text-ore-dimmer">
-                                    从在线曲库点「+」，或导入 MIDI / 文件夹；只保存转码后的 PBE2
-                                </p>
-                            </div>
-                        }
-                    />
+            <div
+                className={`mt-3 hidden grid-cols-[28px_minmax(0,1fr)_68px_56px_56px_48px_108px] items-center gap-3 border-b border-ore-border bg-[var(--pb-surface)] px-3 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ore-dim md:mr-2.5 md:grid ${songTableGrid(statsColumns)}`}
+            >
+                <span className="text-center">#</span>
+                <span>曲目</span>
+                <span className="text-right">音符</span>
+                {statsColumns >= 2 && (
+                    <>
+                        <span className="text-right">添加</span>
+                        <span className="text-right">播放</span>
+                    </>
                 )}
-            </section>
+                <span className="text-right">时长</span>
+                <span />
+            </div>
+
+            {tab === "online" ? (
+                <VirtualSongList
+                    className="mt-1 min-h-0 flex-1 px-1 pb-2 [scrollbar-gutter:stable] md:px-0"
+                    items={filteredLibrary}
+                    rowHeight={rowHeight}
+                    gap={0}
+                    getKey={(meta) => meta.id}
+                    renderItem={renderLibraryRow}
+                    empty={
+                        <div className="px-4 py-12 text-center">
+                            <p className="text-[13px] font-medium">{library ? "没有匹配的曲目" : "曲库加载中…"}</p>
+                            {library && (
+                                <p className="mt-1 text-[11.5px] text-ore-dim">换个关键词，或清空搜索再看一遍</p>
+                            )}
+                        </div>
+                    }
+                />
+            ) : (
+                <VirtualSongList
+                    className="mt-1 min-h-0 flex-1 px-1 pb-2 [scrollbar-gutter:stable] md:px-0"
+                    items={filteredSongs}
+                    rowHeight={rowHeight}
+                    gap={0}
+                    getKey={(song) => song.id}
+                    renderItem={renderMyRow}
+                    empty={
+                        <div className="flex flex-col items-center px-6 py-12 text-center">
+                            <PianoKeys playing={false} className="mb-4 h-10 w-12 p-1.5" />
+                            <p className="text-[13px] font-medium">
+                                {myMusic.length === 0 ? "我的音乐还是空的" : "没有匹配的曲目"}
+                            </p>
+                            <p className="mx-auto mt-1 max-w-[360px] text-[11.5px] leading-relaxed text-ore-dim">
+                                {myMusic.length === 0
+                                    ? "从在线曲库保存曲目，或导入 MIDI 文件 / 文件夹。这里只保存转码后的 PBE2。"
+                                    : "换个关键词试试"}
+                            </p>
+                        </div>
+                    }
+                />
+            )}
 
             <ImportCodeDialog
                 opened={Boolean(code)}

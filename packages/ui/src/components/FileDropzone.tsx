@@ -11,6 +11,7 @@ export interface FileDropzoneProps {
     onDrop: (files: File[]) => void;
     /** 紧凑模式：作为按钮式的导入区域使用 */
     compact?: boolean;
+    className?: string;
 }
 
 function matchesAccept(file: File, accept?: string[]): boolean {
@@ -32,6 +33,7 @@ export function FileDropzone({
     icon,
     onDrop,
     compact = false,
+    className,
 }: FileDropzoneProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
@@ -49,9 +51,10 @@ export function FileDropzone({
             aria-disabled={disabled || undefined}
             className={[
                 "flex cursor-pointer items-center rounded-lg border border-dashed transition-colors",
-                compact ? "gap-2.5 px-4 py-3" : "flex-col gap-3 px-6 py-7 text-center",
-                dragging ? "border-brand bg-brand/10" : "border-ore-border bg-[var(--pb-soft)] hover:border-brand/60",
+                compact ? "gap-2.5 px-3.5 py-2.5" : "flex-col gap-3 px-6 py-7 text-center",
+                dragging ? "border-brand bg-brand/5" : "border-ore-border hover:border-brand/50 hover:bg-[var(--pb-soft)]",
                 disabled ? "pointer-events-none opacity-50" : "",
+                className ?? "",
             ].join(" ")}
             onClick={() => inputRef.current?.click()}
             onKeyDown={(event) => {
@@ -71,11 +74,7 @@ export function FileDropzone({
                 if (!disabled) handleFiles(event.dataTransfer.files);
             }}
         >
-            {icon && (
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-brand/35 bg-brand/12 text-[color:var(--pb-primary-light)]">
-                    {icon}
-                </div>
-            )}
+            {icon && <div className="shrink-0 text-ore-dimmer">{icon}</div>}
             <div className={compact ? "min-w-0 text-left" : ""}>
                 <div className={compact ? "text-[13px] font-semibold" : "text-[15px] font-semibold"}>{title}</div>
                 {description && <div className="mt-0.5 text-xs text-ore-dim">{description}</div>}

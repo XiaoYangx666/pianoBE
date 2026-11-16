@@ -44,11 +44,23 @@ export function dismiss(id: number) {
 export const notifications = { show: notify };
 
 const TONE: Record<NotifyTone, { ring: string; icon: string; iconNode: ReactNode }> = {
-    teal: { ring: "border-emerald-500/40", icon: "text-emerald-600 dark:text-emerald-400", iconNode: <CheckCircle2 size={16} /> },
-    red: { ring: "border-red-500/40", icon: "text-red-600 dark:text-red-400", iconNode: <AlertTriangle size={16} /> },
-    yellow: { ring: "border-amber-500/40", icon: "text-amber-600 dark:text-amber-400", iconNode: <AlertTriangle size={16} /> },
-    gray: { ring: "border-[color:var(--pb-border)]", icon: "text-ore-dim", iconNode: <Info size={16} /> },
-    blue: { ring: "border-brand/40", icon: "text-brand", iconNode: <Info size={16} /> },
+    teal: {
+        ring: "pb-edge-success",
+        icon: "text-[color:var(--pb-success)]",
+        iconNode: <CheckCircle2 size={15} />,
+    },
+    red: {
+        ring: "pb-edge-danger",
+        icon: "text-[color:var(--pb-danger)]",
+        iconNode: <AlertTriangle size={15} />,
+    },
+    yellow: {
+        ring: "pb-edge-warning",
+        icon: "text-[color:var(--pb-warning)]",
+        iconNode: <AlertTriangle size={15} />,
+    },
+    gray: { ring: "border-[color:var(--pb-border)]", icon: "text-ore-dim", iconNode: <Info size={15} /> },
+    blue: { ring: "pb-edge-brand", icon: "text-[color:var(--pb-primary-light)]", iconNode: <Info size={15} /> },
 };
 
 /** 通知容器：每个应用在根部挂一次 */
@@ -64,20 +76,20 @@ export function ToastHost() {
     }, []);
 
     return (
-        <div className="pointer-events-none fixed right-4 top-4 z-[6000] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2">
+        <div className="pointer-events-none fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-[6000] flex flex-col gap-2 md:inset-x-auto md:right-5 md:top-4 md:w-[360px]">
             {list.map((item) => {
                 const tone = TONE[item.color ?? "gray"];
                 return (
                     <div
                         key={item.id}
-                        className={`pointer-events-auto flex items-start gap-2.5 rounded-lg border ${tone.ring} bg-ore-raised/95 px-3 py-2.5 shadow-xl backdrop-blur`}
+                        className={`pointer-events-auto flex items-start gap-2.5 rounded-[10px] border ${tone.ring} bg-ore-raised px-3 py-2.5 shadow-[0_16px_40px_-12px_var(--pb-shadow)] animate-[pbStatusIn_160ms_ease-out]`}
                         role="status"
                     >
                         <span className={`mt-0.5 shrink-0 ${tone.icon}`}>{tone.iconNode}</span>
                         <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-semibold leading-snug">{item.title}</div>
+                            <div className="text-[12.5px] font-medium leading-snug">{item.title}</div>
                             {item.message && (
-                                <div className="mt-0.5 break-words text-xs leading-relaxed text-ore-dim">
+                                <div className="mt-0.5 break-words text-[11.5px] leading-relaxed text-ore-dim">
                                     {item.message}
                                 </div>
                             )}
@@ -85,10 +97,10 @@ export function ToastHost() {
                         <button
                             type="button"
                             aria-label="关闭通知"
-                            className="shrink-0 rounded p-0.5 text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text"
+                            className="grid h-5 w-5 shrink-0 place-items-center rounded text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text"
                             onClick={() => dismiss(item.id)}
                         >
-                            <X size={14} />
+                            <X size={13} />
                         </button>
                     </div>
                 );

@@ -13,27 +13,28 @@ import { createPortal } from "react-dom";
 /**
  * 应用基础控件（PianoBE 自己的实现）。
  *
- * 原先这些是 OreUI（0.0.1）的 Web Component，踩到的问题太多：
- * 下拉菜单没有背景/圆角、触发器必须套它们的按钮、输入框 error 传 undefined 会显示
- * 字面量、深色配色不完整、按钮固定 44px。这里换成普通 React 组件，
- * 样式全部走 Tailwind token，行为可控、可测试。
+ * 视觉基线：石墨中性色、1px 分隔线、克制圆角；主操作只有一处品牌青绿。
+ * 所有控件都支持键盘焦点与深浅色主题。
  */
 
 const cx = (...values: Array<string | false | null | undefined>) => values.filter(Boolean).join(" ");
 
 /* ---------- 按钮 ---------- */
 
-export type ButtonColor = "primary" | "secondary" | "destructive";
+export type ButtonColor = "primary" | "secondary" | "ghost" | "destructive";
 
 const BUTTON_TONE: Record<ButtonColor, string> = {
-    primary: "bg-brand text-white shadow-sm hover:bg-brand-hover active:bg-brand",
+    primary:
+        "bg-brand text-white shadow-[0_1px_2px_var(--pb-shadow)] hover:bg-brand-hover active:brightness-95",
     secondary:
-        "bg-[var(--pb-control)] text-ore-text border border-[var(--pb-control-border)] hover:bg-[var(--pb-control-hover)]",
-    destructive: "bg-[#b93b32] text-white shadow-sm hover:bg-[#c8453b] active:bg-[#b93b32]",
+        "border border-[var(--pb-control-border)] bg-ore-raised text-ore-text hover:bg-[var(--pb-control-hover)]",
+    ghost: "text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text active:bg-[var(--pb-soft)]",
+    destructive:
+        "bg-[#bf3b32] text-white shadow-[0_1px_2px_var(--pb-shadow)] hover:bg-[#cb443a] active:brightness-95",
 };
 
 const BUTTON_SIZE = {
-    md: "h-9 min-w-[64px] px-3.5 text-[13px] rounded-lg",
+    md: "h-9 min-w-[64px] px-3.5 text-[13px] rounded-md",
     sm: "h-8 min-w-0 px-2.5 text-xs rounded-md",
 } as const;
 
@@ -60,8 +61,8 @@ export function Button({
             disabled={disabled || loading}
             aria-busy={loading || undefined}
             className={cx(
-                "relative inline-flex shrink-0 select-none items-center justify-center gap-1.5 font-medium transition-colors",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                "relative inline-flex shrink-0 select-none items-center justify-center gap-1.5 font-medium transition-[background-color,color,box-shadow,border-color]",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/70",
                 "disabled:cursor-not-allowed disabled:opacity-45",
                 BUTTON_TONE[color],
                 BUTTON_SIZE[size],
@@ -83,13 +84,19 @@ export interface IconButtonProps extends Omit<ButtonProps, "size" | "children"> 
     children: ReactNode;
 }
 
-export function IconButton({ size = "sm", className, children, loading, ...rest }: IconButtonProps) {
+export function IconButton({ size = "sm", className, children, loading, color = "ghost", ...rest }: IconButtonProps) {
     return (
         <Button
             {...rest}
+            color={color}
             size={size}
             loading={loading}
-            className={cx("aspect-square px-0", size === "sm" ? "h-8 w-8 min-w-8" : "h-9 w-9 min-w-9", className)}
+            className={cx(
+                "aspect-square px-0",
+                size === "sm" ? "h-8 w-8 min-w-8" : "h-9 w-9 min-w-9",
+                color !== "ghost" && "rounded-md",
+                className
+            )}
         >
             {children}
         </Button>
@@ -111,31 +118,45 @@ export function Spinner({ size = 14 }: { size?: number }) {
 
 const FIELD_BASE =
     "w-full rounded-md border bg-[var(--pb-field)] px-2.5 text-[13px] text-ore-text placeholder:text-ore-dimmer " +
-    "transition-colors focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/40 disabled:opacity-50";
+    "transition-[border-color,box-shadow] focus:outline-none focus:border-brand/70 focus:ring-2 focus:ring-brand/15 disabled:opacity-50";
 
 export interface TextfieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
     label?: ReactNode;
     description?: ReactNode;
     error?: string;
+    /** 输入框左侧图标（例如搜索图标） */
+    leading?: ReactNode;
 }
 
-export function Textfield({ label, description, error, className, id, ...rest }: TextfieldProps) {
+export function Textfield({ label, description, error, leading, className, id, ...rest }: TextfieldProps) {
     const inputId = id ?? rest.name ?? undefined;
     return (
         <div className={cx("flex w-full flex-col gap-1", className)}>
             {label && (
-                <label htmlFor={inputId} className="text-xs font-medium text-ore-dim">
+                <label htmlFor={inputId} className="text-[11.5px] font-medium text-ore-dim">
                     {label}
                 </label>
             )}
-            <input
-                {...rest}
-                id={inputId}
-                aria-invalid={Boolean(error) || undefined}
-                className={cx(FIELD_BASE, "h-9", error ? "border-red-500/60" : "border-ore-border")}
-            />
+            <div className="relative">
+                {leading && (
+                    <span className="pointer-events-none absolute inset-y-0 left-0 grid w-8 place-items-center text-ore-dimmer">
+                        {leading}
+                    </span>
+                )}
+                <input
+                    {...rest}
+                    id={inputId}
+                    aria-invalid={Boolean(error) || undefined}
+                    className={cx(
+                        FIELD_BASE,
+                        "[height:34px]",
+                        Boolean(leading) && "pl-8",
+                        error ? "pb-edge-danger" : "border-ore-border"
+                    )}
+                />
+            </div>
             {error ? (
-                <span className="text-[11px] text-red-600 dark:text-red-600 dark:text-red-400">{error}</span>
+                <span className="text-[11px] text-[color:var(--pb-danger)]">{error}</span>
             ) : (
                 description && <span className="text-[11px] text-ore-dim">{description}</span>
             )}
@@ -153,7 +174,7 @@ export function Textarea({ label, description, error, className, id, rows = 3, .
     return (
         <div className={cx("flex w-full flex-col gap-1", className)}>
             {label && (
-                <label htmlFor={id} className="text-xs font-medium text-ore-dim">
+                <label htmlFor={id} className="text-[11.5px] font-medium text-ore-dim">
                     {label}
                 </label>
             )}
@@ -161,10 +182,10 @@ export function Textarea({ label, description, error, className, id, rows = 3, .
                 {...rest}
                 id={id}
                 rows={rows}
-                className={cx(FIELD_BASE, "resize-y py-2", error ? "border-red-500/60" : "border-ore-border")}
+                className={cx(FIELD_BASE, "resize-y py-2 leading-relaxed", error ? "pb-edge-danger" : "border-ore-border")}
             />
             {error ? (
-                <span className="text-[11px] text-red-600 dark:text-red-600 dark:text-red-400">{error}</span>
+                <span className="text-[11px] text-[color:var(--pb-danger)]">{error}</span>
             ) : (
                 description && <span className="text-[11px] text-ore-dim">{description}</span>
             )}
@@ -172,25 +193,94 @@ export function Textarea({ label, description, error, className, id, rows = 3, .
     );
 }
 
-/* ---------- 标签 / 分页标签 ---------- */
+/* ---------- 标签 / 分段 / 分页标签 ---------- */
 
 export function Tag({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "brand" | "success" }) {
     const styles =
         tone === "brand"
-            ? "border-brand/45 bg-brand/15 text-[color:var(--pb-primary-light)]"
+            ? "pb-tint-brand"
             : tone === "success"
-              ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
-              : "border-ore-border bg-[var(--pb-soft)] text-ore-dim";
+              ? "pb-tint-success"
+              : "bg-[var(--pb-soft)] text-ore-dim";
     return (
-        <span className={cx("inline-flex shrink-0 items-center rounded px-1.5 py-px text-[11px] font-medium leading-4", styles)}>
+        <span className={cx("inline-flex shrink-0 items-center rounded-[4px] px-1.5 py-px text-[10.5px] font-medium leading-4 tabular-nums", styles)}>
             {children}
         </span>
     );
 }
 
+export interface SegmentedOption<T extends string> {
+    value: T;
+    label: ReactNode;
+    count?: ReactNode;
+}
+
+/** 紧凑分段切换：用于同一页面内的两个视图（在线曲库 / 我的音乐）。 */
+export function Segmented<T extends string>({
+    value,
+    options,
+    onChange,
+    className,
+    ariaLabel,
+}: {
+    value: T;
+    options: SegmentedOption<T>[];
+    onChange: (value: T) => void;
+    className?: string;
+    ariaLabel?: string;
+}) {
+    return (
+        <div
+            role="tablist"
+            aria-label={ariaLabel}
+            onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                event.preventDefault();
+                const index = options.findIndex((option) => option.value === value);
+                const next =
+                    event.key === "ArrowRight"
+                        ? (index + 1 + options.length) % options.length
+                        : (index - 1 + options.length) % options.length;
+                onChange(options[next].value);
+            }}
+            className={cx(
+                "inline-flex w-full items-center gap-0.5 rounded-lg bg-[var(--pb-soft)] p-0.5 md:w-auto",
+                className
+            )}
+        >
+            {options.map((option) => {
+                const selected = option.value === value;
+                return (
+                    <button
+                        key={option.value}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => onChange(option.value)}
+                        className={cx(
+                            "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-[6px] px-2.5 text-[12.5px] font-medium transition-[background-color,color,box-shadow] md:flex-none",
+                            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand/70",
+                            selected
+                                ? "bg-ore-raised text-[color:var(--pb-primary-light)] shadow-[0_1px_2px_var(--pb-shadow)]"
+                                : "text-ore-dim hover:text-ore-text"
+                        )}
+                    >
+                        {option.label}
+                        {option.count !== undefined && (
+                            <span className={cx("text-[10.5px] tabular-nums", selected ? "text-brand/80" : "text-ore-dimmer")}>
+                                {option.count}
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 export function TabBar({ children, className }: { children: ReactNode; className?: string }) {
     return (
-        <div role="tablist" className={cx("flex items-center gap-1", className)}>
+        <div role="tablist" className={cx("flex items-center gap-6", className)}>
             {children}
         </div>
     );
@@ -208,11 +298,11 @@ export function TabButton({ selected, className, children, ...rest }: TabButtonP
             role="tab"
             aria-selected={Boolean(selected)}
             className={cx(
-                "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                "relative -mb-px inline-flex h-9 items-center gap-1.5 border-b-2 text-[13px] transition-colors",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/70",
                 selected
-                    ? "bg-brand/15 text-[color:var(--pb-primary-light)]"
-                    : "text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text",
+                    ? "border-brand font-medium text-[color:var(--pb-primary-light)]"
+                    : "border-transparent text-ore-dim hover:text-ore-text",
                 className
             )}
         >
@@ -239,10 +329,12 @@ export interface MenuProps {
     /** 展开方向；贴底部的播放条需要向上弹 */
     side?: "bottom" | "top";
     className?: string;
+    /** 面板最小宽度 */
+    minWidth?: number;
 }
 
 /** 轻量下拉菜单：挂到 body、自动判断上下方向，避免被滚动容器或底栏裁掉。 */
-export function Menu({ trigger, items, align = "start", side = "bottom", className }: MenuProps) {
+export function Menu({ trigger, items, align = "start", side = "bottom", className, minWidth = 180 }: MenuProps) {
     const [open, setOpen] = useState(false);
     const [position, setPosition] = useState<{
         left: number;
@@ -278,7 +370,7 @@ export function Menu({ trigger, items, align = "start", side = "bottom", classNa
             const el = triggerRef.current;
             if (!el) return;
             const rect = el.getBoundingClientRect();
-            const width = Math.max(180, Math.round(rect.width));
+            const width = Math.max(minWidth, Math.round(rect.width));
             const spaceBelow = window.innerHeight - rect.bottom;
             const spaceAbove = rect.top;
             // 播放条在页面底部：优先向上；其它位置空间不足时自动翻转
@@ -317,7 +409,7 @@ export function Menu({ trigger, items, align = "start", side = "bottom", classNa
             document.removeEventListener("scroll", onScroll, true);
             window.removeEventListener("resize", onResize);
         };
-    }, [open, align, side]);
+    }, [open, align, side, minWidth]);
 
     return (
         <div ref={rootRef} className={cx("relative inline-flex", className)}>
@@ -332,6 +424,7 @@ export function Menu({ trigger, items, align = "start", side = "bottom", classNa
                 }}
                 aria-haspopup="menu"
                 aria-expanded={open}
+                className="inline-flex"
             >
                 {trigger}
             </span>
@@ -373,7 +466,7 @@ export function Menu({ trigger, items, align = "start", side = "bottom", classNa
                                 setOpen(false);
                             }
                         }}
-                        className="z-[3000] max-h-[min(70vh,360px)] overflow-y-auto rounded-lg border border-[color:var(--pb-border)] bg-ore-raised p-1 shadow-2xl"
+                        className="z-[5500] max-h-[min(70vh,360px)] overflow-y-auto rounded-[10px] border border-ore-border bg-ore-raised p-1 shadow-[0_16px_40px_-12px_var(--pb-shadow)] animate-[pbDialogIn_120ms_ease-out]"
                     >
                         {items.map((item) => (
                             <button
@@ -386,16 +479,16 @@ export function Menu({ trigger, items, align = "start", side = "bottom", classNa
                                     item.onSelect?.();
                                 }}
                                 className={cx(
-                                    "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-[13px] transition-colors",
+                                    "flex h-8 w-full items-center gap-2 rounded-[5px] px-2.5 text-left text-[12.5px] transition-colors",
                                     item.danger
-                                        ? "text-red-600 hover:bg-red-500/12 dark:text-red-300"
+                                        ? "text-[color:var(--pb-danger)] hover:bg-[var(--pb-danger-soft)]"
                                         : "text-ore-text hover:bg-[var(--pb-hover)]",
                                     item.selected && "text-[color:var(--pb-primary-light)]"
                                 )}
                             >
-                                {item.icon}
+                                <span className="grid w-4 shrink-0 place-items-center text-ore-dim">{item.icon}</span>
                                 <span className="flex-1 truncate">{item.label}</span>
-                                {item.selected && <span className="text-[11px]">✓</span>}
+                                {item.selected && <span className="text-[11px] text-brand">✓</span>}
                             </button>
                         ))}
                     </div>,
@@ -411,14 +504,14 @@ export function MenuTrigger({ children, className }: { children: ReactNode; clas
         <button
             type="button"
             className={cx(
-                "inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--pb-control-border)] bg-[var(--pb-control)] px-2.5",
-                "text-[13px] text-ore-text transition-colors hover:bg-[var(--pb-control-hover)]",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                "inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--pb-control-border)] bg-ore-raised px-2.5",
+                "text-[12.5px] text-ore-text transition-colors hover:bg-[var(--pb-control-hover)]",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/70",
                 className
             )}
         >
             {children}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ore-dim" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ore-dimmer" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" />
             </svg>
         </button>

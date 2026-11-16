@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AppLayout, Button, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { AppLayout, IconButton, PianoMark, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { AudioWaveform, History, LibraryBig, PackageOpen } from "lucide-react";
 import { previewPlayer } from "./player";
 import { useGenerator } from "./store/generator";
@@ -19,10 +19,9 @@ function ChangelogButton() {
     const [opened, setOpened] = useState(false);
     return (
         <>
-            <Button type="button" color="secondary" size="sm" title="更新日志" onClick={() => setOpened(true)}>
-                <History size={14} />
-                <span className="hidden sm:inline">更新日志</span>
-            </Button>
+            <IconButton type="button" aria-label="更新日志" title="更新日志" onClick={() => setOpened(true)}>
+                <History size={15} />
+            </IconButton>
             <ChangelogModal opened={opened} onClose={() => setOpened(false)} />
         </>
     );
@@ -55,7 +54,12 @@ export default function App() {
     return (
         <>
             <AppLayout
-                brand={{ name: "PianoBE", subtitle: "Minecraft 音乐工具", to: "/" }}
+                brand={{
+                    name: "PianoBE",
+                    subtitle: "Minecraft 音乐工具",
+                    to: "/",
+                    mark: <PianoMark size={17} />,
+                }}
                 nav={nav}
                 navLabel="工作区"
                 bottomNav={nav.slice(0, 2)}

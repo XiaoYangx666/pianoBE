@@ -21,7 +21,7 @@ test("score selection keeps a published score and ignores unknown ids", () => {
 });
 
 describe("piano timbre settings", () => {
-    test("默认音色为经典 P-88", () => {
+    test("默认音色为标准钢琴", () => {
         expect(DEFAULT_PIANO_SETTINGS.timbre).toBe(PIANO_TIMBRES[0].value);
     });
 
@@ -33,9 +33,9 @@ describe("piano timbre settings", () => {
 
     test("生成器裁剪后只显示实际启用的音色，且至少保留默认音色", () => {
         expect(availablePianoTimbres(["piano"]).map((t) => t.id)).toEqual(["piano"]);
-        expect(availablePianoTimbres(["piano", "meta_piano"]).map((t) => t.id)).toEqual([
+        expect(availablePianoTimbres(["piano", "classic_grand"]).map((t) => t.id)).toEqual([
             "piano",
-            "meta_piano",
+            "classic_grand",
         ]);
         expect(availablePianoTimbres([]).map((t) => t.id)).toEqual(["piano"]);
     });
@@ -48,7 +48,7 @@ describe("piano timbre settings", () => {
 
     test("未知音色编号回退到默认值", () => {
         expect(normalizePianoSettings({ timbre: 999 }).timbre).toBe(DEFAULT_PIANO_SETTINGS.timbre);
-        expect(normalizePianoSettings({ timbre: "meta_piano" }).timbre).toBe(DEFAULT_PIANO_SETTINGS.timbre);
+        expect(normalizePianoSettings({ timbre: "classic_grand" }).timbre).toBe(DEFAULT_PIANO_SETTINGS.timbre);
     });
 
     test("旧版设置没有 timbre 时平滑迁移", () => {

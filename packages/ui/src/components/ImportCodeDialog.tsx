@@ -57,7 +57,7 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
         >
             <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2 text-xs leading-relaxed text-ore-dim">
-                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[color:var(--pb-success)]" />
                     <span>
                         在游戏内打开「导入 MIDI」，把下面每一段逐段粘贴到输入框（可乱序）。单段不超过 4800
                         字符，共 {chunks.length} 段。
@@ -90,7 +90,7 @@ export function ImportCodeDialog({ opened, onClose, songName, chunks }: ImportCo
                                 title={copiedIndex === index ? "已复制" : "复制本段"}
                                 onClick={() => void copyChunk(chunk, index)}
                             >
-                                {copiedIndex === index ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
+                                {copiedIndex === index ? <Check size={14} className="text-[color:var(--pb-success)]" /> : <Copy size={14} />}
                             </IconButton>
                         </div>
                     ))}

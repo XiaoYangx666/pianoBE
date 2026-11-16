@@ -31,8 +31,8 @@ export function StatusPill({ label, position = "top" }: StatusPillProps) {
 
     const positionClass =
         position === "bottom-left"
-            ? "left-4 bottom-4 md:bottom-[88px]"
-            : "right-4 top-[68px]";
+            ? "left-4 bottom-[calc(104px+env(safe-area-inset-bottom))] md:bottom-[88px]"
+            : "right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] md:bottom-[88px]";
 
     return createPortal(
         <div
@@ -40,9 +40,9 @@ export function StatusPill({ label, position = "top" }: StatusPillProps) {
             aria-live="polite"
             className={`pointer-events-none fixed z-[4000] ${positionClass} animate-[pbStatusIn_160ms_ease-out]`}
         >
-            <div className="flex items-center gap-2.5 rounded-full border border-ore-border bg-ore-raised/95 px-3.5 py-2 shadow-xl backdrop-blur">
+            <div className="flex items-center gap-2.5 rounded-lg border border-ore-border bg-ore-raised px-3 py-2 shadow-[0_12px_32px_-12px_var(--pb-shadow)]">
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-brand" />
-                <span className="text-[13px] text-ore-text">{label}</span>
+                <span className="text-[12.5px] text-ore-text">{label}</span>
                 {elapsed >= 1 && (
                     <span className="text-[11px] tabular-nums text-ore-dim">{elapsed}s</span>
                 )}

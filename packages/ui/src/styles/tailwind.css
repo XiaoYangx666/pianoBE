@@ -1,12 +1,15 @@
 /* ---------------------------------------------------------------- *
  * PianoBE 样式入口（Tailwind v4）。
  *
- * 两个应用都只 import 这一个文件：Tailwind 的编译单元因此唯一。
+ * 两个应用只 import 这一个文件：Tailwind 的编译单元因此唯一。
  *
- * 主题策略：
- * - @theme 里的颜色全部指向 --pb-* 变量，运行时由 [data-theme] 切换；
- * - 默认浅色，`[data-theme="dark"]` 覆盖成深色；
- * - 额外注册一个 dark: 变体，绑定到 data-theme 而不是系统偏好。
+ * 设计基线：
+ * - 石墨灰中性色做底，深青绿只用于主要操作、当前状态与焦点；
+ * - 页面、侧栏、边框和文字同属冷中性色阶，避免冷暖冲突；
+ * - 用排版、留白和 1px 分隔线建立层级，尽量不用卡片与色块；
+ * - 语义色（成功 / 警告 / 危险）只在需要时出现，不参与品牌表达；
+ * - 圆角克制（按钮 6px、浮层 10~12px），阴影只给浮层；
+ * - 默认浅色，[data-theme="dark"] 独立设计深色色阶。
  * ---------------------------------------------------------------- */
 
 @layer theme, base, components, utilities;
@@ -32,69 +35,147 @@
     --color-ore-dim: var(--pb-dim);
     --color-ore-dimmer: var(--pb-dimmer);
 
-    --color-brand: #4c6ef5;
-    --color-brand-hover: #5c7cfa;
+    --color-brand: var(--pb-primary);
+    --color-brand-hover: var(--pb-primary-hover);
+    --color-brand-soft: var(--pb-brand-soft);
+    --color-brand-ink: var(--pb-primary-light);
+    --color-success: var(--pb-success);
+    --color-warning: var(--pb-warning);
+    --color-danger: var(--pb-danger);
 
     --font-sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* ---------- 浅色（默认） ---------- */
+/* ---------- 浅色（默认，石墨灰 + 深青绿） ---------- */
 :root {
     color-scheme: light;
 
-    --pb-deep: #e4e7ee;
-    --pb-sunken: #eff1f5;
-    --pb-surface: #ffffff;
+    /* 冷中性石墨色阶：页面比浮层略沉，避免整屏发白 */
+    --pb-deep: #e7ebe9;
+    --pb-sunken: #f8f9f8;
+    --pb-surface: #f2f4f3;
     --pb-raised: #ffffff;
-    --pb-border: #d3d8e2;
-    --pb-divider: #e3e7ef;
-    --pb-text: #1b1d22;
-    --pb-dim: #5b6270;
-    --pb-dimmer: #8a91a0;
+    --pb-sidebar: #f0f2f1;
+    --pb-border: #dde3e1;
+    --pb-divider: #e8ecea;
+    --pb-text: #222b30;
+    --pb-dim: #58666b;
+    --pb-dimmer: #849194;
 
-    --pb-hover: rgba(16, 22, 40, 0.05);
-    --pb-soft: rgba(16, 22, 40, 0.03);
+    --pb-hover: rgba(34, 43, 48, 0.05);
+    --pb-soft: rgba(34, 43, 48, 0.035);
+    --pb-active: rgba(24, 127, 120, 0.06);
     --pb-field: #ffffff;
-    --pb-code: rgba(16, 22, 40, 0.05);
+    --pb-code: rgba(34, 43, 48, 0.045);
 
-    --pb-control: #f2f4f8;
-    --pb-control-hover: #e8ecf3;
-    --pb-control-border: #ccd2de;
+    --pb-control: #ffffff;
+    --pb-control-hover: #eff2f1;
+    --pb-control-border: #d7dedb;
 
-    --pb-primary: #4c6ef5;
-    --pb-primary-light: #3b5bdb;
-    --pb-primary-shadow: #2b3f9e;
-    --pb-shadow: rgba(15, 20, 35, 0.14);
-    --pb-track: rgba(16, 22, 40, 0.12);
+    /* 深青绿：主操作、当前项、进度与焦点 */
+    --pb-primary: #187f78;
+    --pb-primary-hover: #126a64;
+    --pb-primary-light: #10625c;
+    --pb-primary-shadow: #0a3f3b;
+    --pb-brand-soft: #e3f1ee;
+    --pb-brand-tint: rgba(24, 127, 120, 0.08);
+    --pb-brand-line: rgba(24, 127, 120, 0.32);
+
+    /* 语义状态：成功用偏黄的绿，避免和品牌青绿混在一起 */
+    --pb-success: #2a8b62;
+    --pb-success-soft: rgba(42, 139, 98, 0.1);
+    --pb-warning: #a9741c;
+    --pb-warning-soft: rgba(169, 116, 28, 0.12);
+    --pb-danger: #c2453c;
+    --pb-danger-soft: rgba(194, 69, 60, 0.1);
+
+    --pb-shadow: rgba(22, 37, 36, 0.14);
+    --pb-track: rgba(34, 43, 48, 0.12);
 }
 
-/* ---------- 深色 ---------- */
+/* ---------- 深色（石墨底 + 亮青绿，独立色阶） ---------- */
 [data-theme="dark"] {
     color-scheme: dark;
 
-    --pb-deep: #17181c;
-    --pb-sunken: #1c1d21;
-    --pb-surface: #23252a;
-    --pb-raised: #26282d;
-    --pb-border: #3a3c41;
-    --pb-divider: #303237;
-    --pb-text: #e8e9ec;
-    --pb-dim: #9aa0aa;
-    --pb-dimmer: #6d7480;
+    --pb-deep: #080b0c;
+    --pb-sunken: #0e1112;
+    --pb-surface: #151a1b;
+    --pb-raised: #1a2021;
+    --pb-sidebar: #121617;
+    --pb-border: #2a3334;
+    --pb-divider: #222a2b;
+    --pb-text: #e9eeed;
+    --pb-dim: #a1aeaf;
+    --pb-dimmer: #728082;
 
     --pb-hover: rgba(255, 255, 255, 0.05);
-    --pb-soft: rgba(255, 255, 255, 0.03);
-    --pb-field: rgba(0, 0, 0, 0.25);
-    --pb-code: rgba(0, 0, 0, 0.35);
+    --pb-soft: rgba(255, 255, 255, 0.032);
+    --pb-active: rgba(47, 163, 154, 0.09);
+    --pb-field: #111617;
+    --pb-code: rgba(0, 0, 0, 0.34);
 
-    --pb-control: #33353a;
-    --pb-control-hover: #3c3f45;
-    --pb-control-border: #42454c;
+    --pb-control: #1d2425;
+    --pb-control-hover: #262e2f;
+    --pb-control-border: #313a3c;
 
-    --pb-primary-light: #91a7ff;
-    --pb-shadow: rgba(0, 0, 0, 0.5);
+    --pb-primary: #187f78;
+    --pb-primary-hover: #146e68;
+    --pb-primary-light: #7fd1c9;
+    --pb-primary-shadow: #062a27;
+    --pb-brand-soft: rgba(47, 163, 154, 0.16);
+    --pb-brand-tint: rgba(47, 163, 154, 0.13);
+    --pb-brand-line: rgba(47, 163, 154, 0.4);
+
+    --pb-success: #4fbf92;
+    --pb-success-soft: rgba(79, 191, 146, 0.13);
+    --pb-warning: #d9a94f;
+    --pb-warning-soft: rgba(217, 169, 79, 0.14);
+    --pb-danger: #e2786c;
+    --pb-danger-soft: rgba(226, 120, 108, 0.14);
+
+    --pb-shadow: rgba(0, 0, 0, 0.6);
     --pb-track: rgba(255, 255, 255, 0.12);
+}
+
+@layer components {
+    /* 语义色浅底：成功 / 警告 / 危险 */
+    .pb-tint-success {
+        background-color: var(--pb-success-soft);
+        color: var(--pb-success);
+    }
+
+    .pb-tint-warning {
+        background-color: var(--pb-warning-soft);
+        color: var(--pb-warning);
+    }
+
+    .pb-tint-danger {
+        background-color: var(--pb-danger-soft);
+        color: var(--pb-danger);
+    }
+
+    .pb-tint-brand {
+        background-color: var(--pb-brand-soft);
+        color: var(--pb-primary-light);
+    }
+
+    /* 通知条的细边框：用语义色混出 35%，不额外引入色板 */
+    .pb-edge-success {
+        border-color: color-mix(in srgb, var(--pb-success) 34%, transparent);
+    }
+
+    .pb-edge-warning {
+        border-color: color-mix(in srgb, var(--pb-warning) 34%, transparent);
+    }
+
+    .pb-edge-danger {
+        border-color: color-mix(in srgb, var(--pb-danger) 34%, transparent);
+    }
+
+    .pb-edge-brand {
+        border-color: var(--pb-brand-line);
+    }
 }
 
 html,
@@ -120,6 +201,10 @@ body,
     [aria-disabled="true"] {
         cursor: not-allowed;
     }
+
+    ::selection {
+        background: color-mix(in srgb, var(--pb-primary) 22%, transparent);
+    }
 }
 
 body {
@@ -128,6 +213,8 @@ body {
     background: var(--pb-sunken);
     color: var(--pb-text);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01";
 }
 
 ::-webkit-scrollbar {
@@ -140,12 +227,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--pb-text) 22%, transparent);
+    background: color-mix(in srgb, var(--pb-text) 18%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
     border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--pb-text) 34%, transparent);
+    background: color-mix(in srgb, var(--pb-text) 30%, transparent);
+    background-clip: padding-box;
 }
 
 @keyframes pbFadeIn {
@@ -171,7 +261,7 @@ body {
 @keyframes pbDialogIn {
     from {
         opacity: 0;
-        transform: translateY(8px) scale(0.98);
+        transform: translateY(6px) scale(0.99);
     }
 
     to {
@@ -192,11 +282,29 @@ body {
     }
 }
 
+@keyframes pbBars {
+    0%,
+    100% {
+        transform: scaleY(0.35);
+    }
+
+    50% {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes pbSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
         animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
 }
