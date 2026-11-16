@@ -291,7 +291,7 @@ export class PianoRuntime {
 
     /** 手动敲键：默认中等力度，可由玩家设置覆盖。 */
     playKey(midi: number, velocity: number = DEFAULT_PIANO_SETTINGS.manualVelocity) {
-        this.playNote(processNote(midi, false), velocity, .15);
+        this.playNote(processNote(midi, false), velocity, .15, 1, true);
     }
 
     turnScore(spread: 0 | 1) {
@@ -310,7 +310,7 @@ export class PianoRuntime {
         return this.display?.isKeyDown(midi) ?? false;
     }
 
-    playNote(note: NoteInfo, velocity: number, duration: number, gain = 1) {
+    playNote(note: NoteInfo, velocity: number, duration: number, gain = 1, manual = false) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
         const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
@@ -319,14 +319,20 @@ export class PianoRuntime {
         const volume = (settings.volume / 100) * velocityVolume(velocity) * gain;
         const stereo = settings.soundMode !== "3d";
         if (volume > 0) {
-            const layer = velocityLayerIndex(velocity, settings.timbre);
-            const instance: SoundInstance | undefined = dimension.playSound(
-                `${pianoSoundId(settings.timbre, layer, stereo)}.${note.sample}`,
-                this.center,
-                { pitch: note.pitch, volume: Math.min(10, volume) }
-            );
-            // Note Off 后统一淡出；不再依赖采样自身的尾音。
-            if (instance) this.soundReleases.add(instance, note.midi, duration, system.currentTick);
+            const tick = system.currentTick;
+            // 先腾声部再 playSound：超限时优先牺牲更轻/更接近结束的音，避免引擎随机截断。
+            if (this.soundReleases.makeRoom(velocity, manual, note.midi)) {
+                const layer = velocityLayerIndex(velocity, settings.timbre);
+                const instance: SoundInstance | undefined = dimension.playSound(
+                    `${pianoSoundId(settings.timbre, layer, stereo)}.${note.sample}`,
+                    this.center,
+                    { pitch: note.pitch, volume: Math.min(10, volume) }
+                );
+                // Note Off 后统一淡出；不再依赖采样自身的尾音。
+                if (instance) {
+                    this.soundReleases.add(instance, note.midi, duration, tick, velocity, manual);
+                }
+            }
         }
         this.display?.strike(note.midi, duration);
         this.noteSignal.publish({ midi: note.midi, duration });

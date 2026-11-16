@@ -12,6 +12,8 @@ export interface SongEntry {
     moduleText?: string;
     /** PBE2 二进制（所有新导入/曲库/模板曲目统一携带） */
     data?: Uint8Array;
+    /** 同时发声峰值（导入时预计算；仅用于提示，不写入 PBE2） */
+    voicePeak?: number;
 }
 
 export function toMeta(entry: SongEntry) {

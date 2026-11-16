@@ -35,6 +35,7 @@ import { previewPlayer } from "../player";
 import { bytesToMB, useGenerator } from "../store/generator";
 import { ScoreThumb } from "../components/ScoreThumb";
 import { ScorePreviewModal } from "../components/ScorePreviewModal";
+import { RenameSongDialog } from "../components/RenameSongDialog";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const ROW_HEIGHT = 50;
@@ -69,6 +70,7 @@ export function AddonPage() {
     const addToAddon = useGenerator((state) => state.addToAddon);
     const togglePreview = useGenerator((state) => state.togglePreview);
     const removeSong = useGenerator((state) => state.removeSong);
+    const renameSong = useGenerator((state) => state.renameSong);
     const clearSongs = useGenerator((state) => state.clearSongs);
     const toggleTimbre = useGenerator((state) => state.toggleTimbre);
     const setPreviewTimbre = useGenerator((state) => state.setPreviewTimbre);
@@ -89,6 +91,7 @@ export function AddonPage() {
     const [previewScore, setPreviewScore] = useState<ScoreEntry | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [pickerQuery, setPickerQuery] = useState("");
+    const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [titleRequest, setTitleRequest] = useState<TitleRequest | null>(null);
     const [titleValue, setTitleValue] = useState("");
@@ -166,6 +169,7 @@ export function AddonPage() {
                 onPlay={() => void togglePreview(song)}
                 playDisabled={playDisabled}
                 onOpenCode={() => openCode(song)}
+                onRename={() => setRenameTarget({ id: song.id, name: song.name })}
                 onRemove={() => removeSong(song.id)}
                 removeLabel="从制作清单移除"
             />
@@ -696,6 +700,15 @@ export function AddonPage() {
                 onClose={() => setCode(null)}
                 songName={code?.name ?? ""}
                 chunks={code?.chunks ?? []}
+            />
+
+            <RenameSongDialog
+                opened={Boolean(renameTarget)}
+                initialName={renameTarget?.name ?? ""}
+                onClose={() => setRenameTarget(null)}
+                onConfirm={(name) => {
+                    if (renameTarget) void renameSong(renameTarget.id, name);
+                }}
             />
 
             <Dialog opened={pickerOpen} onClose={() => setPickerOpen(false)} title="从我的音乐添加" size="lg">

@@ -1,6 +1,13 @@
 import { DDUI } from "sapi-pro";
 import { Player } from "@minecraft/server";
-import { formatBytes, ImportAssembler, parseImportChunk, type ImportProgress } from "@piano/core";
+import {
+    estimatePbe2VoiceLoad,
+    formatBytes,
+    formatVoiceLoadWarning,
+    ImportAssembler,
+    parseImportChunk,
+    type ImportProgress,
+} from "@piano/core";
 import type { MusicStorage } from "@domain/music/storage";
 import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import { midiManager, importedMidiManager, importedSongs } from "@app/midi";
@@ -163,6 +170,13 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
                 resolved.refresh?.();
                 message = `§a已保存到 §f${resolved.label}§a：§f${entry.name}` +
                     `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(resolved.storage.usage().usedBytes)}`;
+            }
+            // 导入时顺带用离线模型估算同时发声峰值，超过引擎上限就提示（不阻止导入）。
+            try {
+                const warning = formatVoiceLoadWarning(estimatePbe2VoiceLoad(payload));
+                if (warning) message += `\n§e${warning}`;
+            } catch {
+                // 负载估算失败不影响已完成的保存
             }
             session.pendingPayload = undefined;
             session.activeTaskId = undefined;

@@ -33,6 +33,7 @@ import type { LibraryMeta } from "../library";
 import type { SongEntry } from "../types";
 import type { StoredSong } from "../localLibrary";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { RenameSongDialog } from "../components/RenameSongDialog";
 
 const SORT_LABELS: Record<LibrarySort, string> = {
     adds: "按添加量",
@@ -62,6 +63,7 @@ export function LibraryPage() {
     const saveLibrarySong = useGenerator((state) => state.saveLibrarySong);
     const addToAddon = useGenerator((state) => state.addToAddon);
     const removeMyMusicSong = useGenerator((state) => state.removeMyMusicSong);
+    const renameSong = useGenerator((state) => state.renameSong);
     const previewLibrarySong = useGenerator((state) => state.previewLibrarySong);
     const togglePreview = useGenerator((state) => state.togglePreview);
     const loadLibraryEntry = useGenerator((state) => state.loadLibraryEntry);
@@ -72,6 +74,7 @@ export function LibraryPage() {
     const [query, setQuery] = useState("");
     const [code, setCode] = useState<{ name: string; chunks: string[] } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<StoredSong | null>(null);
+    const [renameTarget, setRenameTarget] = useState<StoredSong | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const folderRef = useRef<HTMLInputElement>(null);
 
@@ -276,6 +279,7 @@ export function LibraryPage() {
                     onPlay={() => void togglePreview(song)}
                     playDisabled={playDisabled}
                     onOpenCode={() => openCodeForEntry(song)}
+                    onRename={() => setRenameTarget(song)}
                     onRemove={() => setDeleteTarget(song)}
                     removeLabel="从我的音乐删除"
                     trailing={addAction}
@@ -486,6 +490,15 @@ export function LibraryPage() {
                 onClose={() => setCode(null)}
                 songName={code?.name ?? ""}
                 chunks={code?.chunks ?? []}
+            />
+
+            <RenameSongDialog
+                opened={Boolean(renameTarget)}
+                initialName={renameTarget?.name ?? ""}
+                onClose={() => setRenameTarget(null)}
+                onConfirm={(name) => {
+                    if (renameTarget) void renameSong(renameTarget.id, name);
+                }}
             />
 
             <ConfirmDialog

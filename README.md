@@ -108,6 +108,7 @@ pianoBE/
 - 播放列表：meta 与 items 同记录原子更新，owner/public 视图派生（读取即修复，无需索引维护）
 - 双端存储驱动：addon 使用世界动态属性（DPDataBase），后端使用 SQLite（meta）+ 文件（内容），共享同一套 core 端口与契约测试
 - Audio Lab：`web` 的 `/lab` 实验页隔离对比力度层、50ms tick 量化与 Note Off 释放；纯逻辑在 `@piano/core/audioLab`，与正式播放器/游戏包解耦。结论见 `tools/audio-lab-report.md`
+- 声部上限：Bedrock 客户端同时最多混 32 个音效。运行时按 28 的钢琴预算主动回收实例（`SoundReleaseQueue`），导入时由 `@piano/core` 的 `estimateVoiceLoad` 预计算峰值并提示超限曲目；离线数据见 `tools/voice-load-report.md`
 
 ---
 

@@ -313,6 +313,21 @@ export function readAllPbe2Notes(
     return notes;
 }
 
+/**
+ * 修改曲名后重新编码 PBE2（索引与文件头保持一致）。
+ * 曲目 id 不变（仍是 .mid 内容的 CRC32），事件流语义不变。
+ */
+export function renamePbe2(data: Uint8Array, name: string): Uint8Array {
+    const header = readPbe2Header(data);
+    const song = decodePbe2(data);
+    song.name = name;
+    return encodePbe2(song, {
+        includeVelocity: header.hasVelocity,
+        // 原本压缩的继续压缩；原本未压缩的仍交给 auto 判断，避免体积意外变大。
+        compress: header.compressed ? true : "auto",
+    });
+}
+
 /** PBE2 → MidiSong（单轨事件视图；仅用于预览/测试/离线工具） */
 export function decodePbe2(data: Uint8Array): MidiSong {
     const { header, events } = readPbe2Events(data);
@@ -361,5 +376,6 @@ export const PianoBinaryCodec = {
     readEvents: readPbe2Events,
     readNotes: readAllPbe2Notes,
     decode: decodePbe2,
+    rename: renamePbe2,
     toNoteEvents: pbe2ToNoteEvents,
 } as const;

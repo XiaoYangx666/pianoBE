@@ -16,6 +16,7 @@ import {
     readAllPbe2Notes,
     readPbe2Events,
     readPbe2Header,
+    renamePbe2,
     type MidiSong,
 } from "../src/index.js";
 
@@ -52,6 +53,19 @@ describe("PBE2 编解码", () => {
             [72, 800, 100],
             [67, 1600, 50],
         ]);
+    });
+
+    it("改名只更新文件头名称，事件流保持不变", () => {
+        const pbe2 = encodePbe2(song, { includeVelocity: true });
+        const renamed = renamePbe2(pbe2, "新的曲名");
+        const before = readPbe2Header(pbe2);
+        const after = readPbe2Header(renamed);
+        expect(after.name).toBe("新的曲名");
+        expect(after.id).toBe(before.id);
+        expect(after.noteCount).toBe(before.noteCount);
+        expect(after.duration).toBe(before.duration);
+        expect(after.hasVelocity).toBe(before.hasVelocity);
+        expect(readPbe2Events(renamed).events).toEqual(readPbe2Events(pbe2).events);
     });
 
     it("力度按 MIDI 0~127 编码，并写入 VELOCITY_127 标记", () => {

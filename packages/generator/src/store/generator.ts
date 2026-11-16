@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import {
+    BEDROCK_SIMULTANEOUS_SOUND,
+    MAX_SONG_NAME_CHARS,
     PIANO_SAMPLE_KEYS,
     PIANO_TIMBRES,
     pianoSoundLayers,
     pianoSoundId,
     planImportChunks,
+    renamePbe2,
 } from "@piano/core";
 import { notifications } from "@piano/ui";
 import { loadTemplate, type TemplateInfo } from "../template";
@@ -101,6 +104,8 @@ interface GeneratorState {
     /** 把在线曲库曲目保存到本地「我的音乐」，不自动加入附加包 */
     saveLibrarySong: (id: string) => Promise<void>;
     addToAddon: (entry: SongEntry) => void;
+    /** 同时重命名「我的音乐」（含本地持久化）与制作清单里的同 id 曲目。 */
+    renameSong: (id: string, name: string) => Promise<void>;
     removeMyMusicSong: (id: string) => Promise<void>;
     togglePreview: (entry: SongEntry) => Promise<void>;
     previewLibrarySong: (meta: LibraryMeta) => Promise<void>;
@@ -269,6 +274,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         set({ loadingText: "正在转换 MIDI..." });
         let skipped = 0;
         const added: StoredSong[] = [];
+        const overloaded: StoredSong[] = [];
         const base = Date.now();
         try {
             for (const file of files) {
@@ -279,6 +285,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                         continue;
                     }
                     added.push({ ...entry, createdAt: base + added.length });
+                    if ((entry.voicePeak ?? 0) > BEDROCK_SIMULTANEOUS_SOUND) overloaded.push({ ...entry, createdAt: 0 });
                 } catch (error) {
                     notifyError(`MIDI 导入失败：${file.name}`, error);
                 }
@@ -301,6 +308,19 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                     message: `新增 ${added.length} 首${skipped ? `，跳过 ${skipped} 首重复曲目` : ""}${addToAddon ? "" : " · 可在「我的音乐」加入附加包"}`,
                     color: "teal",
                 });
+                if (overloaded.length > 0) {
+                    const worst = overloaded.reduce((a, b) => ((b.voicePeak ?? 0) > (a.voicePeak ?? 0) ? b : a));
+                    const names = overloaded.slice(0, 3).map((song) => `《${song.name}》`).join("、");
+                    notifications.show({
+                        title: "部分曲目声部超限",
+                        message:
+                            `${overloaded.length} 首曲目最密集处同时发声超过 ${BEDROCK_SIMULTANEOUS_SOUND} 个` +
+                            `（${names}${overloaded.length > 3 ? " 等" : ""}，最高 ${worst.voicePeak} 个）。` +
+                            "游戏内超出上限的音会自动省略，建议精简声部后再导入。",
+                        color: "yellow",
+                        duration: 10_000,
+                    });
+                }
             } else if (skipped > 0) {
                 notifications.show({
                     title: "没有新增曲目",
@@ -374,6 +394,63 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         if (get().songs.some((song) => song.id === entry.id)) return;
         set({ songs: [...get().songs, entry] });
         notifications.show({ title: "已加入附加包", message: entry.name, color: "teal" });
+    },
+
+    renameSong: async (id, name) => {
+        const next = name.trim();
+        if (!next) {
+            notifications.show({ title: "改名失败", message: "曲名不能为空", color: "red" });
+            return;
+        }
+        if (Array.from(next).length > MAX_SONG_NAME_CHARS) {
+            notifications.show({
+                title: "改名失败",
+                message: `曲名最多 ${MAX_SONG_NAME_CHARS} 个字符`,
+                color: "red",
+            });
+            return;
+        }
+        const inMine = get().myMusic.find((song) => song.id === id);
+        const inAddon = get().songs.find((song) => song.id === id);
+        const current = inMine ?? inAddon;
+        if (!current) return;
+        if (current.name === next) return;
+
+        // 索引和 PBE2 文件头里的名字都更新，保证列表、导入码、导出包一致。
+        let mineData = inMine?.data;
+        let addonData = inAddon?.data;
+        try {
+            if (mineData) mineData = renamePbe2(mineData, next);
+            if (addonData) addonData = renamePbe2(addonData, next);
+        } catch (error) {
+            notifyError("改名失败", error);
+            return;
+        }
+
+        const mine = get().myMusic;
+        const nextMine = inMine
+            ? mine.map((song) =>
+                  song.id === id ? { ...song, name: next, data: mineData ?? song.data } : song
+              )
+            : mine;
+        if (inMine) set({ myMusic: nextMine });
+        if (inAddon) {
+            set({
+                songs: get().songs.map((song) =>
+                    song.id === id ? { ...song, name: next, data: addonData ?? song.data } : song
+                ),
+            });
+        }
+
+        try {
+            if (inMine) {
+                const stored = nextMine.find((song) => song.id === id);
+                if (stored) await putLocalSongs([stored]);
+            }
+            notifications.show({ title: "已改名", message: next, color: "teal" });
+        } catch (error) {
+            notifyError("保存新曲名失败", error);
+        }
     },
 
     removeMyMusicSong: async (id) => {

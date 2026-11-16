@@ -65,8 +65,9 @@ if (install) {
     const installed = join(root, "node_modules/sapi-pro");
     rmSync(installed, { recursive: true, force: true });
     execSync("npm install", { cwd: root, stdio: "inherit" });
+    // DDScope 是 DDUI 页面作用域的核心实现，存在即说明装到的是带 DDUI 的构建。
     const scopeFile = join(installed, "dist/Form/ddui/scope.js");
-    const marker = existsSync(scopeFile) && readFileSync(scopeFile, "utf8").includes("source.getData");
+    const marker = existsSync(scopeFile) && readFileSync(scopeFile, "utf8").includes("DDScope");
     if (!marker) {
         throw new Error("npm install 后 sapi-pro 仍是旧构建（dist 缺少 DDUI 标记），请检查 tarball");
     }

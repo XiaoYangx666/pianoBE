@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Pencil } from "lucide-react";
 import { IconButton, Menu, type MenuItem } from "../primitives";
 
 const cx = (...values: Array<string | false | null | undefined>) => values.filter(Boolean).join(" ");
@@ -10,9 +10,9 @@ export type RowPlayState = "idle" | "playing" | "pending";
 export type SongTableStats = 1 | 2 | 3;
 
 const TABLE_GRID: Record<SongTableStats, string> = {
-    1: "md:grid-cols-[28px_minmax(0,1fr)_68px_48px_136px]",
-    2: "md:grid-cols-[28px_minmax(0,1fr)_68px_56px_48px_136px]",
-    3: "md:grid-cols-[28px_minmax(0,1fr)_68px_56px_56px_48px_136px]",
+    1: "md:grid-cols-[28px_minmax(0,1fr)_68px_48px_180px]",
+    2: "md:grid-cols-[28px_minmax(0,1fr)_68px_56px_48px_180px]",
+    3: "md:grid-cols-[28px_minmax(0,1fr)_68px_56px_56px_48px_180px]",
 };
 
 /** 表头与行共用同一套列宽；两处都从这里取，避免各写一份再漂移。 */
@@ -50,6 +50,9 @@ export interface SongRowProps {
     trailing?: ReactNode;
     onRemove?: () => void;
     removeLabel?: string;
+    /** 重命名（可选）；不传则不显示入口 */
+    onRename?: () => void;
+    renameLabel?: string;
     /** 行首额外内容（封面等） */
     leading?: ReactNode;
     /** 表格模式：曲库列表使用固定列，与表头共用一套网格 */
@@ -187,6 +190,8 @@ export function SongRow({
     trailing,
     onRemove,
     removeLabel = "移除",
+    onRename,
+    renameLabel = "重命名",
     leading,
     layout = "row",
     statsColumns = 3,
@@ -199,6 +204,14 @@ export function SongRow({
             label: codeLabel,
             icon: <span className="font-mono text-[10px]">{"</>"}</span>,
             onSelect: onOpenCode,
+        });
+    }
+    if (onRename) {
+        menuItems.push({
+            key: "rename",
+            label: renameLabel,
+            icon: <Pencil size={13} />,
+            onSelect: onRename,
         });
     }
     if (onRemove) {
@@ -315,7 +328,7 @@ export function SongRow({
             )}
 
             <div className={cx("flex shrink-0 items-center gap-0.5", layout === "table" && "justify-end")}>
-                {(actions || onOpenCode || onRemove) && (
+                {(actions || onOpenCode || onRename || onRemove) && (
                     <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 md:flex">
                         {onOpenCode && (
                             <IconButton size="sm" aria-label={codeLabel} title={codeLabel} onClick={onOpenCode}>
@@ -323,6 +336,11 @@ export function SongRow({
                             </IconButton>
                         )}
                         {actions}
+                        {onRename && (
+                            <IconButton size="sm" aria-label={renameLabel} title={renameLabel} onClick={onRename}>
+                                <Pencil size={14} />
+                            </IconButton>
+                        )}
                         {onRemove && (
                             <IconButton
                                 size="sm"

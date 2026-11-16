@@ -9,6 +9,9 @@
 /** 曲目 id 允许的字符集（与 PBE2 内容寻址 id 一致） */
 export const MUSIC_ENTRY_ID_PATTERN = /^[0-9A-Za-z_-]{1,24}$/;
 
+/** 曲名最大字符数（按 Unicode 码点计；与 UI 输入限制一致） */
+export const MAX_SONG_NAME_CHARS = 64;
+
 export interface MusicStorageLimits {
     /** 单首曲目原始 PBE2 上限 */
     maxSongBytes: number;

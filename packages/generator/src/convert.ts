@@ -1,4 +1,4 @@
-import { encodePbe2, readPbe2Header } from "@piano/core";
+import { encodePbe2, estimateSongVoiceLoad, readPbe2Header } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 import type { SongEntry } from "./types";
 
@@ -8,6 +8,8 @@ export async function midiFileToEntry(file: File): Promise<SongEntry> {
     const song = midiBufferToSong(buffer, file.name.replace(/\.midi?$/i, ""));
     const data = encodePbe2(song, { includeVelocity: true });
     const header = readPbe2Header(data);
+    // 导入时顺便算出同时发声峰值，供 UI 提示“会超过游戏 32 音效上限”。
+    const voiceLoad = estimateSongVoiceLoad(song);
     return {
         id: header.id,
         name: header.name,
@@ -15,6 +17,7 @@ export async function midiFileToEntry(file: File): Promise<SongEntry> {
         noteCount: header.noteCount,
         isOriginal: false,
         data,
+        voicePeak: voiceLoad.peakVoices,
     };
 }
 
