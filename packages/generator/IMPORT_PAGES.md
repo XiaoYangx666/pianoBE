@@ -78,4 +78,4 @@
 | 标题 | 弹窗确认，默认文件名 | `score-pack.json` 的 `title` |
 | 页数上限 | 64 页 | 无硬性上限（受 16 张总数限制） |
 
-导出时两种来源完全一致：都会重写 `scorePack.js`、`textures/ui/piano_score/`、`textures/entity/piano_score/`、RP 实体纹理表、render controller 与 BP 实体 `xypiano:score_variant` 范围。详见 [SCORE_PACK.md](./SCORE_PACK.md#导出后的-addon-文件)。
+导出时两种来源完全一致：都会重写 `scorePack.js`、`textures/ui/piano_score/`、`textures/entity/piano_score/`、RP 实体纹理表、render controller 与 BP 实体 `pbe:score_variant` 范围。详见 [SCORE_PACK.md](./SCORE_PACK.md#导出后的-addon-文件)。

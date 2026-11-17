@@ -2,11 +2,11 @@
   "format_version": "1.21.100",
   "minecraft:entity": {
     "description": {
-      "identifier": "xypiano:piano_display",
+      "identifier": "pbe:piano_display",
       "is_spawnable": false,
       "is_summonable": true,
       "properties": {
-        "xypiano:keys_0": {
+        "pbe:keys_0": {
           "type": "int",
           "range": [
             1,
@@ -15,7 +15,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_1": {
+        "pbe:keys_1": {
           "type": "int",
           "range": [
             1,
@@ -24,7 +24,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_2": {
+        "pbe:keys_2": {
           "type": "int",
           "range": [
             1,
@@ -33,7 +33,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_3": {
+        "pbe:keys_3": {
           "type": "int",
           "range": [
             1,
@@ -42,7 +42,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_4": {
+        "pbe:keys_4": {
           "type": "int",
           "range": [
             1,
@@ -51,7 +51,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_5": {
+        "pbe:keys_5": {
           "type": "int",
           "range": [
             1,
@@ -60,7 +60,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_6": {
+        "pbe:keys_6": {
           "type": "int",
           "range": [
             1,
@@ -69,7 +69,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:keys_7": {
+        "pbe:keys_7": {
           "type": "int",
           "range": [
             1,
@@ -78,7 +78,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:playback_light": {
+        "pbe:playback_light": {
           "type": "int",
           "range": [
             1,
@@ -87,7 +87,7 @@
           "default": 1,
           "client_sync": true
         },
-        "xypiano:card_inserted": {
+        "pbe:card_inserted": {
           "type": "int",
           "range": [
             1,

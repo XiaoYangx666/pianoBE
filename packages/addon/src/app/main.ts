@@ -15,7 +15,7 @@ import { Command, initSAPIPro, pcommand } from "sapi-pro";
 //注册模组组件
 system.beforeEvents.startup.subscribe((e) => {
     e.itemComponentRegistry.registerCustomComponent(
-        "xypiano:placer",
+        "pbe:placer",
         blockPlacerComponent
     );
     e.itemComponentRegistry.registerCustomComponent(
@@ -23,7 +23,7 @@ system.beforeEvents.startup.subscribe((e) => {
         blockPlacerComponent
     );
     e.blockComponentRegistry.registerCustomComponent(
-        "xypiano:piano_block",
+        "pbe:piano_block",
         PianoBlockComponent
     );
     e.blockComponentRegistry.registerCustomComponent(
@@ -35,7 +35,7 @@ system.beforeEvents.startup.subscribe((e) => {
         P88BenchRecoveryComponent
     );
     e.itemComponentRegistry.registerCustomComponent(
-        "xypiano:music_card",
+        "pbe:music_card",
         MusicCardComponent
     );
 });

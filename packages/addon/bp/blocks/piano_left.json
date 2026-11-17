@@ -2,7 +2,7 @@
     "format_version": "1.26.10",
     "minecraft:block": {
         "description": {
-            "identifier": "xypiano:piano_left",
+            "identifier": "pbe:piano_left",
             "menu_category": {
                 "category": "none",
                 "is_hidden_in_commands": false
@@ -18,10 +18,10 @@
             "minecraft:geometry": "geometry.piano_left",
             "minecraft:material_instances": {
                 "*": {
-                    "texture": "piano:texture"
+                    "texture": "pbe:texture"
                 }
             },
-            "xypiano:piano_block": {},
+            "pbe:piano_block": {},
             "minecraft:tick": { "interval_range": [35, 50], "looping": true },
             "minecraft:destructible_by_mining": {
                 "seconds_to_destroy": 1.6,

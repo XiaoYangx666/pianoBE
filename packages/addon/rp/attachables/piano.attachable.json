@@ -2,7 +2,7 @@
     "format_version": "1.26.0",
     "minecraft:attachable": {
         "description": {
-            "identifier": "xypiano:piano_item",
+            "identifier": "pbe:piano_item",
             "render_controllers": ["controller.render.item_default"],
             "materials": {
                 "default": "entity_alphatest",
@@ -16,8 +16,8 @@
                 "default": "geometry.piano_item"
             },
             "animations": {
-                "hold_first_person": "animation.xypiano.hold_first_person",
-                "hold_third_person": "animation.xypiano.hold_third_person"
+                "hold_first_person": "animation.pbe.hold_first_person",
+                "hold_third_person": "animation.pbe.hold_third_person"
             },
             "scripts": {
                 "animate": [

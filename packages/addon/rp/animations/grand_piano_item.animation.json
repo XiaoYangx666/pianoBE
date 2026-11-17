@@ -1,7 +1,7 @@
 {
     "format_version": "1.8.0",
     "animations": {
-        "animation.xypiano.grand_piano_item.first_person": {
+        "animation.pbe.grand_piano_item.first_person": {
             "loop": true,
             "bones": {
                 "piano": {
@@ -11,7 +11,7 @@
                 }
             }
         },
-        "animation.xypiano.grand_piano_item.third_person": {
+        "animation.pbe.grand_piano_item.third_person": {
             "loop": true,
             "bones": {
                 "piano": {

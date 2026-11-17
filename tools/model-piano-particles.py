@@ -119,7 +119,7 @@ def effect(name, tile, *, count, lifetime, active_time, direction, size, tint,
         "format_version": "1.10.0",
         "particle_effect": {
             "description": {
-                "identifier": f"xypiano:{name}",
+                "identifier": f"pbe:{name}",
                 "basic_render_parameters": {"material": material, "texture": TEXTURE},
             },
             "components": components,

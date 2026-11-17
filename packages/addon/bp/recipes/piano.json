@@ -2,7 +2,7 @@
     "format_version": "1.17",
     "minecraft:recipe_shaped": {
         "description": {
-            "identifier": "xypiano:piano_recipe"
+            "identifier": "pbe:piano_recipe"
         },
         "tags": ["crafting_table"],
         "pattern": ["XXX", "BAB", "IRI"],
@@ -14,7 +14,7 @@
             "R": { "item": "minecraft:redstone" }
         },
         "result": {
-            "item": "xypiano:piano_item",
+            "item": "pbe:piano_item",
             "count": 1
         }
     }

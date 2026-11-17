@@ -7,7 +7,7 @@ import { DEFAULT_MANUAL_VELOCITY, FOLLOW_PIANO_VELOCITY, manualVelocityAt, manua
 test("old pianos start with the score off and the former peach selection becomes sakura", () => {
     const old = readPianoSettings('{"particleStyle":5}');
     expect(old.scoreMounted).toBe(false);
-    expect(PIANO_PARTICLE_STYLES.find(style => style.value === old.particleStyle)?.effect).toBe("xypiano:sakura_drift");
+    expect(PIANO_PARTICLE_STYLES.find(style => style.value === old.particleStyle)?.effect).toBe("pbe:sakura_drift");
     expect(readPianoSettings(JSON.stringify({ ...old, scoreMounted: true })).scoreMounted).toBe(true);
 });
 

@@ -2,8 +2,8 @@
     "format_version": "1.10.0",
     "minecraft:attachable": {
         "description": {
-            "identifier": "xypiano:grand_piano_item",
-            "item": { "xypiano:grand_piano_item": "query.is_owner_identifier_any('minecraft:player')" },
+            "identifier": "pbe:grand_piano_item",
+            "item": { "pbe:grand_piano_item": "query.is_owner_identifier_any('minecraft:player')" },
             "materials": {
                 "default": "entity"
             },
@@ -14,8 +14,8 @@
                 "default": "geometry.grand_piano_item"
             },
             "animations": {
-                "hold_first_person": "animation.xypiano.grand_piano_item.first_person",
-                "hold_third_person": "animation.xypiano.grand_piano_item.third_person"
+                "hold_first_person": "animation.pbe.grand_piano_item.first_person",
+                "hold_third_person": "animation.pbe.grand_piano_item.third_person"
             },
             "scripts": {
                 "animate": [
@@ -27,7 +27,7 @@
                     }
                 ]
             },
-            "render_controllers": ["controller.render.xypiano.item"]
+            "render_controllers": ["controller.render.pbe.item"]
         }
     }
 }

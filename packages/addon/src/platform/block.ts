@@ -6,11 +6,11 @@ export function getLeftPianoBlock(block: Block) {
     if (!block?.isValid) return;
 
     const leftBlock =
-        block.typeId == "xypiano:piano_left"
+        block.typeId == "pbe:piano_left"
             ? block
             : getAdjacentPianoBlock(block);
 
-    if (leftBlock?.typeId !== "xypiano:piano_left") {
+    if (leftBlock?.typeId !== "pbe:piano_left") {
         return;
     }
 
@@ -29,7 +29,7 @@ export function getRightBlock(block: Block, direction: Cardinal_Direction) {
 
 /** 获取与当前钢琴块配对的另一半（左/右） */
 export function getAdjacentPianoBlock(block: Block) {
-    if (!block?.isValid || !block.typeId.startsWith("xypiano:piano")) {
+    if (!block?.isValid || !block.typeId.startsWith("pbe:piano")) {
         return;
     }
 
@@ -38,7 +38,7 @@ export function getAdjacentPianoBlock(block: Block) {
     ) as Cardinal_Direction | undefined;
     if (!direction) return;
 
-    const isLeft = block.typeId === "xypiano:piano_left";
+    const isLeft = block.typeId === "pbe:piano_left";
     const offset = isLeft
         ? PairOffsets[direction].left
         : PairOffsets[direction].right;

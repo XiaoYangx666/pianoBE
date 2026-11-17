@@ -7,10 +7,10 @@ const rp = new URL("../rp/", import.meta.url);
 const bp = new URL("../bp/", import.meta.url);
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, rp), "utf8"));
 const retired = new Set([
-    "xypiano:grand_cell_2_0_0", "xypiano:grand_cell_2_2_0",
-    "xypiano:grand_cell_3_0_0", "xypiano:grand_cell_3_0_1",
-    "xypiano:grand_cell_3_1_0", "xypiano:grand_cell_3_1_1",
-    "xypiano:grand_cell_3_2_0", "xypiano:grand_cell_3_2_1",
+    "pbe:grand_cell_2_0_0", "pbe:grand_cell_2_2_0",
+    "pbe:grand_cell_3_0_0", "pbe:grand_cell_3_0_1",
+    "pbe:grand_cell_3_1_0", "pbe:grand_cell_3_1_1",
+    "pbe:grand_cell_3_2_0", "pbe:grand_cell_3_2_1",
 ]);
 
 test("retired grand cells stay invisible instead of shipping empty geometry", () => {
@@ -33,12 +33,12 @@ test("retired grand cells stay invisible instead of shipping empty geometry", ()
 
 test("grand item attachable uses the shared item renderer and a bindable bone", () => {
     const attachable = read("attachables/grand_piano.attachable.json")["minecraft:attachable"]["description"];
-    expect(attachable.identifier).toBe("xypiano:grand_piano_item");
-    expect(attachable.render_controllers).toEqual(["controller.render.xypiano.item"]);
+    expect(attachable.identifier).toBe("pbe:grand_piano_item");
+    expect(attachable.render_controllers).toEqual(["controller.render.pbe.item"]);
     expect(attachable.textures.default).toBe("textures/blocks/grand");
 
     const controller = read("render_controllers/piano_item.render_controllers.json")["render_controllers"];
-    expect(controller["controller.render.xypiano.item"]).toEqual({
+    expect(controller["controller.render.pbe.item"]).toEqual({
         geometry: "Geometry.default",
         materials: [{ "*": "Material.default" }],
         textures: ["Texture.default"],
@@ -51,8 +51,8 @@ test("grand item attachable uses the shared item renderer and a bindable bone", 
     expect(geometry.description.texture_width).toBe(512);
 
     const animations = read("animations/grand_piano_item.animation.json")["animations"];
-    expect(animations["animation.xypiano.grand_piano_item.first_person"].bones.piano).toBeDefined();
-    expect(animations["animation.xypiano.grand_piano_item.third_person"].bones.piano).toBeDefined();
+    expect(animations["animation.pbe.grand_piano_item.first_person"].bones.piano).toBeDefined();
+    expect(animations["animation.pbe.grand_piano_item.third_person"].bones.piano).toBeDefined();
     expect(existsSync(new URL("textures/items/grand_piano_item.png", rp))).toBe(true);
 });
 
@@ -60,7 +60,7 @@ test("the score uses an entity and atlas separate from the keyboard", () => {
     const keys = read("entity/grand_display.entity.json")["minecraft:client_entity"].description;
     const score = read("entity/grand_score.entity.json")["minecraft:client_entity"].description;
     expect(keys.textures.default).toBe("textures/blocks/grand");
-    expect(score.identifier).toBe("xypiano:grand_score");
+    expect(score.identifier).toBe("pbe:grand_score");
     const first = PIANO_SCORES[0];
     const firstTexture = first
         ? `textures/entity/piano_score/${first.id}`
@@ -70,12 +70,12 @@ test("the score uses an entity and atlas separate from the keyboard", () => {
     expect(score.textures.score_0).toBe(firstTexture);
     expect(existsSync(new URL(`${firstTexture}.png`, rp))).toBe(true);
     const controller = read("render_controllers/grand_score.render_controllers.json")["render_controllers"]
-        ["controller.render.xypiano.grand_score"];
+        ["controller.render.pbe.grand_score"];
     expect(controller.arrays.textures["Array.scores"])
         .toHaveLength(Math.max(1, PIANO_SCORES.length));
-    expect(controller.textures).toEqual(["Array.scores[q.property('xypiano:score_variant')]"]);
+    expect(controller.textures).toEqual(["Array.scores[q.property('pbe:score_variant')]"]);
     const behavior = JSON.parse(readFileSync(new URL("entities/grand_score.json", bp), "utf8"))["minecraft:entity"];
-    expect(behavior.description.properties["xypiano:score_variant"].range)
+    expect(behavior.description.properties["pbe:score_variant"].range)
         .toEqual([0, Math.max(1, PIANO_SCORES.length - 1)]);
 
     const keyGeometry = read("models/entity/grand_display.geo.json")["minecraft:geometry"][0];
@@ -95,7 +95,7 @@ test("the score uses an entity and atlas separate from the keyboard", () => {
     const grandBoard = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "grand_board");
     const digitalBoard = scoreGeometry.bones.find((bone: { name: string }) => bone.name === "digital_board");
     expect(grandBoard.cubes[0].size[0]).toBeGreaterThan(digitalBoard.cubes[0].size[0]);
-    expect(behavior.description.properties["xypiano:score_mounted"].default).toBe(false);
+    expect(behavior.description.properties["pbe:score_mounted"].default).toBe(false);
     expect(behavior.components["minecraft:collision_box"]).toEqual({ width: 0, height: 0 });
     expect(behavior.components["minecraft:interact"]).toBeUndefined();
 });

@@ -8,14 +8,14 @@ export interface InstrumentDefinition {
 }
 
 export const pianoDefinition: InstrumentDefinition = {
-    parts: [{ typeId: "xypiano:piano_left", right: 0 }, { typeId: "xypiano:piano_right", right: 1 }],
-    itemId: "xypiano:piano_item",
+    parts: [{ typeId: "pbe:piano_left", right: 0 }, { typeId: "pbe:piano_right", right: 1 }],
+    itemId: "pbe:piano_item",
 };
 
 export const grandDefinition: InstrumentDefinition = {
     parts: GRAND_PARTS,
-    itemId: "xypiano:grand_piano_item",
-    displayId: "xypiano:grand_display",
+    itemId: "pbe:grand_piano_item",
+    displayId: "pbe:grand_display",
 };
 
 const definitionsByPart = new Map(

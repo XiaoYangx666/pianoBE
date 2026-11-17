@@ -10,19 +10,19 @@ import { scoreStandOffset } from "@domain/geometry/keyRay";
 import { isMusicCard, type ItemSlot, containerItemSlot } from "@platform/storage/cardItem";
 import { CARD_SLOT_INDEX } from "@platform/storage/cardSlot";
 
-export const PIANO_DISPLAY = "xypiano:piano_display";
-export const SCORE_STAND_ENTITY = "xypiano:grand_score";
-export const SCORE_SPREAD = "xypiano:score_spread";
-export const SCORE_MOUNTED = "xypiano:score_mounted";
-export const SCORE_VARIANT = "xypiano:score_variant";
-export const CARD_INSERTED = "xypiano:card_inserted";
-const SCORE_GRAND = "xypiano:score_grand";
+export const PIANO_DISPLAY = "pbe:piano_display";
+export const SCORE_STAND_ENTITY = "pbe:grand_score";
+export const SCORE_SPREAD = "pbe:score_spread";
+export const SCORE_MOUNTED = "pbe:score_mounted";
+export const SCORE_VARIANT = "pbe:score_variant";
+export const CARD_INSERTED = "pbe:card_inserted";
+const SCORE_GRAND = "pbe:score_grand";
 export function pianoDisplayType(location: InstrumentLocation) {
     return location.definition?.displayId ?? PIANO_DISPLAY;
 }
-const ANCHOR = "xypiano:anchor";
-const PLAYBACK = "xypiano:playback_v1";
-const SETTINGS = "xypiano:settings_v1";
+const ANCHOR = "pbe:anchor";
+const PLAYBACK = "pbe:playback_v1";
+const SETTINGS = "pbe:settings_v1";
 const LOWEST_KEY = 21;
 const KEY_COUNT = 88;
 const KEYS_PER_MASK = 11;
@@ -151,9 +151,9 @@ export class PianoDisplay {
         this.savedSettings = JSON.stringify(this.config);
         // Clear pressed keys and strike bits left in a persisted display.
         for (let group = 0; group < MASK_COUNT; group++) {
-            entity.setProperty(`xypiano:keys_${group}`, 1);
+            entity.setProperty(`pbe:keys_${group}`, 1);
         }
-        entity.setProperty("xypiano:playback_light", 1);
+        entity.setProperty("pbe:playback_light", 1);
         setCardInserted(entity, readCardFromDisplay(entity) !== undefined);
     }
 
@@ -241,7 +241,7 @@ export class PianoDisplay {
     setLight(playing: boolean) {
         const value = playing ? 2 : 1;
         if (this.light === value || !this.entity.isValid) return;
-        this.entity.setProperty("xypiano:playback_light", value);
+        this.entity.setProperty("pbe:playback_light", value);
         this.light = value;
     }
 
@@ -258,7 +258,7 @@ export class PianoDisplay {
             const nextStrikes = strikes ^ (this.pendingStrikes[group] & down[group]);
             const mask = 1 + ((nextStrikes << STRIKE_SHIFT) | down[group]);
             if (this.sent[group] !== mask) {
-                this.entity.setProperty(`xypiano:keys_${group}`, mask);
+                this.entity.setProperty(`pbe:keys_${group}`, mask);
                 this.sent[group] = mask;
             }
             this.pendingStrikes[group] = 0;

@@ -1,15 +1,15 @@
 {
     "texture_data": {
-        "piano:piano_item": {
+        "pbe:piano_item": {
             "textures": "textures/items/piano_item"
         },
-        "piano:grand_piano_item": {
+        "pbe:grand_piano_item": {
             "textures": "textures/items/grand_piano_item"
         },
         "pbe:p88_bench": {
             "textures": "textures/items/p88_bench"
         },
-        "piano:music_card": {
+        "pbe:music_card": {
             "textures": "textures/items/music_card"
         }
     }

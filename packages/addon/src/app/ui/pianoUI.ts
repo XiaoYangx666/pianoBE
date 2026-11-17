@@ -13,13 +13,13 @@ export function switchKeyMap(state: PianoState, p: Player) {
     let idx = state.keyMap.getData();
     idx = (idx + 1) % keyMaps.length;
     state.keyMap.setData(idx);
-    p.setDynamicProperty("piano:keyMap", idx);
+    p.setDynamicProperty("pbe:keyMap", idx);
 }
 
 export function switchComMode(state: PianoState, p: Player) {
     const newMode = !state.mode.getData();
     state.mode.setData(newMode);
-    p.setDynamicProperty("piano:comMode", newMode);
+    p.setDynamicProperty("pbe:comMode", newMode);
 }
 
 /** 面板里的音长按钮：跟随钢琴 → 长音 → 标准音 → 短音 → 跟随钢琴 */
@@ -27,7 +27,7 @@ export function switchSoundType(state: PianoState, p: Player) {
     const next = state.sound.getData() + 1;
     const idx = next >= manualVelocityPresets.length ? FOLLOW_PIANO_VELOCITY : next;
     state.sound.setData(idx);
-    p.setDynamicProperty("piano:sound", idx);
+    p.setDynamicProperty("pbe:sound", idx);
 }
 
 /**

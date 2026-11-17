@@ -93,7 +93,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 
 ## 4. 持久实体与临时资源
 
-- **持久显示实体**：`xypiano:piano_display` / `xypiano:grand_display`，是钢琴外观的一部分，不因玩家离开而删除。它持有键位属性、灯光、设置和播放记录。
+- **持久显示实体**：`pbe:piano_display` / `pbe:grand_display`，是钢琴外观的一部分，不因玩家离开而删除。它持有键位属性、灯光、设置和播放记录。
 - **临时运行时资源**：`NativeTextSurface`、MIDI 播放器、定时器、订阅、`PianoScope` 子作用域。它们随 `PianoRuntime.dispose()` 回收。
 - 不采用棋牌盒的 Anchor / Visual 分离：钢琴显示实体不是可随时删除的派生投影，键位和灯光就是乐器外观本身。
 

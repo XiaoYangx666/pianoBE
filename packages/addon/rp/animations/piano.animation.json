@@ -1,7 +1,7 @@
 {
 	"format_version": "1.8.0",
 	"animations": {
-		"animation.xypiano.hold_first_person": {
+		"animation.pbe.hold_first_person": {
 			"loop": true,
 			"bones": {
 				"piano": {
@@ -11,7 +11,7 @@
 				}
 			}
 		},
-		"animation.xypiano.hold_third_person": {
+		"animation.pbe.hold_third_person": {
 			"loop": true,
 			"bones": {
 				"piano": {

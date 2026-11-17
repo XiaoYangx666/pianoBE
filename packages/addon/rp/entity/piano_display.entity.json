@@ -2,7 +2,7 @@
   "format_version": "1.10.0",
   "minecraft:client_entity": {
     "description": {
-      "identifier": "xypiano:piano_display",
+      "identifier": "pbe:piano_display",
       "materials": {
         "default": "entity_alphatest"
       },
@@ -13,8 +13,8 @@
         "default": "geometry.piano_display"
       },
       "animations": {
-        "keys": "animation.xypiano.piano_display",
-        "lamp": "animation.xypiano.playback_light"
+        "keys": "animation.pbe.piano_display",
+        "lamp": "animation.pbe.playback_light"
       },
       "scripts": {
         "initialize": [
@@ -29,14 +29,14 @@
           "v.key_98=0;v.strike_98=0;v.lift_98=0;v.key_99=0;v.strike_99=0;v.lift_99=0;v.key_100=0;v.strike_100=0;v.lift_100=0;v.key_101=0;v.strike_101=0;v.lift_101=0;v.key_102=0;v.strike_102=0;v.lift_102=0;v.key_103=0;v.strike_103=0;v.lift_103=0;v.key_104=0;v.strike_104=0;v.lift_104=0;v.key_105=0;v.strike_105=0;v.lift_105=0;v.key_106=0;v.strike_106=0;v.lift_106=0;v.key_107=0;v.strike_107=0;v.lift_107=0;v.key_108=0;v.strike_108=0;v.lift_108=0;"
         ],
         "pre_animation": [
-          "t.mask=q.property('xypiano:keys_0')-1;v.keys_0=math.mod(t.mask,2048);v.strikes_0=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_1')-1;v.keys_1=math.mod(t.mask,2048);v.strikes_1=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_2')-1;v.keys_2=math.mod(t.mask,2048);v.strikes_2=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_3')-1;v.keys_3=math.mod(t.mask,2048);v.strikes_3=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_4')-1;v.keys_4=math.mod(t.mask,2048);v.strikes_4=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_5')-1;v.keys_5=math.mod(t.mask,2048);v.strikes_5=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_6')-1;v.keys_6=math.mod(t.mask,2048);v.strikes_6=math.floor(t.mask/2048);",
-          "t.mask=q.property('xypiano:keys_7')-1;v.keys_7=math.mod(t.mask,2048);v.strikes_7=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_0')-1;v.keys_0=math.mod(t.mask,2048);v.strikes_0=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_1')-1;v.keys_1=math.mod(t.mask,2048);v.strikes_1=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_2')-1;v.keys_2=math.mod(t.mask,2048);v.strikes_2=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_3')-1;v.keys_3=math.mod(t.mask,2048);v.strikes_3=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_4')-1;v.keys_4=math.mod(t.mask,2048);v.strikes_4=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_5')-1;v.keys_5=math.mod(t.mask,2048);v.strikes_5=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_6')-1;v.keys_6=math.mod(t.mask,2048);v.strikes_6=math.floor(t.mask/2048);",
+          "t.mask=q.property('pbe:keys_7')-1;v.keys_7=math.mod(t.mask,2048);v.strikes_7=math.floor(t.mask/2048);",
           "v.key_down=(v.keys_0+v.keys_1+v.keys_2+v.keys_3+v.keys_4+v.keys_5+v.keys_6+v.keys_7)>0;",
           "v.key_animate=v.key_down||v.key_tail>0;",
           "v.key_dt=math.max(0,q.delta_time);",

@@ -2,7 +2,7 @@
     "format_version": "1.26.10",
     "minecraft:item": {
         "description": {
-            "identifier": "xypiano:music_card",
+            "identifier": "pbe:music_card",
             "menu_category": {
                 "category": "items"
             }
@@ -13,12 +13,12 @@
             },
             "minecraft:icon": {
                 "textures": {
-                    "default": "piano:music_card"
+                    "default": "pbe:music_card"
                 }
             },
             "minecraft:max_stack_size": 1,
             "minecraft:glint": true,
-            "xypiano:music_card": {}
+            "pbe:music_card": {}
         }
     }
 }

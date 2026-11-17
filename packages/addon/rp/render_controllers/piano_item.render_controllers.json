@@ -1,7 +1,7 @@
 {
     "format_version": "1.8.0",
     "render_controllers": {
-        "controller.render.xypiano.item": {
+        "controller.render.pbe.item": {
             "geometry": "Geometry.default",
             "materials": [
                 {

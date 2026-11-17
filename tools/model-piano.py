@@ -29,7 +29,7 @@ KEY_PRESS_DEGREES = 8
 KEY_PRESS_SECONDS = .04
 KEY_RELEASE_SECONDS = .08
 KEY_RESTRIKE_LIFT_SECONDS = .025
-DISPLAY = "xypiano:piano_display"
+DISPLAY = "pbe:piano_display"
 KEYS_PER_MASK = 11
 PITCHES = range(21, 109)
 FACES = ("north", "south", "west", "east", "up", "down")
@@ -365,8 +365,8 @@ def sync_property(high):
 def display_assets():
     mask_base = 2**KEYS_PER_MASK
     groups = range(len(PITCHES) // KEYS_PER_MASK)
-    properties = {f"xypiano:keys_{i}": sync_property(mask_base**2) for i in groups}
-    properties["xypiano:playback_light"] = sync_property(2)
+    properties = {f"pbe:keys_{i}": sync_property(mask_base**2) for i in groups}
+    properties["pbe:playback_light"] = sync_property(2)
     write(BP / "entities/piano_display.json", {"format_version": "1.21.100", "minecraft:entity": {
         "description": {"identifier": DISPLAY, "is_spawnable": False, "is_summonable": True, "properties": properties},
         "components": {
@@ -378,7 +378,7 @@ def display_assets():
         },
     }})
     reads = [
-        f"t.mask=q.property('xypiano:keys_{i}')-1;"
+        f"t.mask=q.property('pbe:keys_{i}')-1;"
         f"v.keys_{i}=math.mod(t.mask,{mask_base});"
         f"v.strikes_{i}=math.floor(t.mask/{mask_base});"
         for i in groups
@@ -388,8 +388,8 @@ def display_assets():
         "description": {"identifier": DISPLAY, "materials": {"default": "entity_alphatest"},
                         "textures": {"default": "textures/blocks/piano"},
                         "geometry": {"default": "geometry.piano_display"},
-                        "animations": {"keys": "animation.xypiano.piano_display",
-                                       "lamp": "animation.xypiano.playback_light"},
+                        "animations": {"keys": "animation.pbe.piano_display",
+                                       "lamp": "animation.pbe.playback_light"},
                         "scripts": {
                             "initialize": ["v.key_tail=0;"] + [
                                 "".join(f"v.key_{midi}=0;v.strike_{midi}=0;v.lift_{midi}=0;"
@@ -428,9 +428,9 @@ def display_assets():
         bones[f"key_{midi}"] = {"rotation": [motion, 0, 0]}
     write(RP / "animations/piano_display.animation.json", {"format_version": "1.8.0",
           "animations": {
-              "animation.xypiano.piano_display": {"loop": True, "bones": bones},
-              "animation.xypiano.playback_light": {"loop": True, "bones": {
-                  "playback_light": {"scale": "q.property('xypiano:playback_light')==2?1:0"}
+              "animation.pbe.piano_display": {"loop": True, "bones": bones},
+              "animation.pbe.playback_light": {"loop": True, "bones": {
+                  "playback_light": {"scale": "q.property('pbe:playback_light')==2?1:0"}
               }},
           }})
 

@@ -64,19 +64,19 @@ export const PianoPanelPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
 
         // 玩家级状态持久化；ui.set 的同步不会触发
         ui.onChange(state.octave, (octave) => {
-            if (player.isValid) player.setDynamicProperty("piano:octave", octave);
+            if (player.isValid) player.setDynamicProperty("pbe:octave", octave);
             updatePianoUI(state, view, activeNotes());
         });
         ui.onChange(state.compact, (compact) => {
-            if (player.isValid) player.setDynamicProperty("piano:compact", compact);
+            if (player.isValid) player.setDynamicProperty("pbe:compact", compact);
             updatePianoUI(state, view, activeNotes());
         });
         ui.onChange(state.showScore, (show) => {
-            if (player.isValid) player.setDynamicProperty("piano:scorePreview", show);
+            if (player.isValid) player.setDynamicProperty("pbe:scorePreview", show);
         });
 
         // 打开时同步：大钢琴只有主面板入口，简洁模式只在有屏幕的钢琴上生效
-        ui.set(state.compact, piano.hasScreen && player.getDynamicProperty("piano:compact") === true);
+        ui.set(state.compact, piano.hasScreen && player.getDynamicProperty("pbe:compact") === true);
         ui.set(state.score, scoreIndexOf(piano.settings?.scoreId));
 
         const shouldClose = () => {

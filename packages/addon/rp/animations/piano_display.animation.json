@@ -1,7 +1,7 @@
 {
   "format_version": "1.8.0",
   "animations": {
-    "animation.xypiano.piano_display": {
+    "animation.pbe.piano_display": {
       "loop": true,
       "bones": {
         "key_21": {
@@ -622,11 +622,11 @@
         }
       }
     },
-    "animation.xypiano.playback_light": {
+    "animation.pbe.playback_light": {
       "loop": true,
       "bones": {
         "playback_light": {
-          "scale": "q.property('xypiano:playback_light')==2?1:0"
+          "scale": "q.property('pbe:playback_light')==2?1:0"
         }
       }
     }

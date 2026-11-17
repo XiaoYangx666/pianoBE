@@ -65,12 +65,12 @@ describe("instrument assemblies", () => {
         const right = dimension.getBlock({ x: -1, y: 0, z: 0 });
         right.permutation = { type: { id: right.typeId }, getState: () => "south" };
         expect(destroyInstrument(location, true)).toBe(true);
-        expect(right.typeId).toBe("xypiano:piano_right");
+        expect(right.typeId).toBe("pbe:piano_right");
         expect(dimension.spawnItem).toHaveBeenCalledTimes(1);
     });
     test("digital and grand instruments drop their own item", () => {
-        expect(pianoDefinition.itemId).toBe("xypiano:piano_item");
-        expect(grandDefinition.itemId).toBe("xypiano:grand_piano_item");
+        expect(pianoDefinition.itemId).toBe("pbe:piano_item");
+        expect(grandDefinition.itemId).toBe("pbe:grand_piano_item");
     });
     test("places and resolves the full grand in every rotation, then drops its own item", () => {
         const transforms = {
@@ -99,7 +99,7 @@ describe("instrument assemblies", () => {
             expect(destroyInstrument(owner, true)).toBe(true);
             expect(blocks.every(block => block.isAir)).toBe(true);
             expect(dimension.spawnItem).toHaveBeenCalledTimes(1);
-            expect(dimension.spawnItem.mock.calls[0][0].typeId).toBe("xypiano:grand_piano_item");
+            expect(dimension.spawnItem.mock.calls[0][0].typeId).toBe("pbe:grand_piano_item");
         }
     });
     test("an obstruction in the grand's tail leaves the anchor untouched", () => {

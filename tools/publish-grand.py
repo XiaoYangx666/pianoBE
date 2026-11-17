@@ -22,12 +22,12 @@ RP = ADDON / "rp"
 write = MODEL["write"]
 rounded = MODEL["rounded"]
 native_geometry = MODEL["CELL_TOOLS"]["native_geometry"]
-DISPLAY = "xypiano:grand_display"
-SCORE_DISPLAY = "xypiano:grand_score"
-SCORE_PROPERTY = "xypiano:score_spread"
-SCORE_MOUNTED = "xypiano:score_mounted"
-SCORE_GRAND = "xypiano:score_grand"
-SCORE_VARIANT = "xypiano:score_variant"
+DISPLAY = "pbe:grand_display"
+SCORE_DISPLAY = "pbe:grand_score"
+SCORE_PROPERTY = "pbe:score_spread"
+SCORE_MOUNTED = "pbe:score_mounted"
+SCORE_GRAND = "pbe:score_grand"
+SCORE_VARIANT = "pbe:score_variant"
 # Stand origin sits on the front crossblock or rear deck. The large-print
 # two-page spread is intentionally wider and taller than the earlier A4 demo.
 SCORE_ORIGIN_Z = 2.91
@@ -89,7 +89,7 @@ def publish_cell(project, part_id, *, front_layer=None):
         block.pop("permutations", None)
     else:
         components["minecraft:geometry"] = geometry["minecraft:geometry"][0]["description"]["identifier"]
-        components["minecraft:material_instances"]["*"]["texture"] = "piano:grand"
+        components["minecraft:material_instances"]["*"]["texture"] = "pbe:grand"
     selection = elements
     if front_layer == 0:
         selection = [e for e in elements if key_name(e) or e["name"].startswith("Keyboard / ")]
@@ -223,22 +223,22 @@ def publish_score():
         "description": {"identifier": SCORE_DISPLAY, "materials": {"default": "entity_alphatest"},
                         "textures": textures,
                         "geometry": {"default": "geometry.grand_score"},
-                        "animations": {"score": "animation.xypiano.grand_score"},
+                        "animations": {"score": "animation.pbe.grand_score"},
                         "scripts": {"pre_animation": [
                             f"t.page=q.property('{SCORE_PROPERTY}');"
                             "t.turn=v.score_turn??t.page;"
                             "t.step=2.5*math.max(0,q.delta_time);"
                             "v.score_turn=t.turn+math.clamp(t.page-t.turn,-t.step,t.step);",
                         ], "animate": ["score"]},
-                        "render_controllers": [{"controller.render.xypiano.grand_score": f"q.property('{SCORE_MOUNTED}')"}]},
+                        "render_controllers": [{"controller.render.pbe.grand_score": f"q.property('{SCORE_MOUNTED}')"}]},
     }})
     write(RP / "animations/grand_score.animation.json", {"format_version": "1.8.0", "animations": {
-        "animation.xypiano.grand_score": {"loop": True, "bones": {
+        "animation.pbe.grand_score": {"loop": True, "bones": {
             "score_leaf": {"rotation": [0, "180*v.score_turn", 0]},
         }},
     }})
     write(RP / "render_controllers/grand_score.render_controllers.json", {"format_version": "1.8.0",
-        "render_controllers": {"controller.render.xypiano.grand_score": {
+        "render_controllers": {"controller.render.pbe.grand_score": {
             "arrays": {"textures": {"Array.scores": [
                 f"Texture.score_{index}" for index in range(max(1, len(SCORES)))]}},
             "geometry": "Geometry.default", "materials": [{"*": "Material.default"}],
@@ -294,7 +294,7 @@ def write_runtime(parts, interaction_cells, full, keys):
     data = {
         "GRAND_PARTS": parts,
         "GRAND_INTERACTION_CELLS": interaction_cells,
-        "GRAND_RETIRED_CELLS": ["xypiano:" + name for name in RETIRED_CELLS],
+        "GRAND_RETIRED_CELLS": ["pbe:" + name for name in RETIRED_CELLS],
         "GRAND_KEYBOARD_HITBOX": keyboard_bounds(keys),
         "GRAND_KEY_HITBOXES": keys,
         "GRAND_CASE_HITBOXES": [e["from"] + e["to"] for e in case],
@@ -333,14 +333,14 @@ def main():
         x, y, z = cell["offset"]
         project = read(ASSETS / cell["project"])
         assert project["model_identifier"] not in RETIRED_CELLS
-        part_id = "xypiano:" + project["model_identifier"]
+        part_id = "pbe:" + project["model_identifier"]
         parts.append({"typeId": part_id, "right": -x, "forward": -z, "up": y})
         front_layer = y if z == 0 and y <= 1 else None
         if front_layer is not None:
             interaction_cells.append(part_id)
         publish_cell(project, part_id, front_layer=front_layer)
     for name in RETIRED_CELLS:
-        publish_cell({**full, "model_identifier": name, "elements": []}, "xypiano:" + name)
+        publish_cell({**full, "model_identifier": name, "elements": []}, "pbe:" + name)
     keys = publish_display(full, [e for e in full["elements"] if key_name(e)])
     publish_score()
     publish_score_assets(RP)

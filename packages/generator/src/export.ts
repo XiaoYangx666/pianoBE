@@ -227,7 +227,7 @@ function updateRpRenderController(addon: AddonTemplate, rpPath: string, count: n
         return;
     }
     const json = JSON.parse(text) as RpRenderControllerJson;
-    const controller = json.render_controllers?.["controller.render.xypiano.grand_score"];
+    const controller = json.render_controllers?.["controller.render.pbe.grand_score"];
     if (!controller) {
         console.warn(`[generator] ${path} 缺少谱架 render controller，无法同步纹理数组`);
         return;
@@ -238,7 +238,7 @@ function updateRpRenderController(addon: AddonTemplate, rpPath: string, count: n
         { length: count },
         (_, index) => `Texture.score_${index}`
     );
-    controller.textures = ["Array.scores[q.property('xypiano:score_variant')]"];
+    controller.textures = ["Array.scores[q.property('pbe:score_variant')]"];
     addon.writeText(path, `${JSON.stringify(json, null, 4)}\n`);
 }
 
@@ -256,7 +256,7 @@ function updateBpScoreVariant(addon: AddonTemplate, bpPath: string, count: numbe
         return;
     }
     description.properties ??= {};
-    description.properties["xypiano:score_variant"] = {
+    description.properties["pbe:score_variant"] = {
         type: "int",
         // Bedrock rejects range min == max; keep at least [0, 1].
         range: [0, Math.max(1, count - 1)],

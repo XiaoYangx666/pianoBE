@@ -5,7 +5,7 @@
 - 游戏内 DDUI 面板使用的单页 A4 竖版纹理
 - 谱架实体使用的 1024×1024 纹理
 - `scorePack.js` 曲谱数据模块
-- RP 实体纹理表、render controller 纹理数组与 BP 实体 `xypiano:score_variant` 范围
+- RP 实体纹理表、render controller 纹理数组与 BP 实体 `pbe:score_variant` 范围
 
 整个 addon 最终最多 **16 张曲谱**（模板已有 + 新导入）。超过上限时整包拒绝导入。
 
@@ -133,7 +133,7 @@ my-score-pack/
 
 - `RP/render_controllers/grand_score.render_controllers.json`
 
-  `controller.render.xypiano.grand_score` 的 `arrays.textures["Array.scores"]` 与 `textures` 会被同步更新，顺序与 `PIANO_SCORES` 一致；`part_visibility` 等其它字段保持不变：
+  `controller.render.pbe.grand_score` 的 `arrays.textures["Array.scores"]` 与 `textures` 会被同步更新，顺序与 `PIANO_SCORES` 一致；`part_visibility` 等其它字段保持不变：
 
   ```json
   {
@@ -144,9 +144,9 @@ my-score-pack/
     },
     "geometry": "Geometry.default",
     "materials": [{ "*": "Material.default" }],
-    "textures": ["Array.scores[q.property('xypiano:score_variant')]"],
+    "textures": ["Array.scores[q.property('pbe:score_variant')]"],
     "part_visibility": [
-      { "grand_*": "q.property('xypiano:score_grand')" }
+      { "grand_*": "q.property('pbe:score_grand')" }
     ]
   }
   ```
@@ -155,7 +155,7 @@ my-score-pack/
 
 - `BP/entities/grand_score.json`
 
-  `minecraft:entity.description.properties["xypiano:score_variant"]` 会被写成：
+  `minecraft:entity.description.properties["pbe:score_variant"]` 会被写成：
 
   ```json
   {

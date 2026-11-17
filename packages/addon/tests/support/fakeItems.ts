@@ -93,7 +93,7 @@ export class FakeEntity {
     readonly properties = new Map<string, PropertyValue>();
     inventory?: FakeContainer;
 
-    constructor(public typeId = "xypiano:piano_display", inventorySize = 1) {
+    constructor(public typeId = "pbe:piano_display", inventorySize = 1) {
         if (inventorySize > 0) this.inventory = new FakeContainer(Array.from({ length: inventorySize }, () => ({})));
     }
 

@@ -25,6 +25,6 @@ export function summonParticle(dim: Dimension, center: Vector3, right: Vector3, 
     const key = pianoParticleOrigin(center, right, midi, true, model);
     if (key) {
         variables.setFloat("variable.piano_key_axis_x", Math.abs(right.x));
-        dim.spawnParticle("xypiano:key_glimmer", key, variables);
+        dim.spawnParticle("pbe:key_glimmer", key, variables);
     }
 }

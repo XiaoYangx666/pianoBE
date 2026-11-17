@@ -18,9 +18,9 @@ const { SCORE_STAND_ENTITY, SCORE_MOUNTED, SCORE_SPREAD, PianoDisplay, PIANO_DIS
     recoverScoreStand, removeScoreStand, removeDormantDisplay } = await import("../src/platform/display");
 const { grandDefinition } = await import("../src/domain/instrument/definition");
 
-const ANCHOR = "xypiano:anchor";
-const PLAYBACK = "xypiano:playback_v1";
-const SETTINGS = "xypiano:settings_v1";
+const ANCHOR = "pbe:anchor";
+const PLAYBACK = "pbe:playback_v1";
+const SETTINGS = "pbe:settings_v1";
 
 class FakeEntity {
     id: string;
@@ -111,8 +111,8 @@ describe("PianoDisplay lifecycle", () => {
     });
 
     test("display type follows the instrument definition", () => {
-        expect(pianoDisplayType({ definition: { displayId: "xypiano:grand_display" } } as never))
-            .toBe("xypiano:grand_display");
+        expect(pianoDisplayType({ definition: { displayId: "pbe:grand_display" } } as never))
+            .toBe("pbe:grand_display");
         expect(pianoDisplayType({ definition: undefined } as never)).toBe(PIANO_DISPLAY);
     });
 });
@@ -135,7 +135,7 @@ test("grand score keeps its own entity and page through recovery and is removed 
     expect(recovered.getRotation().y).toBe(90);
     expect(recovered.getProperty(SCORE_SPREAD)).toBe(1);
     expect(recovered.getProperty(SCORE_MOUNTED)).toBe(true);
-    expect(recovered.getProperty("xypiano:score_grand")).toBe(true);
+    expect(recovered.getProperty("pbe:score_grand")).toBe(true);
     expect(keys.entity.getProperty(SCORE_SPREAD)).toBeUndefined();
     expect(duplicate.removed).toBe(true);
 
@@ -150,7 +150,7 @@ test("the digital stand mounts on its lower deck and can be removed independentl
     const keys = PianoDisplay.recover(location, point);
     const score = recoverScoreStand(location, point);
     expect(score.location.y).toBeCloseTo(16.83335 / 16);
-    expect(score.getProperty("xypiano:score_grand")).toBe(false);
+    expect(score.getProperty("pbe:score_grand")).toBe(false);
     removeScoreStand(location, point);
     expect(score.isValid).toBe(false);
     expect(keys.entity.isValid).toBe(true);

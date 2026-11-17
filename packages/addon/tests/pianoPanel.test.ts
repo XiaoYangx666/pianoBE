@@ -201,14 +201,14 @@ describe("主钢琴面板", () => {
         expect(input.getData()).toBe("z");
 
         // 绑定 “!” 为连音快捷键：同一次输入里切换模式后按连音模式清空
-        const shortcutPlayer = makePlayer("p2", { "piano:shortcuts": JSON.stringify({ legato: "!" }) });
+        const shortcutPlayer = makePlayer("p2", { "pbe:shortcuts": JSON.stringify({ legato: "!" }) });
         const next = openPanel(shortcutPlayer);
         const nextInput = next.form.components.find((item) => item.type === "textField")!.value as FakeObservable<string>;
         nextInput.setData("z!");
         await Promise.resolve();
         await Promise.resolve();
         expect(nextInput.getData()).toBe("");
-        expect(shortcutPlayer.properties.get("piano:comMode")).toBe(false);
+        expect(shortcutPlayer.properties.get("pbe:comMode")).toBe(false);
     });
 
     test("单音模式下长时间输入只保留尾部 32 个字符", async () => {
@@ -227,13 +227,13 @@ describe("主钢琴面板", () => {
         const octave = findToggle(form, "升8度 (高音模式)");
 
         // 打开时的同步（ui.set）不应持久化
-        expect(player.properties.has("piano:compact")).toBe(false);
+        expect(player.properties.has("pbe:compact")).toBe(false);
 
         compact.setData(true);
         octave.setData(true);
 
-        expect(player.properties.get("piano:compact")).toBe(true);
-        expect(player.properties.get("piano:octave")).toBe(true);
+        expect(player.properties.get("pbe:compact")).toBe(true);
+        expect(player.properties.get("pbe:octave")).toBe(true);
         expect(piano.played).toEqual([]);
     });
 

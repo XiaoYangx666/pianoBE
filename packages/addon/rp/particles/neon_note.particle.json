@@ -2,7 +2,7 @@
   "format_version": "1.10.0",
   "particle_effect": {
     "description": {
-      "identifier": "xypiano:neon_note",
+      "identifier": "pbe:neon_note",
       "basic_render_parameters": {
         "material": "particles_add",
         "texture": "textures/particle/piano_fx"

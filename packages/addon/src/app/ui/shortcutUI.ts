@@ -9,7 +9,7 @@ import {
     type ShortcutBindings,
 } from "@domain/piano/shortcuts";
 
-export const SHORTCUTS_PROPERTY = "piano:shortcuts";
+export const SHORTCUTS_PROPERTY = "pbe:shortcuts";
 
 /** 从玩家动态属性读取快捷键；旧存档或损坏数据会回退为空绑定。 */
 export function loadShortcuts(player: Player): ShortcutBindings {

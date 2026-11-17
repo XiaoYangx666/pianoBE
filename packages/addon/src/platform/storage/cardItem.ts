@@ -10,7 +10,7 @@ import { DynamicMusicStorage, CARD_META_PREFIX, CARD_STORAGE_PREFIX } from "@pla
 import { currentPbeSettings } from "@platform/storage/settingsProvider";
 
 /** 自定义物品：音乐存储卡（不可堆叠）。 */
-export const MUSIC_CARD_ID = "xypiano:music_card";
+export const MUSIC_CARD_ID = "pbe:music_card";
 const CARD_UID = `${CARD_META_PREFIX}uid`;
 const CARD_REV = `${CARD_META_PREFIX}rev`;
 const CARD_NAME = `${CARD_META_PREFIX}name`;

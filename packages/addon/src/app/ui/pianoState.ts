@@ -41,14 +41,14 @@ const KEY_ROW_COUNT = 4;
 
 /** 从玩家动态属性恢复面板状态；紧凑模式是否生效由页面按钢琴类型决定。 */
 export function createPianoState(player: Player, ui: DDUIContext<any>): PianoState {
-    const keyMap = (player.getDynamicProperty("piano:keyMap") as number) ?? 0;
-    const mode = (player.getDynamicProperty("piano:comMode") as boolean) ?? true;
-    const storedSound = player.getDynamicProperty("piano:sound");
+    const keyMap = (player.getDynamicProperty("pbe:keyMap") as number) ?? 0;
+    const mode = (player.getDynamicProperty("pbe:comMode") as boolean) ?? true;
+    const storedSound = player.getDynamicProperty("pbe:sound");
     const sound =
         typeof storedSound === "number" && manualVelocityPresets[storedSound] ? storedSound : FOLLOW_PIANO_VELOCITY;
-    const compact = player.getDynamicProperty("piano:compact") === true;
-    const showScore = player.getDynamicProperty("piano:scorePreview") === true;
-    const octave = player.getDynamicProperty("piano:octave") === true;
+    const compact = player.getDynamicProperty("pbe:compact") === true;
+    const showScore = player.getDynamicProperty("pbe:scorePreview") === true;
+    const octave = player.getDynamicProperty("pbe:octave") === true;
 
     const compactObs = ui.boolean(compact);
     return {
