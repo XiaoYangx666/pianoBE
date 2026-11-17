@@ -6,13 +6,16 @@ import { deflateSync } from "node:zlib";
 const root = new URL("../../packages/addon/rp/", import.meta.url);
 const check = process.argv.includes("--check");
 const width = 256;
-const height = 128;
+const height = 256;
 const texture = "textures/particle/vfx_lab";
 const tiles = {
     mote: [0, 0, 32, 32],
     glint: [32, 0, 32, 32],
     silk: [64, 0, 32, 32],
+    curtain: [96, 0, 32, 48],
+    spark: [128, 0, 32, 32],
     beam: [0, 48, 256, 48],
+    ripple: [0, 104, 128, 128],
 };
 
 function write(path, contents) {
@@ -63,13 +66,13 @@ paint(tiles.glint, 0.81, (x, y) => {
         + 0.23 * gaussian(x, 0.33) * gaussian(y, 0.068);
     return [0.77 + 0.23 * gaussian(r, 0.15), (halo + flare + 0.45 * gaussian(r, 0.115)) * smooth((0.86 - r) / 0.25)];
 });
-paint(tiles.silk, 0.91, (x, y) => {
+paint(tiles.silk, 0.23, (x, y) => {
     const radius = Math.hypot(x, y);
-    const core = gaussian(radius, 0.34);
-    const halo = gaussian(radius, 0.54);
-    return [0.72 + 0.28 * core, smooth((0.87 - radius) / 0.33) * (0.79 * core + 0.21 * halo)];
+    const core = gaussian(radius, 0.24);
+    const halo = gaussian(radius, 0.49);
+    return [0.72 + 0.28 * core, smooth((0.93 - radius) / 0.29) * (0.76 * core + 0.16 * halo)];
 });
-paint(tiles.beam, 1, (x, y) => {
+paint(tiles.beam, 0.59, (x, y) => {
     // Taper cross-section along the beam and extend a softer, asymmetric wake.
     const progress = (x + 1) / 2;
     const end = smooth((progress - 0.015) / 0.34) * smooth((0.986 - progress) / 0.19);
@@ -82,6 +85,23 @@ paint(tiles.beam, 1, (x, y) => {
     const head = 0.77 + 0.23 * gaussian(x - 0.48, 0.32);
     return [0.74 + 0.26 * Math.max(core, 0.5 * shoulder),
         end * head * smooth((0.89 - Math.abs(y)) / 0.24) * (0.77 * core + 0.18 * shoulder + 0.24 * halo + 0.06 * filaments)];
+});
+paint(tiles.curtain, 0.26, (x, y) => {
+    const edges = smooth((0.85 - Math.abs(x)) / 0.47) * smooth((0.9 - Math.abs(y)) / 0.45);
+    const threads = 0.54 * gaussian(x, 0.17) + 0.16 * gaussian(x - 0.36, 0.09) + 0.14 * gaussian(x + 0.3, 0.12);
+    return [0.76 + 0.24 * gaussian(x, 0.19), edges * threads * (0.86 + 0.14 * Math.cos(y * 10))];
+});
+paint(tiles.spark, 0.53, (x, y) => {
+    const radius = Math.abs(x) + 0.71 * Math.abs(y);
+    return [0.71 + 0.29 * gaussian(radius, 0.21), gaussian(radius, 0.32) * smooth((0.9 - radius) / 0.32)];
+});
+paint(tiles.ripple, 0.35, (x, y) => {
+    const radius = Math.hypot(x, y);
+    const angle = Math.atan2(y, x);
+    const grooves = 0.84 + 0.16 * Math.cos(angle * 9 + 0.35 * Math.sin(angle * 4));
+    return [0.81 + 0.19 * gaussian(radius - 0.78, 0.02),
+        grooves * (0.78 * gaussian(radius - 0.78, 0.021) + 0.27 * gaussian(radius - 0.71, 0.033))
+        * smooth((0.92 - radius) / 0.12)];
 });
 
 function chunk(type, data) {
@@ -125,6 +145,8 @@ const fade = (inTime, outTime, time = age, life = "variable.particle_lifetime") 
 const rightX = param("right_x", 1);
 const rightZ = param("right_z", 0);
 const rotate = (x, y, z) => [`(${x}) * ${rightX} + (${z}) * ${rightZ}`, y, `(${x}) * ${rightZ} - (${z}) * ${rightX}`];
+const scaled = (expr) => `(${expr}) * ${param("scale", 1)}`;
+const position = (x, y, z) => rotate(x, y, z).map(scaled);
 const uv = ([x, y, w, h]) => ({ texture_width: width, texture_height: height, uv: [x, y], uv_size: [w, h] });
 const tint = ([r, g, b], alpha) => ({ color: [param("red", r), param("green", g), param("blue", b), `${param("opacity", 0.75)} * ${alpha}`] });
 const localSpace = { position: true, rotation: true };
@@ -140,19 +162,19 @@ function particle(name, components) {
 }
 
 const extent = param("range", 1);
-const moteSize = `${param("size", 1)} * (0.042 + 0.105 * math.pow(${random(4)}, 2.6))`;
+const moteSize = scaled(`${param("size", 1)} * (0.042 + 0.105 * math.pow(${random(4)}, 2.6))`);
 const drift = (scale, seed) => `${random(4)} < 0.32 ? 0 : ${scale} * ${param("speed", 1)} * (2 * ${random(seed)} - 1)`;
 particle("field", {
     "minecraft:emitter_rate_steady": { spawn_rate: param("rate", 12), max_particles: param("max_particles", 38) },
     "minecraft:emitter_lifetime_once": { active_time: param("active", 2.1) },
     "minecraft:emitter_shape_custom": {
         // The symmetric power distribution concentrates particles in the interior of the volume.
-        offset: rotate(`2.45 * ${extent} * (${random(1)} < 0.5 ? -1 : 1) * math.pow(math.abs(2 * ${random(1)} - 1), 1.35)`,
+        offset: position(`2.45 * ${extent} * (${random(1)} < 0.5 ? -1 : 1) * math.pow(math.abs(2 * ${random(1)} - 1), 1.35)`,
             `1.28 + ${param("height", 0)} + 1.7 * (${random(2)} - 0.5)`,
             `0.26 + ${extent} * (0.24 + 2.5 * ${random(3)})`),
         direction: [0, 1, 0],
     },
-    "minecraft:particle_initial_speed": rotate(drift(0.22, 3), drift(0.13, 1), drift(0.17, 2)),
+    "minecraft:particle_initial_speed": position(drift(0.22, 3), drift(0.13, 1), drift(0.17, 2)),
     "minecraft:particle_motion_dynamic": { linear_drag_coefficient: 0.38 },
     "minecraft:particle_lifetime_expression": { max_lifetime: `1.2 + 2.0 * ${random(1)}` },
     "minecraft:particle_appearance_billboard": {
@@ -166,17 +188,20 @@ particle("field", {
 const phase = `${param("phase", 0)} - ${param("angular_speed", 124)} * ${age}`;
 const waveLife = param("life", 4.7);
 const harmonic = `math.sin(${phase}) + 0.23 * math.sin(2 * (${phase}) + 30)`;
-const waveRadius = param("radius", 0.142);
+const waveRadius = scaled(param("radius", 0.109));
+const amplitude = param("amplitude", 0.37);
+const previousAmplitude = param("previous_amplitude", 0.37);
 particle("wave", {
     "minecraft:emitter_rate_instant": { num_particles: 1 },
     "minecraft:emitter_lifetime_once": { active_time: waveLife },
     "minecraft:emitter_local_space": localSpace,
     "minecraft:emitter_shape_point": point,
-    "minecraft:particle_motion_parametric": { relative_position: [0, `${param("amplitude", 0.37)} * (${harmonic})`, 0] },
+    "minecraft:particle_motion_parametric": { relative_position: [0,
+        scaled(`math.lerp(${previousAmplitude}, ${amplitude}, ${saturate(`${age} / 0.48`)}) * (${harmonic})`), 0] },
     "minecraft:particle_lifetime_expression": { max_lifetime: waveLife },
     "minecraft:particle_appearance_billboard": {
         facing_camera_mode: "rotate_xyz",
-        size: [waveRadius, waveRadius],
+        size: [waveRadius, `0.72 * ${waveRadius}`],
         uv: uv(tiles.silk),
     },
     "minecraft:particle_appearance_tinting": tint([0.58, 0.90, 1],
@@ -195,29 +220,100 @@ const lateral = `${bend} * math.sin(180 * ${progress})`;
 const dirX = param("dir_x", 1);
 const dirZ = param("dir_z", 0);
 const crossSlope = `3.141593 * ${bend} * math.cos(180 * ${progress}) / ${span}`;
+const heightDelta = param("height_delta", 0);
+const climb = `${heightDelta} * (1 - ${saturate(`(${elapsed}) / 0.64`)})`;
 particle("beam", {
     "minecraft:emitter_rate_instant": { num_particles: 1 },
     "minecraft:emitter_lifetime_once": { active_time: beamLife },
     "minecraft:emitter_local_space": localSpace,
     "minecraft:emitter_shape_point": point,
     "minecraft:particle_motion_parametric": {
-        relative_position: rotate(`(${track}) * ${dirX} - (${lateral}) * ${dirZ}`,
-            `0.53 * math.abs(${bend}) * math.sin(180 * ${progress} - 24)`,
+        relative_position: position(`(${track}) * ${dirX} - (${lateral}) * ${dirZ}`,
+            `0.53 * math.abs(${bend}) * math.sin(180 * ${progress} - 24) + ${climb}`,
             `(${track}) * ${dirZ} + (${lateral}) * ${dirX}`),
     },
     "minecraft:particle_lifetime_expression": { max_lifetime: beamLife },
     "minecraft:particle_appearance_billboard": {
         facing_camera_mode: "direction_x",
-        size: [`0.5 * ${param("length", 1.36)} * (0.64 + 0.36 * math.sin(180 * ${progress}))`, `0.5 * ${param("width", 0.16)}`],
+        size: [scaled(`0.5 * ${param("length", 1.36)} * (0.64 + 0.36 * math.sin(180 * ${progress}))`),
+            scaled(`0.5 * ${param("width", 0.16)}`)],
         direction: {
             mode: "custom_direction",
             custom_direction: rotate(`${dirX} - (${crossSlope}) * ${dirZ}`,
-                `1.665044 * math.abs(${bend}) * math.cos(180 * ${progress} - 24) / ${span}`,
+                `(1.665044 * math.abs(${bend}) * math.cos(180 * ${progress} - 24) - ((${elapsed}) >= 0 && (${elapsed}) < 0.64 ? ${heightDelta} * ${life} / 0.64 : 0)) / ${span}`,
                 `${dirZ} + (${crossSlope}) * ${dirX}`),
         },
         uv: uv(tiles.beam),
     },
     "minecraft:particle_appearance_tinting": tint([1, 0.85, 0.70], fade(0.22, 0.53, elapsed, life)),
+});
+
+const shortLife = "variable.particle_lifetime";
+const normalizedAge = saturate(`${age} / ${shortLife}`);
+const ringRadius = scaled(`${param("radius", 1.9)} * (0.16 + 0.84 * math.pow(${normalizedAge}, 0.65)) * ${param("size", 1)}`);
+particle("ripple", {
+    "minecraft:emitter_rate_instant": { num_particles: 1 },
+    "minecraft:emitter_lifetime_once": { active_time: param("life", 1.1) },
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_lifetime_expression": { max_lifetime: param("life", 1.1) },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "emitter_transform_xz", size: [ringRadius, ringRadius], uv: uv(tiles.ripple),
+    },
+    "minecraft:particle_appearance_tinting": tint([0.54, 0.89, 0.86], fade(0.13, 0.65)),
+});
+
+const fountainSpeed = param("speed", 1);
+const sparkSize = scaled(`(0.036 + 0.035 * ${random(3)}) * ${param("size", 1)}`);
+particle("fountain", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 8) },
+    "minecraft:emitter_lifetime_once": { active_time: 1.4 },
+    "minecraft:emitter_shape_custom": { offset: position(`0.19 * (2 * ${random(1)} - 1)`, 0, `0.15 * (2 * ${random(4)} - 1)`) },
+    "minecraft:particle_initial_speed": position(`${param("side", 1)} * (0.22 + 0.85 * ${random(1)})`,
+        `(2.6 + 1.65 * ${random(2)}) * ${fountainSpeed}`, `0.15 + 0.58 * ${random(4)}`),
+    "minecraft:particle_motion_dynamic": { linear_acceleration: [0, scaled(-7.6), 0], linear_drag_coefficient: 0.15 },
+    "minecraft:particle_lifetime_expression": { max_lifetime: `${param("life", 1.15)} * (0.65 + 0.5 * ${random(2)})` },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "rotate_xyz", size: [sparkSize, `1.45 * ${sparkSize}`], uv: uv(tiles.spark),
+    },
+    "minecraft:particle_appearance_tinting": tint([1, 0.86, 0.65], fade(0.09, 0.46)),
+});
+
+const curtainLife = param("life", 1.38);
+const curtainPhase = `${param("phase", 0)} + 130 * ${param("speed", 1)} * ${age}`;
+particle("curtain", {
+    "minecraft:emitter_rate_instant": { num_particles: 1 },
+    "minecraft:emitter_lifetime_once": { active_time: curtainLife },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_motion_parametric": { relative_position: position(0,
+        `0.16 * math.sin(${curtainPhase}) - 0.32 * ${age}`, `0.21 * math.cos(${curtainPhase})`) },
+    "minecraft:particle_lifetime_expression": { max_lifetime: curtainLife },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "lookat_y",
+        size: [scaled(`0.5 * ${param("width", 0.14)}`), scaled(`0.5 * ${param("length", 1.4)}`)],
+        uv: uv(tiles.curtain),
+    },
+    "minecraft:particle_appearance_tinting": tint([0.55, 0.62, 0.94], fade(0.34, 0.52)),
+});
+
+const orbitLife = param("life", 2.45);
+const orbitAngle = `${param("phase", 0)} + 360 * ${random(1)} + 67 * ${param("speed", 1)} * ${age}`;
+const orbitRadius = `${param("radius", 1.42)} * (0.86 + 0.28 * ${random(2)})`;
+const orbitSize = scaled(`(0.035 + 0.039 * ${random(4)}) * ${param("size", 1)}`);
+particle("orbit", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 10) },
+    "minecraft:emitter_lifetime_once": { active_time: orbitLife },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_motion_parametric": { relative_position: position(
+        `math.cos(${orbitAngle}) * ${orbitRadius}`,
+        `0.43 * math.sin(${orbitAngle}) + 0.18 * (2 * ${random(3)} - 1)`,
+        `0.67 * math.sin(${orbitAngle}) * ${orbitRadius}`) },
+    "minecraft:particle_lifetime_expression": { max_lifetime: orbitLife },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "rotate_xyz", size: [orbitSize, orbitSize], uv: uv(tiles.glint),
+    },
+    "minecraft:particle_appearance_tinting": tint([0.83, 0.66, 0.99], fade(0.38, 0.6)),
 });
 
 console.log(check ? "VFX Lab: checked particles, RGBA atlas and emissive texture set" : "VFX Lab: built particles, RGBA atlas and emissive texture set");

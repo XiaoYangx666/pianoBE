@@ -18,9 +18,9 @@
       },
       "minecraft:emitter_shape_custom": {
         "offset": [
-          "(2.45 * (variable.vfx_range ?? 1) * (variable.particle_random_1 < 0.5 ? -1 : 1) * math.pow(math.abs(2 * variable.particle_random_1 - 1), 1.35)) * (variable.vfx_right_x ?? 1) + (0.26 + (variable.vfx_range ?? 1) * (0.24 + 2.5 * variable.particle_random_3)) * (variable.vfx_right_z ?? 0)",
-          "1.28 + (variable.vfx_height ?? 0) + 1.7 * (variable.particle_random_2 - 0.5)",
-          "(2.45 * (variable.vfx_range ?? 1) * (variable.particle_random_1 < 0.5 ? -1 : 1) * math.pow(math.abs(2 * variable.particle_random_1 - 1), 1.35)) * (variable.vfx_right_z ?? 0) - (0.26 + (variable.vfx_range ?? 1) * (0.24 + 2.5 * variable.particle_random_3)) * (variable.vfx_right_x ?? 1)"
+          "((2.45 * (variable.vfx_range ?? 1) * (variable.particle_random_1 < 0.5 ? -1 : 1) * math.pow(math.abs(2 * variable.particle_random_1 - 1), 1.35)) * (variable.vfx_right_x ?? 1) + (0.26 + (variable.vfx_range ?? 1) * (0.24 + 2.5 * variable.particle_random_3)) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
+          "(1.28 + (variable.vfx_height ?? 0) + 1.7 * (variable.particle_random_2 - 0.5)) * (variable.vfx_scale ?? 1)",
+          "((2.45 * (variable.vfx_range ?? 1) * (variable.particle_random_1 < 0.5 ? -1 : 1) * math.pow(math.abs(2 * variable.particle_random_1 - 1), 1.35)) * (variable.vfx_right_z ?? 0) - (0.26 + (variable.vfx_range ?? 1) * (0.24 + 2.5 * variable.particle_random_3)) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
         ],
         "direction": [
           0,
@@ -29,9 +29,9 @@
         ]
       },
       "minecraft:particle_initial_speed": [
-        "(variable.particle_random_4 < 0.32 ? 0 : 0.22 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_3 - 1)) * (variable.vfx_right_x ?? 1) + (variable.particle_random_4 < 0.32 ? 0 : 0.17 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_2 - 1)) * (variable.vfx_right_z ?? 0)",
-        "variable.particle_random_4 < 0.32 ? 0 : 0.13 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_1 - 1)",
-        "(variable.particle_random_4 < 0.32 ? 0 : 0.22 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_3 - 1)) * (variable.vfx_right_z ?? 0) - (variable.particle_random_4 < 0.32 ? 0 : 0.17 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_2 - 1)) * (variable.vfx_right_x ?? 1)"
+        "((variable.particle_random_4 < 0.32 ? 0 : 0.22 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_3 - 1)) * (variable.vfx_right_x ?? 1) + (variable.particle_random_4 < 0.32 ? 0 : 0.17 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_2 - 1)) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
+        "(variable.particle_random_4 < 0.32 ? 0 : 0.13 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_1 - 1)) * (variable.vfx_scale ?? 1)",
+        "((variable.particle_random_4 < 0.32 ? 0 : 0.22 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_3 - 1)) * (variable.vfx_right_z ?? 0) - (variable.particle_random_4 < 0.32 ? 0 : 0.17 * (variable.vfx_speed ?? 1) * (2 * variable.particle_random_2 - 1)) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
       ],
       "minecraft:particle_motion_dynamic": {
         "linear_drag_coefficient": 0.38
@@ -42,12 +42,12 @@
       "minecraft:particle_appearance_billboard": {
         "facing_camera_mode": "lookat_xyz",
         "size": [
-          "(variable.vfx_size ?? 1) * (0.042 + 0.105 * math.pow(variable.particle_random_4, 2.6))",
-          "(variable.vfx_size ?? 1) * (0.042 + 0.105 * math.pow(variable.particle_random_4, 2.6))"
+          "((variable.vfx_size ?? 1) * (0.042 + 0.105 * math.pow(variable.particle_random_4, 2.6))) * (variable.vfx_scale ?? 1)",
+          "((variable.vfx_size ?? 1) * (0.042 + 0.105 * math.pow(variable.particle_random_4, 2.6))) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
           "texture_width": 256,
-          "texture_height": 128,
+          "texture_height": 256,
           "uv": [
             "variable.particle_random_4 > 0.82 ? 32 : 0",
             0

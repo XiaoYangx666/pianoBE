@@ -4,12 +4,14 @@ import { EventCursor, OTHER_SCALE, SCHEDULE_LEAD_TICKS, TIME_SCALE, readAllPbe2N
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
+import type { PianoTransportEvent } from "./visualEvent";
 
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
 
 interface MidiOutput {
-    note(note: NoteInfo, duration: number, velocity: number, gain: number): void;
+    note(note: NoteInfo, duration: number, velocity: number, gain: number, songTime: number, hasVelocity: boolean): void;
     playing(value: boolean): void;
+    transport?(event: PianoTransportEvent): void;
     /** 立即停止所有正在发声/释放的实例（seek、暂停、销毁）；正常播放结束不调用。 */
     stopNotes(): void;
 }
@@ -90,9 +92,11 @@ export class MidiPlayer {
             this.state = "idle";
             this.isLoading = false;
             this.output.playing(false);
+            this.output.transport?.({ type: "stop", position: 0 });
             return;
         }
 
+        this.output.transport?.({ type: "track", position: 0 });
         this.isLoading = true;
         await this.loadMidi(info, generation);
         if (generation !== this.generation) return;
@@ -105,6 +109,7 @@ export class MidiPlayer {
 
         this.state = "playing";
         this.output.playing(true);
+        this.output.transport?.({ type: "start", position: 0 });
         this.lastTime = Date.now();
     }
 
@@ -113,6 +118,7 @@ export class MidiPlayer {
         this.state = "paused";
         this.output.stopNotes();
         this.output.playing(false);
+        this.output.transport?.({ type: "pause", position: this.currentTime });
     }
 
     resume() {
@@ -125,6 +131,7 @@ export class MidiPlayer {
 
         this.state = "playing";
         this.output.playing(true);
+        this.output.transport?.({ type: "resume", position: this.currentTime });
         this.lastTime = Date.now();
     }
 
@@ -184,6 +191,7 @@ export class MidiPlayer {
         // 先收掉跳转前的所有实例，避免旧音符继续发声到原定释放时间。
         this.output.stopNotes();
         this.cursor.seek(target * TIME_SCALE);
+        this.output.transport?.({ type: "seek", position: target });
 
         if (this.state === "idle" || this.state === "stopped") {
             this.state = "playing";
@@ -199,6 +207,7 @@ export class MidiPlayer {
         this.state = "stopped";
         this.output.stopNotes();
         this.output.playing(false);
+        this.output.transport?.({ type: "stop", position: this.currentTime });
         this.releaseSong();
         this.currentTime = 0;
         this.isLoading = false;
@@ -304,12 +313,14 @@ export class MidiPlayer {
         for (let attempt = 0; attempt < limit; attempt++) {
             const nextInfo = this.queue.next();
             if (!nextInfo) break;
+            this.output.transport?.({ type: "track", position: 0 });
             await this.loadMidi(nextInfo, generation);
             if (generation !== this.generation) return;
 
             if (this.hasContent()) {
                 this.state = "playing";
                 this.output.playing(true);
+                this.output.transport?.({ type: "start", position: 0 });
                 this.lastTime = Date.now();
                 this.isLoading = false;
                 return;
@@ -317,6 +328,7 @@ export class MidiPlayer {
         }
         this.state = "idle";
         this.output.playing(false);
+        this.output.transport?.({ type: "stop", position: this.currentTime });
         this.isLoading = false;
     }
 
@@ -332,7 +344,8 @@ export class MidiPlayer {
             if (time > horizon || time === Infinity) break;
             const note = cursor.next();
             if (!note) break;
-            this.playNote(processNote(note.midi, false), note.duration / OTHER_SCALE, note.velocity);
+            this.output.note(processNote(note.midi, false), note.duration / OTHER_SCALE, note.velocity,
+                this.normalizationGain, time / TIME_SCALE, this.song?.song.header.hasVelocity ?? false);
         }
     }
 
@@ -371,10 +384,6 @@ export class MidiPlayer {
         this.song = undefined;
         song?.release();
         this.updateNormalizationGain();
-    }
-
-    private playNote(info: NoteInfo, duration: number, velocity: number) {
-        this.output.note(info, duration, velocity, this.normalizationGain);
     }
 
     /* ================== 状态判断 ================== */

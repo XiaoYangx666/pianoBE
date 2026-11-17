@@ -1,0 +1,70 @@
+{
+  "format_version": "1.10.0",
+  "particle_effect": {
+    "description": {
+      "identifier": "pbe:vfx_fountain",
+      "basic_render_parameters": {
+        "material": "particles_add",
+        "texture": "textures/particle/vfx_lab"
+      }
+    },
+    "components": {
+      "minecraft:emitter_rate_instant": {
+        "num_particles": "(variable.vfx_count ?? 8)"
+      },
+      "minecraft:emitter_lifetime_once": {
+        "active_time": 1.4
+      },
+      "minecraft:emitter_shape_custom": {
+        "offset": [
+          "((0.19 * (2 * variable.particle_random_1 - 1)) * (variable.vfx_right_x ?? 1) + (0.15 * (2 * variable.particle_random_4 - 1)) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
+          "(0) * (variable.vfx_scale ?? 1)",
+          "((0.19 * (2 * variable.particle_random_1 - 1)) * (variable.vfx_right_z ?? 0) - (0.15 * (2 * variable.particle_random_4 - 1)) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
+        ]
+      },
+      "minecraft:particle_initial_speed": [
+        "(((variable.vfx_side ?? 1) * (0.22 + 0.85 * variable.particle_random_1)) * (variable.vfx_right_x ?? 1) + (0.15 + 0.58 * variable.particle_random_4) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
+        "((2.6 + 1.65 * variable.particle_random_2) * (variable.vfx_speed ?? 1)) * (variable.vfx_scale ?? 1)",
+        "(((variable.vfx_side ?? 1) * (0.22 + 0.85 * variable.particle_random_1)) * (variable.vfx_right_z ?? 0) - (0.15 + 0.58 * variable.particle_random_4) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
+      ],
+      "minecraft:particle_motion_dynamic": {
+        "linear_acceleration": [
+          0,
+          "(-7.6) * (variable.vfx_scale ?? 1)",
+          0
+        ],
+        "linear_drag_coefficient": 0.15
+      },
+      "minecraft:particle_lifetime_expression": {
+        "max_lifetime": "(variable.vfx_life ?? 1.15) * (0.65 + 0.5 * variable.particle_random_2)"
+      },
+      "minecraft:particle_appearance_billboard": {
+        "facing_camera_mode": "rotate_xyz",
+        "size": [
+          "((0.036 + 0.035 * variable.particle_random_3) * (variable.vfx_size ?? 1)) * (variable.vfx_scale ?? 1)",
+          "1.45 * ((0.036 + 0.035 * variable.particle_random_3) * (variable.vfx_size ?? 1)) * (variable.vfx_scale ?? 1)"
+        ],
+        "uv": {
+          "texture_width": 256,
+          "texture_height": 256,
+          "uv": [
+            128,
+            0
+          ],
+          "uv_size": [
+            32,
+            32
+          ]
+        }
+      },
+      "minecraft:particle_appearance_tinting": {
+        "color": [
+          "(variable.vfx_red ?? 1)",
+          "(variable.vfx_green ?? 0.86)",
+          "(variable.vfx_blue ?? 0.65)",
+          "(variable.vfx_opacity ?? 0.75) * math.clamp((variable.particle_age) / 0.09, 0, 1) * math.clamp((variable.particle_lifetime - (variable.particle_age)) / 0.46, 0, 1)"
+        ]
+      }
+    }
+  }
+}

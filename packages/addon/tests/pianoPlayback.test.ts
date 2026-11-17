@@ -7,6 +7,7 @@ import {
     type SongHandle,
 } from "@piano/core";
 import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
+import type { PianoTransportEvent } from "../src/domain/playback/visualEvent";
 
 const song = { id: "sample", name: "Sample", duration: 400 };
 
@@ -57,6 +58,29 @@ function fixture() {
     });
     return { midi, notes, playing, stopNotes };
 }
+
+test("visual output preserves source note time, default velocity and transport boundaries", async () => {
+    const transport: PianoTransportEvent[] = [];
+    const notes: [number, number, number, boolean][] = [];
+    const legacy = handleFor(song);
+    const midi = new MidiPlayer({ acquire: async () => legacy }, {
+        note: (info, _duration, velocity, _gain, time, hasVelocity) => notes.push([info.midi, time, velocity, hasVelocity]),
+        playing: () => {}, stopNotes: () => {}, transport: event => transport.push(event),
+    });
+    midi.queue.enqueue(song);
+    await midi.play();
+    midi.tick(Date.now() + 25);
+    expect(notes[0]).toEqual([60, 0, 100, false]);
+    midi.pause();
+    midi.seek(2);
+    midi.resume();
+    midi.tick(Date.now() + 25);
+    await midi.play();
+    midi.end();
+    expect(notes[1]).toEqual([62, 2, 100, false]);
+    expect(transport.map(event => event.type)).toEqual(["track", "start", "pause", "seek", "resume", "track", "start", "stop"]);
+    expect(transport[3].position).toBe(2);
+});
 
 test("loaded piano resumes the saved song and skips earlier notes", async () => {
     const { midi, notes } = fixture();

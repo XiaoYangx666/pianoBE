@@ -22,6 +22,7 @@ import { CardSlot } from "@platform/storage/cardSlot";
 import { CardAccess } from "@platform/storage/cardItem";
 import type { MusicStorage } from "@domain/music/storage";
 import { SoundReleaseQueue } from "@domain/playback/soundRelease";
+import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visualEvent";
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -52,7 +53,8 @@ export class PianoRuntime {
     readonly hitModel;
     readonly disposedSignal = new Signal<void>();
     /** 每次真正发声时发布；per-piano 键位视图用它聚合所有来源的按键。 */
-    readonly noteSignal = new Signal<{ midi: number; duration: number }>();
+    readonly noteSignal = new Signal<Pick<PianoVisualNote, "midi" | "duration"> & Partial<PianoVisualNote>>();
+    readonly transportSignal = new Signal<PianoTransportEvent>();
     /** 运行时每 tick 发布，UI 等订阅者用来做到期清理，避免自己挂定时器。 */
     readonly tickSignal = new Signal<number>();
     private display?: PianoDisplay;
@@ -260,8 +262,8 @@ export class PianoRuntime {
             this.midi = new MidiPlayer(
                 { acquire: (ref: MusicRef) => this.music.acquire(ref) },
                 {
-                    note: (note, duration, velocity, gain) => {
-                        if (this.playNote(note, velocity, duration, gain)
+                    note: (note, duration, velocity, gain, songTime, hasVelocity) => {
+                        if (this.playNote(note, velocity, duration, gain, false, songTime, hasVelocity)
                             && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance) {
                             this.midiHandsThisTick |= pianoHandZoneBit(note.midi);
                         }
@@ -273,6 +275,7 @@ export class PianoRuntime {
                     },
                     // 正常播放结束时不调用 stopNotes：释放队列的 600ms 尾音交给 tick 自然走完。
                     stopNotes: () => this.soundReleases.stopAll(),
+                    transport: event => this.transportSignal.publish(event),
                 }
             );
         }
@@ -304,7 +307,7 @@ export class PianoRuntime {
         return this.display?.isKeyDown(midi) ?? false;
     }
 
-    playNote(note: NoteInfo, velocity: number, duration: number, gain = 1, manual = false) {
+    playNote(note: NoteInfo, velocity: number, duration: number, gain = 1, manual = false, songTime?: number, hasVelocity = true) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
         const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
@@ -329,7 +332,8 @@ export class PianoRuntime {
             }
         }
         this.display?.strike(note.midi, duration);
-        this.noteSignal.publish({ midi: note.midi, duration });
+        this.noteSignal.publish({ midi: note.midi, duration, velocity, tick: system.currentTick,
+            source: manual ? "manual" : "midi", songTime, hasVelocity });
         this.activate();
         if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);
         return true;
@@ -417,6 +421,7 @@ export class PianoRuntime {
         this.disposedSignal.publish();
         this.disposedSignal.dispose();
         this.noteSignal.dispose();
+        this.transportSignal.dispose();
         this.tickSignal.dispose();
         if (!removeVisual) {
             try {

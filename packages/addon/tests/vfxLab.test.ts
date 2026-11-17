@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
-import { parseVfxOptions, planVfxScene, VFX_LIMITS, VFX_SCENES, VFX_EMITTERS_PER_TICK } from "../src/domain/piano/vfxLab";
+import { effectEmitters, parseVfxOptions, planVfxScene, VFX_EFFECTS, VFX_LIMITS,
+    VFX_SCENES, VFX_EMITTERS_PER_TICK, type VfxEffect } from "../src/domain/piano/vfxLab";
 
 test("Lab rejects malformed, non-finite, out-of-range and unknown options", () => {
     expect(parseVfxOptions('{"range":1.4,"waveColor":"#2ED9FF","lanes":1}')).toEqual({
@@ -45,7 +46,7 @@ test("wave covers every center column and offsets its two inner layers in depth 
     expect(columns[0]).toBeCloseTo(-2.3);
     expect(columns.at(-1)).toBeCloseTo(2.3);
     expect(columns.slice(1).every((x, i) => Math.abs(x - columns[i] - 4.6 / 32) < 1e-8)).toBe(true);
-    expect(wave.every(emitter => emitter.offset.z > 1 && emitter.variables.radius > 0.12)).toBe(true);
+    expect(wave.every(emitter => emitter.offset.z > 1 && emitter.variables.radius < 0.14)).toBe(true);
     const center = wave.filter(emitter => emitter.offset.x === 0);
     expect(center.map(emitter => emitter.variables.phase)).toEqual([-37, 0, 37]);
     expect(center[0].offset.z).toBeLessThan(center[1].offset.z);
@@ -86,11 +87,10 @@ test("particle documents reference the original atlas and declare only supplied 
     expect(mer.toString("ascii", 37, 41)).toBe("IDAT");
     const emissive = inflateSync(mer.subarray(41, 41 + mer.readUInt32BE(33)));
     const green = (x: number, y: number) => emissive[y * (width * 3 + 1) + x * 3 + 2];
-    expect(green(172, 72)).toBeGreaterThan(200);
-    expect(green(80, 16)).toBeGreaterThan(190);
+    expect(green(172, 72)).toBeGreaterThan(125);
+    expect(green(80, 16)).toBeWithin(35, 64);
     expect(green(0, 48)).toBe(0);
-    const build = planVfxScene("demo").flatMap(cue => cue.emitters);
-    for (const effect of ["field", "wave", "beam"]) {
+    for (const effect of Object.keys(VFX_EFFECTS) as VfxEffect[]) {
         const source = readFileSync(new URL(`particles/pbe_vfx_${effect}.particle.json`, resource), "utf8");
         const document = JSON.parse(source).particle_effect;
         expect(document.description.identifier).toBe(`pbe:vfx_${effect}`);
@@ -102,8 +102,8 @@ test("particle documents reference the original atlas and declare only supplied 
             expect(u + uv.uv_size[0]).toBeLessThanOrEqual(width);
             expect(v + uv.uv_size[1]).toBeLessThanOrEqual(height);
         }
-        const variables = new Set(Object.keys(build.find(emitter => emitter.effect === effect)!.variables));
-        variables.add("right_x").add("right_z");
+        const variables = new Set(Object.keys(effectEmitters(effect, {})[0].variables));
+        variables.add("right_x").add("right_z").add("scale");
         for (const match of source.matchAll(/variable\.vfx_(\w+)/g)) expect(variables.has(match[1])).toBe(true);
         for (const match of source.matchAll(/variable\.(?!vfx_)(\w+)/g)) {
             expect(/^(particle_age|particle_lifetime|particle_random_[1-4])$/.test(match[1])).toBe(true);

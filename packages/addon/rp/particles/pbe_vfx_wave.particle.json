@@ -29,7 +29,7 @@
       "minecraft:particle_motion_parametric": {
         "relative_position": [
           0,
-          "(variable.vfx_amplitude ?? 0.37) * (math.sin((variable.vfx_phase ?? 0) - (variable.vfx_angular_speed ?? 124) * variable.particle_age) + 0.23 * math.sin(2 * ((variable.vfx_phase ?? 0) - (variable.vfx_angular_speed ?? 124) * variable.particle_age) + 30))",
+          "(math.lerp((variable.vfx_previous_amplitude ?? 0.37), (variable.vfx_amplitude ?? 0.37), math.clamp(variable.particle_age / 0.48, 0, 1)) * (math.sin((variable.vfx_phase ?? 0) - (variable.vfx_angular_speed ?? 124) * variable.particle_age) + 0.23 * math.sin(2 * ((variable.vfx_phase ?? 0) - (variable.vfx_angular_speed ?? 124) * variable.particle_age) + 30))) * (variable.vfx_scale ?? 1)",
           0
         ]
       },
@@ -39,12 +39,12 @@
       "minecraft:particle_appearance_billboard": {
         "facing_camera_mode": "rotate_xyz",
         "size": [
-          "(variable.vfx_radius ?? 0.142)",
-          "(variable.vfx_radius ?? 0.142)"
+          "((variable.vfx_radius ?? 0.109)) * (variable.vfx_scale ?? 1)",
+          "0.72 * ((variable.vfx_radius ?? 0.109)) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
           "texture_width": 256,
-          "texture_height": 128,
+          "texture_height": 256,
           "uv": [
             64,
             0

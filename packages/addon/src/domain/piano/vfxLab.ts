@@ -1,8 +1,9 @@
 import type { Vec3 } from "@domain/geometry/offsets";
+import { quietFeatures, type MusicFeatures } from "./vfxMusic";
 
 export const VFX_SCENES = ["field", "wave", "beam", "mix", "burst", "demo"] as const;
 export type VfxScene = typeof VFX_SCENES[number];
-export type VfxEffect = "field" | "wave" | "beam";
+export type VfxEffect = "field" | "wave" | "beam" | "ripple" | "fountain" | "curtain" | "orbit";
 
 export const VFX_LIMITS = {
     range: [0.65, 1.6],
@@ -21,9 +22,15 @@ export const VFX_LIMITS = {
     bend: [0, 1.4],
     lanes: [1, 6],
     segments: [1, 3],
+    x: [-5, 5],
+    y: [-3, 4],
+    z: [-5, 7],
+    rotation: [-180, 180],
+    scale: [0.5, 1.7],
+    intensity: [0, 1],
 } as const;
 
-type NumericParameter = keyof typeof VFX_LIMITS;
+export type NumericParameter = keyof typeof VFX_LIMITS;
 export type VfxOptions = Partial<Record<NumericParameter, number> & Record<`${VfxEffect}Color`, string>>;
 export interface VfxEmitter {
     effect: VfxEffect;
@@ -32,21 +39,26 @@ export interface VfxEmitter {
     /** Upper bounds used only for reservations and diagnostics. */
     particles: number;
     lifetime: number;
+    transform?: Pick<VfxOptions, "x" | "y" | "z" | "rotation" | "scale">;
 }
 export interface VfxCue {
     tick: number;
     emitters: VfxEmitter[];
 }
 
-const colorKeys = ["fieldColor", "waveColor", "beamColor"];
-const palette = { field: "#A6B7FB", wave: "#93E6FF", beam: "#FFD8B2" };
+const palette: Record<VfxEffect, string> = {
+    field: "#A6B7FB", wave: "#79BCDD", beam: "#FFD8B2", ripple: "#8AE4DB",
+    fountain: "#FFDDA8", curtain: "#8C9EEF", orbit: "#D4A9FE",
+};
 const origin = { x: 0, y: 0, z: 0 };
 const ticksPerSecond = 20;
 export const VFX_EMITTERS_PER_TICK = 6;
 
 export function parseVfxOptions(input: string): VfxOptions {
-    if (!input) return {};
-    const options: unknown = JSON.parse(input);
+    return input ? validateVfxOptions(JSON.parse(input)) : {};
+}
+
+export function validateVfxOptions(options: unknown): VfxOptions {
     if (!options || typeof options !== "object" || Array.isArray(options)) {
         throw new Error("参数需要是 JSON 对象");
     }
@@ -59,7 +71,8 @@ export function parseVfxOptions(input: string): VfxOptions {
             if ((key === "lanes" || key === "segments") && !Number.isInteger(value)) {
                 throw new Error(`${key} 需要是整数`);
             }
-        } else if (!colorKeys.includes(key) || typeof value !== "string" || !/^#[a-f\d]{6}$/i.test(value)) {
+        } else if (!key.endsWith("Color") || !Object.hasOwn(palette, key.slice(0, -5)) ||
+            typeof value !== "string" || !/^#[a-f\d]{6}$/i.test(value)) {
             throw new Error(`无效参数 ${key}，颜色格式为 #RRGGBB`);
         }
     }
@@ -72,7 +85,7 @@ function tint(effect: VfxEffect, options: VfxOptions, opacity: number) {
         red: parseInt(code.slice(1, 3), 16) / 255,
         green: parseInt(code.slice(3, 5), 16) / 255,
         blue: parseInt(code.slice(5, 7), 16) / 255,
-        opacity: opacity * (options.opacity ?? 1),
+        opacity: opacity * (options.opacity ?? 1) * (options.intensity ?? 1),
     };
 }
 
@@ -90,7 +103,7 @@ function field(options: VfxOptions, opacity: number, rate: number, seconds: numb
     };
 }
 
-function wave(options: VfxOptions, opacity: number, amplitude: number, life: number): VfxEmitter[] {
+function wave(options: VfxOptions, opacity: number, amplitude: number, life: number, previous = options): VfxEmitter[] {
     const span = 4.6 * (options.range ?? 1);
     const columns = 2 * Math.round(16 * Math.max(0.75, options.density ?? 1)) + 1;
     const step = span / (columns - 1);
@@ -111,11 +124,12 @@ function wave(options: VfxOptions, opacity: number, amplitude: number, life: num
                 offset: { x, y: 1.56 + (options.height ?? 0) + layer * 0.19, z: 1.59 + layer * spacing + depthCurve },
                 lifetime: life, particles: 1,
                 variables: {
-                    ...tint("wave", options, opacity * (layer === 0 ? 0.84 : layer === -1 ? 0.31 : 0.24)
+                    ...tint("wave", options, opacity * (layer === 0 ? 0.57 : layer === -1 ? 0.24 : 0.16)
                         * (0.28 + 0.72 * Math.sin(Math.PI * u) ** 0.55)),
                     phase: angle, angular_speed: angularSpeed,
                     amplitude: (options.amplitude ?? 0.37) * amplitude * (0.48 + 0.52 * Math.sin(Math.PI * u)),
-                    radius: step * (layer === 0 ? 0.99 : 1.72) * (options.size ?? 1), life,
+                    previous_amplitude: (previous.amplitude ?? 0.37) * amplitude * (0.48 + 0.52 * Math.sin(Math.PI * u)),
+                    radius: step * (layer === 0 ? 0.76 : 0.94) * (options.size ?? 1), life,
                 },
             });
         }
@@ -123,7 +137,7 @@ function wave(options: VfxOptions, opacity: number, amplitude: number, life: num
     return emitters;
 }
 
-function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst: boolean): VfxEmitter[] {
+function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst: boolean, previous = options): VfxEmitter[] {
     const range = options.range ?? 1;
     const life = 2.7 / (options.speed ?? 1);
     const lanes = options.lanes ?? defaultLanes;
@@ -145,12 +159,119 @@ function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst:
                     bend: (options.bend ?? 0.56) * reverse,
                     length: (options.length ?? 1.36) * [1, 0.8, 0.55][segment],
                     width: (options.width ?? 0.16) * (options.size ?? 1),
-                    life, delay: delay / ticksPerSecond,
+                    life, delay: delay / ticksPerSecond, height_delta: (previous.height ?? 0) - (options.height ?? 0),
                 },
             });
         }
     }
     return emitters;
+}
+
+function ripple(options: VfxOptions, music: Readonly<MusicFeatures>): VfxEmitter[] {
+    const layers = music.chord > 0.45 ? 3 : music.chord ? 2 : 1;
+    return Array.from({ length: layers }, (_, index) => {
+        const life = (1.1 + index * 0.17) / (options.speed ?? 1);
+        return {
+            effect: "ripple", offset: { x: 0, y: 0.23 + index * 0.065 + (options.height ?? 0), z: 1.1 },
+            lifetime: life, particles: 1,
+            variables: {
+                ...tint("ripple", options, 0.56 / (1 + index * 0.48)),
+                life, radius: (1.9 + 0.55 * index) * (options.range ?? 1),
+                size: options.size ?? 1,
+            },
+        };
+    });
+}
+
+function fountain(options: VfxOptions): VfxEmitter[] {
+    const life = 1.15;
+    const count = Math.round(8 * (options.density ?? 1));
+    return [-1, 1].map(side => ({
+        effect: "fountain", offset: {
+            x: side * 1.35 * (options.range ?? 1), y: 0.32 + (options.height ?? 0), z: 1.64,
+        },
+        lifetime: life + 0.25, particles: count,
+        variables: { ...tint("fountain", options, 0.63), count, life,
+            side, speed: options.speed ?? 1, size: options.size ?? 1 },
+    }));
+}
+
+function curtain(options: VfxOptions): VfxEmitter[] {
+    const range = options.range ?? 1;
+    const life = 1.38;
+    const columns = Math.round(7 * (options.density ?? 1));
+    return Array.from({ length: columns }, (_, index) => {
+        const x = (index / (columns - 1) - 0.5) * 4.1;
+        return {
+            effect: "curtain", offset: { x: x * range, y: 1.68 + (options.height ?? 0), z: 2.67 + Math.cos(x) * 0.23 },
+            lifetime: life, particles: 1,
+            variables: {
+                ...tint("curtain", options, 0.22 + 0.17 * Math.cos(x * 0.6)), life,
+                phase: index * 44 + (options.phase ?? 0), speed: options.speed ?? 1,
+                length: (options.length ?? 1.4) * (0.68 + 0.32 * Math.cos(x * 0.8)),
+                width: (options.width ?? 0.14) * (options.size ?? 1),
+            },
+        };
+    });
+}
+
+function orbit(options: VfxOptions): VfxEmitter[] {
+    const life = 2.45;
+    const count = Math.round(10 * (options.density ?? 1));
+    return [{
+        effect: "orbit", offset: { x: 0, y: 1.32 + (options.height ?? 0), z: 1.69 },
+        lifetime: life, particles: count,
+        variables: {
+            ...tint("orbit", options, 0.53), life, count, radius: 1.42 * (options.range ?? 1),
+            speed: options.speed ?? 1, size: options.size ?? 1, phase: options.phase ?? 0,
+        },
+    }];
+}
+
+export type VfxMode = "autonomous" | "trigger" | "continuous";
+export type VfxCategory = "atmosphere" | "line" | "surface" | "stage" | "geometry";
+export interface VfxEffectContext {
+    music: Readonly<MusicFeatures>;
+    previous: VfxOptions;
+}
+interface VfxDefinition {
+    category: VfxCategory;
+    mode: VfxMode;
+    interval: number;
+    options: readonly NumericParameter[];
+    emit(options: VfxOptions, context: VfxEffectContext): VfxEmitter[];
+}
+const stageOptions = ["range", "height", "opacity", "size", "speed", "density"] as const;
+
+/** Effect factories are pure. Scheduling and transports only consume this catalog. */
+export const VFX_EFFECTS: Record<VfxEffect, VfxDefinition> = {
+    field: { category: "atmosphere", mode: "autonomous", interval: 32, options: stageOptions,
+        emit: o => [field(o, 0.68, 10, 1.7)] },
+    wave: { category: "surface", mode: "continuous", interval: 30,
+        options: [...stageOptions, "amplitude", "wavelength", "period", "phase"],
+        emit: (o, c) => wave(o, 1, 1, 2.35, c.previous) },
+    beam: { category: "line", mode: "continuous", interval: 24,
+        options: [...stageOptions, "heading", "length", "width", "bend", "lanes", "segments"],
+        emit: (o, c) => beam({ lanes: 2, segments: 2, ...o }, 0.73, 2, false, c.previous) },
+    ripple: { category: "geometry", mode: "trigger", interval: 16, options: stageOptions,
+        emit: (o, c) => ripple(o, c.music) },
+    fountain: { category: "stage", mode: "continuous", interval: 18, options: stageOptions,
+        emit: fountain },
+    curtain: { category: "surface", mode: "continuous", interval: 18,
+        options: [...stageOptions, "length", "width", "phase"], emit: curtain },
+    orbit: { category: "geometry", mode: "autonomous", interval: 35,
+        options: [...stageOptions, "phase"], emit: orbit },
+};
+
+export function effectEmitters(effect: VfxEffect, options: VfxOptions, context: VfxEffectContext = {
+    music: quietFeatures, previous: options,
+}): VfxEmitter[] {
+    return applyTransform(options, VFX_EFFECTS[effect].emit(options, context));
+}
+
+function applyTransform(options: VfxOptions, emitters: VfxEmitter[]): VfxEmitter[] {
+    const { x, y, z, rotation, scale } = options;
+    return emitters.map(emitter => ({ ...emitter, transform: { x, y, z, rotation, scale } }));
 }
 
 /** Cues are relative to the scene start. Wave phase is corrected at dispatch. */
@@ -160,7 +281,7 @@ export function planVfxScene(scene: VfxScene, options: VfxOptions = {}): VfxCue[
         // Allocate no more than one scene's packet share on a tick.
         const start = Math.round(seconds * ticksPerSecond);
         for (let index = 0; index < emitters.length; index += VFX_EMITTERS_PER_TICK) {
-            const batch = emitters.slice(index, index + VFX_EMITTERS_PER_TICK);
+            const batch = applyTransform(options, emitters.slice(index, index + VFX_EMITTERS_PER_TICK));
             const requested = start + index / VFX_EMITTERS_PER_TICK;
             const tick = Math.max(requested, (cues.at(-1)?.tick ?? -1) + 1);
             cues.push({ tick, emitters: batch });
