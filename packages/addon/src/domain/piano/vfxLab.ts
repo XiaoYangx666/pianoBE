@@ -104,32 +104,31 @@ function field(options: VfxOptions, opacity: number, rate: number, seconds: numb
 }
 
 function wave(options: VfxOptions, opacity: number, amplitude: number, life: number, previous = options): VfxEmitter[] {
-    const span = 4.6 * (options.range ?? 1);
-    const columns = 2 * Math.round(16 * Math.max(0.75, options.density ?? 1)) + 1;
-    const step = span / (columns - 1);
-    const frequency = 360 / (options.wavelength ?? 4.6);
+    const range = options.range ?? 1;
+    const columns = 2 * Math.round(18 * Math.max(0.76, options.density ?? 1));
+    const circumference = 12.8 * range;
+    const cycles = Math.max(1, Math.round(circumference / (options.wavelength ?? 5.2)));
+    const step = circumference / columns;
     const angularSpeed = 360 / (options.period ?? 2.9) * (options.speed ?? 1);
     const layers = [-1, 0, 1];
     const emitters: VfxEmitter[] = [];
     for (let column = 0; column < columns; column++) {
-        const u = column / (columns - 1);
-        const x = (u - 0.5) * span;
-        const innerSample = column % 2 === 0 && Math.abs(x) <= span * 0.4;
+        const azimuth = column / columns * 2 * Math.PI;
+        const innerSample = column % 3 === 0;
         for (const layer of innerSample ? layers : [0]) {
-            const angle = frequency * x + layer * 37 + (options.phase ?? 0);
-            const spacing = 0.45 * (options.range ?? 1);
-            const depthCurve = 0.25 * Math.sin(Math.PI * u);
+            const angle = 360 * cycles * column / columns + layer * 37 + (options.phase ?? 0);
+            const radius = (2.21 + 0.23 * layer) * range;
             emitters.push({
                 effect: "wave",
-                offset: { x, y: 1.56 + (options.height ?? 0) + layer * 0.19, z: 1.59 + layer * spacing + depthCurve },
+                offset: { x: radius * Math.cos(azimuth), y: 1.19 + (options.height ?? 0) + layer * 0.18,
+                    z: 0.88 * radius * Math.sin(azimuth) },
                 lifetime: life, particles: 1,
                 variables: {
-                    ...tint("wave", options, opacity * (layer === 0 ? 0.57 : layer === -1 ? 0.24 : 0.16)
-                        * (0.28 + 0.72 * Math.sin(Math.PI * u) ** 0.55)),
+                    ...tint("wave", options, opacity * (layer === 0 ? 0.51 : layer === -1 ? 0.19 : 0.15)),
                     phase: angle, angular_speed: angularSpeed,
-                    amplitude: (options.amplitude ?? 0.37) * amplitude * (0.48 + 0.52 * Math.sin(Math.PI * u)),
-                    previous_amplitude: (previous.amplitude ?? 0.37) * amplitude * (0.48 + 0.52 * Math.sin(Math.PI * u)),
-                    radius: step * (layer === 0 ? 0.76 : 0.94) * (options.size ?? 1), life,
+                    amplitude: (options.amplitude ?? 0.37) * amplitude,
+                    previous_amplitude: (previous.amplitude ?? 0.37) * amplitude,
+                    radius: Math.min(0.16, step * (layer === 0 ? 0.53 : 0.43)) * (options.size ?? 1), life,
                 },
             });
         }
@@ -141,6 +140,7 @@ function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst:
     const range = options.range ?? 1;
     const life = 2.7 / (options.speed ?? 1);
     const lanes = options.lanes ?? defaultLanes;
+    const around = options.heading === undefined && options.bend !== 0;
     const emitters: VfxEmitter[] = [];
     for (let lane = 0; lane < lanes; lane++) {
         const side = lane - (lanes - 1) / 2;
@@ -150,7 +150,7 @@ function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst:
             const delay = Math.round((lane * (burst ? 0.05 : 0.18) + segment * 0.105) * ticksPerSecond);
             emitters.push({
                 effect: "beam",
-                offset: { x: 0, y: 2.12 + (options.height ?? 0) + side * 0.15, z: 1.72 + side * 0.14 },
+                offset: { x: 0, y: 1.65 + (options.height ?? 0) + side * 0.15, z: 0 },
                 lifetime: life + delay / ticksPerSecond, particles: 1,
                 variables: {
                     ...tint("beam", options, opacity * [1, 0.52, 0.24][segment]),
@@ -160,6 +160,9 @@ function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst:
                     length: (options.length ?? 1.36) * [1, 0.8, 0.55][segment],
                     width: (options.width ?? 0.16) * (options.size ?? 1),
                     life, delay: delay / ticksPerSecond, height_delta: (previous.height ?? 0) - (options.height ?? 0),
+                    around: around ? 1 : 0, arc_phase: 35 + 360 / lanes * lane,
+                    arc_sweep: (burst ? 136 : 212) * reverse,
+                    arc_radius: (2.48 + side * 0.09) * range,
                 },
             });
         }
@@ -172,11 +175,11 @@ function ripple(options: VfxOptions, music: Readonly<MusicFeatures>): VfxEmitter
     return Array.from({ length: layers }, (_, index) => {
         const life = (1.1 + index * 0.17) / (options.speed ?? 1);
         return {
-            effect: "ripple", offset: { x: 0, y: 0.23 + index * 0.065 + (options.height ?? 0), z: 1.1 },
+            effect: "ripple", offset: { x: 0, y: 0.23 + index * 0.065 + (options.height ?? 0), z: 0 },
             lifetime: life, particles: 1,
             variables: {
                 ...tint("ripple", options, 0.56 / (1 + index * 0.48)),
-                life, radius: (1.9 + 0.55 * index) * (options.range ?? 1),
+                life, radius: (2.15 + 0.45 * index) * (options.range ?? 1),
                 size: options.size ?? 1,
             },
         };
@@ -188,7 +191,7 @@ function fountain(options: VfxOptions): VfxEmitter[] {
     const count = Math.round(8 * (options.density ?? 1));
     return [-1, 1].map(side => ({
         effect: "fountain", offset: {
-            x: side * 1.35 * (options.range ?? 1), y: 0.32 + (options.height ?? 0), z: 1.64,
+            x: side * 1.88 * (options.range ?? 1), y: 0.32 + (options.height ?? 0), z: -0.18,
         },
         lifetime: life + 0.25, particles: count,
         variables: { ...tint("fountain", options, 0.63), count, life,
@@ -199,16 +202,18 @@ function fountain(options: VfxOptions): VfxEmitter[] {
 function curtain(options: VfxOptions): VfxEmitter[] {
     const range = options.range ?? 1;
     const life = 1.38;
-    const columns = Math.round(7 * (options.density ?? 1));
-    return Array.from({ length: columns }, (_, index) => {
-        const x = (index / (columns - 1) - 0.5) * 4.1;
+    const columns = Math.max(2, Math.round(4 * (options.density ?? 1)));
+    return Array.from({ length: 2 * columns }, (_, index) => {
+        const z = (index % columns / (columns - 1) - 0.5) * 3.05;
+        const side = index < columns ? -1 : 1;
         return {
-            effect: "curtain", offset: { x: x * range, y: 1.68 + (options.height ?? 0), z: 2.67 + Math.cos(x) * 0.23 },
+            effect: "curtain", offset: { x: side * (2.05 + 0.22 * Math.cos(z)) * range,
+                y: 1.58 + (options.height ?? 0), z: z * range },
             lifetime: life, particles: 1,
             variables: {
-                ...tint("curtain", options, 0.22 + 0.17 * Math.cos(x * 0.6)), life,
+                ...tint("curtain", options, 0.19 + 0.14 * Math.cos(z * 0.6)), life,
                 phase: index * 44 + (options.phase ?? 0), speed: options.speed ?? 1,
-                length: (options.length ?? 1.4) * (0.68 + 0.32 * Math.cos(x * 0.8)),
+                length: (options.length ?? 1.4) * (0.68 + 0.32 * Math.cos(z * 0.8)),
                 width: (options.width ?? 0.14) * (options.size ?? 1),
             },
         };
@@ -219,10 +224,10 @@ function orbit(options: VfxOptions): VfxEmitter[] {
     const life = 2.45;
     const count = Math.round(10 * (options.density ?? 1));
     return [{
-        effect: "orbit", offset: { x: 0, y: 1.32 + (options.height ?? 0), z: 1.69 },
+        effect: "orbit", offset: { x: 0, y: 1.17 + (options.height ?? 0), z: 0 },
         lifetime: life, particles: count,
         variables: {
-            ...tint("orbit", options, 0.53), life, count, radius: 1.42 * (options.range ?? 1),
+            ...tint("orbit", options, 0.53), life, count, radius: 2.32 * (options.range ?? 1),
             speed: options.speed ?? 1, size: options.size ?? 1, phase: options.phase ?? 0,
         },
     }];

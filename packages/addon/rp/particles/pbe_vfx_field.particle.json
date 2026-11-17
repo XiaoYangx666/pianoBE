@@ -18,9 +18,9 @@
       },
       "minecraft:emitter_shape_custom": {
         "offset": [
-          "((2.45 * (variable.vfx_range ?? 1) * (variable.particle_random_1 < 0.5 ? -1 : 1) * math.pow(math.abs(2 * variable.particle_random_1 - 1), 1.35)) * (variable.vfx_right_x ?? 1) + (0.26 + (variable.vfx_range ?? 1) * (0.24 + 2.5 * variable.particle_random_3)) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
-          "(1.28 + (variable.vfx_height ?? 0) + 1.7 * (variable.particle_random_2 - 0.5)) * (variable.vfx_scale ?? 1)",
-          "((2.45 * (variable.vfx_range ?? 1) * (variable.particle_random_1 < 0.5 ? -1 : 1) * math.pow(math.abs(2 * variable.particle_random_1 - 1), 1.35)) * (variable.vfx_right_z ?? 0) - (0.26 + (variable.vfx_range ?? 1) * (0.24 + 2.5 * variable.particle_random_3)) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
+          "((math.cos(360 * variable.particle_random_1) * (1.49 + 1.32 * variable.particle_random_3) * (variable.vfx_range ?? 1)) * (variable.vfx_right_x ?? 1) + (math.sin(360 * variable.particle_random_1) * (1.49 + 1.32 * variable.particle_random_3) * (variable.vfx_range ?? 1) * 0.91 * (variable.vfx_stage_depth ?? 1)) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
+          "(1.08 + (variable.vfx_height ?? 0) + 1.64 * (variable.particle_random_2 - 0.5)) * (variable.vfx_scale ?? 1)",
+          "((math.cos(360 * variable.particle_random_1) * (1.49 + 1.32 * variable.particle_random_3) * (variable.vfx_range ?? 1)) * (variable.vfx_right_z ?? 0) - (math.sin(360 * variable.particle_random_1) * (1.49 + 1.32 * variable.particle_random_3) * (variable.vfx_range ?? 1) * 0.91 * (variable.vfx_stage_depth ?? 1)) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
         ],
         "direction": [
           0,

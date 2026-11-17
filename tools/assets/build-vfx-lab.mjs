@@ -147,6 +147,7 @@ const rightZ = param("right_z", 0);
 const rotate = (x, y, z) => [`(${x}) * ${rightX} + (${z}) * ${rightZ}`, y, `(${x}) * ${rightZ} - (${z}) * ${rightX}`];
 const scaled = (expr) => `(${expr}) * ${param("scale", 1)}`;
 const position = (x, y, z) => rotate(x, y, z).map(scaled);
+const stageDepth = param("stage_depth", 1);
 const uv = ([x, y, w, h]) => ({ texture_width: width, texture_height: height, uv: [x, y], uv_size: [w, h] });
 const tint = ([r, g, b], alpha) => ({ color: [param("red", r), param("green", g), param("blue", b), `${param("opacity", 0.75)} * ${alpha}`] });
 const localSpace = { position: true, rotation: true };
@@ -162,16 +163,17 @@ function particle(name, components) {
 }
 
 const extent = param("range", 1);
+const fieldAngle = `360 * ${random(1)}`;
+const fieldRadius = `(1.49 + 1.32 * ${random(3)}) * ${extent}`;
 const moteSize = scaled(`${param("size", 1)} * (0.042 + 0.105 * math.pow(${random(4)}, 2.6))`);
 const drift = (scale, seed) => `${random(4)} < 0.32 ? 0 : ${scale} * ${param("speed", 1)} * (2 * ${random(seed)} - 1)`;
 particle("field", {
     "minecraft:emitter_rate_steady": { spawn_rate: param("rate", 12), max_particles: param("max_particles", 38) },
     "minecraft:emitter_lifetime_once": { active_time: param("active", 2.1) },
     "minecraft:emitter_shape_custom": {
-        // The symmetric power distribution concentrates particles in the interior of the volume.
-        offset: position(`2.45 * ${extent} * (${random(1)} < 0.5 ? -1 : 1) * math.pow(math.abs(2 * ${random(1)} - 1), 1.35)`,
-            `1.28 + ${param("height", 0)} + 1.7 * (${random(2)} - 0.5)`,
-            `0.26 + ${extent} * (0.24 + 2.5 * ${random(3)})`),
+        offset: position(`math.cos(${fieldAngle}) * ${fieldRadius}`,
+            `1.08 + ${param("height", 0)} + 1.64 * (${random(2)} - 0.5)`,
+            `math.sin(${fieldAngle}) * ${fieldRadius} * 0.91 * ${stageDepth}`),
         direction: [0, 1, 0],
     },
     "minecraft:particle_initial_speed": position(drift(0.22, 3), drift(0.13, 1), drift(0.17, 2)),
@@ -222,15 +224,25 @@ const dirZ = param("dir_z", 0);
 const crossSlope = `3.141593 * ${bend} * math.cos(180 * ${progress}) / ${span}`;
 const heightDelta = param("height_delta", 0);
 const climb = `${heightDelta} * (1 - ${saturate(`(${elapsed}) / 0.64`)})`;
+const arc = param("around", 1);
+const arcSweep = param("arc_sweep", 212);
+const arcAngle = `${param("arc_phase", 35)} + ${arcSweep} * ${progress}`;
+const arcRadius = param("arc_radius", 2.48);
+const arcDepth = `(0.77 + 0.1 * math.abs(${bend})) * ${stageDepth}`;
+const arcSign = `${arcSweep} < 0 ? -1 : 1`;
+const arcOrLine = (curve, line) => `(${arc} > 0.5 ? (${curve}) : (${line}))`;
+const lineSlopeY = `(1.665044 * math.abs(${bend}) * math.cos(180 * ${progress} - 24) - ((${elapsed}) >= 0 && (${elapsed}) < 0.64 ? ${heightDelta} * ${life} / 0.64 : 0)) / ${span}`;
 particle("beam", {
     "minecraft:emitter_rate_instant": { num_particles: 1 },
     "minecraft:emitter_lifetime_once": { active_time: beamLife },
     "minecraft:emitter_local_space": localSpace,
     "minecraft:emitter_shape_point": point,
     "minecraft:particle_motion_parametric": {
-        relative_position: position(`(${track}) * ${dirX} - (${lateral}) * ${dirZ}`,
-            `0.53 * math.abs(${bend}) * math.sin(180 * ${progress} - 24) + ${climb}`,
-            `(${track}) * ${dirZ} + (${lateral}) * ${dirX}`),
+        relative_position: position(
+            arcOrLine(`math.cos(${arcAngle}) * ${arcRadius}`, `(${track}) * ${dirX} - (${lateral}) * ${dirZ}`),
+            `${arcOrLine(`0.59 * ${bend} * math.sin(${arcAngle} - 24)`,
+                `0.53 * math.abs(${bend}) * math.sin(180 * ${progress} - 24)`)} + ${climb}`,
+            arcOrLine(`math.sin(${arcAngle}) * ${arcRadius} * ${arcDepth}`, `(${track}) * ${dirZ} + (${lateral}) * ${dirX}`)),
     },
     "minecraft:particle_lifetime_expression": { max_lifetime: beamLife },
     "minecraft:particle_appearance_billboard": {
@@ -239,9 +251,10 @@ particle("beam", {
             scaled(`0.5 * ${param("width", 0.16)}`)],
         direction: {
             mode: "custom_direction",
-            custom_direction: rotate(`${dirX} - (${crossSlope}) * ${dirZ}`,
-                `(1.665044 * math.abs(${bend}) * math.cos(180 * ${progress} - 24) - ((${elapsed}) >= 0 && (${elapsed}) < 0.64 ? ${heightDelta} * ${life} / 0.64 : 0)) / ${span}`,
-                `${dirZ} + (${crossSlope}) * ${dirX}`),
+            custom_direction: rotate(
+                arcOrLine(`-(${arcSign}) * math.sin(${arcAngle})`, `${dirX} - (${crossSlope}) * ${dirZ}`),
+                arcOrLine(`(${arcSign}) * 0.59 * ${bend} * math.cos(${arcAngle} - 24) / ${arcRadius}`, lineSlopeY),
+                arcOrLine(`(${arcSign}) * math.cos(${arcAngle}) * ${arcDepth}`, `${dirZ} + (${crossSlope}) * ${dirX}`)),
         },
         uv: uv(tiles.beam),
     },
@@ -250,7 +263,7 @@ particle("beam", {
 
 const shortLife = "variable.particle_lifetime";
 const normalizedAge = saturate(`${age} / ${shortLife}`);
-const ringRadius = scaled(`${param("radius", 1.9)} * (0.16 + 0.84 * math.pow(${normalizedAge}, 0.65)) * ${param("size", 1)}`);
+const ringRadius = scaled(`${param("radius", 2.15)} * (0.16 + 0.84 * math.pow(${normalizedAge}, 0.65)) * ${param("size", 1)} * ${stageDepth}`);
 particle("ripple", {
     "minecraft:emitter_rate_instant": { num_particles: 1 },
     "minecraft:emitter_lifetime_once": { active_time: param("life", 1.1) },
@@ -298,7 +311,7 @@ particle("curtain", {
 
 const orbitLife = param("life", 2.45);
 const orbitAngle = `${param("phase", 0)} + 360 * ${random(1)} + 67 * ${param("speed", 1)} * ${age}`;
-const orbitRadius = `${param("radius", 1.42)} * (0.86 + 0.28 * ${random(2)})`;
+const orbitRadius = `${param("radius", 2.32)} * (0.92 + 0.16 * ${random(2)})`;
 const orbitSize = scaled(`(0.035 + 0.039 * ${random(4)}) * ${param("size", 1)}`);
 particle("orbit", {
     "minecraft:emitter_rate_instant": { num_particles: param("count", 10) },
@@ -308,7 +321,7 @@ particle("orbit", {
     "minecraft:particle_motion_parametric": { relative_position: position(
         `math.cos(${orbitAngle}) * ${orbitRadius}`,
         `0.43 * math.sin(${orbitAngle}) + 0.18 * (2 * ${random(3)} - 1)`,
-        `0.67 * math.sin(${orbitAngle}) * ${orbitRadius}`) },
+        `0.89 * math.sin(${orbitAngle}) * ${orbitRadius} * ${stageDepth}`) },
     "minecraft:particle_lifetime_expression": { max_lifetime: orbitLife },
     "minecraft:particle_appearance_billboard": {
         facing_camera_mode: "rotate_xyz", size: [orbitSize, orbitSize], uv: uv(tiles.glint),

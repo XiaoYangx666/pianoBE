@@ -51,7 +51,7 @@ test("pause clears old MIDI attacks, seeks reset response and manual notes still
 test("neon wave changes continuously without onset and carries its previous amplitude to the client", () => {
     const player = new VfxPresetPlayer(validateVfxPreset(VFX_PRESETS.neon));
     const center = (tick: number, density: number) => player.update(tick, { ...quietFeatures, density })
-        .flatMap(batch => batch.emitters).find(e => e.effect === "wave" && e.offset.x === 0 && e.variables.phase === 0)!;
+        .flatMap(batch => batch.emitters).find(e => e.effect === "wave" && e.variables.phase === 0)!;
     const quiet = center(0, 0);
     const louder = center(32, 0.8);
     expect(quiet.variables.amplitude).toBeCloseTo(0.14);

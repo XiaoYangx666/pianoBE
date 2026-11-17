@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { effectEmitters, parseVfxOptions, planVfxScene, VFX_EFFECTS, VFX_LIMITS,
     VFX_SCENES, VFX_EMITTERS_PER_TICK, type VfxEffect } from "../src/domain/piano/vfxLab";
+import { vfxStageFrame } from "../src/domain/piano/vfxStage";
+import { grandDefinition, pianoDefinition } from "../src/domain/instrument/definition";
 
 test("Lab rejects malformed, non-finite, out-of-range and unknown options", () => {
     expect(parseVfxOptions('{"range":1.4,"waveColor":"#2ED9FF","lanes":1}')).toEqual({
@@ -39,36 +41,43 @@ test("every scene stays inside its tick and particle budgets at maximum settings
     expect(Math.max(...stats)).toBeLessThanOrEqual(275);
 });
 
-test("wave covers every center column and offsets its two inner layers in depth and phase", () => {
+test("wave closes around the instrument and seat without filling the middle", () => {
     const wave = planVfxScene("wave").filter(cue => cue.tick < 20).flatMap(cue => cue.emitters);
-    const columns = [...new Set(wave.map(emitter => emitter.offset.x))];
-    expect(columns).toHaveLength(33);
-    expect(columns[0]).toBeCloseTo(-2.3);
-    expect(columns.at(-1)).toBeCloseTo(2.3);
-    expect(columns.slice(1).every((x, i) => Math.abs(x - columns[i] - 4.6 / 32) < 1e-8)).toBe(true);
-    expect(wave.every(emitter => emitter.offset.z > 1 && emitter.variables.radius < 0.14)).toBe(true);
-    const center = wave.filter(emitter => emitter.offset.x === 0);
-    expect(center.map(emitter => emitter.variables.phase)).toEqual([-37, 0, 37]);
-    expect(center[0].offset.z).toBeLessThan(center[1].offset.z);
-    expect(center[1].offset.z).toBeLessThan(center[2].offset.z);
+    const center = wave.filter(emitter => emitter.offset.y === 1.19);
+    expect(center).toHaveLength(36);
+    expect(wave.slice(0, 3).map(emitter => emitter.variables.phase)).toEqual([-37, 0, 37]);
+    expect(wave.every(emitter => Math.hypot(emitter.offset.x, emitter.offset.z) > 1.7 &&
+        emitter.variables.radius <= 0.16)).toBe(true);
+    for (const definition of [pianoDefinition, grandDefinition]) {
+        const stage = vfxStageFrame(definition);
+        const depths = center.map(emitter => stage.centerZ + stage.depth * emitter.offset.z);
+        expect(Math.min(...depths)).toBeLessThan(-1.4);
+        expect(Math.max(...depths)).toBeGreaterThan(definition === grandDefinition ? 4.45 : 0.45);
+    }
 });
 
-test("beam can emit a single straight strip and demo enters each layer in order", () => {
+test("beam can emit a straight strip; default tracks sweep both the seat and cabinet sides", () => {
     const beam = planVfxScene("beam", { lanes: 1, segments: 1, bend: 0, heading: 90 }).flatMap(cue => cue.emitters);
     expect(beam).toHaveLength(2);
     expect(beam[0].variables.dir_z).toBeCloseTo(1);
     expect(beam[0].variables.bend).toBe(0);
+    expect(beam[0].variables.around).toBe(0);
     const demo = planVfxScene("demo").flatMap(cue => cue.emitters.map(emitter => ({ ...emitter, tick: cue.tick })));
     expect([...new Set(demo.map(emitter => emitter.effect))]).toEqual(["field", "wave", "beam"]);
     expect(demo.at(-1)?.effect).toBe("field");
     expect(demo.filter(emitter => emitter.effect === "beam" && emitter.tick >= 230 && emitter.tick < 245)).toHaveLength(18);
-    for (const { offset, variables } of demo.filter(emitter => emitter.effect === "beam")) {
-        for (let i = 0; i <= 16; i++) {
-            const progress = i / 16;
-            const track = variables.start + variables.span * progress;
-            const lateral = variables.bend * Math.sin(Math.PI * progress);
-            expect(offset.z + track * variables.dir_z + lateral * variables.dir_x).toBeGreaterThan(0.9);
-        }
+    const tracks = demo.filter(emitter => emitter.effect === "beam");
+    expect(tracks.every(emitter => emitter.variables.around === 1)).toBe(true);
+    const depths = tracks.flatMap(({ variables }) => Array.from({ length: 17 }, (_, i) => {
+        const angle = (variables.arc_phase + variables.arc_sweep * i / 16) * Math.PI / 180;
+        return Math.sin(angle) * variables.arc_radius * (0.77 + 0.1 * Math.abs(variables.bend));
+    }));
+    expect(Math.min(...depths)).toBeLessThan(-1.7);
+    expect(Math.max(...depths)).toBeGreaterThan(1.7);
+    for (const effect of ["fountain", "curtain"] as const) {
+        const offsets = effectEmitters(effect, {}).map(emitter => emitter.offset);
+        expect(offsets.some(position => position.x < -1.5)).toBe(true);
+        expect(offsets.some(position => position.x > 1.5)).toBe(true);
     }
 });
 
@@ -103,7 +112,7 @@ test("particle documents reference the original atlas and declare only supplied 
             expect(v + uv.uv_size[1]).toBeLessThanOrEqual(height);
         }
         const variables = new Set(Object.keys(effectEmitters(effect, {})[0].variables));
-        variables.add("right_x").add("right_z").add("scale");
+        variables.add("right_x").add("right_z").add("scale").add("stage_depth");
         for (const match of source.matchAll(/variable\.vfx_(\w+)/g)) expect(variables.has(match[1])).toBe(true);
         for (const match of source.matchAll(/variable\.(?!vfx_)(\w+)/g)) {
             expect(/^(particle_age|particle_lifetime|particle_random_[1-4])$/.test(match[1])).toBe(true);
