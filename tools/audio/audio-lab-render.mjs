@@ -32,11 +32,11 @@ import {
     velocityHistogram,
     velocityGainDb,
     voiceStats,
-} from "../packages/core/dist/audioLab/index.js";
-import { pianoSoundId, processNote, velocityLayerIndex } from "../packages/core/dist/midi/note.js";
+} from "../../packages/core/dist/audioLab/index.js";
+import { pianoSoundId, processNote, velocityLayerIndex } from "../../packages/core/dist/midi/note.js";
 
 const { Midi } = midiPkg;
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const FFMPEG = process.env.FFMPEG || "D:\\ffmpeg\\bin\\ffmpeg.exe";
 const SR = 44100;
 const OUT = join(ROOT, "build", "audio-lab");

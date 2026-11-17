@@ -8,7 +8,7 @@ from runpy import run_path
 from PIL import Image, ImageDraw
 
 
-RP = Path(__file__).resolve().parents[1] / "packages/addon/rp"
+RP = Path(__file__).resolve().parents[2] / "packages/addon/rp"
 BP = RP.with_name("bp")
 FACES = ("north", "south", "west", "east", "up", "down")
 ATLAS_SIZE = (128, 64)

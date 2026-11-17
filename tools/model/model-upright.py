@@ -14,7 +14,7 @@ from uuid import NAMESPACE_URL, uuid5
 from PIL import Image, ImageDraw
 
 
-ASSETS = Path(__file__).resolve().parents[1] / "assets/upright"
+ASSETS = Path(__file__).resolve().parents[2] / "assets/upright"
 FULL = ASSETS / "upright_full.bbmodel"
 ATLAS_SIZE = 256
 PALETTE = {

@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 
-RP = Path(__file__).resolve().parents[1] / "packages/addon/rp"
+RP = Path(__file__).resolve().parents[2] / "packages/addon/rp"
 TILE = 64
 ATLAS_SIZE = (256, 2 * TILE)
 TEXTURE = "textures/particle/piano_fx"

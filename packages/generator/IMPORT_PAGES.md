@@ -38,7 +38,7 @@
 每个曲谱仍生成一张 **1024×1024** 的谱架纹理，规格与 `.zip` 曲谱包一致：
 
 - 整张画布填充纸张底色 `#FFFBEB`；
-- 底部绘制谱架木条/挡板的硬件 UV 条带（与 `tools/grand_score.py` 的 `paint_hardware` 一致）；
+- 底部绘制谱架木条/挡板的硬件 UV 条带（与 `tools/model/grand_score.py` 的 `paint_hardware` 一致）；
 - 2×2 共 4 个竖版槽位，每个 **352×456**，按 contain 缩放居中：
 
   | 槽位 | 坐标 |

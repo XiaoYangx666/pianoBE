@@ -1,6 +1,6 @@
 # VCSL 实验采样
 
-本目录由 `tools/build-audio-lab-assets.mjs` 生成，仅用于 Web Audio Lab 实验，不进入正式音色包。
+本目录由 `tools/audio/build-audio-lab-assets.mjs` 生成，仅用于 Web Audio Lab 实验，不进入正式音色包。
 
 - 来源：VCSL（Versilian Community Sample Library）— Grand Piano, Steinway B
   https://github.com/sgossner/VCSL

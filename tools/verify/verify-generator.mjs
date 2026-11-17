@@ -14,9 +14,9 @@ import {
     planImportChunks,
     ImportAssembler,
 } from "@piano/core";
-import { loadTemplate, parseExistingMidis } from "../packages/generator/src/template.ts";
-import { generateAddonZip } from "../packages/generator/src/export.ts";
-import { songEntryToEvents } from "../packages/generator/src/player.ts";
+import { loadTemplate, parseExistingMidis } from "../../packages/generator/src/template.ts";
+import { generateAddonZip } from "../../packages/generator/src/export.ts";
+import { songEntryToEvents } from "../../packages/generator/src/player.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const MIDI_A = "midis/files/Beyond - 海阔天空.mid";

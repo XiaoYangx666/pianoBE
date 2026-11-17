@@ -24,7 +24,7 @@ import wave
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FFMPEG = os.environ.get("FFMPEG", r"D:\ffmpeg\bin\ffmpeg.exe")
 CALIBRATION = os.path.join(ROOT, "tools", "piano_timbres_source", "calibration.json")
 SOUNDS = os.path.join(ROOT, "packages", "addon", "rp", "sounds")

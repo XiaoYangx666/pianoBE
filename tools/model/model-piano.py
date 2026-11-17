@@ -18,7 +18,7 @@ import uuid
 
 from PIL import Image, ImageDraw
 
-ADDON = Path(__file__).resolve().parents[1] / "packages/addon"
+ADDON = Path(__file__).resolve().parents[2] / "packages/addon"
 RP = ADDON / "rp"
 BP = ADDON / "bp"
 SIZE = 128

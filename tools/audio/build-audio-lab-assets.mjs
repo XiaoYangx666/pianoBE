@@ -21,7 +21,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const FFMPEG = process.env.FFMPEG || "D:\\ffmpeg\\bin\\ffmpeg.exe";
 const CALIBRATION = join(ROOT, "tools", "piano_timbres_source", "calibration.json");
 const CACHE = join(ROOT, "tools", "audio_lab_source", "vcsl");

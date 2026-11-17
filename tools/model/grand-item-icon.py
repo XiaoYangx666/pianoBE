@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "assets/grand/grand_full.bbmodel"
 OUT = ROOT / "packages/addon/rp/textures/items/grand_piano_item.png"
 CANVAS = 1024

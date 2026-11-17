@@ -6,13 +6,13 @@
 - [分块重拼工程](./cut/grand_reassembled.bbmodel)可在 Blockbench 中对照整模。独立分块位于 `cut/`，对应的基岩版几何位于 `bedrock/`。
 - [格位索引](./cut-map.json)按 Blockbench 的 X/Y/Z 给出格偏移，原点是琴键一端的底层中央格。琴键朝 −Z。每格工程以格底中心为局部原点，导出的原生几何按现有钢琴的规则反射 X。
 
-在仓库根目录运行 `python tools/model-grand.py cut` 可从保存的整模重切。首次生成整模使用 `python tools/model-grand.py author`，依赖 Python 3 和 Pillow。切割保留外表面 UV 的对应区域，隐藏新切出的内部面。
+在仓库根目录运行 `python tools/model/model-grand.py cut` 可从保存的整模重切。首次生成整模使用 `python tools/model/model-grand.py author`，依赖 Python 3 和 Pillow。切割保留外表面 UV 的对应区域，隐藏新切出的内部面。
 
-`python tools/publish-grand.py` 将已裁好的模型发布到附加包，并生成琴键、谱架和交互范围。用「三角钢琴」物品放置，琴键朝向玩家。点击琴键直接弹奏，点击琴键后方中央的琴身打开完整面板，再从面板进入 MIDI 播放器或钢琴设置。前排的侧颊、下沿和琴尾不触发面板。
+`python tools/model/publish-grand.py` 将已裁好的模型发布到附加包，并生成琴键、谱架和交互范围。用「三角钢琴」物品放置，琴键朝向玩家。点击琴键直接弹奏，点击琴键后方中央的琴身打开完整面板，再从面板进入 MIDI 播放器或钢琴设置。前排的侧颊、下沿和琴尾不触发面板。
 
 「三角钢琴凳」可从创造物品栏取得，也可用工作台合成，从上往下各放两块黑色羊毛、两块深色橡木木板、两根木棍。搭配三角钢琴时，面朝琴键，把凳子放在键盘前方紧邻的中间格。交互入座，按下骑乘时的下坐骑键起身。凳面高 0.65625 格，白键面约高 0.96 格。凳子可独立放置，每张凳子供一名玩家使用。
 
-琴凳的模型和贴图由 `python tools/model-piano-bench.py` 生成，可将产出的 `piano_bench.geo.json` 和 `piano_bench.png` 导入 Blockbench 检查。调整凳面高度时，同步更新方块碰撞、选择框和行为包里的 `piano_bench_seat.json` 骑乘位置。
+琴凳的模型和贴图由 `python tools/model/model-piano-bench.py` 生成，可将产出的 `piano_bench.geo.json` 和 `piano_bench.png` 导入 Blockbench 检查。调整凳面高度时，同步更新方块碰撞、选择框和行为包里的 `piano_bench_seat.json` 骑乘位置。
 
 「P-88 琴凳」用两块黑色羊毛和两块铁锭合成（羊毛在上，铁锭在下），也可从创造物品栏取得。搭配电子琴时，面朝键盘，对准键盘前一排地砖的中缝，在缝边的地砖上使用琴凳物品。两半会以中缝为中心一起摆下，点击任意一半均可入座。生存模式挖任意半边会回收整张凳子。P-88 凳面同样高 0.65625 格，坐垫中心朝琴键移了 3/16 格。两款琴凳的落座点都在坐垫前半部。
 

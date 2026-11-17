@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { readAddonFile, writeAddonFile } from "@bepack/addon/node";
 import { pianoSoundLayers, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const templatePath = resolve(root, process.argv[2] ?? "packages/addon/dist/template.mcaddon");
 const optional = PIANO_TIMBRES.filter((timbre) => timbre.id !== "piano");
 const optionalDirs = new Set(

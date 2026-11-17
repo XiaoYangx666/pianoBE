@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parents[1] / "packages/addon/rp"
+ROOT = Path(__file__).resolve().parents[2] / "packages/addon/rp"
 VANILLA_RIDING_ARM_PITCH = -36.0
 
 

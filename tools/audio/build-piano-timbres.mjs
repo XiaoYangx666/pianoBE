@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { PIANO_TIMBRES, PIANO_SAMPLE_KEYS, pianoSoundId, pianoSoundLayers } from "@piano/core";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CACHE = join(ROOT, "tools", "piano_timbres_source");
 const SOUNDS = join(ROOT, "packages", "addon", "rp", "sounds");
 const WEB_PUBLIC = join(ROOT, "packages", "web", "public", "piano");

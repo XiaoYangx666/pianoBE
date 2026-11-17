@@ -17,7 +17,7 @@ import wave
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, "build", "audio-lab")
 METRICS = os.path.join(OUT, "metrics.json")
 REPORT = os.path.join(ROOT, "tools", "audio-lab-report.md")

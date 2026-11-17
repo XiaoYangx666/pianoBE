@@ -67,9 +67,9 @@ describe("embedded MIDI build layout", () => {
         expect(generatorExport).toContain("TIMBRES_SCRIPT_PATH");
         expect(generatorExport).not.toContain("scripts/piano/timbres.js");
 
-        expect(fs.readFileSync(path.join(addonRoot, "../../tools/strip-template-timbres.mjs"), "utf8"))
+        expect(fs.readFileSync(path.join(addonRoot, "../../tools/build/strip-template-timbres.mjs"), "utf8"))
             .toContain(timbresModule);
-        expect(fs.readFileSync(path.join(addonRoot, "../../tools/verify-timbres.mjs"), "utf8"))
+        expect(fs.readFileSync(path.join(addonRoot, "../../tools/verify/verify-timbres.mjs"), "utf8"))
             .toContain(`bp/${timbresModule}`);
     });
 

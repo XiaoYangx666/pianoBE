@@ -15,7 +15,7 @@ from shutil import rmtree
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCORE_ASSETS = ROOT / "assets/scores"
 
 STAND_TEXTURE_SIZE = 1024

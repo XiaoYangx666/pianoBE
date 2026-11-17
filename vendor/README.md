@@ -10,7 +10,7 @@ npm run vendor:tabletop   # runs `npm pack` in ../tabletop (its prepack builds f
 npm install
 ```
 
-`tools/pack-tabletop.mjs` also accepts an explicit checkout path: `node tools/pack-tabletop.mjs path/to/tabletop`. The tarball SHA-512 is pinned in the root `package-lock.json`; if a repack changes it, refresh the lockfile with `npm install` and commit the lockfile only. Bumping the tabletop version means updating `packages/addon/package.json` as well.
+`tools/vendor/pack-tabletop.mjs` also accepts an explicit checkout path: `node tools/vendor/pack-tabletop.mjs path/to/tabletop`. The tarball SHA-512 is pinned in the root `package-lock.json`; if a repack changes it, refresh the lockfile with `npm install` and commit the lockfile only. Bumping the tabletop version means updating `packages/addon/package.json` as well.
 
 Only the addon (and the packages derived from its template build) needs Tabletop; `@piano/core`, `@piano/server`, `@piano/web` build without it.
 
@@ -29,8 +29,8 @@ git clone https://github.com/XiaoYangx666/SAPI-Pro.git ../SAPI-Pro
 npm run vendor:sapipro        # builds SAPI-Pro stable, packs vendor/sapi-pro-dev.tgz, npm install
 ```
 
-`tools/sync-sapipro.mjs` also accepts an explicit checkout path:
-`node tools/sync-sapipro.mjs path/to/SAPI-Pro`. Re-run it after every SAPI-Pro change; add
+`tools/vendor/sync-sapipro.mjs` also accepts an explicit checkout path:
+`node tools/vendor/sync-sapipro.mjs path/to/SAPI-Pro`. Re-run it after every SAPI-Pro change; add
 `--no-install` to only refresh the tarball.
 
 Because `packages/addon/package.json` points at a tarball, `npm install` pins the archive hash in

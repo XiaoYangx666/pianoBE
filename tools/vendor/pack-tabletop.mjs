@@ -10,7 +10,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const checkout = resolve(root, process.argv[2] ?? "../tabletop");
 const addonPackage = JSON.parse(
     readFileSync(join(root, "packages/addon/package.json"), "utf8")

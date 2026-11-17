@@ -5,8 +5,8 @@
 import { readFileSync } from "node:fs";
 import { readAddon } from "@bepack/addon";
 import { readAddonArchiveFile } from "@bepack/addon/node";
-import { loadTemplate } from "../packages/generator/src/template.ts";
-import { generateAddonZip } from "../packages/generator/src/export.ts";
+import { loadTemplate } from "../../packages/generator/src/template.ts";
+import { generateAddonZip } from "../../packages/generator/src/export.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const TIMBRES = "packages/generator/public/timbres";

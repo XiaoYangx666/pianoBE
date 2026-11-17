@@ -13,11 +13,11 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pbe2ToNoteEvents } from "../packages/core/dist/pbe2/index.js";
-import { BEDROCK_SIMULTANEOUS_SOUND, PIANO_VOICE_BUDGET } from "../packages/core/dist/music/voiceLoad.js";
-import { processNote } from "../packages/core/dist/midi/note.js";
+import { pbe2ToNoteEvents } from "../../packages/core/dist/pbe2/index.js";
+import { BEDROCK_SIMULTANEOUS_SOUND, PIANO_VOICE_BUDGET } from "../../packages/core/dist/music/voiceLoad.js";
+import { processNote } from "../../packages/core/dist/midi/note.js";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const LIBRARY = join(ROOT, "midis", "library");
 const REPORT = join(ROOT, "tools", "voice-load-report.md");
 

@@ -15,7 +15,7 @@ from uuid import NAMESPACE_URL, uuid5
 from PIL import Image, ImageDraw
 
 
-ASSETS = Path(__file__).resolve().parents[1] / "assets/grand"
+ASSETS = Path(__file__).resolve().parents[2] / "assets/grand"
 FULL = ASSETS / "grand_full.bbmodel"
 # Same Blockbench UV/cell conventions as the upright, which follows ddz's cutter.
 CELL_TOOLS = run_path(str(Path(__file__).with_name("model-upright.py")))

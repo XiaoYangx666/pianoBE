@@ -15,7 +15,7 @@
 ## 音源
 
 - **FluidR3**：复用 `packages/web/public/piano` 的正式三档采样。
-- **VCSL 多层**：`packages/web/public/lab/vcsl`，由 `tools/build-audio-lab-assets.mjs`
+- **VCSL 多层**：`packages/web/public/lab/vcsl`，由 `tools/audio/build-audio-lab-assets.mjs`
   从 VCSL Steinway B 的 vl2/vl3/vl4 生成（30 键 × 3 层 × 4s，OGG 约 5 MB）。
   每层先对齐响度，再套同一条力度→响度曲线，避免切换层时出现响度台阶。
 
@@ -37,10 +37,10 @@
 
 ```bash
 npm run build:core
-# 需要 tools/piano_timbres_source/calibration.json（由 tools/build-piano-timbres.mjs 生成）
-node tools/build-audio-lab-assets.mjs
-node tools/audio-lab-render.mjs
-python tools/audio-lab-analyze.py
+# 需要 tools/piano_timbres_source/calibration.json（由 tools/audio/build-piano-timbres.mjs 生成）
+node tools/audio/build-audio-lab-assets.mjs
+node tools/audio/audio-lab-render.mjs
+python tools/audio/audio-lab-analyze.py
 npm run dev:web
 ```
 

@@ -176,12 +176,12 @@ DDUI 表单在 `1.26.50` + `@minecraft/server-ui 2.2.0` 下已验证关闭即释
 npx tsc -p packages/addon/tsconfig.json --noEmit
 cd packages/addon && bun test
 cd packages/addon && npx bepack build --skip-copy
-cd packages/addon && node ../../tools/verify-addon-build.mjs client
+cd packages/addon && node ../../tools/verify/verify-addon-build.mjs client
 cd packages/addon && npx bepack build --config bepack.server.config.ts --skip-copy
-cd packages/addon && node ../../tools/verify-addon-build.mjs server
+cd packages/addon && node ../../tools/verify/verify-addon-build.mjs server
 ```
 
-构建布局约束：preserve-modules 输出把入口相关模块放在 `bp/scripts/` 根层，路径别名模块保留 `packages/addon/src/**` 结构。`tools/verify-addon-build.mjs` 会同时校验源码导入、构建钩子目标目录和实际产物的相对解析，避免 MIDI 路径偏移导致运行时曲库为空。生成器覆写音色开关时使用 `bp/scripts/packages/addon/src/domain/piano/timbres.js`，路径由 `packages/generator/src/timbres.ts` 的 `TIMBRES_SCRIPT_PATH` 统一提供，并由同一脚本校验模板产物。
+构建布局约束：preserve-modules 输出把入口相关模块放在 `bp/scripts/` 根层，路径别名模块保留 `packages/addon/src/**` 结构。`tools/verify/verify-addon-build.mjs` 会同时校验源码导入、构建钩子目标目录和实际产物的相对解析，避免 MIDI 路径偏移导致运行时曲库为空。生成器覆写音色开关时使用 `bp/scripts/packages/addon/src/domain/piano/timbres.js`，路径由 `packages/generator/src/timbres.ts` 的 `TIMBRES_SCRIPT_PATH` 统一提供，并由同一脚本校验模板产物。
 
 测试覆盖：
 

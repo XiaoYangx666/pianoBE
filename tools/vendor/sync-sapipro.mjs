@@ -13,7 +13,7 @@ import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "nod
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
 const install = !process.argv.includes("--no-install");
 const checkout = resolve(root, args[0] ?? "../SAPI-Pro");

@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readAddonFile } from "@bepack/addon/node";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const addon = path.join(root, "packages/addon");
 const scripts = path.join(addon, "bp/scripts");
 const src = path.join(addon, "src");
@@ -67,9 +67,9 @@ check(generatorTimbres.includes(`TIMBRES_SCRIPT_PATH = "${timbresSource}"`),
     "generator timbres path matches preserve-modules output");
 const generatorExport = read(path.join(root, "packages/generator/src/export.ts"));
 check(generatorExport.includes("TIMBRES_SCRIPT_PATH"), "generator export uses TIMBRES_SCRIPT_PATH");
-check(read(path.join(root, "tools/strip-template-timbres.mjs")).includes(timbresSource),
+check(read(path.join(root, "tools/build/strip-template-timbres.mjs")).includes(timbresSource),
     "template strip uses the domain timbres path");
-check(read(path.join(root, "tools/verify-timbres.mjs")).includes(timbresModule),
+check(read(path.join(root, "tools/verify/verify-timbres.mjs")).includes(timbresModule),
     "timbres verifier uses the domain timbres path");
 
 const templatePath = path.join(addon, "dist/template.mcaddon");

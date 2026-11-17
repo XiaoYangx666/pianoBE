@@ -16,7 +16,7 @@ from grand_score import (SCORES, STAND_HARDWARE_TOP, STAND_HARDWARE_UV_SIZE, STA
 
 MODEL = run_path(str(Path(__file__).with_name("model-grand.py")))
 ASSETS = MODEL["ASSETS"]
-ADDON = ASSETS.parents[1] / "packages/addon"
+ADDON = ASSETS.parents[2] / "packages/addon"
 BP = ADDON / "bp"
 RP = ADDON / "rp"
 write = MODEL["write"]

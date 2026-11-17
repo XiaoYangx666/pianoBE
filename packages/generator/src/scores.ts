@@ -54,7 +54,7 @@ const STAND_SLOT_ORIGINS = [
     [352, 456],
 ] as const;
 
-/** 谱架硬件 UV 条带：坐标与 tools/grand_score.py 的 paint_hardware 一致。 */
+/** 谱架硬件 UV 条带：坐标与 tools/model/grand_score.py 的 paint_hardware 一致。 */
 const STAND_HARDWARE_TOP = 959;
 const STAND_HARDWARE_ROWS = 26;
 const STAND_HARDWARE_WIDTH = 26;
