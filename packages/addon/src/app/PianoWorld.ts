@@ -11,6 +11,7 @@ import { displayAnchor, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, r
 import { hitsGrandPanel, pickScorePage, pickPianoKey, pickPianoMenu, pickPianoPanel, pianoEye, pianoRay } from "@domain/geometry/keyRay";
 import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
 import { playerVelocity } from "@app/playerSound";
+import { animateMidiPerformance, MIDI_PERFORMANCE_INTERVAL } from "@app/playerPerformance";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
 
 class PianoWorld {
@@ -226,6 +227,10 @@ class PianoWorld {
                 }
                 else if (integrity === "unloaded") piano.holdPlaybackClock(now);
                 else if (!piano.tick(tick, now)) this.active.delete(piano);
+                else if (piano.showsMidiPerformance
+                    && (piano.midiHandsThisTick || tick % MIDI_PERFORMANCE_INTERVAL === 0)) {
+                    animateMidiPerformance(piano);
+                }
             } catch (error) {
                 console.warn("[piano] 钢琴运行时更新失败", error);
                 // Rebuild from the assembly on the next interaction/sweep instead

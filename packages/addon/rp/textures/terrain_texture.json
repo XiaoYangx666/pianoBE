@@ -5,6 +5,9 @@
         },
         "piano:grand": {
             "textures": "textures/blocks/grand"
+        },
+        "pbe:bench": {
+            "textures": "textures/blocks/piano_bench"
         }
     }
 }

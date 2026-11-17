@@ -4,9 +4,11 @@ import type { Player } from "@minecraft/server";
 import type { PianoState } from "@app/ui/pianoState";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { playerVelocity } from "@app/playerSound";
+import { animatePianoPress } from "@app/playerPerformance";
 import { shortcutAction, type ShortcutBindings } from "@domain/piano/shortcuts";
 import { switchComMode, switchSoundType } from "@app/ui/pianoUI";
 import { scoreAt } from "@domain/score/score";
+import { pianoHandZoneBit } from "@domain/util/note";
 
 /** 处理本次新输入的字符里的快捷键；返回是否有状态被切换。 */
 export function handleShortcuts(
@@ -56,7 +58,11 @@ export function handleInput(val: string, state: PianoState, piano: PianoRuntime,
     const { keys, notes } = parseInput(val, comMode, keyMap, octave);
 
     const velocity = playerVelocity(player, piano);
-    for (const note of notes) piano.playNote(note, velocity, .15);
+    let hands = 0;
+    for (const note of notes) {
+        if (piano.playNote(note, velocity, .15)) hands |= pianoHandZoneBit(note.midi);
+    }
+    if (hands) animatePianoPress(player, piano, hands);
 
     return { keys, last: notes.at(-1), shouldClear: !comMode };
 }

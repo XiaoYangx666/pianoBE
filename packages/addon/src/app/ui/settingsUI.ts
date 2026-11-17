@@ -39,6 +39,7 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
 
     const volume = field("volume", ui.number(settings.volume));
     const timbre = field("timbre", ui.number(settings.timbre));
+    const midiPerformance = field("midiPerformance", ui.boolean(settings.midiPerformance));
     const manualVelocity = ui.number(manualVelocityIndexOf(settings.manualVelocity));
     ui.onChange(manualVelocity, (index) => {
         const velocity = manualVelocityAt(index);
@@ -59,6 +60,9 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
     ui.toggle("3D 定位", spatialAudio, { description: "开：有方位与距离衰减。" });
     ui.toggle("响度归一化", normalizeLoudness, {
         description: "开：拉平曲目响度；关：保留原动态。",
+    });
+    ui.toggle("播放 MIDI 时显示弹奏动画", midiPerformance, {
+        description: "琴前近处、面向琴键的玩家会做出弹奏动作，优先选择坐着的人。",
     });
     ui.dropdown("手动弹奏力度", manualVelocity, manualVelocityPresets.map(({ name }, value) => ({ label: name, value })));
 

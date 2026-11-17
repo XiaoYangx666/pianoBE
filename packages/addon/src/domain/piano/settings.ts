@@ -46,6 +46,7 @@ export const DEFAULT_PIANO_SETTINGS = {
     timbre: DEFAULT_PIANO_TIMBRE as number,
     /** 开：按曲目自动拉平响度；关：保持原始 MIDI 动态（默认关）。 */
     normalizeLoudness: false,
+    midiPerformance: true,
     /** 手动敲键力度（1~127）；谱面播放使用 MIDI 自带力度。 */
     manualVelocity: DEFAULT_MANUAL_VELOCITY as number,
     /** stereo = 立体声（无 3D 定位）；3d = 有距离衰减/定位（单声道） */
@@ -131,6 +132,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         normalizeLoudness: typeof saved.normalizeLoudness === "boolean"
             ? saved.normalizeLoudness
             : defaults.normalizeLoudness,
+        midiPerformance: typeof saved.midiPerformance === "boolean" ? saved.midiPerformance : defaults.midiPerformance,
         manualVelocity: normalizeManualVelocity(saved, defaults.manualVelocity),
         soundMode: normalizeSoundMode(saved.soundMode) ?? defaults.soundMode,
         textVisible: typeof saved.textVisible === "boolean" ? saved.textVisible : defaults.textVisible,

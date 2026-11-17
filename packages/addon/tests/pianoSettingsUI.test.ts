@@ -128,6 +128,18 @@ describe("钢琴设置（拆分为多个表单）", () => {
         expect(getSettings().normalizeLoudness).toBe(true);
     });
 
+    test("MIDI 弹奏动画开关默认开启且可以关闭", () => {
+        const { piano, getSettings } = makePiano();
+        const form = open(PianoSettingsPage, { piano });
+        const toggle = form.components.find(
+            item => item.type === "toggle" && item.label === "播放 MIDI 时显示弹奏动画"
+        );
+        expect(toggle).toBeDefined();
+        expect(getSettings().midiPerformance).toBe(true);
+        (toggle!.value as FakeObservable<boolean>).setData(false);
+        expect(getSettings().midiPerformance).toBe(false);
+    });
+
     test("三个子页都用 push 进入，返回时回到主表单", () => {
         const { piano } = makePiano();
         const form = open(PianoSettingsPage, { piano });

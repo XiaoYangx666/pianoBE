@@ -1,0 +1,136 @@
+{
+    "format_version": "1.26.10",
+    "minecraft:block": {
+        "description": {
+            "identifier": "pbe:p88_bench_right",
+            "menu_category": {
+                "category": "none",
+                "is_hidden_in_commands": true
+            },
+            "traits": {
+                "minecraft:placement_direction": {
+                    "enabled_states": [
+                        "minecraft:cardinal_direction"
+                    ]
+                }
+            }
+        },
+        "components": {
+            "minecraft:geometry": "geometry.p88_bench_right",
+            "minecraft:material_instances": {
+                "*": {
+                    "texture": "pbe:bench",
+                    "render_method": "opaque"
+                }
+            },
+            "minecraft:collision_box": [
+                {
+                    "origin": [
+                        -8,
+                        7.95,
+                        -1.5
+                    ],
+                    "size": [
+                        7.4,
+                        2.55,
+                        9
+                    ]
+                },
+                {
+                    "origin": [
+                        -2.41,
+                        0,
+                        -0.46
+                    ],
+                    "size": [
+                        1.14,
+                        7.95,
+                        1.1
+                    ]
+                },
+                {
+                    "origin": [
+                        -2.41,
+                        0,
+                        5.36
+                    ],
+                    "size": [
+                        1.14,
+                        7.95,
+                        1.1
+                    ]
+                }
+            ],
+            "minecraft:selection_box": {
+                "origin": [
+                    -8,
+                    0,
+                    -1.5
+                ],
+                "size": [
+                    7.4,
+                    10.5,
+                    9
+                ]
+            },
+            "minecraft:destructible_by_mining": {
+                "seconds_to_destroy": 0.8
+            },
+            "minecraft:destructible_by_explosion": {
+                "explosion_resistance": 2
+            },
+            "minecraft:loot": "loot_tables/piano.json",
+            "minecraft:movable": {
+                "movement_type": "immovable"
+            },
+            "minecraft:light_dampening": 0,
+            "minecraft:tick": {
+                "interval_range": [
+                    80,
+                    120
+                ],
+                "looping": true
+            },
+            "pbe:piano_bench_seating": {},
+            "pbe:p88_bench_recovery": {}
+        },
+        "permutations": [
+            {
+                "condition": "q.block_state('minecraft:cardinal_direction') == 'west'",
+                "components": {
+                    "minecraft:transformation": {
+                        "rotation": [
+                            0,
+                            90,
+                            0
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('minecraft:cardinal_direction') == 'south'",
+                "components": {
+                    "minecraft:transformation": {
+                        "rotation": [
+                            0,
+                            180,
+                            0
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('minecraft:cardinal_direction') == 'east'",
+                "components": {
+                    "minecraft:transformation": {
+                        "rotation": [
+                            0,
+                            -90,
+                            0
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+}

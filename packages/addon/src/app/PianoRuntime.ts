@@ -9,7 +9,7 @@ import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
 import { pianoSoundId, velocityLayerIndex, velocityVolume, type MusicRef, type SongHandle } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
-import { processNote } from "@domain/util/note";
+import { pianoHandZoneBit, processNote } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
 import { PianoDisplay, readCardFromDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD, SCORE_VARIANT, setCardInserted } from "@platform/display";
@@ -62,6 +62,7 @@ export class PianoRuntime {
     private text?: NativeTextSurface;
     private textValue?: string;
     private midi?: MidiPlayer;
+    midiHandsThisTick = 0;
     private verifiedAt = -Infinity;
     private integrity: ReturnType<typeof inspectInstrument> = "unloaded";
     private visualRetryAt = 0;
@@ -255,7 +256,11 @@ export class PianoRuntime {
             this.midi = new MidiPlayer(
                 { acquire: (ref: MusicRef) => this.music.acquire(ref) },
                 {
-                    note: (note, duration, velocity, gain) => this.playNote(note, velocity, duration, gain),
+                    note: (note, duration, velocity, gain) => {
+                        if (this.playNote(note, velocity, duration, gain)) {
+                            this.midiHandsThisTick |= pianoHandZoneBit(note.midi);
+                        }
+                    },
                     playing: value => {
                         if (value) this.activate();
                         this.checkpoint();
@@ -268,6 +273,10 @@ export class PianoRuntime {
         }
         this.midi.setNormalizeLoudness((this.settings ?? DEFAULT_PIANO_SETTINGS).normalizeLoudness);
         return this.midi;
+    }
+
+    get showsMidiPerformance() {
+        return this.midi?.isPlaying() === true && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance;
     }
 
     /** 手动敲键：默认中等力度，可由玩家设置覆盖。 */
@@ -319,6 +328,7 @@ export class PianoRuntime {
         this.noteSignal.publish({ midi: note.midi, duration });
         this.activate();
         if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);
+        return true;
     }
 
     refreshScreen() { this.refreshText(); }
@@ -364,6 +374,7 @@ export class PianoRuntime {
     tick(tick: number, now: number) {
         this.tickSignal.publish(tick);
         this.soundReleases.update(tick);
+        this.midiHandsThisTick = 0;
         this.midi?.tick(now);
         const playing = this.midi?.isPlaying() === true;
         // 释放队列里还有实例时必须继续 tick，否则淡出后的 stop() 永远不会执行，

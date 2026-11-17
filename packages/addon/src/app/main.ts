@@ -1,6 +1,7 @@
 import { blockPlacerComponent } from "@app/components/blockPlacer";
 import { PianoBlockComponent, regEvents } from "@app/components/pianoBlock";
 import { MusicCardComponent } from "@app/components/musicCard";
+import { P88BenchRecoveryComponent, PianoBenchComponent } from "@app/components/pianoBench";
 import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
@@ -17,9 +18,21 @@ system.beforeEvents.startup.subscribe((e) => {
         "xypiano:placer",
         blockPlacerComponent
     );
+    e.itemComponentRegistry.registerCustomComponent(
+        "pbe:p88_bench_placer",
+        blockPlacerComponent
+    );
     e.blockComponentRegistry.registerCustomComponent(
         "xypiano:piano_block",
         PianoBlockComponent
+    );
+    e.blockComponentRegistry.registerCustomComponent(
+        "pbe:piano_bench_seating",
+        PianoBenchComponent
+    );
+    e.blockComponentRegistry.registerCustomComponent(
+        "pbe:p88_bench_recovery",
+        P88BenchRecoveryComponent
     );
     e.itemComponentRegistry.registerCustomComponent(
         "xypiano:music_card",

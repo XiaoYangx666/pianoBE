@@ -1,0 +1,14 @@
+{
+    "format_version": "1.26.10",
+    "minecraft:item": {
+        "description": {
+            "identifier": "pbe:p88_bench_item",
+            "menu_category": { "category": "items" }
+        },
+        "components": {
+            "minecraft:display_name": { "value": "P-88 琴凳" },
+            "minecraft:icon": { "textures": { "default": "pbe:p88_bench" } },
+            "pbe:p88_bench_placer": {}
+        }
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "format_version": "1.26.10",
+    "minecraft:recipe_shaped": {
+        "description": { "identifier": "pbe:piano_bench_recipe" },
+        "tags": ["crafting_table"],
+        "pattern": ["WW", "PP", "SS"],
+        "key": {
+            "W": { "item": "minecraft:black_wool" },
+            "P": { "item": "minecraft:dark_oak_planks" },
+            "S": { "item": "minecraft:stick" }
+        },
+        "result": { "item": "pbe:piano_bench", "count": 1 },
+        "unlock": [{ "item": "minecraft:black_wool" }]
+    }
+}

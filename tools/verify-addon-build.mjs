@@ -81,6 +81,25 @@ if (fs.existsSync(templatePath)) {
 // --- 实际产物 ---
 check(fs.existsSync(scripts), "bp/scripts exists (run a build first)");
 
+const seat = JSON.parse(read(path.join(addon, "bp/entities/piano_bench_seat.json")))["minecraft:entity"];
+const rideHeight = seat.components["minecraft:rideable"]?.seats?.[0]?.position?.[1];
+check(seat.description.identifier === "pbe:piano_bench_seat"
+    && seat.components["minecraft:rideable"]?.seat_count === 1
+    && !("minecraft:pushable" in seat.components),
+    "bench seat uses the current entity schema and provides one rider seat");
+
+for (const [name, recovery] of [["piano_bench", false], ["p88_bench_left", true], ["p88_bench_right", true]]) {
+    const block = JSON.parse(read(path.join(addon, `bp/blocks/${name}.json`)))["minecraft:block"];
+    check(block.description.identifier === `pbe:${name}`
+        && "pbe:piano_bench_seating" in block.components
+        && ("pbe:p88_bench_recovery" in block.components) === recovery
+        && ("minecraft:tick" in block.components) === recovery,
+        `${name} declares seating and the correct tick registration`);
+    const cushion = block.components["minecraft:selection_box"];
+    check(rideHeight >= 0 && rideHeight * 16 < cushion.origin[1] + cushion.size[1],
+        `${name} allows for the visual rider height above the native seat`);
+}
+
 const scorePack = path.join(scripts, "packages/addon/src/data/scorePack.js");
 const resourcePackUuid = JSON.parse(read(path.join(addon, "rp/manifest.json"))).header.uuid;
 check(fs.existsSync(scorePack) && read(scorePack).includes(resourcePackUuid),

@@ -1,0 +1,14 @@
+{
+    "format_version": "1.26.10",
+    "minecraft:recipe_shaped": {
+        "description": { "identifier": "pbe:p88_bench_recipe" },
+        "tags": ["crafting_table"],
+        "pattern": ["WW", "II"],
+        "key": {
+            "W": { "item": "minecraft:black_wool" },
+            "I": { "item": "minecraft:iron_ingot" }
+        },
+        "result": { "item": "pbe:p88_bench_item", "count": 1 },
+        "unlock": [{ "item": "minecraft:black_wool" }]
+    }
+}

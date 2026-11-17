@@ -1,0 +1,82 @@
+{
+    "format_version": "1.8.0",
+    "animations": {
+        "animation.pbe.performer.midi": {
+            "loop": true,
+            "animation_length": 1,
+            "blend_weight": "!(variable.is_first_person ?? 0) || (query.get_equipped_item_name('main_hand') == '' && query.get_equipped_item_name('off_hand') == '')",
+            "bones": {
+                "waist": {
+                    "rotation": ["variable.is_first_person ? 0 : 7", 0, 0]
+                },
+                "leftarm": {
+                    "rotation": [
+                        "t.age = q.life_time - (v.pbe_left_note_at ?? -1); t.press = t.age >= 0 && t.age < 0.065; v.pbe_left_press = math.lerp(v.pbe_left_press ?? 0, t.press, math.clamp(q.delta_time * 25, 0, 1)); return -42.9 + 3.0 * v.pbe_left_press;",
+                        "v.pbe_left_turn = math.lerp(v.pbe_left_turn ?? 0, v.pbe_left_outer ?? 0, math.clamp(q.delta_time * 12, 0, 1)); return 6 - 13.2 * v.pbe_left_turn;",
+                        0
+                    ]
+                },
+                "rightarm": {
+                    "rotation": [
+                        "t.age = q.life_time - (v.pbe_right_note_at ?? -1); t.press = t.age >= 0 && t.age < 0.065; v.pbe_right_press = math.lerp(v.pbe_right_press ?? 0, t.press, math.clamp(q.delta_time * 25, 0, 1)); return variable.is_first_person ? 96 + v.pbe_right_press - this : -42.9 + 3.0 * v.pbe_right_press;",
+                        "v.pbe_right_turn = math.lerp(v.pbe_right_turn ?? 0, v.pbe_right_outer ?? 0, math.clamp(q.delta_time * 12, 0, 1)); return variable.is_first_person ? (-42 - this) : -6 + 13.2 * v.pbe_right_turn;",
+                        "variable.is_first_person ? (110 - this) : 0"
+                    ],
+                    "position": [
+                        "variable.is_first_person ? (11.8 - this) : 0",
+                        "variable.is_first_person ? (-8.4 - this) : 0",
+                        "variable.is_first_person ? (12.5 - this) : 0"
+                    ]
+                }
+            }
+        },
+        "animation.pbe.performer.note.01": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_right_note_at = q.life_time; v.pbe_right_outer = 0;"
+            }
+        },
+        "animation.pbe.performer.note.02": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_right_note_at = q.life_time; v.pbe_right_outer = 1;"
+            }
+        },
+        "animation.pbe.performer.note.10": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_left_note_at = q.life_time; v.pbe_left_outer = 0;"
+            }
+        },
+        "animation.pbe.performer.note.11": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_left_note_at = q.life_time; v.pbe_left_outer = 0; v.pbe_right_note_at = q.life_time; v.pbe_right_outer = 0;"
+            }
+        },
+        "animation.pbe.performer.note.12": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_left_note_at = q.life_time; v.pbe_left_outer = 0; v.pbe_right_note_at = q.life_time; v.pbe_right_outer = 1;"
+            }
+        },
+        "animation.pbe.performer.note.20": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_left_note_at = q.life_time; v.pbe_left_outer = 1;"
+            }
+        },
+        "animation.pbe.performer.note.21": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_left_note_at = q.life_time; v.pbe_left_outer = 1; v.pbe_right_note_at = q.life_time; v.pbe_right_outer = 0;"
+            }
+        },
+        "animation.pbe.performer.note.22": {
+            "animation_length": 0.05,
+            "timeline": {
+                "0.01": "v.pbe_left_note_at = q.life_time; v.pbe_left_outer = 1; v.pbe_right_note_at = q.life_time; v.pbe_right_outer = 1;"
+            }
+        }
+    }
+}

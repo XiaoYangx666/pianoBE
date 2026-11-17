@@ -1,0 +1,35 @@
+{
+    "format_version": "1.8.0",
+    "animations": {
+        "animation.pbe.performer.play": {
+            "loop": true,
+            "animation_length": 1,
+            "blend_weight": "!(variable.is_first_person ?? 0) || (query.get_equipped_item_name('main_hand') == '' && query.get_equipped_item_name('off_hand') == '')",
+            "bones": {
+                "leftarm": {
+                    "rotation": [
+                        "t.age = q.life_time - (v.pbe_left_note_at ?? -1); t.press = t.age >= 0 && t.age < 0.065; v.pbe_left_press = math.lerp(v.pbe_left_press ?? 0, t.press, math.clamp(q.delta_time * 25, 0, 1)); return (-69.4 + 3.0 * v.pbe_left_press) - this;",
+                        "v.pbe_left_turn = math.lerp(v.pbe_left_turn ?? 0, v.pbe_left_outer ?? 0, math.clamp(q.delta_time * 12, 0, 1)); return (6 - 13.2 * v.pbe_left_turn) - this;",
+                        "-this"
+                    ]
+                },
+                "rightarm": {
+                    "rotation": [
+                        "t.age = q.life_time - (v.pbe_right_note_at ?? -1); t.press = t.age >= 0 && t.age < 0.065; v.pbe_right_press = math.lerp(v.pbe_right_press ?? 0, t.press, math.clamp(q.delta_time * 25, 0, 1)); return (variable.is_first_person ? 96 + v.pbe_right_press : -69.4 + 3.0 * v.pbe_right_press) - this;",
+                        "v.pbe_right_turn = math.lerp(v.pbe_right_turn ?? 0, v.pbe_right_outer ?? 0, math.clamp(q.delta_time * 12, 0, 1)); return (variable.is_first_person ? -42 : -6 + 13.2 * v.pbe_right_turn) - this;",
+                        "(variable.is_first_person ? 110 : 0) - this"
+                    ],
+                    "position": [
+                        "variable.is_first_person ? (11.8 - this) : 0",
+                        "variable.is_first_person ? (-8.4 - this) : 0",
+                        "variable.is_first_person ? (12.5 - this) : 0"
+                    ]
+                }
+            }
+        },
+        "animation.pbe.performer.release": {
+            "loop": false,
+            "animation_length": 0.05
+        }
+    }
+}
