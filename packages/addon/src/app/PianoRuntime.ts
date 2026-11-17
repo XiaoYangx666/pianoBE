@@ -2,14 +2,14 @@ import { NativeTextSurface, textRotationForHeading } from "@begame/tabletop/mine
 import { hostScope, textPort } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
-import { type Entity, type SoundInstance, Vector3, system } from "@minecraft/server";
+import { type Entity, type Player, type SoundInstance, Vector3, system } from "@minecraft/server";
 import { grandDefinition } from "@domain/instrument/definition";
 import { inspectInstrument, instrumentCenter, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
 import { pianoSoundId, velocityLayerIndex, velocityVolume, type MusicRef, type SongHandle } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
-import { pianoHandZoneBit, processNote } from "@domain/util/note";
+import { pianoHandZoneBit } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
 import { PianoDisplay, readCardFromDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD, SCORE_VARIANT, setCardInserted } from "@platform/display";
@@ -62,7 +62,7 @@ export class PianoRuntime {
     private text?: NativeTextSurface;
     private textValue?: string;
     private midi?: MidiPlayer;
-    midiHandsThisTick = 0;
+    private midiHandsThisTick = 0;
     private verifiedAt = -Infinity;
     private integrity: ReturnType<typeof inspectInstrument> = "unloaded";
     private visualRetryAt = 0;
@@ -78,7 +78,11 @@ export class PianoRuntime {
     private readonly soundReleases = new SoundReleaseQueue(NOTE_RELEASE_SECONDS);
     lastNearby = system.currentTick;
 
-    constructor(readonly location: InstrumentLocation, private activate: () => void) {
+    constructor(
+        readonly location: InstrumentLocation,
+        private activate: () => void,
+        private onManualPress: (player: Player, hands: number) => void,
+    ) {
         this.right = RightOffsets[location.direction];
         this.center = pianoCenter(location);
         this.hitModel = location.definition === grandDefinition ? grandPianoHitModel : digitalPianoHitModel;
@@ -257,7 +261,8 @@ export class PianoRuntime {
                 { acquire: (ref: MusicRef) => this.music.acquire(ref) },
                 {
                     note: (note, duration, velocity, gain) => {
-                        if (this.playNote(note, velocity, duration, gain)) {
+                        if (this.playNote(note, velocity, duration, gain)
+                            && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance) {
                             this.midiHandsThisTick |= pianoHandZoneBit(note.midi);
                         }
                     },
@@ -275,13 +280,12 @@ export class PianoRuntime {
         return this.midi;
     }
 
-    get showsMidiPerformance() {
-        return this.midi?.isPlaying() === true && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance;
-    }
-
-    /** 手动敲键：默认中等力度，可由玩家设置覆盖。 */
-    playKey(midi: number, velocity: number = DEFAULT_PIANO_SETTINGS.manualVelocity) {
-        this.playNote(processNote(midi, false), velocity, .15, 1, true);
+    playManualNotes(player: Player, notes: readonly NoteInfo[], velocity: number) {
+        let hands = 0;
+        for (const note of notes) {
+            if (this.playNote(note, velocity, .15, 1, true)) hands |= pianoHandZoneBit(note.midi);
+        }
+        if (hands) this.onManualPress(player, hands);
     }
 
     turnScore(spread: 0 | 1) {
@@ -380,9 +384,15 @@ export class PianoRuntime {
         // 释放队列里还有实例时必须继续 tick，否则淡出后的 stop() 永远不会执行，
         // 手动敲键的最后一个实例会一直留在队列里。
         const sounding = this.soundReleases.size > 0;
-        if (!this.display?.entity.isValid) return playing || sounding;
-        this.display.setLight(playing);
-        return this.display.tick(tick) || playing || sounding;
+        let visualActive = false;
+        if (this.display?.entity.isValid) {
+            this.display.setLight(playing);
+            visualActive = this.display.tick(tick);
+        }
+        // Include notes from the last tick even if playback ended in midi.tick().
+        const animateMidi = playing && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance;
+        const midiHands = animateMidi || this.midiHandsThisTick ? this.midiHandsThisTick : undefined;
+        return { active: visualActive || playing || sounding, midiHands };
     }
 
     holdPlaybackClock(now: number) { this.midi?.holdClock(now); }
@@ -424,8 +434,9 @@ export class PianoRuntime {
             console.warn("[piano] 释放音乐缓存失败", error);
         }
         this.cardSlotBinding = undefined;
-        // activate 闭包捕获了 runtime 自身；不清理就是一个永久自环。
+        // 断开世界组装时注入的回调；它们捕获了本运行时。
         this.activate = noop;
+        this.onManualPress = noop;
         this.visualScope = undefined;
         this.text = undefined;
         this.midi = undefined;

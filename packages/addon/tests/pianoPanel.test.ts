@@ -105,8 +105,8 @@ function makePiano() {
         disposedSignal: new Signal(),
         isAlive: () => true,
         verify: () => "complete",
-        playNote: (note: any, velocity: unknown, duration: number) => {
-            played.push({ midi: note.midi, velocity, duration });
+        playManualNotes: (_player: unknown, notes: { midi: number }[], velocity: unknown) => {
+            for (const note of notes) played.push({ midi: note.midi, velocity, duration: .15 });
         },
         getMidiPlayer: () => ({ isAlive: () => false }),
         played,

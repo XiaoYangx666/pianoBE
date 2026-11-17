@@ -1,4 +1,4 @@
-import { createBlockResourceEvents, createNativeDropSuppression } from "@begame/tabletop/minecraft";
+import type { createBlockResourceEvents } from "@begame/tabletop/minecraft";
 import { eventHost } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { BlockCustomComponent, EntityComponentTypes, EquipmentSlot, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";
@@ -12,7 +12,6 @@ import { isMusicCard } from "@platform/storage/cardItem";
 import { GRAND_INTERACTION_CELLS, GRAND_RETIRED_CELLS } from "@data/grand.generated";
 import { grandDefinition, instrumentBlockTypes } from "@domain/instrument/definition";
 import { destroyInstrument, instrumentDestroyed, instrumentKey, instrumentPlaced, inspectInstrument, InstrumentLocation, resolveInstrument, resolveInstrumentSnapshot } from "@platform/assembly";
-import { inspectP88Bench, P88_BENCH_BLOCKS, removeP88BenchRemainder, resolveP88Bench } from "@platform/p88Bench";
 
 const grandInteractionCells = new Set<string>(GRAND_INTERACTION_CELLS);
 const grandRetiredCells = new Set<string>(GRAND_RETIRED_CELLS);
@@ -79,14 +78,12 @@ export const PianoBlockComponent: BlockCustomComponent = {
     },
 };
 
-const suppressNativeDrop = createNativeDropSuppression(eventHost);
-
-export function regEvents() {
+export function registerPianoBlockEvents(blockEvents: ReturnType<typeof createBlockResourceEvents>) {
     interface PendingBreak {
         blasts: ExplosionBeforeEvent[];
     }
     const pending = new Map<string, PendingBreak>();
-    const scope = new PianoScope(eventHost.scope, "events");
+    const scope = new PianoScope(eventHost.scope, "pianoBlock");
 
     function queueBreak(location: InstrumentLocation): PendingBreak {
         const key = instrumentKey(location.dimension, location.pos);
@@ -112,30 +109,12 @@ export function regEvents() {
     }));
     const onBreakBlock = (e: PlayerBreakBlockBeforeEvent) => {
         if (e.cancel) return;
-        const bench = resolveP88Bench(e.block.dimension, e.block.location, e.block.permutation);
-        if (bench) {
-            if (inspectP88Bench(bench) === "unknown") e.cancel = true;
-            return;
-        }
         const location = resolveInstrument(e.block);
         // Wait for the partner rather than committing a partial break at a chunk edge.
         if (location && inspectInstrument(location) === "unloaded") e.cancel = true;
     };
     world.beforeEvents.playerBreakBlock.subscribe(onBreakBlock);
     scope.own("playerBreakBlock", () => world.beforeEvents.playerBreakBlock.unsubscribe(onBreakBlock));
-    const blockEvents = createBlockResourceEvents(eventHost, suppressNativeDrop);
-    blockEvents.register({
-        blockTypes: P88_BENCH_BLOCKS,
-        boundary: "p88Bench",
-        broken: (e, suppressDrop) => {
-            const bench = resolveP88Bench(e.dimension, e.block.location, e.brokenBlockPermutation);
-            if (!bench) return;
-            const mode = e.player.getGameMode();
-            const drop = mode === GameMode.Survival || mode === GameMode.Adventure;
-            if (drop && e.itemStackBeforeBreak?.getComponent("minecraft:enchantable")?.getEnchantment("silk_touch")) suppressDrop();
-            removeP88BenchRemainder(bench, drop);
-        },
-    });
     blockEvents.register({
         blockTypes: instrumentBlockTypes,
         boundary: "piano",
@@ -147,7 +126,6 @@ export function regEvents() {
             if (inspectInstrument(location) === "incomplete") destroyInstrument(location, drop);
         },
     });
-    blockEvents.start();
     const onExplosion = (e: ExplosionBeforeEvent) => {
         if (e.cancel || e.source?.typeId === "minecraft:wind_charge_projectile") return;
         const assemblies = new Map<string, InstrumentLocation>();

@@ -1,7 +1,9 @@
 import { blockPlacerComponent } from "@app/components/blockPlacer";
-import { PianoBlockComponent, regEvents } from "@app/components/pianoBlock";
+import { PianoBlockComponent, registerPianoBlockEvents } from "@app/components/pianoBlock";
 import { MusicCardComponent } from "@app/components/musicCard";
-import { P88BenchRecoveryComponent, PianoBenchComponent } from "@app/components/pianoBench";
+import { P88BenchRecoveryComponent, PianoBenchComponent, registerPianoBenchEvents } from "@app/components/pianoBench";
+import { createBlockResourceEvents, createNativeDropSuppression } from "@begame/tabletop/minecraft";
+import { eventHost } from "@platform/host";
 import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
@@ -40,7 +42,10 @@ system.beforeEvents.startup.subscribe((e) => {
     );
 });
 
-regEvents();
+const blockEvents = createBlockResourceEvents(eventHost, createNativeDropSuppression(eventHost));
+registerPianoBenchEvents(blockEvents);
+registerPianoBlockEvents(blockEvents);
+blockEvents.start();
 
 // 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻加载配置。
 system.run(() => {

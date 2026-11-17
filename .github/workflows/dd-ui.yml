@@ -6,13 +6,19 @@ on:
       - feature/addon-overhaul
     paths:
       - ".github/workflows/dd-ui.yml"
-      - "packages/addon/src/app/ui/**"
+      - "packages/addon/src/**"
       - "packages/addon/tests/**"
+      - "packages/addon/tsconfig.json"
+      - "packages/addon/bunfig.toml"
+      - "packages/core/**"
   pull_request:
     paths:
       - ".github/workflows/dd-ui.yml"
-      - "packages/addon/src/app/ui/**"
+      - "packages/addon/src/**"
       - "packages/addon/tests/**"
+      - "packages/addon/tsconfig.json"
+      - "packages/addon/bunfig.toml"
+      - "packages/core/**"
   workflow_dispatch:
 
 jobs:
@@ -33,6 +39,7 @@ jobs:
           (cd "$core_dir" && bun install && bun add --dev typescript@5.9.3 && bun run build)
           mkdir -p packages/addon/node_modules/@piano
           ln -s "$core_dir" packages/addon/node_modules/@piano/core
+          ln -s "$core_dir/node_modules/typescript" packages/addon/node_modules/typescript
       - name: Ensure obsolete PianoViewModel is absent
         shell: bash
         run: |
@@ -40,6 +47,6 @@ jobs:
             echo "Obsolete PianoViewModel reference detected"
             exit 1
           fi
-      - name: Run scoped UI regression tests
+      - name: Check architecture and run UI regressions
         working-directory: packages/addon
-        run: bun test tests/pianoPanel.test.ts tests/midiPlayerUI.test.ts
+        run: bun test tests/architecture.test.ts tests/pianoPanel.test.ts tests/pianoSettingsUI.test.ts tests/midiPlayerUI.test.ts

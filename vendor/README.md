@@ -1,11 +1,12 @@
 # Vendored Tabletop dependency
 
-`begame-tabletop-0.1.16.tgz` is a private dependency of `@piano/addon`. It is **not** distributed with this repository (`vendor/*.tgz` is ignored) and is not part of the git history. Its source lives in the private repository `https://github.com/ykxyx666/tabletop.git`, packed at commit `8f76d0f`.
+`begame-tabletop-0.1.16.tgz` is a private dependency of `@piano/addon`. It is **not** distributed with this repository (`vendor/*.tgz` is ignored) and is not part of the git history. Its source lives in the private repository `https://github.com/ykxyx666/tabletop.git`.
 
-A fresh clone therefore cannot build the addon until you provide the tarball yourself:
+A fresh clone needs the private tarball to build the addon. The lockfile pins the archive built from Tabletop commit `7082e443b67436d5a5e04eb8ad2215d835ee1e29`, which includes `createMinecraftSeats` and its mount HUD option.
 
 ```bash
 git clone git@github.com:ykxyx666/tabletop.git ../tabletop
+git -C ../tabletop checkout 7082e443b67436d5a5e04eb8ad2215d835ee1e29
 npm run vendor:tabletop   # runs `npm pack` in ../tabletop (its prepack builds first)
 npm install
 ```

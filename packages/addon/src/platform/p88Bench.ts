@@ -7,7 +7,6 @@ import type { Cardinal_Direction } from "@domain/types";
 import { reportPianoError } from "@runtime/scope";
 
 export const P88_BENCH_ITEM = "pbe:p88_bench_item";
-export const PIANO_BENCH_SEAT = "pbe:piano_bench_seat";
 export const P88_BENCH_BLOCKS = ["pbe:p88_bench_left", "pbe:p88_bench_right"] as const;
 export const BENCH_CARDINAL = "minecraft:cardinal_direction";
 

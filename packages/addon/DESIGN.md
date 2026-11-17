@@ -76,6 +76,8 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 - `PianoRuntime.verify()` 按 `VERIFY_INTERVAL` 检查装配完整性。
 - `PianoRuntime.tick()` 推进 MIDI 状态机、更新键位/灯光和 LCD。
 - 播放状态机通过 `MidiOutput` 回调发声；状态机本身不直接调用 Minecraft。
+- 面板输入和世界内点琴键都调用 `PianoRuntime.playManualNotes()`。运行时聚合实际触发的音符；`PianoWorld` 注入手动演奏动画回调，并在消费 MIDI tick 结果时驱动自动演奏动画。面板不直接加载动画或琴凳装配。
+- 演奏动画会话随所属的 `PianoRuntime` 销毁。玩家切换钢琴时，会话的清理回调转移到新钢琴。每个玩家同时只保留一个演奏会话。
 
 ### 卸载
 
@@ -95,6 +97,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 
 - **持久显示实体**：`pbe:piano_display` / `pbe:grand_display`，是钢琴外观的一部分，不因玩家离开而删除。它持有键位属性、灯光、设置和播放记录。
 - **临时运行时资源**：`NativeTextSurface`、MIDI 播放器、定时器、订阅、`PianoScope` 子作用域。它们随 `PianoRuntime.dispose()` 回收。
+- 琴凳方块可独立摆放。琴凳组件提供座位位置、朝向和完整性判断，由 Tabletop 的 `createMinecraftSeats()` 管理入座、占用和临时实体回收。
 - 不采用棋牌盒的 Anchor / Visual 分离：钢琴显示实体不是可随时删除的派生投影，键位和灯光就是乐器外观本身。
 
 ## 5. MIDI 边界

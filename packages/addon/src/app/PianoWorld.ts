@@ -11,7 +11,8 @@ import { displayAnchor, PIANO_DISPLAY, pianoDisplayType, removeDormantDisplay, r
 import { hitsGrandPanel, pickScorePage, pickPianoKey, pickPianoMenu, pickPianoPanel, pianoEye, pianoRay } from "@domain/geometry/keyRay";
 import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
 import { playerVelocity } from "@app/playerSound";
-import { animateMidiPerformance, MIDI_PERFORMANCE_INTERVAL } from "@app/playerPerformance";
+import { animateMidiPerformance, animatePianoPress, MIDI_PERFORMANCE_INTERVAL } from "@app/playerPerformance";
+import { processNote } from "@domain/util/note";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
 
 class PianoWorld {
@@ -71,7 +72,11 @@ class PianoWorld {
         }
         const tick = system.currentTick;
         if (!piano) {
-            const runtime = new PianoRuntime(location, () => this.active.add(runtime));
+            const runtime = new PianoRuntime(
+                location,
+                () => this.active.add(runtime),
+                (player, hands) => animatePianoPress(player, runtime, hands),
+            );
             if (runtime.verify(tick) !== "complete") {
                 runtime.dispose(false);
                 return;
@@ -106,7 +111,7 @@ class PianoWorld {
         const ray = pianoRay(piano.center, piano.right, player.getHeadLocation(), player.getViewDirection());
         const midi = pickPianoKey(ray, 4, midi => piano.isKeyDown(midi), piano.hitModel);
         if (midi !== undefined) {
-            piano.playKey(midi, playerVelocity(player, piano));
+            piano.playManualNotes(player, [processNote(midi, false)], playerVelocity(player, piano));
             return "key";
         }
         const grand = !piano.hasScreen;
@@ -226,10 +231,12 @@ class PianoWorld {
                     this.unload(piano.location, true);
                 }
                 else if (integrity === "unloaded") piano.holdPlaybackClock(now);
-                else if (!piano.tick(tick, now)) this.active.delete(piano);
-                else if (piano.showsMidiPerformance
-                    && (piano.midiHandsThisTick || tick % MIDI_PERFORMANCE_INTERVAL === 0)) {
-                    animateMidiPerformance(piano);
+                else {
+                    const { active, midiHands } = piano.tick(tick, now);
+                    if (!active) this.active.delete(piano);
+                    if (midiHands !== undefined && (midiHands || tick % MIDI_PERFORMANCE_INTERVAL === 0)) {
+                        animateMidiPerformance(piano, midiHands);
+                    }
                 }
             } catch (error) {
                 console.warn("[piano] 钢琴运行时更新失败", error);

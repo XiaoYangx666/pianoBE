@@ -1,5 +1,5 @@
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { PIANO_BENCH_SEAT } from "@platform/p88Bench";
+import { PIANO_BENCH_SEAT } from "@platform/benchSeat";
 import { reportPianoError } from "@runtime/scope";
 import { system } from "@minecraft/server";
 import type { Player } from "@minecraft/server";
@@ -18,6 +18,8 @@ interface Performance {
     piano: PianoRuntime;
     stopAt: number;
     seated: boolean;
+    checkRun?: number;
+    detach?: () => void;
 }
 
 const performing = new Map<string, Performance>();
@@ -52,7 +54,31 @@ function playingPosition(player: Player, piano: PianoRuntime) {
     return { seated: mount !== undefined, distance: Math.hypot(dx, dz) };
 }
 
+function stop(id: string, performance: Performance) {
+    if (performing.get(id) !== performance) return;
+    performing.delete(id);
+    performance.detach?.();
+    if (performance.checkRun !== undefined) system.clearRun(performance.checkRun);
+    try {
+        if (performance.player.isValid) {
+            performance.player.playAnimation("animation.pbe.performer.release", {
+                controller: CONTROLLER,
+                blendOutTime: .25,
+                stopExpression: "query.all_animations_finished",
+            });
+        }
+    } catch (error) {
+        reportPianoError("playerPerformance.release", error);
+    }
+}
+
+function scheduleCheck(id: string, performance: Performance, delay: number) {
+    performance.checkRun = system.runTimeout(() => check(id, performance), delay);
+}
+
 function check(id: string, performance: Performance) {
+    if (performing.get(id) !== performance) return;
+    performance.checkRun = undefined;
     const { player, piano, stopAt } = performance;
     const remaining = stopAt - system.currentTick;
     try {
@@ -60,32 +86,30 @@ function check(id: string, performance: Performance) {
         if (remaining > 0 && position
             && piano.isAlive() && piano.verify(system.currentTick) === "complete"
             && position.seated === performance.seated) {
-            system.runTimeout(() => check(id, performance), Math.min(remaining, CHECK_INTERVAL));
+            scheduleCheck(id, performance, Math.min(remaining, CHECK_INTERVAL));
             return;
-        }
-
-        if (player.isValid) {
-            player.playAnimation("animation.pbe.performer.release", {
-                controller: CONTROLLER,
-                blendOutTime: .25,
-                stopExpression: "query.all_animations_finished",
-            });
         }
     } catch (error) {
         reportPianoError("playerPerformance.check", error);
     }
-    performing.delete(id);
+    stop(id, performance);
+}
+
+function bindPiano(id: string, performance: Performance, piano: PianoRuntime) {
+    performance.detach?.();
+    performance.piano = piano;
+    performance.detach = piano.onDispose(() => stop(id, performance));
 }
 
 function play(player: Player, ticks: number, piano: PianoRuntime, seated: boolean) {
-    if (!player.isValid) return;
+    if (!player.isValid || !piano.isAlive()) return;
     const stopAt = system.currentTick + ticks;
     const current = performing.get(player.id);
     if (current && current.seated === seated) {
         // Refresh the deadline without restarting either arm.
         current.player = player;
         current.stopAt = current.piano === piano ? Math.max(current.stopAt, stopAt) : stopAt;
-        current.piano = piano;
+        if (current.piano !== piano) bindPiano(player.id, current, piano);
         return;
     }
 
@@ -97,15 +121,16 @@ function play(player: Player, ticks: number, piano: PianoRuntime, seated: boolea
     });
     if (current) {
         current.player = player;
-        current.piano = piano;
+        if (current.piano !== piano) bindPiano(player.id, current, piano);
         current.stopAt = stopAt;
         current.seated = seated;
         return;
     }
     const id = player.id;
-    const performance = { player, piano, stopAt, seated };
+    const performance: Performance = { player, piano, stopAt, seated };
     performing.set(id, performance);
-    system.runTimeout(() => check(id, performance), CHECK_INTERVAL);
+    bindPiano(id, performance, piano);
+    scheduleCheck(id, performance, CHECK_INTERVAL);
 }
 
 function signalNote(player: Player, mask: number) {
@@ -130,7 +155,7 @@ export function animatePianoPress(player: Player, piano: PianoRuntime, hands: nu
     }
 }
 
-export function animateMidiPerformance(piano: PianoRuntime) {
+export function animateMidiPerformance(piano: PianoRuntime, hands: number) {
     try {
         const nearby = piano.location.dimension.getPlayers({ location: piano.center, maxDistance: 2 });
         let performer: { player: Player; seated: boolean; distance: number } | undefined;
@@ -144,7 +169,7 @@ export function animateMidiPerformance(piano: PianoRuntime) {
         }
         if (!performer) return;
         play(performer.player, MIDI_PERFORMANCE_INTERVAL + 2, piano, performer.seated);
-        signalNote(performer.player, piano.midiHandsThisTick);
+        signalNote(performer.player, hands);
     } catch (error) {
         reportPianoError("playerPerformance.midi", error);
     }
