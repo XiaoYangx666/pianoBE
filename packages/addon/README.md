@@ -145,6 +145,7 @@ npm run verify:addon-build    # client/server 构建 + MIDI 路径与 server-onl
 ## 音色包与生成器
 
 - `npm run build`：开发构建，包含全部音色，并复制到本地游戏开发包目录。
+- [VFX Lab](../../docs/vfx/README.md)：瞄准钢琴后运行 `/scriptevent pbe:vfx demo`，可独立预览三种粒子素材和组合演出。
 - `npm run build:template`：生成供生成器使用的精简基础模板，只保留标准钢琴；
   可选音色由生成器按用户勾选合并，不再把整套音色塞进模板。
 - `npm run build:timbres`：重新下载/裁剪/转码音色采样，并生成

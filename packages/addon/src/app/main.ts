@@ -8,6 +8,7 @@ import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";
 import { openPbeSettings } from "@app/ui/adminSettingsUI";
 import { openAdminLibrary } from "@app/ui/adminLibraryUI";
+import { registerVfxLab } from "@app/vfxLab";
 import { midiManager } from "@app/midi";
 import { loadPbeSettings } from "@platform/storage/pbeSettingsStore";
 import { worldLibrary } from "@platform/storage/worldLibrary";
@@ -46,6 +47,7 @@ const blockEvents = createBlockResourceEvents(eventHost, createNativeDropSuppres
 registerPianoBenchEvents(blockEvents);
 registerPianoBlockEvents(blockEvents);
 blockEvents.start();
+registerVfxLab();
 
 // 世界动态属性不能在模块求值期访问（early execution），延后到首个游戏刻加载配置。
 system.run(() => {
