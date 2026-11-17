@@ -14,17 +14,17 @@
 
 ## A · 空间悬浮粒子场
 
-- **空间和材质** · 蓝灰色散点覆盖琴周围约 5.8 × 2.15 × 4.2 格的体积，横向中密外疏。较小的漫射光粒充当背景，少数偏大的星芒提供亮度参照。每个点分布在真实三维坐标，侧向观察会改变前后遮挡。
+- **空间和材质** · 淡蓝散点覆盖琴后侧约 4.9 × 1.7 × 2.5 格的体积，横向中密外疏。较小的漫射光粒充当背景，少数偏大的星芒提供亮度参照。每个点分布在真实三维坐标，侧向观察会改变前后遮挡。
 - **出现到消失** · 客户端在各方向随机取样，约 32% 的样本静止，其余沿正负三轴缓漂并受阻尼。单点先淡入、轻微起伏，再逐渐消退，寿命 1.2–3.2 秒。通过重叠短发射窗口维持整体氛围。
 - **Bedrock** · `emitter_rate_steady`、`emitter_lifetime_once`、`emitter_shape_custom`、三轴 `particle_initial_speed`、`particle_motion_dynamic`、`lookat_xyz`，用随机变量切换图集的柔光与星芒两格。
 - **引擎边界** · 体积由多个发光平面构成，深度来自三维分布和透视。局部空间混合、近景遮挡及光晕仍取决于客户端的渲染设置。
 
 ## B · 流动曲面
 
-- **空间和材质** · 琴后方横向展开约 5.5 格。中心丝线最完整、最亮，前后两层错开高度、纵深和相位，内侧较宽，末端垂下亮度并消隐。图集中用窄芯叠加细薄的宽晕作为丝线截面。
-- **出现到消失** · 默认每条中心线 21 列。每列的高度是主正弦加较弱的二次谐波。主波默认 2.9 秒一周期、波长 5.5 格，沿琴的局部正 X 传播。每个光段沿曲线切线摆放，宽度按采样间距与斜率调整，软端互相覆盖。发射按列铺开，分批出生的采样按整场时钟校准相位，接续段沿用该相位。
-- **Bedrock** · `emitter_rate_instant` 为每个确定位置生成一个段，随后 `particle_motion_parametric` 在客户端驱动高度。Billboard 使用 `direction_x` 和 `custom_direction` 对齐局部切线，`particle_appearance_tinting` 控制沿波峰的光度变化和整段淡入淡出。
-- **引擎边界** · 每层是交叠的平面小段。极端组合（低密度、极短波长、大跨度和高波幅）以及接近侧缘或正上方的机位可能看见间隙或变薄。相位按服务端发射刻推算，网络到包抖动可能扰动同帧对齐。
+- **空间和材质** · 琴后方横向展开约 4.6 格。中心丝线最完整、最亮，前后两层错开高度、纵深和相位，末端逐渐降亮。发光采样由窄芯和宽晕构成，相邻位置的宽晕互相覆盖。
+- **出现到消失** · 默认中心线 33 列，两条副线每隔一列采样。每列的高度是主正弦加较弱的二次谐波。主波默认 2.9 秒一周期、波长 4.6 格，沿琴的局部正 X 传播。发射按列铺开，分批出生的采样按整场时钟校准相位，接续段沿用该相位。
+- **Bedrock** · `emitter_rate_instant` 为每个确定位置生成一个采样，随后 `particle_motion_parametric` 在客户端驱动高度。Billboard 使用 `rotate_xyz` 让圆形光芯在斜视时保持可见，`particle_appearance_tinting` 控制沿波峰的光度变化和整段淡入淡出。
+- **引擎边界** · 每层由平面光点叠成，极端组合（低密度、极短波长、大跨度和高波幅）可能拉开采样之间的距离。相位按服务端发射刻推算，网络到包抖动可能扰动同帧对齐。
 
 ## C · 纹理光条与流光
 
@@ -35,6 +35,6 @@
 
 ## 合成与资源
 
-三种效果共用一张原创 256 × 128 RGBA 图集。生成器独立绘制两格点光、丝线截面和光束渐变，并预留透明边。透明度沿粒子时间和纹理空间分别计算。评估的备选组件包括 `emitter_shape_box` 的均匀体积、`emitter_shape_disc` 的盘面采样、`uv.flipbook` 的逐帧换图和 `particle_appearance_lighting` 的世界光照采样。当前选择自定义发射位置、静态图集区域和 Molang 时间包络，使造型和材质变化来自明确的空间及时间参数。Billboard 的 `size` 按半宽和半高设置。[Microsoft Particle Effects](https://learn.microsoft.com/en-us/minecraft/creator/documents/particleeffects?view=minecraft-bedrock-stable)
+三种效果共用一张原创 256 × 128 RGBA 图集。生成器独立绘制两格点光、波面采样和光束渐变，并预留透明边。同尺寸的 MER 图集用绿通道标记自发光，光芯最强，半透明边缘逐渐变暗，透明区为零。Vibrant Visuals 通过粒子 Texture Set 读取该发光图。粒子时间包络和纹理透明度分别计算。Billboard 的 `size` 按半宽和半高设置。[Microsoft Particle Effects](https://learn.microsoft.com/en-us/minecraft/creator/documents/particleeffects?view=minecraft-bedrock-stable) · [Vibrant Visuals Texture Sets](https://learn.microsoft.com/en-us/minecraft/creator/documents/vibrantvisuals/vvresourcepacks?view=minecraft-bedrock-stable)
 
 资料依据：[Microsoft 粒子介绍](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/particlesreference/particlesintroduction)、[组件文档](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/particlesreference/examples/particlecomponents/particle_effect?view=minecraft-bedrock-stable)、[Mojang 粒子组件和变量说明](https://mojang.github.io/bedrock-samples/Particles.html)、[Dimension.spawnParticle](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/dimension?view=minecraft-bedrock-stable)。

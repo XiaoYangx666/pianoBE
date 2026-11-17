@@ -39,7 +39,7 @@ export interface VfxCue {
 }
 
 const colorKeys = ["fieldColor", "waveColor", "beamColor"];
-const palette = { field: "#71A8F8", wave: "#83E7F7", beam: "#FFC59B" };
+const palette = { field: "#A6B7FB", wave: "#93E6FF", beam: "#FFD8B2" };
 const origin = { x: 0, y: 0, z: 0 };
 const ticksPerSecond = 20;
 export const VFX_EMITTERS_PER_TICK = 6;
@@ -91,32 +91,31 @@ function field(options: VfxOptions, opacity: number, rate: number, seconds: numb
 }
 
 function wave(options: VfxOptions, opacity: number, amplitude: number, life: number): VfxEmitter[] {
-    const span = 5.5 * (options.range ?? 1);
-    const columns = Math.round(21 * Math.max(0.72, options.density ?? 1));
+    const span = 4.6 * (options.range ?? 1);
+    const columns = 2 * Math.round(16 * Math.max(0.75, options.density ?? 1)) + 1;
     const step = span / (columns - 1);
-    const frequency = 360 / (options.wavelength ?? 5.5);
+    const frequency = 360 / (options.wavelength ?? 4.6);
     const angularSpeed = 360 / (options.period ?? 2.9) * (options.speed ?? 1);
     const layers = [-1, 0, 1];
     const emitters: VfxEmitter[] = [];
     for (let column = 0; column < columns; column++) {
         const u = column / (columns - 1);
         const x = (u - 0.5) * span;
-        for (const layer of Math.abs(x) > span * 0.44 ? [0] : layers) {
+        const innerSample = column % 2 === 0 && Math.abs(x) <= span * 0.4;
+        for (const layer of innerSample ? layers : [0]) {
             const angle = frequency * x + layer * 37 + (options.phase ?? 0);
-            const spacing = 0.52 * (options.range ?? 1);
-            const depthCurve = 0.36 * Math.cos(Math.PI * u);
-            const depthSlope = -0.36 * Math.PI / span * Math.sin(Math.PI * u);
+            const spacing = 0.45 * (options.range ?? 1);
+            const depthCurve = 0.25 * Math.sin(Math.PI * u);
             emitters.push({
                 effect: "wave",
-                offset: { x, y: 1.93 + (options.height ?? 0) + layer * 0.18, z: 1.34 + layer * spacing + depthCurve },
+                offset: { x, y: 1.56 + (options.height ?? 0) + layer * 0.19, z: 1.59 + layer * spacing + depthCurve },
                 lifetime: life, particles: 1,
                 variables: {
-                    ...tint("wave", options, opacity * (layer === 0 ? 0.72 : layer === -1 ? 0.42 : 0.3)
-                        * (0.39 + 0.61 * Math.sin(Math.PI * u) ** 0.55)),
-                    phase: angle, angular_speed: angularSpeed, frequency,
-                    amplitude: (options.amplitude ?? 0.5) * amplitude * (0.56 + 0.44 * Math.sin(Math.PI * u)),
-                    amplitude_slope: (options.amplitude ?? 0.5) * amplitude * 0.44 * Math.PI / span * Math.cos(Math.PI * u),
-                    depth_slope: depthSlope, step, width: 0.095 * (options.size ?? 1), life,
+                    ...tint("wave", options, opacity * (layer === 0 ? 0.84 : layer === -1 ? 0.31 : 0.24)
+                        * (0.28 + 0.72 * Math.sin(Math.PI * u) ** 0.55)),
+                    phase: angle, angular_speed: angularSpeed,
+                    amplitude: (options.amplitude ?? 0.37) * amplitude * (0.48 + 0.52 * Math.sin(Math.PI * u)),
+                    radius: step * (layer === 0 ? 0.99 : 1.72) * (options.size ?? 1), life,
                 },
             });
         }
@@ -131,21 +130,21 @@ function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst:
     const emitters: VfxEmitter[] = [];
     for (let lane = 0; lane < lanes; lane++) {
         const side = lane - (lanes - 1) / 2;
-        const heading = ((options.heading ?? 0) + side * (burst ? 37 : 9)) * Math.PI / 180;
+        const heading = ((options.heading ?? (burst ? 90 : 0)) + side * (burst ? 24 : 7)) * Math.PI / 180;
         const reverse = !burst && lane % 2 === 1 ? -1 : 1;
         for (let segment = 0; segment < (options.segments ?? 3); segment++) {
             const delay = Math.round((lane * (burst ? 0.05 : 0.18) + segment * 0.105) * ticksPerSecond);
             emitters.push({
                 effect: "beam",
-                offset: { x: 0, y: 2.75 + (options.height ?? 0) + side * 0.23, z: 0.67 + side * 0.44 },
+                offset: { x: 0, y: 2.12 + (options.height ?? 0) + side * 0.15, z: 1.72 + side * 0.14 },
                 lifetime: life + delay / ticksPerSecond, particles: 1,
                 variables: {
-                    ...tint("beam", options, opacity * [0.92, 0.46, 0.22][segment]),
+                    ...tint("beam", options, opacity * [1, 0.52, 0.24][segment]),
                     dir_x: reverse * Math.cos(heading), dir_z: reverse * Math.sin(heading),
-                    span: (burst ? 3.6 : 6.5) * range, start: burst ? 0 : -3.25 * range,
-                    bend: (options.bend ?? 0.64) * (lane % 2 === 0 ? 1 : -1),
-                    length: (options.length ?? 1.22) * [1, 0.8, 0.55][segment],
-                    width: (options.width ?? 0.10) * (options.size ?? 1),
+                    span: (burst ? 2.75 : 4.8) * range, start: burst ? 0 : -2.4 * range,
+                    bend: (options.bend ?? 0.56) * reverse,
+                    length: (options.length ?? 1.36) * [1, 0.8, 0.55][segment],
+                    width: (options.width ?? 0.16) * (options.size ?? 1),
                     life, delay: delay / ticksPerSecond,
                 },
             });
@@ -194,18 +193,18 @@ export function planVfxScene(scene: VfxScene, options: VfxOptions = {}): VfxCue[
         case "burst":
             addField(0, 0.75, 16, 0.8);
             addWave(0.15, 1, 1.25, 3);
-            addBeam(0.8, 1, 6, true);
+            addBeam(1.15, 1, 6, true);
             break;
         case "demo":
-            addField(0, 0.52, 8);
-            addField(2, 0.66, 10);
+            addField(0.8, 0.62, 8);
+            addField(2.45, 0.74, 10);
             addWave(3.4, 0.7, 0.72);
             addField(4.5, 0.61, 10);
             addWave(7.1, 0.86, 0.9);
             addBeam(7.9, 0.82, 3);
             addField(9.5, 0.65, 11);
             addWave(10.8, 1, 1.16);
-            addBeam(11.5, 1, 6, true);
+            addBeam(11.8, 1, 6, true);
             addBeam(13.4, 0.56, 3);
             addWave(14.6, 0.54, 1.16, 3.3);
             addField(15.4, 0.43, 6);

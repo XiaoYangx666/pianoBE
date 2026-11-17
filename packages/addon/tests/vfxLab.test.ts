@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { parseVfxOptions, planVfxScene, VFX_LIMITS, VFX_SCENES, VFX_EMITTERS_PER_TICK } from "../src/domain/piano/vfxLab";
 
 test("Lab rejects malformed, non-finite, out-of-range and unknown options", () => {
@@ -40,10 +41,11 @@ test("every scene stays inside its tick and particle budgets at maximum settings
 test("wave covers every center column and offsets its two inner layers in depth and phase", () => {
     const wave = planVfxScene("wave").filter(cue => cue.tick < 20).flatMap(cue => cue.emitters);
     const columns = [...new Set(wave.map(emitter => emitter.offset.x))];
-    expect(columns).toHaveLength(21);
-    expect(columns[0]).toBeCloseTo(-2.75);
-    expect(columns.at(-1)).toBeCloseTo(2.75);
-    expect(columns.slice(1).every((x, i) => Math.abs(x - columns[i] - 0.275) < 1e-8)).toBe(true);
+    expect(columns).toHaveLength(33);
+    expect(columns[0]).toBeCloseTo(-2.3);
+    expect(columns.at(-1)).toBeCloseTo(2.3);
+    expect(columns.slice(1).every((x, i) => Math.abs(x - columns[i] - 4.6 / 32) < 1e-8)).toBe(true);
+    expect(wave.every(emitter => emitter.offset.z > 1 && emitter.variables.radius > 0.12)).toBe(true);
     const center = wave.filter(emitter => emitter.offset.x === 0);
     expect(center.map(emitter => emitter.variables.phase)).toEqual([-37, 0, 37]);
     expect(center[0].offset.z).toBeLessThan(center[1].offset.z);
@@ -59,6 +61,14 @@ test("beam can emit a single straight strip and demo enters each layer in order"
     expect([...new Set(demo.map(emitter => emitter.effect))]).toEqual(["field", "wave", "beam"]);
     expect(demo.at(-1)?.effect).toBe("field");
     expect(demo.filter(emitter => emitter.effect === "beam" && emitter.tick >= 230 && emitter.tick < 245)).toHaveLength(18);
+    for (const { offset, variables } of demo.filter(emitter => emitter.effect === "beam")) {
+        for (let i = 0; i <= 16; i++) {
+            const progress = i / 16;
+            const track = variables.start + variables.span * progress;
+            const lateral = variables.bend * Math.sin(Math.PI * progress);
+            expect(offset.z + track * variables.dir_z + lateral * variables.dir_x).toBeGreaterThan(0.9);
+        }
+    }
 });
 
 test("particle documents reference the original atlas and declare only supplied or engine variables", () => {
@@ -68,6 +78,17 @@ test("particle documents reference the original atlas and declare only supplied 
     const width = atlas.readUInt32BE(16);
     const height = atlas.readUInt32BE(20);
     expect(atlas[25]).toBe(6);
+    const textureSet = JSON.parse(readFileSync(new URL("textures/particle/vfx_lab.texture_set.json", resource), "utf8"));
+    expect(textureSet["minecraft:texture_set"]).toEqual({ color: "vfx_lab", metalness_emissive_roughness: "vfx_lab_mer" });
+    const mer = readFileSync(new URL("textures/particle/vfx_lab_mer.png", resource));
+    expect([mer.readUInt32BE(16), mer.readUInt32BE(20), mer[25]]).toEqual([width, height, 2]);
+    // The original atlas generator emits one IDAT with unfiltered RGB rows.
+    expect(mer.toString("ascii", 37, 41)).toBe("IDAT");
+    const emissive = inflateSync(mer.subarray(41, 41 + mer.readUInt32BE(33)));
+    const green = (x: number, y: number) => emissive[y * (width * 3 + 1) + x * 3 + 2];
+    expect(green(172, 72)).toBeGreaterThan(200);
+    expect(green(80, 16)).toBeGreaterThan(190);
+    expect(green(0, 48)).toBe(0);
     const build = planVfxScene("demo").flatMap(cue => cue.emitters);
     for (const effect of ["field", "wave", "beam"]) {
         const source = readFileSync(new URL(`particles/pbe_vfx_${effect}.particle.json`, resource), "utf8");

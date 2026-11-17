@@ -1,0 +1,7 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:texture_set": {
+    "color": "vfx_lab",
+    "metalness_emissive_roughness": "vfx_lab_mer"
+  }
+}
