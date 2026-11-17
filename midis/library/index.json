@@ -30,6 +30,13 @@
   "noteCount": 1215
  },
  {
+  "id": "80104f94",
+  "name": "巴啦啦小魔仙 主题曲",
+  "duration": 3898,
+  "noteCount": 1198,
+  "bytes": 3126
+ },
+ {
   "id": "9929de6e",
   "name": "坂本龙一 Merry Christmas Mr. Lawrence",
   "duration": 10894,
@@ -94,6 +101,13 @@
   "name": "勃拉姆斯 - 匈牙利舞曲第五号",
   "duration": 5376,
   "noteCount": 1717
+ },
+ {
+  "id": "d6d11eb5",
+  "name": "步步惊心 三寸天堂",
+  "duration": 11300,
+  "noteCount": 1262,
+  "bytes": 3996
  },
  {
   "id": "df64c336",
@@ -354,6 +368,13 @@
   "noteCount": 1942
  },
  {
+  "id": "8a060516",
+  "name": "电击小子 主题曲",
+  "duration": 3113,
+  "noteCount": 755,
+  "bytes": 1842
+ },
+ {
   "id": "1a4c0883",
   "name": "哆啦A梦 - 主题曲",
   "duration": 9612,
@@ -378,6 +399,13 @@
   "noteCount": 1913
  },
  {
+  "id": "ecc4ef88",
+  "name": "灌篮高手 好想大声说喜欢你",
+  "duration": 10111,
+  "noteCount": 2834,
+  "bytes": 7300
+ },
+ {
   "id": "1bcfaccb",
   "name": "光良 - 第一次",
   "duration": 10253,
@@ -396,6 +424,20 @@
   "noteCount": 597
  },
  {
+  "id": "a6ae6cf1",
+  "name": "海屿你",
+  "duration": 11878,
+  "noteCount": 3482,
+  "bytes": 9467
+ },
+ {
+  "id": "d3cd0e8e",
+  "name": "黑猫警长 主题曲",
+  "duration": 4497,
+  "noteCount": 1366,
+  "bytes": 3464
+ },
+ {
   "id": "3fb6936",
   "name": "黑神话：悟空-主题曲",
   "duration": 4114,
@@ -408,10 +450,11 @@
   "noteCount": 888
  },
  {
-  "id": "93e29624",
+  "id": "a529f114",
   "name": "胡歌 - 忘记时间",
-  "duration": 7108,
-  "noteCount": 312
+  "duration": 10488,
+  "noteCount": 1490,
+  "bytes": 5257
  },
  {
   "id": "ea12c4e5",
@@ -514,6 +557,13 @@
   "name": "卡农",
   "duration": 12513,
   "noteCount": 2154
+ },
+ {
+  "id": "cb351113",
+  "name": "开心宝贝 开心往前飞",
+  "duration": 3078,
+  "noteCount": 970,
+  "bytes": 2692
  },
  {
   "id": "7b5d758f",
@@ -918,6 +968,13 @@
   "noteCount": 1927
  },
  {
+  "id": "4b285ea8",
+  "name": "名侦探柯南 主题曲",
+  "duration": 6335,
+  "noteCount": 2024,
+  "bytes": 5597
+ },
+ {
   "id": "11363175",
   "name": "鸣潮 - 远航星的告别",
   "duration": 9100,
@@ -1080,6 +1137,20 @@
   "noteCount": 717
  },
  {
+  "id": "e13dde4",
+  "name": "上海滩 主题曲",
+  "duration": 6014,
+  "noteCount": 1020,
+  "bytes": 3281
+ },
+ {
+  "id": "922615e1",
+  "name": "神话 美丽的神话",
+  "duration": 11135,
+  "noteCount": 2025,
+  "bytes": 5801
+ },
+ {
   "id": "b1d8c5cd",
   "name": "石进 - 夜的钢琴曲六",
   "duration": 8330,
@@ -1090,6 +1161,13 @@
   "name": "石进 - 夜的钢琴曲五",
   "duration": 10396,
   "noteCount": 1424
+ },
+ {
+  "id": "83667e9",
+  "name": "数码宝贝 Butter-Fly",
+  "duration": 12543,
+  "noteCount": 3147,
+  "bytes": 8886
  },
  {
   "id": "c1286fd4",
@@ -1174,6 +1252,20 @@
   "name": "陶喆 - 找自己",
   "duration": 11576,
   "noteCount": 3012
+ },
+ {
+  "id": "e658d2b1",
+  "name": "陶喆 爱我还是他",
+  "duration": 7124,
+  "noteCount": 1065,
+  "bytes": 3083
+ },
+ {
+  "id": "a1ce0220",
+  "name": "陶喆 小镇姑娘",
+  "duration": 11774,
+  "noteCount": 3880,
+  "bytes": 8886
  },
  {
   "id": "df458ffb",
@@ -1314,6 +1406,13 @@
   "noteCount": 994
  },
  {
+  "id": "e79ad48f",
+  "name": "王心凌 爱你",
+  "duration": 8340,
+  "noteCount": 1784,
+  "bytes": 3666
+ },
+ {
   "id": "4a361d62",
   "name": "蔚蓝档案 Constant Moderato",
   "duration": 7293,
@@ -1446,6 +1545,13 @@
   "noteCount": 495
  },
  {
+  "id": "7571ccfb",
+  "name": "喜羊羊 奇思妙想喜羊羊",
+  "duration": 3684,
+  "noteCount": 653,
+  "bytes": 1520
+ },
+ {
   "id": "128610ea",
   "name": "仙剑奇侠传 - 偏爱",
   "duration": 8634,
@@ -1462,6 +1568,13 @@
   "name": "仙剑奇侠传 - 雪见·落入凡尘",
   "duration": 11661,
   "noteCount": 2060
+ },
+ {
+  "id": "a87f1d3f",
+  "name": "仙剑奇侠传 杀破狼",
+  "duration": 11159,
+  "noteCount": 2640,
+  "bytes": 6803
  },
  {
   "id": "84f0b77f",
@@ -1492,6 +1605,20 @@
   "name": "星际穿越 Cornfield Chase",
   "duration": 11369,
   "noteCount": 1469
+ },
+ {
+  "id": "8c6b0412",
+  "name": "熊出没 你从未离去",
+  "duration": 12579,
+  "noteCount": 2192,
+  "bytes": 6212
+ },
+ {
+  "id": "7fc37a43",
+  "name": "熊出没 我还有点小糊涂",
+  "duration": 3245,
+  "noteCount": 816,
+  "bytes": 1947
  },
  {
   "id": "bec50797",
@@ -1644,10 +1771,52 @@
   "noteCount": 757
  },
  {
+  "id": "cd9307ec",
+  "name": "原神 杯中明月",
+  "duration": 4714,
+  "noteCount": 1124,
+  "bytes": 3302
+ },
+ {
   "id": "cc205a5b",
   "name": "原神 层岩巨渊 激扬的韧战",
   "duration": 10253,
   "noteCount": 2726
+ },
+ {
+  "id": "aee5f8cf",
+  "name": "原神 雷电将军 何妄何执",
+  "duration": 5768,
+  "noteCount": 1239,
+  "bytes": 3567
+ },
+ {
+  "id": "19e4e2f9",
+  "name": "原神 龙脊雪山 皎洁的笑颜",
+  "duration": 3229,
+  "noteCount": 480,
+  "bytes": 1491
+ },
+ {
+  "id": "8970b5bf",
+  "name": "原神 蒙德的午夜",
+  "duration": 2212,
+  "noteCount": 178,
+  "bytes": 661
+ },
+ {
+  "id": "dc5b7927",
+  "name": "原神 霜月 寂夜月如锋",
+  "duration": 7411,
+  "noteCount": 2361,
+  "bytes": 5997
+ },
+ {
+  "id": "28a2cb50",
+  "name": "原神 水神之舞 罪人的终幕",
+  "duration": 6768,
+  "noteCount": 1024,
+  "bytes": 3042
  },
  {
   "id": "fe794707",
@@ -1660,6 +1829,13 @@
   "name": "原神 渊下宫 湮没的忆念",
   "duration": 5767,
   "noteCount": 386
+ },
+ {
+  "id": "360b60cc",
+  "name": "原神 至冬 冰湖的凯旋礼",
+  "duration": 9191,
+  "noteCount": 3175,
+  "bytes": 8646
  },
  {
   "id": "45db532f",
