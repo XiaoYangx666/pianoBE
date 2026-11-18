@@ -1,12 +1,12 @@
 import type { MidiSongMeta } from "../types.js";
-import { encodeBase64Url } from "../pbe2/base64url.js";
+import { encodeBase64Url } from "../binary/base64url.js";
 
 /**
- * 单曲 PBE2 → addon 内嵌模块文本。
- * 模块只保存压缩后的 PBE2 数据（Base64URL），不再内联完整音符数组。
+ * 单曲 PBE3 → addon 内嵌模块文本。
+ * 模块只保存压缩后的 PBE3 数据（Base64URL），不再内联完整音符数组。
  */
-export function pbe2ToAddonModule(pbe2: Uint8Array): string {
-    return `export default ${JSON.stringify(encodeBase64Url(pbe2))};`;
+export function pbe3ToAddonModule(pbe3: Uint8Array): string {
+    return `export default ${JSON.stringify(encodeBase64Url(pbe3))};`;
 }
 
 /** 曲目元列表 → addon 内嵌 index.js 文本（value() 返回模块内的 Base64URL 数据） */

@@ -1,7 +1,7 @@
 /**
  * 离线声部负载模拟：不需要进游戏。
  *
- * 用真实 PBE2 曲库跑与运行时一致的释放模型：
+ * 用真实 PBE3 曲库跑与运行时一致的释放模型：
  *   - Note Off 后 release 秒淡出，再 stop；
  *   - 同键重触发快速收掉旧实例；
  *   - 同时实例上限 maxVoices，超出停掉最早的；
@@ -13,26 +13,31 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pbe2ToNoteEvents } from "../../packages/core/dist/pbe2/index.js";
-import { BEDROCK_SIMULTANEOUS_SOUND, PIANO_VOICE_BUDGET } from "../../packages/core/dist/music/voiceLoad.js";
+import { songToNoteEvents } from "../../packages/core/dist/songCodec.js";
+import {
+    BEDROCK_SIMULTANEOUS_SOUND,
+    DEFAULT_MAX_HELD_SECONDS,
+    DEFAULT_SAMPLE_SECONDS,
+    PIANO_VOICE_BUDGET,
+} from "../../packages/core/dist/music/voiceLoad.js";
 import { processNote } from "../../packages/core/dist/midi/note.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const LIBRARY = join(ROOT, "midis", "library");
 const REPORT = join(ROOT, "tools", "voice-load-report.md");
 
-const SAMPLE_SECONDS = 4;
+const SAMPLE_SECONDS = DEFAULT_SAMPLE_SECONDS;
 const TICK_SECONDS = 0.05;
 /** 钢琴声部预算（运行时 SoundReleaseQueue 的上限）。 */
 const MAX_VOICES = PIANO_VOICE_BUDGET;
-const MAX_HELD_SECONDS = 8;
+const MAX_HELD_SECONDS = DEFAULT_MAX_HELD_SECONDS;
 const SAME_NOTE_FADE_SECONDS = 0.04;
 const SAME_NOTE_STOP_SECONDS = 0.1;
 
-/** 读一份 PBE2 曲目为秒制音符事件。 */
+/** 读一份 PBE3 曲目为秒制音符事件。 */
 function loadSong(file) {
     const data = new Uint8Array(readFileSync(join(LIBRARY, file)));
-    return pbe2ToNoteEvents(data);
+    return songToNoteEvents(data);
 }
 
 function percentile(values, ratio) {
@@ -57,9 +62,11 @@ function simulate(notes, releaseSeconds, maxVoices) {
         const pitch = processNote(note.midi, false).pitch;
         const naturalEnd = start + SAMPLE_SECONDS / pitch;
         const noteOff = start + Math.max(0.05, note.duration);
-        const releaseEnd = noteOff + releaseSeconds;
-        const audibleEnd = Math.min(naturalEnd, releaseEnd);
-        const handleEnd = Math.min(noteOff, start + MAX_HELD_SECONDS) + releaseSeconds + 0.1;
+        const sampleFirst = noteOff > naturalEnd;
+        const releaseAt = Math.min(noteOff, naturalEnd, start + MAX_HELD_SECONDS);
+        const audibleEnd = Math.min(naturalEnd, noteOff + releaseSeconds);
+        // 采样先放完时到点直接 stop；否则 Note Off 后还要占 releaseSeconds 的淡出时间。
+        const handleEnd = releaseAt + (sampleFirst ? 0 : releaseSeconds + 0.1);
         const velocity = Math.round((note.velocity ?? 1) * 127);
 
         // 同键重触发：旧实例 40ms 淡出、约 100ms 后 stop。
@@ -73,7 +80,7 @@ function simulate(notes, releaseSeconds, maxVoices) {
 
         open = open.filter((item) => item.handleEnd > start);
 
-        // 与运行时一致：先腾位；新音不比最弱候选更响时直接省略。
+        // 与运行时一致：先腾位；只有新音严格更轻时才直接省略。
         if (!sameKeyActive && open.length >= maxVoices) {
             let victimIndex = 0;
             for (let i = 1; i < open.length; i++) {
@@ -81,14 +88,16 @@ function simulate(notes, releaseSeconds, maxVoices) {
                 const b = open[victimIndex];
                 if (a.velocity !== b.velocity) {
                     if (a.velocity < b.velocity) victimIndex = i;
-                } else if (a.noteOff !== b.noteOff) {
-                    if (a.noteOff < b.noteOff) victimIndex = i;
-                } else if (a.start < b.start) {
+                } else if (a.releaseAt !== b.releaseAt) {
+                    if (a.releaseAt < b.releaseAt) victimIndex = i;
+                } else if (a.start !== b.start) {
+                    if (a.start < b.start) victimIndex = i;
+                } else if (a.midi < b.midi) {
                     victimIndex = i;
                 }
             }
             const victim = open[victimIndex];
-            if (velocity <= victim.velocity) {
+            if (velocity < victim.velocity) {
                 dropped++;
                 continue;
             }
@@ -98,7 +107,7 @@ function simulate(notes, releaseSeconds, maxVoices) {
             evictions++;
         }
 
-        const voice = { start, audibleEnd, handleEnd, midi: note.midi, velocity, noteOff };
+        const voice = { start, audibleEnd, handleEnd, midi: note.midi, velocity, noteOff, releaseAt };
         voices.push(voice);
         same.push(voice);
         byMidi.set(note.midi, same);
@@ -161,8 +170,8 @@ function simulate(notes, releaseSeconds, maxVoices) {
 
 function loadIndex() {
     const meta = JSON.parse(readFileSync(join(LIBRARY, "index.json"), "utf8"));
-    const files = new Set(readdirSync(LIBRARY).filter((name) => name.endsWith(".pbe2")));
-    return meta.filter((song) => files.has(`${song.id}.pbe2`));
+    const files = new Set(readdirSync(LIBRARY).filter((name) => name.endsWith(".pbe3")));
+    return meta.filter((song) => files.has(`${song.id}.pbe3`));
 }
 
 function summarize(releaseSeconds) {
@@ -170,7 +179,7 @@ function summarize(releaseSeconds) {
     const results = [];
     for (const meta of index) {
         try {
-            const notes = loadSong(`${meta.id}.pbe2`);
+            const notes = loadSong(`${meta.id}.pbe3`);
             // 先用宽松上限测“自然峰值”，再用钢琴预算统计实际会被收掉多少实例。
             const stats = simulate(notes, releaseSeconds, 64);
             const capped = simulate(notes, releaseSeconds, MAX_VOICES);
@@ -209,10 +218,10 @@ const lines = [
     "# 离线声部负载模拟（600ms 释放）",
     "",
     `- 生成时间：${new Date().toISOString()}`,
-    `- 曲库：${main.songs.length} 首真实 PBE2`,
+    `- 曲库：${main.songs.length} 首真实 PBE3`,
     `- 采样长度：${SAMPLE_SECONDS}s；同键重触发 ${SAME_NOTE_FADE_SECONDS * 1000}ms 淡出 / ${SAME_NOTE_STOP_SECONDS * 1000}ms 停止`,
-    `- 引擎上限：${BEDROCK_SIMULTANEOUS_SOUND} 个同时音效；钢琴声部预算：${MAX_VOICES}；超长音符最多持有 ${MAX_HELD_SECONDS}s`,
-    "- `audible` = 实际还在发声；`handle` = JS 仍持有 SoundInstance 的实例数（淡出期间两者相同）",
+    `- 引擎上限：${BEDROCK_SIMULTANEOUS_SOUND} 个同时音效；钢琴声部预算：${MAX_VOICES}；踏板长音在 ${SAMPLE_SECONDS}s 采样结束后释放（安全上限 ${MAX_HELD_SECONDS}s）`,
+    "- `audible` = 实际还在发声；`handle` = JS 仍持有 SoundInstance 的实例数（淡出期间两者相同，采样结束的踏板长音不再占 handle）",
     "",
     "## 释放时长对比",
     "",
@@ -253,9 +262,10 @@ lines.push(
     `- 全库最大 P95 为 **${main.maxP95}**，即 95% 的时间发声数不超过这个值。`,
     `- **缩短淡出不能解决峰值**：释放从 ${shortest.releaseSeconds}s 拉到 ${longest.releaseSeconds}s，峰值始终是 ` +
         `${shortest.maxPeak} → ${longest.maxPeak}，因为峰值来自真正同时按住的音，而不是释放尾巴。`,
-    `- 因此运行时按 ${MAX_VOICES} 的钢琴预算主动收掉“最不重要”的音（更轻、更接近 Note Off、谱面优先于手动）；` +
+    `- 因此运行时按 ${MAX_VOICES} 的钢琴预算主动收掉“最不重要”的音（更轻、更接近采样结束、谱面优先于手动，同条件优先保留高音）；` +
         `导入时用同一模型预计算峰值并提示超限曲目。`,
-    `- ${MAX_VOICES} 预算下，${main.songsOverCap} 首会触发回收：停掉 ${main.totalEvictions} 个实例、直接省略 ${main.totalDropped} 个更轻的新音；所有实例句柄最终都归零。`,
+    `- ${MAX_VOICES} 预算下，${main.songsOverCap} 首会触发回收：停掉 ${main.totalEvictions} 个实例、只省略 ${main.totalDropped} 个严格更轻的新音；` +
+        `力度相同的新音不会被吞掉，所有实例句柄最终都归零。`,
     "",
     "复现：`node tools/analyze-voice-load.mjs`",
     ""

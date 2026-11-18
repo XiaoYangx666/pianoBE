@@ -3,7 +3,7 @@ import {
     MusicCollection,
     MusicValidationError,
     StorageBudget,
-    encodePbe2,
+    encodePbe3,
     entryStoredBytes,
     metaKey,
     musicRefKey,
@@ -24,7 +24,7 @@ function song(id: string, name = id, notes = 8, compress: boolean | "auto" = "au
         duration: Math.max(1, notes * 40),
         tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: values }],
     };
-    return encodePbe2(midi, { compress });
+    return encodePbe3(midi, { compress });
 }
 
 function collection(kv: MemoryKv, limit: () => number) {

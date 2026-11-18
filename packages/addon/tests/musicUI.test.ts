@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { encodePbe2, type StoredMusicEntry } from "@piano/core";
+import { encodePbe3, type StoredMusicEntry } from "@piano/core";
 import { MidiPlayer } from "../src/domain/playback/player";
 import { Signal } from "../src/domain/util/signal";
 import { createDDUIHost, createMidiAppMock, createSapiProMock, FakeObservable, type FakeCustomForm } from "./support/fakeDDUI";
@@ -102,7 +102,7 @@ function makeEntry(id: string, name: string): StoredMusicEntry {
 function fakeStorage(entries: StoredMusicEntry[], label = "测试卡") {
     const data = new Map<string, Uint8Array>();
     for (const entry of entries) {
-        data.set(entry.id, encodePbe2({
+        data.set(entry.id, encodePbe3({
             id: entry.id,
             name: entry.name,
             duration: 1200,

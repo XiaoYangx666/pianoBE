@@ -32,31 +32,31 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         return c.body(raw, 200, { "content-type": "audio/midi" });
     });
 
-    // GET /api/songs/:id/code —— 游戏内导入码（PBE2 分段）
+    // GET /api/songs/:id/code —— 游戏内导入码（PBE3 分段）
     app.get("/:id/code", readRole(), (c) => {
         const id = c.req.param("id") ?? "";
-        const pbe2 = deps.songPort.getPbe2(id);
-        if (!pbe2) return c.json({ error: "曲目不存在" }, 404);
+        const pbe3 = deps.songPort.getPbe3(id);
+        if (!pbe3) return c.json({ error: "曲目不存在" }, 404);
         const meta = deps.songPort.getMeta(id);
         return c.json({
             name: meta?.name ?? id,
-            chunks: planImportChunks(pbe2),
-            bytes: pbe2.byteLength,
+            chunks: planImportChunks(pbe3),
+            bytes: pbe3.byteLength,
         });
     });
 
-    // GET /api/songs/:id —— 游戏播放器曲目（统一 PBE2，Base64URL 传输）
+    // GET /api/songs/:id —— 游戏播放器曲目（统一 PBE3，Base64URL 传输）
     app.get("/:id", readRole(), (c) => {
         const id = c.req.param("id") ?? "";
-        const pbe2 = deps.songPort.getPbe2(id);
-        if (!pbe2) return c.json({ error: "曲目不存在" }, 404);
+        const pbe3 = deps.songPort.getPbe3(id);
+        if (!pbe3) return c.json({ error: "曲目不存在" }, 404);
         const meta = deps.songPort.getMeta(id);
         return c.json({
             id,
             name: meta?.name ?? id,
             duration: meta?.duration ?? 0,
-            /** Base64URL(PBE2)：BDS 的 server-net 响应体为字符串，二进制统一走 Base64URL */
-            data: encodeBase64Url(pbe2),
+            /** Base64URL(PBE3)：BDS 的 server-net 响应体为字符串，二进制统一走 Base64URL */
+            data: encodeBase64Url(pbe3),
         });
     });
 

@@ -1,7 +1,7 @@
 import { crc32Hex } from "../midi/crc32.js";
-import { encodeBase64Url } from "../pbe2/base64url.js";
-import { readAllPbe2Notes, readPbe2Events, readPbe2Header } from "../pbe2/codec.js";
-import type { Pbe2Header } from "../pbe2/format.js";
+import { encodeBase64Url } from "../binary/base64url.js";
+import { readAllPbe3Notes, readPbe3Events, readPbe3Header } from "../pbe3/codec.js";
+import type { Pbe3Header } from "../pbe3/format.js";
 import {
     DEFAULT_MUSIC_LIMITS,
     MUSIC_ENTRY_ID_PATTERN,
@@ -19,8 +19,8 @@ export class MusicValidationError extends Error {
 }
 
 export interface ValidatedMusic {
-    header: Pbe2Header;
-    /** 整份 PBE2 的 CRC32（16 进制） */
+    header: Pbe3Header;
+    /** 整份 PBE3 的 CRC32（16 进制） */
     checksum: string;
     /** Base64URL 编码后的长度（写盘计费用） */
     encoded: string;
@@ -35,20 +35,20 @@ export function isValidMusicId(id: unknown): id is string {
  * 任何一项失败都抛 MusicValidationError（中文提示可直接展示），不写半成品。
  */
 export function validateMusic(
-    pbe2: Uint8Array,
+    pbe3: Uint8Array,
     limits: MusicStorageLimits = DEFAULT_MUSIC_LIMITS
 ): ValidatedMusic {
-    if (!pbe2 || pbe2.length === 0) throw new MusicValidationError("曲目数据为空");
-    if (pbe2.length > limits.maxSongBytes) {
+    if (!pbe3 || pbe3.length === 0) throw new MusicValidationError("曲目数据为空");
+    if (pbe3.length > limits.maxSongBytes) {
         throw new MusicValidationError(
             `曲目超过单曲上限 ${(limits.maxSongBytes / 1024 / 1024).toFixed(0)}MB`
         );
     }
-    let header: Pbe2Header;
+    let header: Pbe3Header;
     try {
-        header = readPbe2Header(pbe2);
+        header = readPbe3Header(pbe3);
     } catch {
-        throw new MusicValidationError("不是有效的 PBE2 曲目数据");
+        throw new MusicValidationError("不是有效的 PBE3 曲目数据");
     }
     if (!isValidMusicId(header.id)) throw new MusicValidationError("曲目 id 非法");
     if (header.noteCount <= 0) throw new MusicValidationError("曲目没有音符");
@@ -61,12 +61,12 @@ export function validateMusic(
     }
     let events: Uint8Array;
     try {
-        events = readPbe2Events(pbe2).events;
+        events = readPbe3Events(pbe3).events;
     } catch {
         throw new MusicValidationError("曲目数据损坏（事件流无法解压）");
     }
-    if (readAllPbe2Notes(events, header.hasVelocity, header.velocityMax).length !== header.noteCount) {
+    if (readAllPbe3Notes(events, header.palette, header.velocityBits).length !== header.noteCount) {
         throw new MusicValidationError("曲目音符数量校验失败");
     }
-    return { header, checksum: crc32Hex(pbe2), encoded: encodeBase64Url(pbe2) };
+    return { header, checksum: crc32Hex(pbe3), encoded: encodeBase64Url(pbe3) };
 }

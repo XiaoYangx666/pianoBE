@@ -1,6 +1,7 @@
 import {
     DEFAULT_MAX_HELD_SECONDS,
     DEFAULT_NOTE_RELEASE_SECONDS,
+    DEFAULT_SAMPLE_SECONDS,
     PIANO_VOICE_BUDGET,
     SAME_NOTE_FADE_SECONDS,
     SAME_NOTE_STOP_SECONDS,
@@ -14,6 +15,11 @@ import {
  * 声部上限：Bedrock 客户端同一时刻最多混 32 个音效，而淡出中的实例仍占名额。
  * 队列按 `PIANO_VOICE_BUDGET`（28）控制自己持有的 SoundInstance 数，
  * 超限时主动挑一个“最不重要”的音立即收掉，而不是让引擎随机截断。
+ *
+ * 采样本身只有 4 秒（见 tools/audio/build-piano-timbres.mjs），被踏板延长到
+ * 8 秒的音符在后半段其实已经无声。这里按 `4s / pitch` 计算真实可闻时长：
+ * 采样先结束时直接 stop，不再白占 4 秒声部名额；只有 Note Off 早于采样结束时
+ * 才走 `releaseSeconds` 淡出。
  */
 export interface ReleasableSound {
     fade(durationSeconds: number, targetVolume: number): void;
@@ -30,6 +36,8 @@ interface Voice {
     startTick: number;
     releaseTick: number;
     stopTick?: number;
+    /** 采样先于 Note Off 结束：到点直接 stop，不需要淡出。 */
+    stopAtRelease?: boolean;
     failed?: boolean;
     /** 已因超限被选中（用于统计，避免同一声部计两次）。 */
     evicted?: boolean;
@@ -44,7 +52,7 @@ export class SoundReleaseQueue {
         private readonly releaseSeconds = DEFAULT_NOTE_RELEASE_SECONDS,
         private readonly tickRate = 20,
         private readonly maxVoices = PIANO_VOICE_BUDGET,
-        /** 单个实例最多保留多久；用于超长音符在采样自然结束后释放句柄。 */
+        /** 单个实例的安全上限；正常由 `4s / pitch` 的采样长度决定。 */
         private readonly maxHeldSeconds = DEFAULT_MAX_HELD_SECONDS
     ) {}
 
@@ -87,8 +95,10 @@ export class SoundReleaseQueue {
         const victim = this.chooseVictim();
         if (!victim) return false;
 
-        // 新音符不比牺牲者更响，且不是手动按键：省掉这次播放更划算。
-        if (!manual && victim.stopTick === undefined && velocity <= victim.velocity) {
+        // 新音符明显更轻（严格小于）且牺牲者仍在发声时，省掉这次播放更划算。
+        // 注意不能用 <=：大量 MIDI 全曲力度相同，相等就丢会导致满声部后
+        // 后面所有旋律音都被吞掉（旧版本正是这样吞掉《Secret》的高音跑动）。
+        if (!manual && victim.stopTick === undefined && velocity < victim.velocity) {
             this.droppedVoices++;
             return false;
         }
@@ -100,6 +110,7 @@ export class SoundReleaseQueue {
     /**
      * 登记一个刚开始播放的声音。
      * @param durationSeconds MIDI 音符时值；手动按键可传一个较短的固定时值。
+     * @param pitch 采样变调倍数；真实可闻时长 = `DEFAULT_SAMPLE_SECONDS / pitch`。
      */
     add(
         sound: ReleasableSound,
@@ -107,11 +118,22 @@ export class SoundReleaseQueue {
         durationSeconds: number,
         nowTick: number,
         velocity = 100,
-        manual = false
+        manual = false,
+        pitch = 1
     ) {
         // 同键重触发：旧实例先快速收掉，避免两个同音叠加。
         for (const voice of this.voices) {
             if (voice.midi !== midi || voice.stopTick !== undefined) continue;
+            if (voice.stopAtRelease) {
+                // 旧实例的采样早已放完，直接停，不用再等淡出。
+                try {
+                    voice.sound.stop();
+                } catch {
+                    // 实例可能已经自然结束
+                }
+                voice.failed = true;
+                continue;
+            }
             try {
                 voice.sound.fade(SAME_NOTE_FADE_SECONDS, 0);
                 voice.stopTick = nowTick + Math.max(1, Math.round(SAME_NOTE_STOP_SECONDS * this.tickRate));
@@ -119,16 +141,24 @@ export class SoundReleaseQueue {
                 voice.failed = true;
             }
         }
+        this.pruneFailed();
         const ticks = Math.max(1, Math.round(Math.max(0, durationSeconds) * this.tickRate));
-        // 采样本身最长约 4.8s（低音变调后）；超长音符在采样自然结束后就没必要继续持有实例。
-        const held = Math.min(ticks, Math.max(1, Math.round(this.maxHeldSeconds * this.tickRate)));
+        const sampleTicks = Math.max(
+            1,
+            Math.round((DEFAULT_SAMPLE_SECONDS / Math.max(0.01, pitch)) * this.tickRate)
+        );
+        const maxHeldTicks = Math.max(1, Math.round(this.maxHeldSeconds * this.tickRate));
+        // 采样先结束（踏板长音）→ 到点直接 stop；Note Off 先到 → 走 release 淡出。
+        const stopAtRelease = ticks > sampleTicks;
+        const held = Math.min(ticks, sampleTicks, maxHeldTicks);
         this.voices.push({
             sound,
             midi,
             velocity,
             manual,
             startTick: nowTick,
-            releaseTick: nowTick + held,
+            releaseTick: nowTick + Math.max(1, held),
+            stopAtRelease,
         });
         // makeRoom 一般已经腾好位置；这里兜底，防止调用方漏掉预留步骤。
         this.enforceCapacity();
@@ -148,6 +178,11 @@ export class SoundReleaseQueue {
                 continue;
             }
             if (nowTick < voice.releaseTick) continue;
+            if (voice.stopAtRelease) {
+                // 采样已经自然放完，淡出也听不到，直接释放名额。
+                this.stopVoice(voice, i);
+                continue;
+            }
             try {
                 voice.sound.fade(this.releaseSeconds, 0);
                 voice.stopTick = nowTick + Math.max(1, Math.ceil(this.releaseSeconds * this.tickRate)) + 1;
@@ -193,7 +228,8 @@ export class SoundReleaseQueue {
      * 2. 谱面音符优先于手动按键；
      * 3. 力度更低（更听不出来）；
      * 4. 更接近 Note Off（本来就要结束了）；
-     * 5. 更早开始（保留刚触发的新音更有意义）。
+     * 5. 更早开始（保留刚触发的新音更有意义）；
+     * 6. 音高更低（同样条件下优先牺牲伴奏低音，保留旋律高音）。
      */
     private chooseVictim(): Voice | undefined {
         let best: Voice | undefined;
@@ -245,6 +281,7 @@ function victimRank(voice: Voice): number[] {
         voice.velocity,
         voice.releaseTick,
         voice.startTick,
+        voice.midi,
     ];
 }
 

@@ -129,7 +129,7 @@ export class WorldMusicLibrary {
         return this.byId.has(id) || this.collection.has(id);
     }
 
-    /** 读取并校验 PBE2 正文。 */
+    /** 读取并校验 PBE3 正文。 */
     async get(id: string): Promise<Uint8Array | undefined> {
         this.ensureLoaded();
         return this.collection.get(id);
@@ -173,18 +173,18 @@ export class WorldMusicLibrary {
      *
      * 同 id 且内容一致视为幂等重复；同 id 不同内容视为冲突并拒绝覆盖。
      */
-    save(pbe2: Uint8Array): StoredMusicEntry {
+    save(pbe3: Uint8Array): StoredMusicEntry {
         this.ensureLoaded();
-        const { header, checksum } = validateMusic(pbe2);
+        const { header, checksum } = validateMusic(pbe3);
         const existing = this.entry(header.id);
         if (existing) {
-            if (existing.checksum === checksum && existing.bytes === pbe2.length) return existing;
+            if (existing.checksum === checksum && existing.bytes === pbe3.length) return existing;
             throw new MusicValidationError(`歌曲 ID 冲突：${header.id} 已存在且内容不同`);
         }
         if (this.entriesCache.length >= WORLD_LIBRARY_MAX_SONGS) {
             throw new MusicValidationError(`全局曲库歌曲数量已达上限 ${WORLD_LIBRARY_MAX_SONGS}`);
         }
-        const entry = this.collection.save(pbe2);
+        const entry = this.collection.save(pbe3);
         this.reload();
         return entry;
     }
@@ -205,7 +205,7 @@ export class WorldMusicLibrary {
         return { ...this.usage(), maxSongs: WORLD_LIBRARY_MAX_SONGS };
     }
 
-    /** 普通公共曲库使用独立命名空间；管理员接口继续使用原始 PBE2 ID。 */
+    /** 普通公共曲库使用独立命名空间；管理员接口继续使用原始 PBE3 ID。 */
     readonly publicSource = {
         list: (): MidiSongMeta[] => this.list().map(meta => ({ ...meta, id: worldPublicId(meta.id) })),
         get: (publicId: string): Promise<Uint8Array | undefined> => {

@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
-import { encodePbe2, crc32Hex, type MusicRef, type StoredMusicEntry } from "@piano/core";
+import { encodePbe3, crc32Hex, type MusicRef, type StoredMusicEntry } from "@piano/core";
 import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
 import { PlayQueue } from "../src/domain/playback/queue";
 
@@ -16,7 +16,7 @@ const { PianoMusic } = await import("../src/app/music/pianoMusic");
 function music(id: string, notes = 6): Uint8Array {
     const values: number[] = [];
     for (let index = 0; index < notes; index++) values.push(60 + (index % 12), index * 40, 20, 90);
-    return encodePbe2({
+    return encodePbe3({
         id,
         name: `曲目 ${id}`,
         duration: Math.max(1, notes * 40),

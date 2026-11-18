@@ -30,7 +30,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 - **MIDI 播放**：内嵌或远程曲库，播放队列（顺序/循环/单曲/随机）、多钢琴独立播放、UI 同步、区块卸载自动停止
 - **DDUI 表单**：按需创建、关闭即释放；同一玩家同时只保留一个活动表单
 - **自托管后端**：Hono + bun:sqlite + Docker；token 鉴权（Bootstrap 令牌 env 注入、分角色令牌）；React 管理页
-- **曲目文件存储**：SQLite 仅存元数据，完整曲目以 `data/midis/{id}.mid` 源文件存储；游戏播放器按需转为 PBE2，管理页前端直接解析 `.mid` 播放
+- **曲目文件存储**：SQLite 仅存元数据，完整曲目以 `data/midis/{id}.mid` 源文件存储；游戏播放器按需转为 PBE3，管理页前端直接解析 `.mid` 播放
 - **无事务一致性**：存储端口单键原子写、派生索引、崩溃自愈（core 契约测试覆盖）
 - **音频转 MIDI（AMT）**：生成器在浏览器本地运行转录模型；自托管后端调用 Rust `amt-cli`，并可直接解析 B 站视频音频
 
@@ -106,7 +106,7 @@ pianoBE/
 ### 技术要点
 
 - 曲目 `id = crc32(.mid 内容)`，内容寻址；后端、内嵌曲库、生成器三端同一算法，天然对账
-- 统一运行时格式 **PBE2**：40 tick/秒时间差分 + VarInt + 同时刻分组 + Raw DEFLATE，播放器用共享 `SongCache` + `EventCursor` 增量读取（README「曲目格式」）
+- 统一运行时格式 **PBE3**：40 tick/秒时间差分 + VarInt + 同时刻分组 + 力度调色板 + keyDuration + Raw DEFLATE，播放器用共享 `SongCache` + `Pbe3EventCursor` 增量读取（格式细节见 [`docs/pbe3-format.md`](docs/pbe3-format.md)）
 - 音频转 MIDI：服务端任务式转录（原音频 + MIDI 先预览，确认后入库），进度由 `amt-cli --events` 实时音符事件估算
 - 调度：20 TPS 下采用“最近 tick”（提前半个游戏 tick 触发），把量化误差从整体拖后改成居中；子 tick 方案仍只做可行性记录
 - 双端存储驱动：addon 使用世界动态属性（DPDataBase），后端使用 SQLite（meta）+ 文件（内容），共享同一套 core 端口与契约测试
@@ -166,7 +166,7 @@ npm run sync:amt
 
 ### Cloudflare 生成器播放统计
 
-生成器的网页、`library/index.json` 与 `library/{id}.pbe2` 仍由 **Workers Static Assets** 托管；
+生成器的网页、`library/index.json` 与 `library/{id}.pbe3` 仍由 **Workers Static Assets** 托管；
 D1 只保存可变的播放量与防刷状态，不引入传统后端，也不改变现有加歌/构建流程。
 
 首次启用统计需要在 `packages/generator` 下执行一次：
@@ -226,8 +226,8 @@ docker compose -f docker-compose.dev.yml up
 | 目录 | 内容 | 版本控制 |
 |---|---|---|
 | `midis/files/` | 原始 `.mid` 源文件 | 不入库 |
-| `midis/js/` | addon 运行时模块（PBE2 的 Base64URL 文本） | 不入库（构建期生成） |
-| `midis/library/` | PBE2 曲库 `<id>.pbe2` + `index.json` | **入库**（生成器数据源） |
+| `midis/js/` | addon 运行时模块（PBE3 的 Base64URL 文本） | 不入库（构建期生成） |
+| `midis/library/` | PBE3 曲库 `<id>.pbe3` + `index.json` | **入库**（生成器数据源） |
 
 原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
 
@@ -247,17 +247,17 @@ npm run show-song -- <关键词>
 命令说明：
 
 - **内容寻址防重复**：曲目 ID 为 MIDI 内容的 CRC32，内容相同的文件自动识别并跳过（输出 `跳过(重复)`）；同名但内容不同的文件打印警告并分别入库，不会互相覆盖
-- **最小改动**：`add-song` 仅新增/更新指定曲目，`git diff` 只包含对应的 `<id>.pbe2`（PBE2）与 `index.json` 两项变更，便于审查
+- **最小改动**：`add-song` 仅新增/更新指定曲目，`git diff` 只包含对应的 `<id>.pbe3`（PBE3）与 `index.json` 两项变更，便于审查
 - **转换确定性**：同一文件重复转换结果一致；曲名取自文件名，无需了解二进制格式
 
-### PBE2 与游戏内导入
+### PBE3 与游戏内导入
 
-- `PBE2` 是唯一运行时格式：头部含 id/名称/时长/音符数/解压长度/CRC32，事件流由 `@piano/core` 的 `PianoBinaryCodec` 编解码。
-- 转换阶段会把 MIDI CC64 延音踏板烘焙进音符时长（Note Off 后踏板仍按下则延长到抬起，单音最多延长 8 秒），因此 PBE2 本身不需要携带控制器事件。
-- addon 只解压一次并在 `SongCache` 中共享；每架钢琴持有独立 `EventCursor`，跳转使用 5 秒稀疏索引。
+- `PBE3` 是唯一运行时格式：头部含 id/名称/时长/音符数/解压长度/CRC32/力度调色板，事件流由 `@piano/core` 的 `Pbe3Codec` 编解码；完整格式见 [`docs/pbe3-format.md`](docs/pbe3-format.md)。
+- 转换阶段会把 MIDI CC64 延音踏板烘焙进 `soundDuration`（Note Off 后踏板仍按下则延长到抬起，单音最多再延长 4 秒，与采样长度一致），同时保留原始按键时长 `keyDuration` 供琴键显示；因此 PBE3 本身不需要携带控制器事件。
+- addon 只解压一次并在 `SongCache` 中共享；每架钢琴持有独立 `Pbe3EventCursor`，跳转使用 5 秒稀疏索引。
 - 在线生成器曲目条目上的「码」按钮可导出分段导入码；游戏内钢琴面板 →「导入 MIDI」逐段粘贴。
 - 普通玩家导入权限由管理员命令 `/pbe:pbe_setting` 控制（默认关闭，管理员始终允许）。
-- 基准：`npm run bench:pbe2`。
+- 基准：`npm run bench:pbe3`。
 
 ### 全量重建（本地维护）
 

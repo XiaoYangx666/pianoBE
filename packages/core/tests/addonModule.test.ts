@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-    decodeBase64Url,
-    encodePbe2,
+    encodePbe3,
     metasToAddonIndex,
-    pbe2ToAddonModule,
-    readPbe2Header,
+    pbe3ToAddonModule,
+    readPbe3Header,
     type MidiSong,
 } from "../src/index.js";
+import { decodeBase64Url } from "../src/binary/base64url.js";
 
 const song: MidiSong = {
     id: "abc123",
@@ -21,14 +21,14 @@ const song: MidiSong = {
 };
 
 describe("addonModule", () => {
-    it("单曲模块只保存 PBE2 的 Base64URL 数据", () => {
-        const pbe2 = encodePbe2(song);
-        const text = pbe2ToAddonModule(pbe2);
+    it("单曲模块只保存 PBE3 的 Base64URL 数据", () => {
+        const pbe3 = encodePbe3(song);
+        const text = pbe3ToAddonModule(pbe3);
         expect(text.startsWith('export default "')).toBe(true);
         const encoded = JSON.parse(text.slice("export default ".length).replace(/;$/, "")) as string;
         const decoded = decodeBase64Url(encoded);
-        expect(readPbe2Header(decoded).id).toBe(song.id);
-        expect(decoded.length).toBe(pbe2.length);
+        expect(readPbe3Header(decoded).id).toBe(song.id);
+        expect(decoded.length).toBe(pbe3.length);
     });
 
     it("生成索引文本", () => {

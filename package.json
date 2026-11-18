@@ -24,7 +24,7 @@
         "add-song": "node tools/midi/add-song.mjs",
         "show-song": "node tools/midi/show-song.mjs",
         "import:midis": "node tools/midi/import-midis.mjs",
-        "bench:pbe2": "node tools/midi/bench-pbe2.mjs",
+        "bench:pbe3": "node tools/midi/bench-pbe3.mjs",
         "build:core": "npm run build -w @piano/core",
         "build:ci": "npm run build:core && npm run build:template && npm run build:generator",
         "build:all": "npm run build:core && npm run build:template && npm run build:generator && npm run build:web && npm run build:server && npm run build && node tools/verify/verify-addon-build.mjs client",

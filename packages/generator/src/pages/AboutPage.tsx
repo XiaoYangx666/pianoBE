@@ -74,7 +74,7 @@ export function AboutPage() {
                         <PackageOpen size={15} className="mt-0.5 shrink-0 text-ore-dimmer" />
                         <span>
                             <b className="font-medium text-ore-text">附加包制作</b>：整理曲目、选择音色、添加曲谱，
-                            一键导出附加包；曲目改名会同步写入 PBE2 文件头。
+                            一键导出附加包；曲目改名会同步写入 PBE3 文件头。
                         </span>
                     </div>
                 </Section>

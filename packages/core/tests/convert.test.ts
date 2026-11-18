@@ -59,14 +59,15 @@ describe("midi convert", () => {
         expect(song.duration).toBe(20);
     });
 
-    it("转换结果可直接编码为 PBE2 模块文本（互操作）", async () => {
+    it("转换结果可直接编码为 PBE3 模块文本（互操作）", async () => {
         const { midiBufferToSong: convert } = await import("../src/convert.js");
-        const { encodePbe2, pbe2ToAddonModule, decodeBase64Url, readPbe2Header } = await import("../src/index.js");
+        const { encodePbe3, pbe3ToAddonModule, readPbe3Header } = await import("../src/index.js");
+        const { decodeBase64Url } = await import("../src/binary/base64url.js");
         const song = convert(minimalMidi(), "测试");
-        const pbe2 = encodePbe2(song);
-        const text = pbe2ToAddonModule(pbe2);
+        const pbe3 = encodePbe3(song);
+        const text = pbe3ToAddonModule(pbe3);
         const encoded = JSON.parse(text.slice("export default ".length).replace(/;$/, "")) as string;
-        const header = readPbe2Header(decodeBase64Url(encoded));
+        const header = readPbe3Header(decodeBase64Url(encoded));
         expect(header.id).toBe(song.id);
         expect(header.noteCount).toBe(1);
     });

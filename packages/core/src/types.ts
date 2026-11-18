@@ -18,8 +18,13 @@ export interface MidiTrackInstrument {
 
 export interface MidiTrack {
     instrument: MidiTrackInstrument;
-    /** 四元组扁平数组：midi, time, duration, velocity（time/duration/velocity 均已缩放） */
+    /** 四元组扁平数组：midi, time, soundDuration, velocity（time/duration/velocity 均已缩放） */
     notes: number[];
+    /**
+     * 与 notes 一一对应的琴键实际按下时长（1/100 秒）。
+     * 缺省表示等于 soundDuration（没有踏板延音）。
+     */
+    keyDurations?: number[];
 }
 
 /** 一首曲目的完整数据（可 JSON 序列化；addon 播放时再解码为 Uint16Array） */

@@ -1,8 +1,8 @@
 import { expect, mock, test } from "bun:test";
 import {
-    buildSeekIndex,
-    encodePbe2,
-    readPbe2Events,
+    buildPbe3SeekIndex,
+    encodePbe3,
+    readPbe3Events,
     type MidiSongMeta,
     type SongHandle,
 } from "@piano/core";
@@ -15,7 +15,7 @@ function handleFor(
     info: MidiSongMeta,
     notes = [60, 0, 15, 90, 62, 80, 15, 90, 64, 240, 15, 90]
 ): SongHandle {
-    const pbe2 = encodePbe2({
+    const pbe3 = encodePbe3({
         id: info.id,
         name: info.name,
         duration: info.duration,
@@ -24,7 +24,7 @@ function handleFor(
             notes,
         }],
     });
-    const { header, events } = readPbe2Events(pbe2);
+    const { header, events } = readPbe3Events(pbe3);
     return {
         song: {
             id: header.id,
@@ -33,7 +33,9 @@ function handleFor(
             noteCount: header.noteCount,
             header,
             events,
-            index: buildSeekIndex(events, header.hasVelocity),
+            palette: header.palette,
+            velocityBits: header.velocityBits,
+            index: buildPbe3SeekIndex(events, header.velocityBits),
             refCount: 1,
             lastAccess: 0,
             byteSize: events.length,
@@ -70,16 +72,31 @@ test("visual output preserves source note time, default velocity and transport b
     midi.queue.enqueue(song);
     await midi.play();
     midi.tick(Date.now() + 25);
-    expect(notes[0]).toEqual([60, 0, 100, false]);
+    expect(notes[0]).toEqual([60, 0, 90, true]);
     midi.pause();
     midi.seek(2);
     midi.resume();
     midi.tick(Date.now() + 25);
     await midi.play();
     midi.end();
-    expect(notes[1]).toEqual([62, 2, 100, false]);
+    expect(notes[1]).toEqual([62, 2, 90, true]);
     expect(transport.map(event => event.type)).toEqual(["track", "start", "pause", "seek", "resume", "track", "start", "stop"]);
     expect(transport[3].position).toBe(2);
+});
+
+test("passes soundDuration and keyDuration to the visual output", async () => {
+    const notes: { midi: number; time: number; sound?: number; key?: number }[] = [];
+    const midi = new MidiPlayer({ acquire: async () => handleFor(song) }, {
+        note: (info, sound, _velocity, _gain, time, _hasVelocity, key) =>
+            notes.push({ midi: info.midi, time, sound, key }),
+        playing: () => {},
+        stopNotes: () => {},
+    });
+    midi.queue.enqueue(song);
+    await midi.play();
+    midi.tick(Date.now() + 25);
+
+    expect(notes[0]).toEqual({ midi: 60, time: 0, sound: 0.15, key: 0.15 });
 });
 
 test("loaded piano resumes the saved song and skips earlier notes", async () => {

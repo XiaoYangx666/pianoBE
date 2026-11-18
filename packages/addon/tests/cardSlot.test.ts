@@ -36,7 +36,7 @@ mock.module("@minecraft/server", () => ({
 const { CardSlot } = await import("../src/platform/storage/cardSlot");
 const { CardAccess, MUSIC_CARD_ID, cardName, containerItemSlot } = await import("../src/platform/storage/cardItem");
 const { FakeEntity, FakeItemStack } = await import("./support/fakeItems");
-const { encodePbe2 } = await import("@piano/core");
+const { encodePbe3 } = await import("@piano/core");
 
 function card(name = "我的卡"): InstanceType<typeof FakeItemStack> {
     const item = new FakeItemStack(MUSIC_CARD_ID);
@@ -47,7 +47,7 @@ function card(name = "我的卡"): InstanceType<typeof FakeItemStack> {
 function music(id = "card1", notes = 8, compress: boolean | "auto" = "auto"): Uint8Array {
     const values: number[] = [];
     for (let index = 0; index < notes; index++) values.push(60 + (index % 12), index * 40, 20, 90);
-    return encodePbe2({
+    return encodePbe3({
         id,
         name: `卡上歌曲 ${id}`,
         duration: Math.max(1, notes * 40),

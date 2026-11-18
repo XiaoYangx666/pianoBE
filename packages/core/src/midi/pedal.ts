@@ -1,7 +1,7 @@
 /**
  * 延音踏板（MIDI CC64）烘焙工具。
  *
- * PBE2 只有“音符持续时长”一个字段，没有控制器事件。这里在转换阶段把
+ * PBE3 只有“音符持续时长”一个字段，没有控制器事件。这里在转换阶段把
  * 踏板保持的时间合并进 duration：Note Off 时若踏板仍按下，就把音符延长
  * 到踏板抬起，最多延长 MAX_SUSTAIN_EXTENSION_SECONDS 秒。
  */
@@ -27,16 +27,18 @@ export interface SustainSegment {
 }
 
 /**
- * 单个音符因踏板最多延长的秒数。
- * 与 SoundReleaseQueue 的 8 秒持有上限对齐；更长的延长对 4 秒采样没有意义，
- * 也能拦住异常 MIDI（例如踏板永远不收）造成的超大时长。
+ * 单个音符因踏板最多再延长的秒数。
+ *
+ * 采样只有 4 秒，延长超过采样长度不会再发声；旧版本用 8 秒，会让 PBE3 里
+ * 留下大量“僵尸时长”。运行时现在按 `4s / pitch` 提前释放实例，这里把烘焙
+ * 上限也收到 4 秒，避免新导入的曲目继续产生无意义的尾巴。
  */
-export const MAX_SUSTAIN_EXTENSION_SECONDS = 8;
+export const MAX_SUSTAIN_EXTENSION_SECONDS = 4;
 
 /**
  * 收集所有轨道的 CC64 并合并为踏板按下时间段。
  *
- * 曲目在 PBE2 中会被合并成单条事件流，因此这里也按全局时间线处理，
+ * 曲目在 PBE3 中会被合并成单条事件流，因此这里也按全局时间线处理，
  * 不区分 MIDI 通道；对本项目的纯钢琴曲目足够，也能兼容“踏板单独一条轨”的文件。
  */
 export function collectSustainSegments(tracks: Iterable<SustainTrackLike>): SustainSegment[] {

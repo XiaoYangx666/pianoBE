@@ -122,7 +122,7 @@ export function LibraryPage() {
         (entry: SongEntry) => {
             const chunks = scoreChunks(entry);
             if (chunks.length === 0) {
-                notifications.show({ title: "无法生成导入码", message: "该曲目没有可导出的 PBE2 数据", color: "red" });
+                notifications.show({ title: "无法生成导入码", message: "该曲目没有可导出的 PBE3 数据", color: "red" });
                 return;
             }
             setCode({ name: entry.name, chunks, bytes: entry.data?.byteLength });
@@ -465,7 +465,7 @@ export function LibraryPage() {
                             </p>
                             <p className="mx-auto mt-1 max-w-[360px] text-[11.5px] leading-relaxed text-ore-dim">
                                 {myMusic.length === 0
-                                    ? "从在线曲库保存曲目，或导入 MIDI 文件 / 文件夹。这里只保存转码后的 PBE2。"
+                                    ? "从在线曲库保存曲目，或导入 MIDI 文件 / 文件夹。这里只保存转码后的 PBE3。"
                                     : "换个关键词试试"}
                             </p>
                         </div>

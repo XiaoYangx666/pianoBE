@@ -1,14 +1,14 @@
 import { processNote } from "../midi/note.js";
 import { OTHER_SCALE, TIME_SCALE } from "../constants.js";
 import type { MidiSong } from "../types.js";
-import { pbe2EventsToNoteEvents, readPbe2Events } from "../pbe2/codec.js";
+import { pbe3EventsToNoteEvents, readPbe3Events } from "../pbe3/codec.js";
 
 /**
  * 声部负载模型：估算一首曲目在运行时会同时占用多少个音效实例。
  *
  * 运行时（`SoundReleaseQueue`）的实际行为：
  * - Note Off 后先淡出 `releaseSeconds` 再 stop，淡出期间仍占一个 SoundInstance；
- * - 采样自然播完（4s / pitch）后实例不可再发声；
+ * - 采样自然播完（4s / pitch）后直接 stop：踏板把音符延长到 8 秒也不会白占名额；
  * - 同键重触发会把旧实例快速收起；
  * - 超长音符最多持有 `maxHeldSeconds`。
  *
@@ -32,16 +32,22 @@ export const PIANO_VOICE_BUDGET = 28;
 
 /** Note Off 后的默认淡出时长（与运行时一致）。 */
 export const DEFAULT_NOTE_RELEASE_SECONDS = 0.6;
-/** 单个采样的有效长度（低音变调后会短于这个值）。 */
+/** 单个采样的基准长度；实际可闻时长 = 4s / pitch（高音更短、低音略长）。 */
 export const DEFAULT_SAMPLE_SECONDS = 4;
-/** 单个实例最多持有多久。 */
-export const DEFAULT_MAX_HELD_SECONDS = 8;
+/**
+ * 实例持有的安全上限。
+ *
+ * 正常路径由采样长度决定（约 3.78~4.24s）；这里只防异常 pitch 或未来更长的
+ * 采样，不应该被当成常规持有时间。旧版本用 8 秒，导致踏板长音在采样结束后的
+ * 4 秒里仍然占着声部名额。
+ */
+export const DEFAULT_MAX_HELD_SECONDS = 5;
 /** 同键重触发：旧实例淡出时长。 */
 export const SAME_NOTE_FADE_SECONDS = 0.04;
 /** 同键重触发：旧实例停止时间（相对新音符起点）。 */
 export const SAME_NOTE_STOP_SECONDS = 0.1;
 
-/** 秒制音符事件（与 PBE2 → NoteEvent 的字段一致）。 */
+/** 秒制音符事件（与 PBE3 → NoteEvent 的字段一致）。 */
 export interface VoiceLoadNote {
     midi: number;
     /** 起点（秒） */
@@ -124,8 +130,8 @@ function sweep(intervals: readonly { start: number; end: number }[]): SweepResul
 }
 
 /**
- * 估算同时发声的峰值。输入可以是 PBE2 解码后的秒制事件，
- * 也可以由 `estimateSongVoiceLoad` / `estimatePbe2VoiceLoad` 转换。
+ * 估算同时发声的峰值。输入可以是 PBE3 解码后的秒制事件，
+ * 也可以由 `estimateSongVoiceLoad` / `estimatePbe3VoiceLoad` 转换。
  */
 export function estimateVoiceLoad(
     notes: readonly VoiceLoadNote[],
@@ -136,7 +142,7 @@ export function estimateVoiceLoad(
     const maxHeldSeconds = Math.max(0, options.maxHeldSeconds ?? DEFAULT_MAX_HELD_SECONDS);
     const limit = Math.max(1, Math.round(options.limit ?? BEDROCK_SIMULTANEOUS_SOUND));
 
-    // PBE2 本身按时间有序；这里仍排序一次，兼容手写/测试输入。
+    // PBE3 本身按时间有序；这里仍排序一次，兼容手写/测试输入。
     const sorted = [...notes].sort((a, b) => a.time - b.time);
     const voices: Voice[] = [];
     /** 每个音高只有最新一次触发可能仍在响（更早的都被同键重触发收掉了）。 */
@@ -146,8 +152,12 @@ export function estimateVoiceLoad(
         const start = Math.max(0, note.time);
         const pitch = processNote(note.midi, false).pitch;
         const noteOff = start + Math.max(0.05, note.duration);
-        const audibleEnd = Math.min(start + sampleSeconds / pitch, noteOff + releaseSeconds);
-        const handleEnd = Math.min(noteOff, start + maxHeldSeconds) + releaseSeconds + 0.1;
+        const sampleEnd = start + sampleSeconds / pitch;
+        const sampleFirst = noteOff > sampleEnd;
+        const heldEnd = Math.min(noteOff, sampleEnd, start + maxHeldSeconds);
+        const audibleEnd = Math.min(sampleEnd, noteOff + releaseSeconds);
+        // 采样先放完时到点直接 stop；否则 Note Off 后还要占 releaseSeconds 的淡出时间。
+        const handleEnd = heldEnd + (sampleFirst ? 0 : releaseSeconds + 0.1);
 
         const previous = latestByMidi.get(note.midi);
         if (previous && previous.handleEnd > start) {
@@ -207,14 +217,14 @@ export function estimateSongVoiceLoad(
     return estimateVoiceLoad(notes, options);
 }
 
-/** 估算一份完整 PBE2 的声部负载（导入校验用）。 */
-export function estimatePbe2VoiceLoad(
+/** 估算一份完整 PBE3 的声部负载（导入校验用）。 */
+export function estimatePbe3VoiceLoad(
     data: Uint8Array,
     options: VoiceLoadOptions = {}
 ): VoiceLoadEstimate {
-    const { header, events } = readPbe2Events(data);
+    const { header, events } = readPbe3Events(data);
     return estimateVoiceLoad(
-        pbe2EventsToNoteEvents(events, header.hasVelocity, header.velocityMax),
+        pbe3EventsToNoteEvents(events, header.palette, header.velocityBits),
         options
     );
 }

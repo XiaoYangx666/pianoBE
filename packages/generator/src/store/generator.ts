@@ -7,7 +7,7 @@ import {
     pianoSoundLayers,
     pianoSoundId,
     planImportChunks,
-    renamePbe2,
+    renameSong,
 } from "@piano/core";
 import { notifications } from "@piano/ui";
 import { loadTemplate, type TemplateInfo } from "../template";
@@ -75,7 +75,7 @@ interface GeneratorState {
     template: TemplateInfo | null;
     /** 当前附加包工作区：模板曲目 + 从在线曲库或「我的音乐」直接加入的曲目 */
     songs: SongEntry[];
-    /** 本地持久音乐库：只存 PBE2，跨刷新保留 */
+    /** 本地持久音乐库：只存 PBE3，跨刷新保留 */
     myMusic: StoredSong[];
     myMusicReady: boolean;
     scores: ScoreEntry[];
@@ -416,12 +416,12 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         if (!current) return;
         if (current.name === next) return;
 
-        // 索引和 PBE2 文件头里的名字都更新，保证列表、导入码、导出包一致。
+        // 索引和 PBE3 文件头里的名字都更新，保证列表、导入码、导出包一致。
         let mineData = inMine?.data;
         let addonData = inAddon?.data;
         try {
-            if (mineData) mineData = renamePbe2(mineData, next);
-            if (addonData) addonData = renamePbe2(addonData, next);
+            if (mineData) mineData = renameSong(mineData, next);
+            if (addonData) addonData = renameSong(addonData, next);
         } catch (error) {
             notifyError("改名失败", error);
             return;

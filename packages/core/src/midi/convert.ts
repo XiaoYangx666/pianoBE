@@ -37,26 +37,32 @@ const Midi = resolveMidiCtor();
 export function midiBufferToSong(buffer: Uint8Array, name: string): MidiSong {
     const midi = new Midi(buffer);
     const id = crc32Hex(new Uint8Array(buffer));
-    // 踏板在 PBE2 里没有独立事件，转换时烘焙进音符时长。
+    // 踏板在 PBE3 里没有独立事件，转换时烘焙进声音时长；
+    // 同时保留原始按键时长（keyDuration），供琴键显示使用。
     const sustainSegments = collectSustainSegments(midi.tracks);
     let maxEnd = 0;
 
     const tracks: MidiTrack[] = midi.tracks.map((track) => {
         const notes: number[] = [];
+        const keyDurations: number[] = [];
         for (const n of track.notes) {
             const end = n.time + n.duration;
             const duration = n.duration + sustainExtensionSeconds(end, sustainSegments);
             maxEnd = Math.max(maxEnd, n.time + duration);
+            const soundDuration = Math.max(1, Math.round(duration * OTHER_SCALE));
+            const keyDuration = Math.max(1, Math.min(soundDuration, Math.round(n.duration * OTHER_SCALE)));
             notes.push(
                 n.midi,
                 Math.floor(n.time * TIME_SCALE),
-                Math.round(duration * OTHER_SCALE),
+                soundDuration,
                 Math.round(n.velocity * VELOCITY_SCALE)
             );
+            keyDurations.push(keyDuration);
         }
         return {
             instrument: track.instrument as unknown as MidiTrackInstrument,
             notes,
+            keyDurations,
         };
     });
 

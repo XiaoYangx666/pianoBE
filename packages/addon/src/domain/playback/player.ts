@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { EventCursor, OTHER_SCALE, SCHEDULE_LEAD_TICKS, TIME_SCALE, readAllPbe2Notes, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
+import { createSongCursor, readLoadedSongNotes, OTHER_SCALE, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -9,7 +9,15 @@ import type { PianoTransportEvent } from "./visualEvent";
 type PlayerState = "idle" | "playing" | "paused" | "stopped";
 
 interface MidiOutput {
-    note(note: NoteInfo, duration: number, velocity: number, gain: number, songTime: number, hasVelocity: boolean): void;
+    note(
+        note: NoteInfo,
+        soundDuration: number,
+        velocity: number,
+        gain: number,
+        songTime: number,
+        hasVelocity: boolean,
+        keyDuration: number
+    ): void;
     playing(value: boolean): void;
     transport?(event: PianoTransportEvent): void;
     /** 立即停止所有正在发声/释放的实例（seek、暂停、销毁）；正常播放结束不调用。 */
@@ -24,7 +32,7 @@ export interface MidiLoader {
 export class MidiPlayer {
     /** 当前曲目引用（持有期间 SongCache 不会淘汰事件流） */
     private song?: SongHandle;
-    private cursor?: EventCursor;
+    private cursor?: ReturnType<typeof createSongCursor>;
     private totalNotes = 0;
     private currentTime = 0;
 
@@ -236,12 +244,12 @@ export class MidiPlayer {
             this.normalizationGain = 1;
             return;
         }
-        const { header, events } = this.song.song;
-        const notes = readAllPbe2Notes(events, header.hasVelocity, header.velocityMax);
+        const { header } = this.song.song;
+        const notes = readLoadedSongNotes(this.song.song);
         this.normalizationDb = computeNormalizationGainDbFromNotes(
             notes.map((note) => ({
                 velocity: note.velocity,
-                durationSeconds: note.duration / OTHER_SCALE,
+                durationSeconds: note.soundDuration / TIME_SCALE,
             })),
             header.duration / TIME_SCALE
         );
@@ -344,8 +352,15 @@ export class MidiPlayer {
             if (time > horizon || time === Infinity) break;
             const note = cursor.next();
             if (!note) break;
-            this.output.note(processNote(note.midi, false), note.duration / OTHER_SCALE, note.velocity,
-                this.normalizationGain, time / TIME_SCALE, this.song?.song.header.hasVelocity ?? false);
+            this.output.note(
+                processNote(note.midi, false),
+                note.soundDuration / TIME_SCALE,
+                note.velocity,
+                this.normalizationGain,
+                time / TIME_SCALE,
+                true,
+                note.keyDuration / TIME_SCALE
+            );
         }
     }
 
@@ -360,12 +375,7 @@ export class MidiPlayer {
 
             this.releaseSong();
             this.song = song;
-            this.cursor = new EventCursor(
-                song.song.events,
-                song.song.index,
-                song.song.header.hasVelocity,
-                song.song.header.velocityMax
-            );
+            this.cursor = createSongCursor(song.song);
             this.totalNotes = song.song.noteCount;
             this.updateNormalizationGain();
         } catch (e) {

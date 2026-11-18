@@ -66,20 +66,34 @@ describe("SoundReleaseQueue", () => {
         expect(second.fades).toHaveLength(1);
     });
 
-    test("caps how long an unfinished note keeps its instance", () => {
-        const queue = new SoundReleaseQueue(0.6, 20, 96, 8);
+    test("stops a pedal-extended note when the 4s sample ends", () => {
+        const queue = new SoundReleaseQueue(0.6, 20);
         const sound = new FakeSound();
         queue.add(sound, 60, 30, 0);
 
-        queue.update(159);
+        queue.update(79); // 4 秒采样尚未结束
         expect(sound.fades).toHaveLength(0);
+        expect(sound.stops).toBe(0);
 
-        queue.update(160); // 8 秒上限
-        expect(sound.fades).toEqual([{ duration: 0.6, target: 0 }]);
-
-        queue.update(173);
+        queue.update(80); // 采样自然结束：直接 stop，不再淡出
+        expect(sound.fades).toHaveLength(0);
         expect(sound.stops).toBe(1);
         expect(queue.size).toBe(0);
+    });
+
+    test("holds higher notes for less time because the sample is pitch-shifted", () => {
+        const queue = new SoundReleaseQueue(0.6, 20);
+        const low = new FakeSound();
+        const high = new FakeSound();
+        queue.add(low, 48, 30, 0, 100, false, 1); // 4s
+        queue.add(high, 84, 30, 0, 100, false, 2); // 2s
+
+        queue.update(40);
+        expect(high.stops).toBe(1);
+        expect(low.stops).toBe(0);
+
+        queue.update(80);
+        expect(low.stops).toBe(1);
     });
 
     test("drops a voice when fade fails", () => {
@@ -136,6 +150,20 @@ describe("SoundReleaseQueue", () => {
         expect(queue.evictions).toBe(0);
         expect(loud.fades).toHaveLength(0);
         expect(queue.size).toBe(2);
+    });
+
+    test("makeRoom does not drop a new note with the same velocity", () => {
+        const queue = new SoundReleaseQueue(0.6, 20, 2);
+        const first = new FakeSound();
+        const second = new FakeSound();
+        queue.add(first, 60, 1, 0, 100);
+        queue.add(second, 62, 1, 0, 100);
+
+        // 全曲力度相同的 MIDI（例如《Secret》）不能因为“相等”就吞掉新旋律音。
+        expect(queue.makeRoom(100, false, 64)).toBe(true);
+        expect(queue.dropped).toBe(0);
+        expect(queue.evictions).toBe(1);
+        expect(queue.size).toBe(1);
     });
 
     test("makeRoom steals the quietest voice for a louder note", () => {

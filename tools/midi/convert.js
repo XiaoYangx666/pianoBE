@@ -2,9 +2,9 @@ import fs from "fs";
 import path from "path";
 import {
     collectNoteCount,
-    encodePbe2,
+    encodeSong,
     metasToAddonIndex,
-    pbe2ToAddonModule,
+    songToAddonModule,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 
@@ -61,32 +61,32 @@ fs.mkdirSync(libDir, { recursive: true });
 
 // ===== 3. 转换（解析逻辑统一在 @piano/core） =====
 // 每首同时产出：
-//   midis/js/<id>.js          addon 运行时模块（PBE2 的 Base64URL 文本，构建期拷入，不入库）
-//   midis/library/<id>.pbe2   PBE2 曲库二进制（入库；生成器按需加载）
+//   midis/js/<id>.js          addon 运行时模块（PBE3 的 Base64URL 文本，构建期拷入，不入库）
+//   midis/library/<id>.pbe3   PBE3 曲库二进制（入库；生成器按需加载）
 const metas = [];
 let notes = 0;
 let jsBytes = 0;
-let pbe2Bytes = 0;
+let pbe3Bytes = 0;
 
 for (const file of files) {
     const buffer = fs.readFileSync(path.join(inputDir, file));
     const song = midiBufferToSong(buffer, file.replace(/\.midi?$/i, ""));
-    const pbe2 = encodePbe2(song, { includeVelocity: true });
-    const moduleText = pbe2ToAddonModule(pbe2);
+    const pbe3 = encodeSong(song);
+    const moduleText = songToAddonModule(pbe3);
 
     fs.writeFileSync(path.join(jsDir, `${song.id}.js`), moduleText, "utf-8");
-    fs.writeFileSync(path.join(libDir, `${song.id}.pbe2`), pbe2);
+    fs.writeFileSync(path.join(libDir, `${song.id}.pbe3`), pbe3);
 
     metas.push({
         id: song.id,
         name: song.name,
         duration: song.duration,
         noteCount: collectNoteCount(song),
-        bytes: pbe2.length,
+        bytes: pbe3.length,
     });
     notes += collectNoteCount(song);
     jsBytes += moduleText.length;
-    pbe2Bytes += pbe2.length;
+    pbe3Bytes += pbe3.length;
 }
 
 // ===== 4. index.js（addon 运行时）+ index.json（生成器曲库目录） =====
@@ -99,5 +99,5 @@ fs.writeFileSync(path.join(libDir, "index.json"), JSON.stringify(sorted, null, 1
 console.log(`✅ 已转换 ${files.length} 个 MIDI 文件（共 ${Math.round(notes).toLocaleString()} 音符）`);
 console.log(`📥 输入: ${inputArg}`);
 console.log(`📤 addon 模块: ${jsDir}（${(jsBytes / 1048576).toFixed(1)} MB，不入库）`);
-console.log(`📦 曲库二进制: ${libDir}（${(pbe2Bytes / 1048576).toFixed(2)} MB，入库）`);
-console.log(`💾 压缩比: ${(jsBytes / pbe2Bytes).toFixed(1)}×`);
+console.log(`📦 曲库二进制: ${libDir}（${(pbe3Bytes / 1048576).toFixed(2)} MB，入库）`);
+console.log(`💾 压缩比: ${(jsBytes / pbe3Bytes).toFixed(1)}×`);

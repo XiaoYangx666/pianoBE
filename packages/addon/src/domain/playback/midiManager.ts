@@ -5,7 +5,7 @@ import { SongCache, worldRawId, type SongHandle } from "@piano/core";
  * 曲库管理器：
  * - 元信息注册表（同步可查，列表/搜索不加载单曲模块）；
  * - 主来源（内嵌 / 远程）+ 公共附加来源（世界全局曲库）统一路由；
- * - 所有来源的 PBE2 数据进入同一个 SongCache（引用计数 + LRU + 内存预算）。
+ * - 所有来源的 PBE3 数据进入同一个 SongCache（引用计数 + LRU + 内存预算）。
  */
 export class MidiManager {
     /** 主来源元信息（不包含公共附加来源，供 reset 重建索引）。 */
@@ -52,7 +52,7 @@ export class MidiManager {
         return this.cache.acquire(id);
     }
 
-    /** 读取原始 PBE2（不进入共享缓存；跨存储复制/导出用）。 */
+    /** 读取原始 PBE3（不进入共享缓存；跨存储复制/导出用）。 */
     read(id: string): Promise<Uint8Array | undefined> {
         return this.load(id);
     }
@@ -97,7 +97,7 @@ export class MidiManager {
     }
 
     /**
-     * 按需解析单曲元信息：内存已登记直接返回；未命中时经来源加载 PBE2
+     * 按需解析单曲元信息：内存已登记直接返回；未命中时经来源加载 PBE3
      * 并读取文件头，供播放列表按 id 显示歌名等场景。
      */
     async infoOf(id: string): Promise<MidiSongMeta | undefined> {
@@ -134,7 +134,7 @@ export class MidiManager {
         for (const meta of metas) this.register(meta, includeInList);
     }
 
-    /** 加载 PBE2 数据：主来源优先，公共附加来源兜底（未找到返回 undefined） */
+    /** 加载 PBE3 数据：主来源优先，公共附加来源兜底（未找到返回 undefined） */
     private async load(id: string): Promise<Uint8Array | undefined> {
         // 命名空间歌曲只能读世界公共来源，不能被同 ID 的主曲库截获。
         if (worldRawId(id) !== undefined) {

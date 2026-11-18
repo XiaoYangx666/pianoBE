@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
     BEDROCK_SIMULTANEOUS_SOUND,
     PIANO_VOICE_BUDGET,
-    encodePbe2,
-    estimatePbe2VoiceLoad,
+    encodePbe3,
+    estimatePbe3VoiceLoad,
     estimateSongVoiceLoad,
     estimateVoiceLoad,
     formatVoiceLoadWarning,
@@ -62,7 +62,7 @@ describe("声部负载估算", () => {
         expect(PIANO_VOICE_BUDGET).toBeLessThan(BEDROCK_SIMULTANEOUS_SOUND);
     });
 
-    it("可从 MidiSong 与 PBE2 直接估算", () => {
+    it("可从 MidiSong 与 PBE3 直接估算", () => {
         const song: MidiSong = {
             id: "voice001",
             name: "声部测试",
@@ -76,7 +76,7 @@ describe("声部负载估算", () => {
         expect(fromSong.peakVoices).toBe(6);
         expect(fromSong.excess).toBe(2);
 
-        const fromPbe2 = estimatePbe2VoiceLoad(encodePbe2(song), { limit: 4 });
+        const fromPbe2 = estimatePbe3VoiceLoad(encodePbe3(song), { limit: 4 });
         expect(fromPbe2.peakVoices).toBe(6);
         expect(fromPbe2.peakTime).toBeCloseTo(fromSong.peakTime, 5);
     });

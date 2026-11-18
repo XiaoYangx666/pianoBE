@@ -1,6 +1,6 @@
 import { readAddon, type AddonTemplate, type Manifest } from "@bepack/addon";
-import { decodeBase64Url, readPbe2Header } from "@piano/core";
-import { pbe2ToEntry } from "./convert";
+import { decodeBase64Url, readSongHeader } from "@piano/core";
+import { pbe3ToEntry } from "./convert";
 import type { SongEntry } from "./types";
 import { parseTemplateScores, type ScoreEntry } from "./scores";
 
@@ -44,9 +44,9 @@ export async function loadTemplate(fileOrBlob: Blob | Uint8Array): Promise<Templ
 
 /**
  * 解析模板内嵌曲目。文件格式由 @piano/core 的 metasToAddonIndex /
- * pbe2ToAddonModule 生成：
+ * songToAddonModule 生成：
  *   index.js: export const midis=[{id,name,duration,noteCount?,bytes?,value:async()=> (await import("./<id>.js")).default},];
- *   <id>.js:  export default "<Base64URL(PBE2)>";
+ *   <id>.js:  export default "<Base64URL(PBE3)>";
  */
 export function parseExistingMidis(
     addon: AddonTemplate,
@@ -70,10 +70,10 @@ export function parseExistingMidis(
         if (!encoded) continue;
         try {
             const data = decodeBase64Url(encoded);
-            const header = readPbe2Header(data);
+            const header = readSongHeader(data);
             if (header.id !== id) continue;
             items.push(
-                pbe2ToEntry(data, {
+                pbe3ToEntry(data, {
                     isOriginal: true,
                     moduleText: jsContent,
                 })

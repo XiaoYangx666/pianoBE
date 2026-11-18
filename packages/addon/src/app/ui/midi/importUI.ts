@@ -1,7 +1,7 @@
 import { DDUI } from "sapi-pro";
 import { Player } from "@minecraft/server";
 import {
-    estimatePbe2VoiceLoad,
+    estimatePbe3VoiceLoad,
     formatBytes,
     formatVoiceLoadWarning,
     ImportAssembler,
@@ -157,7 +157,7 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
                     `\n§7占用 §f${formatBytes(entry.bytes)}§7（含编码）· 存储已用 §f${formatBytes(usedBytes)}`;
             // 导入时顺带用离线模型估算同时发声峰值，超过引擎上限就提示（不阻止导入）。
             try {
-                const warning = formatVoiceLoadWarning(estimatePbe2VoiceLoad(payload));
+                const warning = formatVoiceLoadWarning(estimatePbe3VoiceLoad(payload));
                 if (warning) message += `\n§e${warning}`;
             } catch {
                 // 负载估算失败不影响已完成的保存

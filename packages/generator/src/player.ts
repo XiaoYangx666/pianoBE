@@ -1,5 +1,5 @@
 import { SampledMidiPlayer, type NoteEvent } from "@piano/core/player";
-import { TIME_SCALE, pbe2ToNoteEvents } from "@piano/core";
+import { TIME_SCALE, songToNoteEvents } from "@piano/core";
 import { AppPlayer } from "@piano/ui";
 import type { TemplateInfo } from "./template";
 import type { SongEntry } from "./types";
@@ -16,7 +16,7 @@ export type { NoteEvent } from "@piano/core/player";
 
 /** SongEntry → 音符事件（PBE2 事件流解码） */
 export function songEntryToEvents(entry: SongEntry): NoteEvent[] {
-    return entry.data ? pbe2ToNoteEvents(entry.data) : [];
+    return entry.data ? songToNoteEvents(entry.data) : [];
 }
 
 export class PreviewPlayer extends SampledMidiPlayer {

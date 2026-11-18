@@ -94,8 +94,8 @@ export class DynamicMusicStorage implements MusicStorage {
         return this.collection.get(id);
     }
 
-    save(pbe2: Uint8Array): StoredMusicEntry {
-        const entry = this.collection.save(pbe2);
+    save(pbe3: Uint8Array): StoredMusicEntry {
+        const entry = this.collection.save(pbe3);
         this.syncOrder();
         return entry;
     }

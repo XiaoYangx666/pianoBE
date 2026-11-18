@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { encodePbe2, worldPublicId } from "@piano/core";
+import { encodePbe3, worldPublicId } from "@piano/core";
 
 const properties = new Map<string, string>();
 const stats = { ids: 0, get: 0, set: 0 };
@@ -25,7 +25,7 @@ mock.module("@minecraft/server", () => ({
 const { WorldMusicLibrary } = await import("../src/platform/storage/worldLibrary");
 
 function music(id: string, name: string, note = 60): Uint8Array {
-    return encodePbe2({
+    return encodePbe3({
         id,
         name,
         duration: 40,

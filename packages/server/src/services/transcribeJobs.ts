@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { encodePbe2, planImportChunks, type MidiSongMeta } from "@piano/core";
+import { encodeSong, planImportChunks, type MidiSongMeta } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 import type { SqliteSongPort } from "../drivers/sqlitePorts.js";
 import type { ServerConfig } from "../config.js";
@@ -219,14 +219,14 @@ export class TranscribeJobStore {
         return this.snapshot(job);
     }
 
-    /** 游戏内导入码（按当前名字即时编码 PBE2） */
+    /** 游戏内导入码（按当前名字即时编码 PBE3） */
     code(id: string): { name: string; chunks: string[]; bytes: number } | undefined {
         const job = this.jobs.get(id);
         if (!job?.midi) return undefined;
         if (job.codeCache?.name === job.name) return job.codeCache;
         const song = midiBufferToSong(job.midi, job.name);
-        const pbe2 = encodePbe2(song, { includeVelocity: true });
-        const cache = { name: job.name, chunks: planImportChunks(pbe2), bytes: pbe2.byteLength };
+        const pbe3 = encodeSong(song);
+        const cache = { name: job.name, chunks: planImportChunks(pbe3), bytes: pbe3.byteLength };
         job.codeCache = cache;
         return cache;
     }

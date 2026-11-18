@@ -10,7 +10,7 @@ export type MusicSource = "card" | "library";
 
 export interface MusicRef extends MidiSongMeta {
     source: MusicSource;
-    /** 整份 PBE2 的 CRC32（16 进制，来源提供时用于内容校验） */
+    /** 整份 PBE3 的 CRC32（16 进制，来源提供时用于内容校验） */
     checksum?: string;
     /**
      * 存储卡身份（卡来源）。
@@ -21,7 +21,7 @@ export interface MusicRef extends MidiSongMeta {
     cardUid?: string;
 }
 
-/** 世界公共曲库在索引和队列中使用独立 ID，PBE2 文件头仍使用原始 ID。 */
+/** 世界公共曲库在索引和队列中使用独立 ID，PBE3 文件头仍使用原始 ID。 */
 export const WORLD_LIBRARY_PUBLIC_PREFIX = "world:";
 export function worldPublicId(id: string): string { return `${WORLD_LIBRARY_PUBLIC_PREFIX}${id}`; }
 export function worldRawId(id: string): string | undefined {

@@ -4,8 +4,8 @@ import {
     buildSeekIndex,
     encodePbe2,
     readPbe2Events,
-    type MidiSong,
-} from "../src/index.js";
+} from "../src/pbe2/index.js";
+import type { MidiSong } from "../src/types.js";
 
 /**
  * 新旧播放器差分测试。

@@ -146,7 +146,7 @@ export class PianoRuntime {
         return this.cardAccess?.uid;
     }
 
-    /** 读取原始 PBE2（曲库复制到存储卡用；曲库来源会走远端/内嵌）。 */
+    /** 读取原始 PBE3（曲库复制到存储卡用；曲库来源会走远端/内嵌）。 */
     readBytes(ref: MusicRef): Promise<Uint8Array | undefined> | Uint8Array | undefined {
         if (ref.source === "library") return this.music.readLibrary(ref.id);
         if (ref.cardUid !== undefined && ref.cardUid !== this.cardUid) return undefined;
@@ -262,8 +262,8 @@ export class PianoRuntime {
             this.midi = new MidiPlayer(
                 { acquire: (ref: MusicRef) => this.music.acquire(ref) },
                 {
-                    note: (note, duration, velocity, gain, songTime, hasVelocity) => {
-                        if (this.playNote(note, velocity, duration, gain, false, songTime, hasVelocity)
+                    note: (note, soundDuration, velocity, gain, songTime, hasVelocity, keyDuration) => {
+                        if (this.playNote(note, velocity, soundDuration, keyDuration, gain, false, songTime, hasVelocity)
                             && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance) {
                             this.midiHandsThisTick |= pianoHandZoneBit(note.midi);
                         }
@@ -286,7 +286,7 @@ export class PianoRuntime {
     playManualNotes(player: Player, notes: readonly NoteInfo[], velocity: number) {
         let hands = 0;
         for (const note of notes) {
-            if (this.playNote(note, velocity, .15, 1, true)) hands |= pianoHandZoneBit(note.midi);
+            if (this.playNote(note, velocity, .15, .15, 1, true)) hands |= pianoHandZoneBit(note.midi);
         }
         if (hands) this.onManualPress(player, hands);
     }
@@ -307,7 +307,7 @@ export class PianoRuntime {
         return this.display?.isKeyDown(midi) ?? false;
     }
 
-    playNote(note: NoteInfo, velocity: number, duration: number, gain = 1, manual = false, songTime?: number, hasVelocity = true) {
+    playNote(note: NoteInfo, velocity: number, soundDuration: number, keyDuration: number, gain = 1, manual = false, songTime?: number, hasVelocity = true) {
         if (this.disposed || note.sample === "none" || this.verify(system.currentTick) !== "complete") return;
         const { dimension } = this.location;
         this.ensureVisual(system.currentTick);
@@ -327,12 +327,14 @@ export class PianoRuntime {
                 );
                 // Note Off 后统一淡出；不再依赖采样自身的尾音。
                 if (instance) {
-                    this.soundReleases.add(instance, note.midi, duration, tick, velocity, manual);
+                    this.soundReleases.add(instance, note.midi, soundDuration, tick, velocity, manual, note.pitch);
                 }
             }
         }
-        this.display?.strike(note.midi, duration);
-        this.noteSignal.publish({ midi: note.midi, duration, velocity, tick: system.currentTick,
+        // keyDuration 是 PBE3 里独立存储的琴键实际按下时长，不再用踏板延音。
+        const visualDuration = Math.max(0, keyDuration);
+        this.display?.strike(note.midi, visualDuration);
+        this.noteSignal.publish({ midi: note.midi, duration: visualDuration, velocity, tick: system.currentTick,
             source: manual ? "manual" : "midi", songTime, hasVelocity });
         this.activate();
         if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);

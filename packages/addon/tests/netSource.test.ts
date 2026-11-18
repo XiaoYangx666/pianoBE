@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { encodeBase64Url, encodePbe2, readPbe2Header } from "@piano/core";
+import { encodeBase64Url, encodePbe3, readPbe3Header } from "@piano/core";
 import {
     RemoteMidiSource,
     type NetFetch,
 } from "../src/platform/server/admin/netSource";
 
 const SONG_META = { id: "aaa", name: "A", duration: 100 };
-const PBE2 = encodePbe2({
+const PBE2 = encodePbe3({
     ...SONG_META,
     tracks: [{ instrument: { family: "piano", number: 0, name: "x" }, notes: [60, 0, 50, 100] }],
 });
@@ -50,7 +50,7 @@ describe("RemoteMidiSource", () => {
         });
         const bytes = await src.get("aaa");
         expect(bytes).toBeDefined();
-        expect(readPbe2Header(bytes!).id).toBe(SONG_META.id);
+        expect(readPbe3Header(bytes!).id).toBe(SONG_META.id);
         expect(Array.from(bytes!)).toEqual(Array.from(PBE2));
     });
 

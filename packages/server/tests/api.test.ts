@@ -7,7 +7,7 @@ import { createApp, type AppDeps } from "../src/app";
 import { createToken, ensureBootstrapToken, getTokenInfo } from "../src/auth";
 import { SqliteSongPort } from "../src/drivers/sqlitePorts";
 import { loadConfig } from "../src/config";
-import { decodeBase64Url, readPbe2Header } from "@piano/core";
+import { decodeBase64Url, readPbe3Header } from "@piano/core";
 
 /** 最小 SMF：format 0、1 轨道、division 96 */
 function minimalMidi(note = 0x3c): Uint8Array {
@@ -147,8 +147,8 @@ describe("曲库 API", () => {
 
         const song = await j<{ id: string; data: string }>(await req(`/api/songs/${songId}`, { token: readerToken }));
         expect(song.id).toBe(songId);
-        const pbe2 = decodeBase64Url(song.data);
-        const header = readPbe2Header(pbe2);
+        const pbe3 = decodeBase64Url(song.data);
+        const header = readPbe3Header(pbe3);
         expect(header.id).toBe(songId);
         expect(header.noteCount).toBe(1);
 

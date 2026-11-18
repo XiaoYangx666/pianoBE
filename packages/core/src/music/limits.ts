@@ -6,14 +6,14 @@
  * - 单曲结构安全上限：这里固定，避免损坏/压缩炸弹数据进入世界存储。
  */
 
-/** 曲目 id 允许的字符集（与 PBE2 内容寻址 id 一致） */
+/** 曲目 id 允许的字符集（与 PBE3 内容寻址 id 一致） */
 export const MUSIC_ENTRY_ID_PATTERN = /^[0-9A-Za-z_-]{1,24}$/;
 
 /** 曲名最大字符数（按 Unicode 码点计；与 UI 输入限制一致） */
 export const MAX_SONG_NAME_CHARS = 64;
 
 export interface MusicStorageLimits {
-    /** 单首曲目原始 PBE2 上限 */
+    /** 单首曲目原始 PBE3 上限 */
     maxSongBytes: number;
     maxNotes: number;
     /** 时长上限（40 tick/秒） */

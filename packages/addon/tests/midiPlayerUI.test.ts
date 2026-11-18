@@ -114,12 +114,12 @@ function makeMidi() {
     return new MidiPlayer(
         {
             acquire: async () => {
-                const { buildSeekIndex, encodePbe2, readPbe2Events } = await import("@piano/core");
-                const pbe2 = encodePbe2({
+                const { buildPbe3SeekIndex, encodePbe3, readPbe3Events } = await import("@piano/core");
+                const pbe2 = encodePbe3({
                     ...SONG,
                     tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 40, 90] }],
                 });
-                const { header, events } = readPbe2Events(pbe2);
+                const { header, events } = readPbe3Events(pbe2);
                 return {
                     song: {
                         key: header.id,
@@ -129,7 +129,9 @@ function makeMidi() {
                         noteCount: header.noteCount,
                         header,
                         events,
-                        index: buildSeekIndex(events, header.hasVelocity),
+                        palette: header.palette,
+                        velocityBits: header.velocityBits,
+                        index: buildPbe3SeekIndex(events, header.velocityBits),
                         refCount: 1,
                         lastAccess: 0,
                         byteSize: events.length,

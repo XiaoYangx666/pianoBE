@@ -3,16 +3,16 @@
 //   npm run add-song -- <文件或目录> [<文件或目录>...]
 //   例: npm run add-song -- ~/Desktop/新歌.mid
 //       npm run add-song -- ./my-midis/ ./one.mid ./two.mid
-// 效果: 每首生成/更新 midis/library/<id>.pbe2，合并进 index.json，
+// 效果: 每首生成/更新 midis/library/<id>.pbe3，合并进 index.json，
 //       同步 midis/js/<id>.js 与 index.js（addon 构建源，不入库）。
 // 防重复: id = crc32(midi 内容)，内容相同自动幂等；同名不同内容会警告。
 import fs from "node:fs";
 import path from "node:path";
 import {
     collectNoteCount,
-    encodePbe2,
+    encodeSong,
     metasToAddonIndex,
-    pbe2ToAddonModule,
+    songToAddonModule,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 
@@ -63,13 +63,13 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         new Uint8Array(fs.readFileSync(file)),
         path.basename(file).replace(/\.midi?$/i, "")
     );
-    const pbe2 = encodePbe2(song, { includeVelocity: true });
+    const pbe3 = encodeSong(song);
     const entry = {
         id: song.id,
         name: song.name,
         duration: song.duration,
         noteCount: collectNoteCount(song),
-        bytes: pbe2.length,
+        bytes: pbe3.length,
     };
     const pos = index.findIndex((m) => m.id === song.id);
     let status;
@@ -91,8 +91,8 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         status = "新增";
         added++;
     }
-    fs.writeFileSync(path.join(libDir, `${song.id}.pbe2`), pbe2);
-    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), pbe2ToAddonModule(pbe2), "utf-8");
+    fs.writeFileSync(path.join(libDir, `${song.id}.pbe3`), pbe3);
+    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), songToAddonModule(pbe3), "utf-8");
     console.log(`  [${status}] ${song.name} (${song.id})`);
 }
 
@@ -101,7 +101,7 @@ index.sort((a, b) => a.name.localeCompare(b.name, "zh"));
 fs.writeFileSync(indexPath, JSON.stringify(index, null, 1) + "\n", "utf-8");
 const addonMetas = index.map((meta) => {
     try {
-        return { ...meta, bytes: fs.statSync(path.join(libDir, `${meta.id}.pbe2`)).size };
+        return { ...meta, bytes: fs.statSync(path.join(libDir, `${meta.id}.pbe3`)).size };
     } catch {
         return meta;
     }

@@ -1,6 +1,6 @@
 import { crc32Hex } from "../midi/crc32.js";
-import { decodeBase64Url } from "../pbe2/base64url.js";
-import { readPbe2Header } from "../pbe2/codec.js";
+import { decodeBase64Url } from "../binary/base64url.js";
+import { readPbe3Header } from "../pbe3/codec.js";
 import {
     MUSIC_SHARD_CHARS,
     StorageBudget,
@@ -60,7 +60,7 @@ function isEntryValid(value: unknown, expectId?: string, limits = DEFAULT_MUSIC_
  * 分片曲目集合：提交点 = 元数据写入。
  *
  * - 写入顺序：数据分片 → 元数据；任一步失败都会回滚本次写入的分片，旧版本保持可读。
- * - 读取顺序：元数据 → 分片 → Base64 解码 → 长度 + CRC32 + PBE2 头部 id 三重校验。
+ * - 读取顺序：元数据 → 分片 → Base64 解码 → 长度 + CRC32 + PBE3 头部 id 三重校验。
  * - 删除顺序：元数据 → 分片；中断只会留下不可见的孤儿分片，由 pruneOrphans 清理。
  */
 export class MusicCollection {
@@ -136,7 +136,7 @@ export class MusicCollection {
             const bytes = decodeBase64Url(shards.join(""));
             if (bytes.length !== entry.bytes) return undefined;
             if (crc32Hex(bytes) !== entry.checksum) return undefined;
-            if (readPbe2Header(bytes).id !== entry.id) return undefined;
+            if (readPbe3Header(bytes).id !== entry.id) return undefined;
             return bytes;
         } catch {
             return undefined;
@@ -153,9 +153,9 @@ export class MusicCollection {
 
     /* ================== 写入 ================== */
 
-    /** 校验并写入 PBE2；失败抛错，调用方可直接展示 message。 */
-    save(pbe2: Uint8Array, name?: string): StoredMusicEntry {
-        const { header, checksum, encoded } = validateMusic(pbe2, this.limits);
+    /** 校验并写入 PBE3；失败抛错，调用方可直接展示 message。 */
+    save(pbe3: Uint8Array, name?: string): StoredMusicEntry {
+        const { header, checksum, encoded } = validateMusic(pbe3, this.limits);
         const entries = this.entries();
         const previous = entries.find(item => item.id === header.id);
         const shards = Math.max(1, Math.ceil(encoded.length / this.shardChars));
@@ -166,7 +166,7 @@ export class MusicCollection {
             name: (name ?? header.name).slice(0, 120) || header.id,
             duration: header.duration,
             noteCount: header.noteCount,
-            bytes: pbe2.length,
+            bytes: pbe3.length,
             checksum,
             shards,
             gen,

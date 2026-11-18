@@ -1,10 +1,10 @@
-import { encodeUtf8 } from "../pbe2/utf8.js";
+import { encodeUtf8 } from "../binary/utf8.js";
 
 /**
  * 音乐存储的容量计量。
  *
  * 只按“真正会被写进持久化存储的字节数”计算：Base64URL 正文、分片键名、
- * 元数据 JSON（中文名称按 UTF-8 计），不按歌曲数量或原始 PBE2 长度估算。
+ * 元数据 JSON（中文名称按 UTF-8 计），不按歌曲数量或原始 PBE3 长度估算。
  */
 
 export const DEFAULT_MUSIC_STORAGE_BYTES = 64 * 1024;
@@ -23,9 +23,9 @@ export interface StoredMusicEntry {
     /** 时长（40 tick/秒） */
     duration: number;
     noteCount: number;
-    /** PBE2 原始字节数 */
+    /** PBE3 原始字节数 */
     bytes: number;
-    /** 整份 PBE2 的 CRC32（16 进制） */
+    /** 整份 PBE3 的 CRC32（16 进制） */
     checksum: string;
     /** Base64URL 分片数量 */
     shards: number;

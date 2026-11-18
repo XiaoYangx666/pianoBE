@@ -67,7 +67,7 @@ export class PianoMusic {
         }
     }
 
-    /** 曲库来源的原始 PBE2（复制到存储卡用）。 */
+    /** 曲库来源的原始 PBE3（复制到存储卡用）。 */
     readLibrary(id: string): Promise<Uint8Array | undefined> {
         return midiManager.read(id);
     }

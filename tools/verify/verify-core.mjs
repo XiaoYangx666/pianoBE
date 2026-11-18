@@ -2,12 +2,12 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 import {
     crc32Hex,
-    encodePbe2,
+    encodePbe3,
     metasToAddonIndex,
-    pbe2ToAddonModule,
-    readPbe2Header,
-    readPbe2Events,
-    readAllPbe2Notes,
+    pbe3ToAddonModule,
+    readPbe3Header,
+    readPbe3Events,
+    readAllPbe3Notes,
     PlaylistStore,
     MemorySongPort,
     MemoryPlaylistPort,
@@ -17,7 +17,7 @@ import {
 const buf = fs.readFileSync("midis/files/Beyond - 海阔天空.mid");
 assert.equal(crc32Hex(new Uint8Array(buf)), "4beea226", "crc32 id 不匹配历史产物");
 
-// 2. 端到端：真实 .mid 经 core 转换 → PBE2 → addon 模块文本，与现有产物一致
+// 2. 端到端：真实 .mid 经 core 转换 → PBE3 → addon 模块文本，与现有产物一致
 import { midiBufferToSong } from "@piano/core/convert";
 {
     const existing = fs.readFileSync("midis/js/4beea226.js", "utf-8");
@@ -25,16 +25,16 @@ import { midiBufferToSong } from "@piano/core/convert";
         new Uint8Array(fs.readFileSync("midis/files/Beyond - 海阔天空.mid")),
         "Beyond - 海阔天空"
     );
-    const pbe2 = encodePbe2(song, { includeVelocity: true });
-    const header = readPbe2Header(pbe2);
+    const pbe3 = encodePbe3(song);
+    const header = readPbe3Header(pbe3);
     assert.equal(header.id, song.id);
     assert.equal(header.noteCount, song.tracks.reduce((s, t) => s + t.notes.length / 4, 0));
-    const notes = readAllPbe2Notes(readPbe2Events(pbe2).events, header.hasVelocity, header.velocityMax);
+    const notes = readAllPbe3Notes(readPbe3Events(pbe3).events, header.palette, header.velocityBits);
     assert.equal(notes.length, header.noteCount);
     // 力度保持 MIDI 0~127：必须与源文件一致，而不是被 x100 缩放。
     const sourceVelocity = song.tracks[0].notes[3];
-    assert.equal(notes[0].velocity, sourceVelocity, "PBE2 力度必须与源 MIDI 一致");
-    assert.equal(pbe2ToAddonModule(pbe2), existing);
+    assert.equal(notes[0].velocity, sourceVelocity, "PBE3 力度必须与源 MIDI 一致");
+    assert.equal(pbe3ToAddonModule(pbe3), existing);
 }
 
 // 3. 曲库：内容寻址幂等 + 过滤缺失
@@ -93,4 +93,4 @@ assert.equal(plStore.create("player2", "新的").id, 3, "删除后 max(id)+1 复
 // 7. 索引文本
 assert.ok(metasToAddonIndex([{ id: "aaa", name: "A", duration: 100 }]).startsWith("export const midis=["));
 
-console.log("✅ core 冒烟验证全部通过（crc32/PBE2/模块文本/曲库/播放列表/崩溃自愈）");
+console.log("✅ core 冒烟验证全部通过（crc32/PBE3/模块文本/曲库/播放列表/崩溃自愈）");

@@ -1,24 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
     EventCursor,
-    ImportAssembler,
     PianoBinaryCodec,
-    SongCache,
     buildSeekIndex,
     collectNoteCount,
-    decodeBase64Url,
-    decodeUtf8,
-    encodeBase64Url,
     encodePbe2,
-    encodeUtf8,
-    parseImportChunk,
-    planImportChunks,
     readAllPbe2Notes,
     readPbe2Events,
     readPbe2Header,
     renamePbe2,
-    type MidiSong,
-} from "../src/index.js";
+} from "../src/pbe2/index.js";
+import {
+    ImportAssembler,
+    parseImportChunk,
+    planImportChunks,
+} from "../src/importCode.js";
+import { SongCache, encodePbe3, type MidiSong } from "../src/index.js";
+import { decodeBase64Url, encodeBase64Url } from "../src/binary/base64url.js";
+import { decodeUtf8, encodeUtf8 } from "../src/binary/utf8.js";
 
 const song: MidiSong = {
     id: "abc12345",
@@ -182,11 +181,11 @@ describe("EventCursor 与稀疏索引", () => {
 
 describe("SongCache", () => {
     it("同一首歌只加载一次，并被多个句柄共享", async () => {
-        const pbe2 = encodePbe2(song);
+        const pbe3 = encodePbe3(song);
         let loads = 0;
         const cache = new SongCache(async () => {
             loads++;
-            return pbe2;
+            return pbe3;
         });
         const [a, b] = await Promise.all([cache.acquire(song.id), cache.acquire(song.id)]);
         expect(loads).toBe(1);
@@ -197,8 +196,8 @@ describe("SongCache", () => {
     });
 
     it("LRU 只淘汰无活跃引用的曲目", async () => {
-        const a = encodePbe2(song);
-        const b = encodePbe2({ ...song, id: "bbb", name: "B", duration: 100 });
+        const a = encodePbe3(song);
+        const b = encodePbe3({ ...song, id: "bbb", name: "B", duration: 100 });
         const cache = new SongCache(async (id) => (id === song.id ? a : b), {
             maxBytes: a.length + b.length - 1,
             now: (() => {
@@ -220,8 +219,8 @@ describe("SongCache", () => {
     });
 
     it("预算不是单曲大小限制：播放中的超预算歌曲不会被淘汰", async () => {
-        const pbe2 = encodePbe2(song);
-        const cache = new SongCache(async () => pbe2, { maxBytes: 1 });
+        const pbe3 = encodePbe3(song);
+        const cache = new SongCache(async () => pbe3, { maxBytes: 1 });
         const handle = await cache.acquire(song.id);
         expect(handle).toBeDefined();
         expect(cache.size).toBe(1);
@@ -234,8 +233,8 @@ describe("SongCache", () => {
     });
 
     it("统计命中、未命中与活跃引用，释放后活跃数归零", async () => {
-        const pbe2 = encodePbe2(song);
-        const cache = new SongCache(async () => pbe2);
+        const pbe3 = encodePbe3(song);
+        const cache = new SongCache(async () => pbe3);
         const first = await cache.acquire(song.id);
         const second = await cache.acquire(song.id);
         const stats = cache.stats();
@@ -252,15 +251,15 @@ describe("SongCache", () => {
 });
 
 describe("DDUI 分段导入码", () => {
-    it("分段长度受限，乱序/重复/缺段提示，完成后还原 PBE2", () => {
-        const pbe2 = encodePbe2({
+    it("分段长度受限，乱序/重复/缺段提示，完成后还原 PBE3", () => {
+        const pbe3 = encodePbe3({
             ...song,
             tracks: [{
                 instrument: song.tracks[0].instrument,
                 notes: Array.from({ length: 6000 }, (_, index) => [60, index * 2, 10, 90]).flat(),
             }],
         }, { compress: false });
-        const chunks = planImportChunks(pbe2, 4800);
+        const chunks = planImportChunks(pbe3, 4800);
         expect(chunks.length).toBeGreaterThan(1);
         for (const chunk of chunks) expect(chunk.length).toBeLessThanOrEqual(4800);
         expect(parseImportChunk(chunks[0])?.index).toBe(1);
@@ -275,11 +274,11 @@ describe("DDUI 分段导入码", () => {
         for (let i = 2; i < chunks.length - 1; i++) result = assembler.add(chunks[i]);
         result = assembler.add(chunks[chunks.length - 1]);
         expect(result.status).toBe("complete");
-        expect(Array.from(result.payload ?? [])).toEqual(Array.from(pbe2));
+        expect(Array.from(result.payload ?? [])).toEqual(Array.from(pbe3));
     });
 
     it("损坏的分段被拒绝，非本协议文本被忽略", () => {
-        const chunks = planImportChunks(encodePbe2(song));
+        const chunks = planImportChunks(encodePbe3(song));
         const broken = chunks[0].slice(0, -4) + "AAAA";
         expect(parseImportChunk(broken)).toBeUndefined();
         const assembler = new ImportAssembler();

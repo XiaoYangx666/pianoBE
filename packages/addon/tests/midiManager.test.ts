@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { encodePbe2, worldPublicId, type MidiSongMeta } from "@piano/core";
+import { encodePbe3, worldPublicId, type MidiSongMeta } from "@piano/core";
 import { MidiManager, type MidiSourceLike } from "../src/domain/playback/midiManager";
 
 const meta = (id: string, name = id): MidiSongMeta => ({ id, name, duration: 40 });
@@ -57,7 +57,7 @@ describe("MidiManager 公共附加来源", () => {
     });
 
     test("主曲库和世界曲库同 ID 时，播放数据与元信息分别对应", async () => {
-        const encode = (name: string) => encodePbe2({
+        const encode = (name: string) => encodePbe3({
             id: "same", name, duration: 40,
             tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 20, 90] }],
         });
