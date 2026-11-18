@@ -10,12 +10,16 @@ import { authMiddleware, type AppVariables } from "./auth.js";
 import { songsRoutes } from "./routes/songs.js";
 import { playlistsRoutes } from "./routes/playlists.js";
 import { tokensRoutes } from "./routes/tokens.js";
+import { transcribeRoutes } from "./routes/transcribe.js";
+import type { AmtService } from "./services/amt.js";
 
 export interface AppDeps {
     db: Database;
     songPort: SqliteSongPort;
     playlistStore: PlaylistStore;
     config: ServerConfig;
+    /** AMT 转录服务；未配置时相关接口返回 503 */
+    amt?: AmtService;
 }
 
 export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
@@ -32,6 +36,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     api.route("/songs", songsRoutes(deps));
     api.route("/playlists", playlistsRoutes(deps));
     api.route("/tokens", tokensRoutes(deps));
+    api.route("/transcribe", transcribeRoutes(deps));
     api.get("/health", (c) => c.json({ ok: true, name: "pianobe-server" }));
     app.route("/api", api);
 

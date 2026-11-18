@@ -24,6 +24,47 @@ export interface TokenInfo {
     revoked: number;
 }
 
+export interface TranscribeStatus {
+    available: boolean;
+    cli?: string;
+    model?: string;
+    decoder: "native" | "ffmpeg";
+    threads: number;
+    eco: boolean;
+    bilibili?: boolean;
+    maxAudioBytes?: number;
+    message?: string;
+}
+
+export interface BiliSearchItem {
+    bvid: string;
+    title: string;
+    author: string;
+    duration: string;
+    play: number;
+}
+
+export interface TranscribeResult {
+    song: MidiSongMeta & { noteCount?: number; dataSize?: number };
+    source:
+        | {
+              kind: "upload";
+              fileName?: string;
+          }
+        | {
+              kind: "bilibili";
+              bvid: string;
+              cid: number;
+              title: string;
+              page: number;
+              pageCount: number;
+              quality: string;
+              codecs: string;
+              bandwidth: number;
+          };
+    elapsedMs: number;
+}
+
 const TOKEN_KEY = "piano_token";
 
 export function getToken(): string | null {
@@ -176,6 +217,34 @@ export const api = {
         request<void>(`/api/tokens/${id}`, {
             method: "DELETE",
             headers: authHeaders(),
+        }),
+
+    transcribeStatus: () =>
+        request<TranscribeStatus>("/api/transcribe/status", { headers: authHeaders() }),
+
+    searchBilibili: (q: string) =>
+        request<{ items: BiliSearchItem[] }>(
+            `/api/transcribe/bilibili/search?q=${encodeURIComponent(q)}&limit=10`,
+            { headers: authHeaders() }
+        ),
+
+    transcribeAudio: async (file: File, name?: string) =>
+        handle<TranscribeResult>(
+            await fetch("/api/transcribe", {
+                method: "POST",
+                headers: authHeaders({
+                    "X-File-Name": encodeURIComponent(name?.trim() || file.name),
+                    "Content-Type": file.type || "application/octet-stream",
+                }),
+                body: file,
+            })
+        ),
+
+    transcribeBilibili: (input: string, name?: string, page = 1) =>
+        request<TranscribeResult>("/api/transcribe/bilibili", {
+            method: "POST",
+            headers: authHeaders({ "content-type": "application/json" }),
+            body: JSON.stringify({ input, name, page }),
         }),
 };
 

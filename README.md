@@ -21,6 +21,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 | **附加包（addon）** | 游戏内钢琴方块：实时弹奏、MIDI 播放器、播放队列与多钢琴支持 |
 | **在线生成器（generator）** | 网页端将 `.mid` 文件与内置曲库打包为 `.mcaddon`，Cloudflare Workers Static Assets 部署；D1 记录试听播放量 |
 | **自托管后端（server + web）** | Hono + SQLite 文件曲库与播放列表服务，配套 React 管理页；BDS 服务器经 server-net 远程拉取曲目 |
+| **音频转 MIDI（AMT）** | 生成器内置浏览器端转录（多线程 WASM）；server 调用 Rust `amt-cli`，支持上传音频与 B 站视频链接 |
 | **共享核心库（core）** | MIDI 转换/打包、曲库编解码、音符映射、存储端口等无游戏依赖的领域逻辑 |
 
 主要特性：
@@ -31,6 +32,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 - **自托管后端**：Hono + bun:sqlite + Docker；token 鉴权（Bootstrap 令牌 env 注入、分角色令牌）；React 管理页
 - **曲目文件存储**：SQLite 仅存元数据，完整曲目以 `data/midis/{id}.mid` 源文件存储；游戏播放器按需转为 PBE2，管理页前端直接解析 `.mid` 播放
 - **无事务一致性**：存储端口单键原子写、派生索引、崩溃自愈（core 契约测试覆盖）
+- **音频转 MIDI（AMT）**：生成器在浏览器本地运行转录模型；自托管后端调用 Rust `amt-cli`，并可直接解析 B 站视频音频
 
 ---
 
@@ -142,6 +144,25 @@ npm run test -w @piano/addon  # addon netSource 缓存/降级
 # 运行
 npm run dev:generator    # 生成器开发模式（predev 自动同步底包与曲库到 public/）
 ```
+
+### 音频转 MIDI（AMT）资源
+
+音频转录（生成器浏览器端 + server 端 Rust CLI）依赖 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription) 的模型与运行时。这些文件体积较大且模型为 CC BY-NC 4.0，不随仓库提交：
+
+```bash
+# 指向本地 AMT 仓库（其中需已 cargo build --release）
+# PowerShell:
+$env:AMT_DIR="E:\Project\muscriptor\Automated-Music-Transcription"
+# bash:
+export AMT_DIR=/path/to/Automated-Music-Transcription
+
+npm run sync:amt
+# 生成器 → packages/generator/public/amt/（模型 + ONNX Runtime WASM）
+# 后端   → packages/server/amt/（amt-cli + onnxruntime.dll + 模型）
+```
+
+未同步时两个页面会显示「AMT 不可用」，其他功能不受影响。服务器端也可用
+`AMT_CLI` / `AMT_MODEL` 直接指定二进制与模型路径。
 
 ### Cloudflare 生成器播放统计
 

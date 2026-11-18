@@ -52,6 +52,13 @@ docker compose -f docker-compose.dev.yml up
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目/公开列表读接口免令牌 |
 | `WEB_ROOT` | 无 | 前端构建产物目录（不存在则不托管） |
+| `AMT_CLI` | `./amt/amt-cli[.exe]` | AMT Rust CLI 路径（也可在 PATH 中查找） |
+| `AMT_MODEL` | `./amt/run4_best.onnx` | ONNX 模型路径 |
+| `AMT_DECODER` | `native` | `native` 内置解码（mp3/m4a/flac/wav/ogg）；`ffmpeg` 外部解码 |
+| `AMT_THREADS` | `4` | 转录线程数 |
+| `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
+| `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
+| `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |
 
 ## 令牌与角色
 
@@ -80,7 +87,33 @@ DELETE /api/playlists/:id             删除（owner/admin）
 GET    /api/tokens                    令牌列表（admin）
 POST   /api/tokens                    { label, role } 创建，返回明文一次（admin）
 DELETE /api/tokens/:id                吊销（admin）
+GET    /api/transcribe/status         AMT 是否就绪（CLI/模型/解码器）
+POST   /api/transcribe                上传音频（原始字节，X-File-Name 头）→ 转录并写入曲库
+GET    /api/transcribe/bilibili/search?q=  按关键词搜索 B 站视频
+POST   /api/transcribe/bilibili       { input: BV/URL, page?, name? } → 下载音频、转录并写入曲库
 ```
+
+### 音频转 MIDI（AMT）
+
+服务端直接调用 muscriptor 的 Rust `amt-cli`（无浏览器、无 Python），音频解码、
+CQT、ONNX 推理和 MIDI 写出都在 CLI 内完成；转录结果作为普通曲目写入曲库，
+管理页「音频转 MIDI」可直接试听。
+
+```bash
+# 同步 CLI + onnxruntime.dll + 模型到 packages/server/amt/
+# PowerShell:
+$env:AMT_DIR="E:\Project\muscriptor\Automated-Music-Transcription"; npm run sync:amt -w @piano/server
+# bash:
+AMT_DIR=/path/to/Automated-Music-Transcription npm run sync:amt -w @piano/server
+```
+
+B 站解析流程：`finger/spi` 取匿名 buvid → `view` 取 cid/title → `playurl`（DASH）
+选最高码率音轨 → 带 Referer 下载 fMP4（`.m4s`）→ 直接交给 `amt-cli`。
+普通音轨无需登录；杜比 / Hi-Res 需 `BILI_SESSDATA`。接口请求在进程内串行并限速
+1 秒/次，转录任务默认排队串行执行（内存占用约 150 MB/任务）。
+
+> Docker / Linux 部署需要自行编译 Linux 版 `amt-cli`（或挂载一个可执行文件），
+> 并通过 `AMT_CLI` / `AMT_MODEL` 指向它；Windows 版 `.exe` 不能在容器里运行。
 
 ## 一致性设计
 

@@ -4,6 +4,7 @@ import { ensureBootstrapToken } from "./auth.js";
 import { SqlitePlaylistPort, SqliteSongPort } from "./drivers/sqlitePorts.js";
 import { createApp } from "./app.js";
 import { PlaylistStore } from "@piano/core";
+import { AmtService } from "./services/amt.js";
 
 const config = loadConfig();
 const db = openDb(config.dbPath);
@@ -20,8 +21,15 @@ if (generated) {
 
 const songPort = new SqliteSongPort(db, config.midisDir);
 const playlistStore = new PlaylistStore(new SqlitePlaylistPort(db));
+const amt = new AmtService(config);
+const amtStatus = amt.status();
+if (amtStatus.available) {
+    console.log(`AMT 转录已启用: ${amtStatus.cli} (model=${amtStatus.model})`);
+} else {
+    console.warn(`AMT 转录未启用: ${amtStatus.message}`);
+}
 
-const app = createApp({ db, songPort, playlistStore, config });
+const app = createApp({ db, songPort, playlistStore, config, amt });
 
 console.log(`PianoBE server: http://0.0.0.0:${config.port} (db=${config.dbPath})`);
 Bun.serve({

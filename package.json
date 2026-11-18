@@ -39,6 +39,7 @@
         "dev:generator": "npm run dev -w @piano/generator",
         "build:generator": "npm run build -w @piano/generator",
         "build:timbres": "node tools/audio/build-piano-timbres.mjs",
+        "sync:amt": "npm run sync:amt -w @piano/server && npm run sync:amt -w @piano/generator",
         "verify:timbres": "bun tools/verify/verify-timbres.mjs",
         "audio-lab:assets": "node tools/audio/build-audio-lab-assets.mjs",
         "audio-lab:render": "node tools/audio/audio-lab-render.mjs",

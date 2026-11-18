@@ -10,6 +10,20 @@ export interface ServerConfig {
     allowPublicRead: boolean;
     /** web 构建产物静态目录（不存在则不托管） */
     webRoot?: string;
+    /** amt-cli 可执行文件路径；默认在 ./amt/ 与 PATH 中查找 */
+    amtCli?: string;
+    /** AMT ONNX 模型路径；默认在 amt-cli 同目录与 ./amt/ 中查找 */
+    amtModel?: string;
+    /** amt-cli 解码器：native（纯 Rust，默认）或 ffmpeg（外部 ffmpeg） */
+    amtDecoder: "native" | "ffmpeg";
+    /** amt-cli 转录线程数（默认 4） */
+    amtThreads: number;
+    /** 使用 --eco 低负载模式（单线程 + 主动让出 CPU） */
+    amtEco: boolean;
+    /** 单次转录超时（默认 10 分钟） */
+    amtTimeoutMs: number;
+    /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
+    biliSessdata?: string;
 }
 
 /**
@@ -26,5 +40,12 @@ export function loadConfig(
         bootstrapToken: env.BOOTSTRAP_TOKEN || undefined,
         allowPublicRead: env.ALLOW_PUBLIC_READ === "true",
         webRoot: env.WEB_ROOT || undefined,
+        amtCli: env.AMT_CLI || undefined,
+        amtModel: env.AMT_MODEL || undefined,
+        amtDecoder: env.AMT_DECODER === "ffmpeg" ? "ffmpeg" : "native",
+        amtThreads: Math.max(1, Number(env.AMT_THREADS ?? 4) || 4),
+        amtEco: env.AMT_ECO === "true",
+        amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
+        biliSessdata: env.BILI_SESSDATA || undefined,
     };
 }

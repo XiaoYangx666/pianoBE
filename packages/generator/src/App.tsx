@@ -1,20 +1,20 @@
 import { memo, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AppLayout, PianoMark, SongBadge, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AppLayout, PianoMark, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { AudioWaveform, Info, LibraryBig, PackageOpen } from "lucide-react";
-import { previewPlayer } from "./player";
+import { appPlayer, previewPlayer } from "./player";
 import { useGenerator } from "./store/generator";
 import { LibraryPage } from "./pages/LibraryPage";
 import { AddonPage } from "./pages/AddonPage";
 import { AboutPage } from "./pages/AboutPage";
-import { ConvertPlaceholderPage } from "./pages/ConvertPlaceholderPage";
+import { ConvertPage } from "./pages/ConvertPage";
 import { ChangelogButton } from "./components/ChangelogButton";
 
 // 页面自身订阅 store，App 的局部状态（弹窗、loading、导出中）不应连带重渲染整个页面树
 const MemoLibraryPage = memo(LibraryPage);
 const MemoAddonPage = memo(AddonPage);
 const MemoAboutPage = memo(AboutPage);
-const MemoConvertPlaceholderPage = memo(ConvertPlaceholderPage);
+const MemoConvertPage = memo(ConvertPage);
 
 export default function App() {
     const init = useGenerator((state) => state.init);
@@ -22,7 +22,6 @@ export default function App() {
     const timbres = useGenerator((state) => state.timbres);
     const previewTimbreId = useGenerator((state) => state.previewTimbreId);
     const setPreviewTimbre = useGenerator((state) => state.setPreviewTimbre);
-    const { pathname } = useLocation();
 
     const [normalizeLoudness, setNormalizeLoudness] = useState(() => {
         try {
@@ -50,10 +49,8 @@ export default function App() {
         { to: "/addon", label: "附加包制作", icon: <PackageOpen size={18} /> },
         {
             to: "/convert",
-            label: "MIDI 转换",
+            label: "音频转 MIDI",
             icon: <AudioWaveform size={18} />,
-            disabled: true,
-            badge: <SongBadge tone="brand">规划中</SongBadge>,
         },
         { to: "/about", label: "关于", icon: <Info size={18} /> },
     ];
@@ -72,10 +69,11 @@ export default function App() {
                 bottomNav={[
                     nav[0],
                     nav[1],
+                    nav[2],
                     nav[3],
                 ]}
                 mobileDrawer={false}
-                player={previewPlayer}
+                player={appPlayer}
                 playerExtras={{
                     timbres: timbres.map((item) => ({ id: item.id, label: item.label })),
                     timbreId: previewTimbreId,
@@ -83,7 +81,7 @@ export default function App() {
                     normalize: { enabled: normalizeLoudness, onToggle: setNormalizeLoudness },
                 }}
                 repoUrl="https://github.com/XiaoYangx666/pianoBE"
-                mobileFlush={pathname !== "/convert"}
+                mobileFlush
                 headerActions={
                     <>
                         <ThemeToggle />
@@ -101,7 +99,7 @@ export default function App() {
                     <Route path="/" element={<MemoLibraryPage />} />
                     <Route path="/addon" element={<MemoAddonPage />} />
                     <Route path="/about" element={<MemoAboutPage />} />
-                    <Route path="/convert" element={<MemoConvertPlaceholderPage />} />
+                    <Route path="/convert" element={<MemoConvertPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </AppLayout>

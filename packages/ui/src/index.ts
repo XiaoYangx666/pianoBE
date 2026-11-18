@@ -15,3 +15,4 @@ export * from "./components/StatusPill";
 export * from "./components/ImportCodeDialog";
 export * from "./components/FileDropzone";
 export * from "./components/VirtualSongList";
+export * from "./components/NoteRoll";

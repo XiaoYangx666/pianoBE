@@ -1,0 +1,6 @@
+# 跨源隔离：让浏览器端 AMT 使用多线程 WASM（SharedArrayBuffer）。
+# 不支持 _headers 的静态托管平台会忽略此文件，页面自动回退单线程。
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin

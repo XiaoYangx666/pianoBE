@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { KeyRound, LibraryBig, ListMusic, LogOut, FlaskConical } from "lucide-react";
+import { KeyRound, LibraryBig, ListMusic, LogOut, FlaskConical, AudioWaveform } from "lucide-react";
 import { AppLayout, IconButton, PianoMark, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { getToken, setToken } from "./api";
 import { Login } from "./Login";
@@ -8,10 +8,12 @@ import { SongsPage } from "./SongsPage";
 import { PlaylistsPage } from "./PlaylistsPage";
 import { TokensPage } from "./TokensPage";
 import { AudioLabPage } from "./audioLab/AudioLabPage";
+import { TranscribePage } from "./TranscribePage";
 import { midiPlayer } from "./midiPlayer";
 
 const nav: AppNavItem[] = [
     { to: "/", label: "曲目库", icon: <LibraryBig size={18} />, end: true },
+    { to: "/transcribe", label: "音频转 MIDI", icon: <AudioWaveform size={18} /> },
     { to: "/playlists", label: "播放列表", icon: <ListMusic size={18} /> },
     { to: "/tokens", label: "令牌管理", icon: <KeyRound size={18} /> },
     { to: "/lab", label: "音频实验室", icon: <FlaskConical size={18} /> },
@@ -68,6 +70,7 @@ export default function App() {
         >
             <Routes>
                 <Route path="/" element={<SongsPage />} />
+                <Route path="/transcribe" element={<TranscribePage />} />
                 <Route path="/playlists" element={<PlaylistsPage />} />
                 <Route path="/tokens" element={<TokensPage />} />
                 <Route path="/lab" element={<AudioLabPage />} />

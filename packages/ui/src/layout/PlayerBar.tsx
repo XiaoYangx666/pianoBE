@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { AudioLines, Piano, Volume2, VolumeX, X } from "lucide-react";
+import { AudioLines, ChevronUp, Piano, Volume2, VolumeX, X } from "lucide-react";
 import { Menu } from "../primitives";
 import { PianoKeys } from "../components/PianoKeys";
+import { NoteRoll, type PlayerNote } from "../components/NoteRoll";
 
 const cx = (...values: Array<string | false | null | undefined>) => values.filter(Boolean).join(" ");
 
@@ -15,6 +16,12 @@ export interface PlayerState {
     duration: number;
     /** 音量 0~1 */
     volume: number;
+    /** 当前音源说明，例如「MIDI 试听」「原音频试听」 */
+    sourceLabel?: string;
+    /** 当前音源可展示的音符（钢琴卷帘） */
+    notes?: PlayerNote[];
+    /** notes 是否带真实力度（原音频转录没有力度） */
+    hasVelocity?: boolean;
 }
 
 export interface PlayerLike {
@@ -302,7 +309,7 @@ function TimbreControl({ extras, compact = false }: { extras?: PlayerExtras; com
                     type="button"
                     title={`音色：${current.label}`}
                     className={cx(
-                        "inline-flex items-center gap-1.5 rounded-md text-[11.5px] text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text",
+                        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md text-[11.5px] text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text",
                         compact ? "h-8 max-w-[132px] border border-ore-border px-2.5" : "h-8 max-w-[140px] border border-ore-border bg-[var(--pb-soft)] px-2.5 hover:border-brand/40"
                     )}
                 >
@@ -331,27 +338,177 @@ function NormalizeControl({ extras }: { extras?: PlayerExtras }) {
             title={normalize.enabled ? "逐曲响度归一化：开" : "逐曲响度归一化：关（保持原始动态）"}
             onClick={() => normalize.onToggle(!normalize.enabled)}
             className={cx(
-                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-colors",
+                "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 text-[11.5px] transition-colors",
                 normalize.enabled
                     ? "border-brand/50 bg-brand/10 text-[color:var(--pb-primary-light)]"
                     : "border-ore-border text-ore-dim hover:bg-[var(--pb-hover)] hover:text-ore-text"
             )}
         >
             <AudioLines size={14} className="shrink-0" />
-            <span>归一化</span>
+            <span className="hidden xl:inline">归一化</span>
         </button>
+    );
+}
+
+/** 播放器详情弹窗：桌面点击底部播放条、移动端点击迷你播放器都会打开它。 */
+function PlayerDetailDialog({
+    player,
+    state,
+    extras,
+    onClose,
+}: {
+    player: PlayerLike;
+    state: PlayerState;
+    extras?: PlayerExtras;
+    onClose: () => void;
+}) {
+    const playing = state.status === "playing";
+    const notes = state.notes ?? [];
+    const hasNotesInfo = state.notes !== undefined;
+    const sourceLabel = state.sourceLabel ?? "MIDI 试听";
+    const isAudio = sourceLabel === "原音频试听";
+    const closeRef = useRef(onClose);
+    closeRef.current = onClose;
+
+    useEffect(() => {
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") closeRef.current();
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.body.style.overflow = previous;
+            document.removeEventListener("keydown", onKeyDown);
+        };
+    }, []);
+
+    return createPortal(
+        <div
+            className="fixed inset-0 z-[80] overflow-y-auto bg-black/55 animate-[pbFadeIn_140ms_ease-out]"
+            onClick={onClose}
+        >
+            <div className="flex min-h-full items-center justify-center p-4">
+                <div
+                    className="relative w-full max-w-[560px] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-ore-border bg-ore-raised p-5 shadow-[0_24px_64px_-16px_var(--pb-shadow)] animate-[pbDialogIn_160ms_ease-out]"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ore-dimmer">
+                            正在播放
+                        </span>
+                        <button
+                            type="button"
+                            aria-label="关闭播放器"
+                            onClick={onClose}
+                            className="grid h-7 w-7 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
+                        >
+                            <X size={15} />
+                        </button>
+                    </div>
+
+                    <div className="mt-5 flex items-center gap-4">
+                        <div className="relative shrink-0">
+                            <PianoKeys playing={playing} className="h-14 w-[70px] rounded-lg p-2" />
+                            <span className="absolute -bottom-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full border border-ore-divider bg-ore-raised">
+                                <PlayingBars active={playing} size="xs" />
+                            </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h2 className="line-clamp-2 text-[19px] font-semibold leading-snug tracking-[-0.02em]">
+                                {state.songName || "未命名曲目"}
+                            </h2>
+                            <div className="mt-1 text-[11.5px] text-ore-dim">
+                                {sourceLabel} · {playing ? "正在播放" : "已暂停"}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-5">
+                        <ProgressTrack player={player} state={state} />
+                        <div className="mt-2 flex justify-between text-[10.5px] tabular-nums text-ore-dim">
+                            <span>{formatClock(state.currentTime)}</span>
+                            <span>{formatClock(state.duration)}</span>
+                        </div>
+                    </div>
+
+                    {hasNotesInfo && (
+                        <div className="mt-4">
+                            <div className="mb-1.5 flex items-center justify-between text-[10.5px] text-ore-dim">
+                                <span>
+                                    {state.hasVelocity
+                                        ? "音符详情 · 条高与透明度表示力度，点击可跳转"
+                                        : "音符详情 · 点击可跳转"}
+                                </span>
+                                <span>{notes.length.toLocaleString()} 个音符</span>
+                            </div>
+                            {notes.length > 0 ? (
+                                <NoteRoll
+                                    notes={notes}
+                                    duration={state.duration}
+                                    currentTime={state.currentTime}
+                                    height={140}
+                                    onSeek={(time) => player.seek(time)}
+                                />
+                            ) : (
+                                <div className="grid h-[80px] place-items-center rounded-md border border-dashed border-ore-border text-[11px] text-ore-dim">
+                                    当前音源还没有音符
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="mt-4 grid grid-cols-3 items-center">
+                        <div className="justify-self-start">
+                            <StopButton player={player} />
+                        </div>
+                        <div className="justify-self-center">
+                            <PlayButton player={player} state={state} size="lg" />
+                        </div>
+                    </div>
+
+                    <div className="mt-5 border-t border-ore-divider pt-3">
+                        {!isAudio && (
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                                <TimbreControl extras={extras} compact />
+                                <NormalizeControl extras={extras} />
+                            </div>
+                        )}
+                        <VolumeControl player={player} state={state} wide />
+                    </div>
+                </div>
+            </div>
+        </div>,
+        document.body
     );
 }
 
 /** 桌面端底部播放条；空闲时不渲染。 */
 export function PlayerBar({ player, extras }: { player: PlayerLike; extras?: PlayerExtras }) {
     const state = usePlayerState(player);
+    const [detailOpen, setDetailOpen] = useState(false);
+
+    useEffect(() => {
+        if (state.status === "idle") setDetailOpen(false);
+    }, [state.status]);
+
     if (state.status === "idle") return null;
     const playing = state.status === "playing";
+    const notes = state.notes ?? [];
+    const hasNotesInfo = state.notes !== undefined;
+    const sourceLabel = state.sourceLabel ?? "MIDI 试听";
+    const isAudio = sourceLabel === "原音频试听";
 
     return (
         <div className="fixed inset-x-0 bottom-0 z-30 hidden border-t border-ore-divider bg-ore-raised lg:block">
-            <div className="mx-auto grid h-[76px] max-w-[1600px] grid-cols-[minmax(0,1.05fr)_minmax(320px,1.55fr)_minmax(0,1fr)] items-center gap-6 px-6">
+            <div
+                className="mx-auto grid h-[76px] max-w-[1600px] cursor-pointer grid-cols-[minmax(0,1fr)_minmax(280px,1.5fr)_auto] items-center gap-6 px-6"
+                onClick={(event) => {
+                    const target = event.target as HTMLElement;
+                    if (target.closest("button, input, a, [role='slider']")) return;
+                    setDetailOpen(true);
+                }}
+            >
                 <div className="flex min-w-0 items-center gap-3">
                     <div className="relative shrink-0">
                         <PianoKeys playing={playing} className="h-10 w-12 p-1.5" />
@@ -372,7 +529,13 @@ export function PlayerBar({ player, extras }: { player: PlayerLike; extras?: Pla
                                 {playing ? "正在播放" : "已暂停"}
                             </span>
                             <span className="text-ore-dimmer">·</span>
-                            <span>MIDI 试听</span>
+                            <span>{sourceLabel}</span>
+                            {notes.length > 0 && (
+                                <>
+                                    <span className="text-ore-dimmer">·</span>
+                                    <span>{notes.length.toLocaleString()} 音符</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -391,14 +554,39 @@ export function PlayerBar({ player, extras }: { player: PlayerLike; extras?: Pla
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 border-l border-ore-divider pl-5">
-                    <TimbreControl extras={extras} />
-                    <NormalizeControl extras={extras} />
+                <div className="flex shrink-0 items-center justify-end gap-2 border-l border-ore-divider pl-5">
+                    {!isAudio && (
+                        <>
+                            <TimbreControl extras={extras} />
+                            <NormalizeControl extras={extras} />
+                        </>
+                    )}
+                    {hasNotesInfo && (
+                        <button
+                            type="button"
+                            aria-label="展开播放详情"
+                            title="详情与音符"
+                            aria-expanded={detailOpen}
+                            onClick={() => setDetailOpen(true)}
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
+                        >
+                            <ChevronUp size={16} />
+                        </button>
+                    )}
                     <span className="h-5 w-px bg-ore-divider" />
                     <VolumeControl player={player} state={state} />
                     {extras?.extra}
                 </div>
             </div>
+
+            {detailOpen && (
+                <PlayerDetailDialog
+                    player={player}
+                    state={state}
+                    extras={extras}
+                    onClose={() => setDetailOpen(false)}
+                />
+            )}
         </div>
     );
 }
@@ -411,20 +599,6 @@ export function MiniPlayer({ player, extras }: { player: PlayerLike; extras?: Pl
     useEffect(() => {
         if (state.status === "idle") setOpened(false);
     }, [state.status]);
-
-    useEffect(() => {
-        if (!opened) return;
-        const previous = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") setOpened(false);
-        };
-        document.addEventListener("keydown", onKeyDown);
-        return () => {
-            document.body.style.overflow = previous;
-            document.removeEventListener("keydown", onKeyDown);
-        };
-    }, [opened]);
 
     if (state.status === "idle") return null;
 
@@ -460,78 +634,14 @@ export function MiniPlayer({ player, extras }: { player: PlayerLike; extras?: Pl
                 <PlayButton player={player} state={state} />
             </div>
 
-            {opened &&
-                createPortal(
-                    <div
-                        className="fixed inset-0 z-[80] overflow-y-auto bg-black/55 animate-[pbFadeIn_140ms_ease-out]"
-                        onClick={() => setOpened(false)}
-                    >
-                        <div className="flex min-h-full items-center justify-center p-4">
-                            <div
-                                className="relative w-full max-w-[360px] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-ore-border bg-ore-raised p-5 shadow-[0_24px_64px_-16px_var(--pb-shadow)] animate-[pbDialogIn_160ms_ease-out]"
-                                onClick={(event) => event.stopPropagation()}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ore-dimmer">
-                                        正在播放
-                                    </span>
-                                    <button
-                                        type="button"
-                                        aria-label="关闭播放器"
-                                        onClick={() => setOpened(false)}
-                                        className="grid h-7 w-7 place-items-center rounded-md text-ore-dim transition-colors hover:bg-[var(--pb-hover)] hover:text-ore-text"
-                                    >
-                                        <X size={15} />
-                                    </button>
-                                </div>
-
-                                <div className="mt-6 flex flex-col items-center text-center">
-                                    <div className="relative">
-                                        <PianoKeys
-                                            playing={playing}
-                                            className="h-16 w-20 rounded-lg p-2.5"
-                                        />
-                                        <span className="absolute -bottom-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full border border-ore-divider bg-ore-raised">
-                                            <PlayingBars active={playing} size="xs" />
-                                        </span>
-                                    </div>
-                                    <h2 className="mt-4 line-clamp-2 text-[19px] font-semibold leading-snug tracking-[-0.02em]">
-                                        {state.songName || "未命名曲目"}
-                                    </h2>
-                                    <div className="mt-1 text-[11.5px] text-ore-dim">
-                                        MIDI 试听 · {playing ? "正在播放" : "已暂停"}
-                                    </div>
-                                </div>
-
-                                <div className="mt-6">
-                                    <ProgressTrack player={player} state={state} />
-                                    <div className="mt-2 flex justify-between text-[10.5px] tabular-nums text-ore-dim">
-                                        <span>{formatClock(state.currentTime)}</span>
-                                        <span>{formatClock(state.duration)}</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 grid grid-cols-3 items-center">
-                                    <div className="justify-self-start">
-                                        <StopButton player={player} />
-                                    </div>
-                                    <div className="justify-self-center">
-                                        <PlayButton player={player} state={state} size="lg" />
-                                    </div>
-                                </div>
-
-                                <div className="mt-5 border-t border-ore-divider pt-3">
-                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                        <TimbreControl extras={extras} compact />
-                                        <NormalizeControl extras={extras} />
-                                    </div>
-                                    <VolumeControl player={player} state={state} wide />
-                                </div>
-                            </div>
-                        </div>
-                    </div>,
-                    document.body
-                )}
+            {opened && (
+                <PlayerDetailDialog
+                    player={player}
+                    state={state}
+                    extras={extras}
+                    onClose={() => setOpened(false)}
+                />
+            )}
         </>
     );
 }
