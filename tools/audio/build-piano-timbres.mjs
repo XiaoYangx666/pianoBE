@@ -590,17 +590,20 @@ async function convertSample(source, target, gainDb, transpose = 0) {
     ], { quiet: true });
 }
 
-/** web 试听页只内嵌默认音色（标准钢琴），保持副本与资源包一致（文件名 # → sharp）。 */
+/** web 试听页内嵌全部可选音色，保持副本与资源包一致（文件名 # → sharp）。 */
 async function syncWebPreview() {
-    const expected = new Set(pianoSoundLayers(0).map((layer) => pianoSoundId(0, layer)));
+    const expected = new Set(
+        PIANO_TIMBRES.flatMap((timbre) =>
+            pianoSoundLayers(timbre.value).map((layer) => pianoSoundId(timbre.value, layer))
+        )
+    );
     for (const entry of await readdir(WEB_PUBLIC, { withFileTypes: true })) {
         if (entry.isDirectory() && !expected.has(entry.name)) {
             await rm(join(WEB_PUBLIC, entry.name), { recursive: true, force: true });
             console.log(`移除旧 Web 试听目录 ${entry.name}`);
         }
     }
-    for (const layer of pianoSoundLayers(0)) {
-        const dir = pianoSoundId(0, layer);
+    for (const dir of expected) {
         const targetDir = join(WEB_PUBLIC, dir);
         await mkdir(targetDir, { recursive: true });
         for (const note of BASE_NOTES) {

@@ -1,6 +1,7 @@
 import * as toneMidi from "@tonejs/midi";
 import { SampledMidiPlayer, type NoteEvent, type PlayerState } from "@piano/core/player";
 import { collectSustainSegments, sustainExtensionSeconds } from "@piano/core/convert";
+import { AppPlayer } from "@piano/ui";
 
 export type { PlayerState, NoteEvent } from "@piano/core/player";
 
@@ -62,6 +63,8 @@ export function parseMidi(buffer: ArrayBuffer): NoteEvent[] {
  * 支持播放 / 暂停 / 继续 / 停止 / 跳转，多订阅状态回调。
  */
 export class MidiPlayer extends SampledMidiPlayer {
+    private currentNotes: NoteEvent[] = [];
+
     constructor() {
         super();
         // 采样文件名含 #（如 F#3/D#3）：静态文件系统存 Fsharp3/Dsharp3（URL 中 # 会被当 fragment 截断）
@@ -77,6 +80,11 @@ export class MidiPlayer extends SampledMidiPlayer {
         };
     }
 
+    /** 当前曲目的音符事件（播放器展开时用于绘制钢琴卷帘） */
+    getNotes(): readonly NoteEvent[] {
+        return this.currentNotes;
+    }
+
     /** 播放 .mid 字节。须在用户手势（点击）中调用以通过浏览器音频策略。 */
     async play(
         songId: string,
@@ -84,9 +92,14 @@ export class MidiPlayer extends SampledMidiPlayer {
         name: string,
         durationSec: number
     ): Promise<void> {
-        await this.playSong(songId, name, durationSec, parseMidi(buffer));
+        const events = parseMidi(buffer);
+        this.currentNotes = events;
+        await this.playSong(songId, name, durationSec, events);
     }
 }
 
 /** 全局单例 */
 export const midiPlayer = new MidiPlayer();
+
+/** 全局播放器（MIDI + 原音频），与生成器共用 @piano/ui 的合并逻辑 */
+export const appPlayer = new AppPlayer(midiPlayer);

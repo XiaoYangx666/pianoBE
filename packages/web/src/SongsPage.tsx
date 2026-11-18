@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, IconButton, Menu, Textfield } from "@piano/ui";
-import { MoreVertical, Pencil, RefreshCw, Search, Trash2, Upload } from "lucide-react";
+import { MoreVertical, Pencil, QrCode, RefreshCw, Search, Trash2, Upload } from "lucide-react";
 import {
     ConfirmDialog,
     Dialog,
     EmptyState,
     FileDropzone,
+    ImportCodeDialog,
     PageHeader,
     SongBadge,
     SongRow,
     notify,
     usePlayerState,
 } from "@piano/ui";
-import { api, formatDuration, type MidiSongMeta } from "./api";
+import { api, formatDuration, type ImportCode, type MidiSongMeta } from "./api";
 import { midiPlayer } from "./midiPlayer";
 
 export function SongsPage() {
@@ -27,6 +28,8 @@ export function SongsPage() {
     const [renameTarget, setRenameTarget] = useState<MidiSongMeta | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [deleteTarget, setDeleteTarget] = useState<MidiSongMeta | null>(null);
+    const [code, setCode] = useState<ImportCode | null>(null);
+    const [codeBusy, setCodeBusy] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const player = usePlayerState(midiPlayer);
 
@@ -106,6 +109,18 @@ export function SongsPage() {
         }
     };
 
+    const openCode = async (song: MidiSongMeta) => {
+        setCodeBusy(song.id);
+        try {
+            const result = await api.getSongCode(song.id);
+            setCode(result);
+        } catch (e) {
+            notify({ title: "生成导入码失败", message: (e as Error).message, color: "red" });
+        } finally {
+            setCodeBusy(null);
+        }
+    };
+
     const play = async (song: MidiSongMeta) => {
         const isCurrent = player.songId === song.id && player.status !== "idle";
         if (isCurrent && player.status === "playing") {
@@ -134,7 +149,7 @@ export function SongsPage() {
             <PageHeader
                 eyebrow="Server Library"
                 title="曲目库"
-                description="管理服务端保存的 MIDI 曲目：上传、试听、重命名与删除。前端播放器使用 /piano 采样，跨页面保持播放状态。"
+                description="管理服务端保存的 MIDI 曲目：上传、试听、重命名、生成游戏内导入码与删除。前端播放器使用 /piano 采样，跨页面保持播放状态。"
                 actions={
                     <>
                         <input
@@ -215,6 +230,12 @@ export function SongsPage() {
                             {list.map((song, index) => {
                                 const isCurrent = player.songId === song.id && player.status !== "idle";
                                 const rowMenu = [
+                                    {
+                                        key: "code",
+                                        label: codeBusy === song.id ? "生成中…" : "生成导入码",
+                                        icon: <QrCode size={13} />,
+                                        onSelect: () => void openCode(song),
+                                    },
                                     {
                                         key: "rename",
                                         label: "重命名",
@@ -319,17 +340,27 @@ export function SongsPage() {
                 }
             >
                 <Textfield
+                    autoFocus
                     label="曲目名称"
                     value={renameValue}
                     onInput={(event) => {
                         const target = event.target as unknown as { value?: unknown };
                         if (typeof target?.value === "string") setRenameValue(target.value);
                     }}
+                    onFocus={(event) => event.currentTarget.select()}
                     onKeyDown={(event: React.KeyboardEvent) => {
                         if (event.key === "Enter") void saveRename();
                     }}
                 />
             </Dialog>
+
+            <ImportCodeDialog
+                opened={Boolean(code)}
+                onClose={() => setCode(null)}
+                songName={code?.name ?? ""}
+                chunks={code?.chunks ?? []}
+                bytes={code?.bytes}
+            />
 
             <ConfirmDialog
                 opened={Boolean(deleteTarget)}

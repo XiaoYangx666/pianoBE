@@ -6,16 +6,6 @@ export interface MidiSongMeta {
     dataSize?: number;
 }
 
-export interface PlaylistMeta {
-    id: number;
-    owner: string;
-    name: string;
-    public: boolean;
-    playCount: number;
-    createdAt: number;
-    updatedAt: number;
-}
-
 export interface TokenInfo {
     id: number;
     label: string;
@@ -44,25 +34,57 @@ export interface BiliSearchItem {
     play: number;
 }
 
-export interface TranscribeResult {
-    song: MidiSongMeta & { noteCount?: number; dataSize?: number };
-    source:
-        | {
-              kind: "upload";
-              fileName?: string;
-          }
-        | {
-              kind: "bilibili";
-              bvid: string;
-              cid: number;
-              title: string;
-              page: number;
-              pageCount: number;
-              quality: string;
-              codecs: string;
-              bandwidth: number;
-          };
+export type TranscribeJobStage =
+    | "queued"
+    | "downloading"
+    | "analyzing"
+    | "transcribing"
+    | "finalizing"
+    | "done"
+    | "error";
+
+export type TranscribeJobSource =
+    | { kind: "upload"; fileName?: string }
+    | {
+          kind: "bilibili";
+          bvid: string;
+          cid: number;
+          title: string;
+          page: number;
+          pageCount: number;
+          quality: string;
+          codecs: string;
+          bandwidth: number;
+      };
+
+export interface TranscribeJob {
+    id: string;
+    stage: TranscribeJobStage;
+    message: string;
+    /** 0-100；-1 表示无法估算（显示不确定进度） */
+    percent: number;
+    audioTime?: number;
+    durationSec?: number;
+    noteCount: number;
+    /** 转录结果时长（已按 TIME_SCALE 缩放） */
+    midiDuration?: number;
+    /** 转录结果 .mid 字节数 */
+    dataSize?: number;
     elapsedMs: number;
+    name: string;
+    source: TranscribeJobSource;
+    createdAt: number;
+    updatedAt: number;
+    audioReady: boolean;
+    midiReady: boolean;
+    error?: string;
+    savedSong?: MidiSongMeta;
+}
+
+export interface ImportCode {
+    name: string;
+    chunks: string[];
+    bytes: number;
 }
 
 const TOKEN_KEY = "piano_token";
@@ -109,6 +131,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     return handle<T>(await fetch(path, { ...init, headers }));
 }
 
+/** 带鉴权的二进制请求（音频/MIDI 试听） */
+async function requestBinary(path: string): Promise<Response> {
+    const res = await fetch(path, { headers: authHeaders() });
+    if (res.status === 401) {
+        setToken(null);
+        throw new ApiError(401, "令牌无效或已过期，请重新登录");
+    }
+    if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new ApiError(res.status, body?.error ?? `请求失败 (${res.status})`);
+    }
+    return res;
+}
+
 export const api = {
     health: () => request<{ ok: boolean }>("/api/health"),
 
@@ -132,6 +168,12 @@ export const api = {
         return res.arrayBuffer();
     },
 
+    /** 游戏内导入码（曲目库中的曲目） */
+    getSongCode: (id: string) =>
+        request<ImportCode>(`/api/songs/${encodeURIComponent(id)}/code`, {
+            headers: authHeaders(),
+        }),
+
     uploadSong: async (file: File) =>
         handle<MidiSongMeta>(
             await fetch("/api/songs", {
@@ -152,50 +194,6 @@ export const api = {
 
     deleteSong: (id: string) =>
         request<void>(`/api/songs/${id}`, {
-            method: "DELETE",
-            headers: authHeaders(),
-        }),
-
-    listPlaylists: (query = "") =>
-        request<{ items: PlaylistMeta[]; total: number }>(
-            `/api/playlists${query}`,
-            { headers: authHeaders() }
-        ),
-
-    getPlaylist: (id: number) =>
-        request<PlaylistMeta & { items: string[] }>(`/api/playlists/${id}`, {
-            headers: authHeaders(),
-        }),
-
-    createPlaylist: (name: string) =>
-        request<PlaylistMeta>("/api/playlists", {
-            method: "POST",
-            headers: authHeaders({ "content-type": "application/json" }),
-            body: JSON.stringify({ name }),
-        }),
-
-    updatePlaylist: (id: number, patch: { name?: string; public?: boolean }) =>
-        request<PlaylistMeta>(`/api/playlists/${id}`, {
-            method: "PATCH",
-            headers: authHeaders({ "content-type": "application/json" }),
-            body: JSON.stringify(patch),
-        }),
-
-    setPlaylistItems: (id: number, items: string[]) =>
-        request<{ items: string[] }>(`/api/playlists/${id}/items`, {
-            method: "PUT",
-            headers: authHeaders({ "content-type": "application/json" }),
-            body: JSON.stringify({ items }),
-        }),
-
-    playPlaylist: (id: number) =>
-        request<{ playCount: number }>(`/api/playlists/${id}/play`, {
-            method: "POST",
-            headers: authHeaders(),
-        }),
-
-    deletePlaylist: (id: number) =>
-        request<void>(`/api/playlists/${id}`, {
             method: "DELETE",
             headers: authHeaders(),
         }),
@@ -228,23 +226,148 @@ export const api = {
             { headers: authHeaders() }
         ),
 
-    transcribeAudio: async (file: File, name?: string) =>
-        handle<TranscribeResult>(
-            await fetch("/api/transcribe", {
-                method: "POST",
-                headers: authHeaders({
-                    "X-File-Name": encodeURIComponent(name?.trim() || file.name),
-                    "Content-Type": file.type || "application/octet-stream",
-                }),
-                body: file,
-            })
-        ),
+    /** 上传音频创建转录任务（XHR 以获得上传进度；结果不会自动进曲目库） */
+    createTranscribeJob: (
+        file: File,
+        options: {
+            name?: string;
+            durationSec?: number;
+            onUploadProgress?: (ratio: number) => void;
+        } = {}
+    ): Promise<TranscribeJob> =>
+        new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/transcribe/jobs");
+            const token = getToken();
+            if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+            xhr.setRequestHeader(
+                "X-File-Name",
+                encodeURIComponent(options.name?.trim() || file.name)
+            );
+            if (options.durationSec && options.durationSec > 0) {
+                xhr.setRequestHeader("X-Audio-Duration", String(options.durationSec));
+            }
+            xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable && event.total > 0) {
+                    options.onUploadProgress?.(event.loaded / event.total);
+                }
+            };
+            xhr.onload = () => {
+                if (xhr.status === 401) {
+                    setToken(null);
+                    reject(new ApiError(401, "令牌无效或已过期，请重新登录"));
+                    return;
+                }
+                let body: unknown = null;
+                try {
+                    body = JSON.parse(xhr.responseText);
+                } catch {
+                    // 非 JSON 响应
+                }
+                if (xhr.status >= 200 && xhr.status < 300 && body) {
+                    resolve(body as TranscribeJob);
+                } else {
+                    const message =
+                        (body as { error?: string } | null)?.error ?? `上传失败 (${xhr.status})`;
+                    reject(new ApiError(xhr.status, message));
+                }
+            };
+            xhr.onerror = () => reject(new ApiError(0, "上传失败：网络错误"));
+            xhr.onabort = () => reject(new ApiError(0, "已取消上传"));
+            xhr.send(file);
+        }),
 
-    transcribeBilibili: (input: string, name?: string, page = 1) =>
-        request<TranscribeResult>("/api/transcribe/bilibili", {
+    createBilibiliJob: (input: string, page = 1, name?: string) =>
+        request<TranscribeJob>("/api/transcribe/jobs/bilibili", {
             method: "POST",
             headers: authHeaders({ "content-type": "application/json" }),
-            body: JSON.stringify({ input, name, page }),
+            body: JSON.stringify({ input, page, name }),
+        }),
+
+    getTranscribeJob: (id: string) =>
+        request<TranscribeJob>(`/api/transcribe/jobs/${id}`, { headers: authHeaders() }),
+
+    /** 订阅任务进度（fetch 流解析 SSE，可携带 Authorization 头） */
+    subscribeTranscribeJob: (
+        id: string,
+        handlers: {
+            onUpdate: (job: TranscribeJob) => void;
+            onError?: (error: Error) => void;
+            onClose?: () => void;
+        }
+    ): (() => void) => {
+        const controller = new AbortController();
+        void (async () => {
+            const res = await fetch(`/api/transcribe/jobs/${id}/events`, {
+                headers: authHeaders(),
+                signal: controller.signal,
+            });
+            if (res.status === 401) {
+                setToken(null);
+                throw new ApiError(401, "令牌无效或已过期，请重新登录");
+            }
+            if (!res.ok || !res.body) {
+                throw new ApiError(res.status, `订阅进度失败 (${res.status})`);
+            }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffered = "";
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffered += decoder.decode(value, { stream: true });
+                let boundary = buffered.indexOf("\n\n");
+                while (boundary >= 0) {
+                    const block = buffered.slice(0, boundary);
+                    buffered = buffered.slice(boundary + 2);
+                    boundary = buffered.indexOf("\n\n");
+                    let event = "message";
+                    let data = "";
+                    for (const line of block.split("\n")) {
+                        if (line.startsWith("event:")) event = line.slice(6).trim();
+                        else if (line.startsWith("data:")) data += line.slice(5).trim();
+                    }
+                    if (event === "progress" && data) {
+                        handlers.onUpdate(JSON.parse(data) as TranscribeJob);
+                    }
+                }
+            }
+            handlers.onClose?.();
+        })().catch((error: unknown) => {
+            if (controller.signal.aborted) return;
+            handlers.onError?.(error instanceof Error ? error : new Error(String(error)));
+        });
+        return () => controller.abort();
+    },
+
+    renameTranscribeJob: (id: string, name: string) =>
+        request<TranscribeJob>(`/api/transcribe/jobs/${id}`, {
+            method: "PATCH",
+            headers: authHeaders({ "content-type": "application/json" }),
+            body: JSON.stringify({ name }),
+        }),
+
+    saveTranscribeJob: (id: string, name?: string) =>
+        request<TranscribeJob>(`/api/transcribe/jobs/${id}/save`, {
+            method: "POST",
+            headers: authHeaders({ "content-type": "application/json" }),
+            body: JSON.stringify({ name }),
+        }),
+
+    getTranscribeCode: (id: string) =>
+        request<ImportCode>(`/api/transcribe/jobs/${id}/code`, { headers: authHeaders() }),
+
+    getTranscribeAudio: async (id: string): Promise<Blob> =>
+        (await requestBinary(`/api/transcribe/jobs/${id}/audio`)).blob(),
+
+    getTranscribeMidi: async (id: string): Promise<ArrayBuffer> =>
+        (await requestBinary(`/api/transcribe/jobs/${id}/midi`)).arrayBuffer(),
+
+    deleteTranscribeJob: (id: string) =>
+        request<void>(`/api/transcribe/jobs/${id}`, {
+            method: "DELETE",
+            headers: authHeaders(),
         }),
 };
 
