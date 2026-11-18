@@ -48,8 +48,10 @@ test("pause clears old MIDI attacks, seeks reset response and manual notes still
     expect(music.sample(12)).toEqual(quietFeatures);
 });
 
-test("neon wave changes continuously without onset and carries its previous amplitude to the client", () => {
-    const player = new VfxPresetPlayer(validateVfxPreset(VFX_PRESETS.neon));
+test("custom wave still carries continuous amplitude changes to the client", () => {
+    const player = new VfxPresetPlayer(validateVfxPreset({ layers: [{ effect: "wave", map: [
+        { input: "density", parameter: "amplitude", from: 0.14, to: 0.62 },
+    ] }] }));
     const center = (tick: number, density: number) => player.update(tick, { ...quietFeatures, density })
         .flatMap(batch => batch.emitters).find(e => e.effect === "wave" && e.variables.phase === 0)!;
     const quiet = center(0, 0);
@@ -61,7 +63,7 @@ test("neon wave changes continuously without onset and carries its previous ampl
     expect(player.update(player.duration, quietFeatures)).toEqual([]);
 });
 
-test("galaxy maps sustained pitch to height and length while stage limits chord triggers", () => {
+test("galaxy maps sustained pitch to height and length for its silk streams", () => {
     const galaxy = new VfxPresetPlayer(validateVfxPreset(VFX_PRESETS.galaxy));
     const beamAt = (tick: number, pitch: number, sustain: number) => galaxy.update(tick, { ...quietFeatures, pitch, sustain })
         .flatMap(batch => batch.emitters).find(e => e.effect === "beam")!;
@@ -71,12 +73,39 @@ test("galaxy maps sustained pitch to height and length while stage limits chord 
     expect(high.variables.length).toBeGreaterThan(low.variables.length);
     expect(high.variables.height_delta).toBeCloseTo(low.offset.y - high.offset.y);
 
+    expect(high.variables.silk).toBe(1);
+});
+
+test("neon remains anchored while stage reserves its fan and sparks for a sustained crest", () => {
+    const neon = new VfxPresetPlayer(validateVfxPreset(VFX_PRESETS.neon));
+    const rails = neon.update(16, { ...quietFeatures, sustain: 0.85 })[0].emitters;
+    const next = neon.update(32, { ...quietFeatures, sustain: 0.2 })[0].emitters;
+    expect(rails.map(e => e.offset)).toEqual(next.map(e => e.offset));
+    expect(rails).toHaveLength(4);
+    expect([...rails, ...next].every(e => e.particle === "shaft_upright" && e.variables.dir_y === 1)).toBe(true);
+    expect(rails.some(e => e.offset.x < -2)).toBe(true);
+    expect(rails.some(e => e.offset.x > 2)).toBe(true);
+    expect(next[0].variables.previous_length).toBeCloseTo(rails[0].variables.length);
+
+    const music = new VfxMusic();
     const stage = new VfxPresetPlayer(validateVfxPreset(VFX_PRESETS.stage));
-    const at = (tick: number, chord: number) => stage.update(tick, { ...quietFeatures, chord });
-    expect(at(0, 0).flatMap(batch => batch.emitters).some(e => e.effect === "ripple")).toBe(false);
-    const hit = at(4, 0.75);
-    expect(hit[0].emitters.map(e => e.effect)).toEqual(["ripple", "ripple", "ripple"]);
-    expect(at(8, 0.75)).toEqual([]);
+    const at = (tick: number) => stage.update(tick, music.sample(tick)).flatMap(batch => batch.emitters);
+    const flourish = (e: ReturnType<typeof at>[number]) => e.effect === "fountain" || e.variables.shaft_style === 1;
+    expect(at(0).some(flourish)).toBe(false);
+    for (const midi of [43, 55, 64, 70]) music.note(note(midi, 1, { duration: 0.1 }));
+    expect(at(4).some(flourish)).toBe(false);
+    let peak = 0;
+    let sparks = 0;
+    for (let tick = 8; tick <= 80; tick += 4) {
+        for (const midi of [43, 48, 55, 62, 69]) music.note(note(midi, tick));
+        const emitters = at(tick);
+        peak = Math.max(peak, ...emitters.filter(e => e.variables.shaft_style === 1).map(e => e.variables.length));
+        sparks += emitters.filter(e => e.effect === "fountain").length;
+    }
+    expect(peak).toBeGreaterThan(4);
+    expect(sparks).toBeGreaterThan(2);
+    for (let tick = 84; tick < 240; tick += 4) at(tick);
+    expect(at(240).some(flourish)).toBe(false);
 });
 
 test("all built-in presets respond to the deterministic music fixture with finite parameters", () => {

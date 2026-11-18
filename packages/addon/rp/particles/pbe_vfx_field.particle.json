@@ -46,7 +46,7 @@
           "((variable.vfx_size ?? 1) * (0.042 + 0.105 * math.pow(variable.particle_random_4, 2.6))) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
-          "texture_width": 256,
+          "texture_width": 512,
           "texture_height": 256,
           "uv": [
             "variable.particle_random_4 > 0.82 ? 32 : 0",

@@ -1,9 +1,11 @@
 import type { Vec3 } from "@domain/geometry/offsets";
 import { quietFeatures, type MusicFeatures } from "./vfxMusic";
+import { stageLights, stageVeils, VFX_LIGHT_LAYOUTS, VFX_VEIL_LAYOUTS, type VfxLayout } from "./vfxLighting";
 
 export const VFX_SCENES = ["field", "wave", "beam", "mix", "burst", "demo"] as const;
 export type VfxScene = typeof VFX_SCENES[number];
-export type VfxEffect = "field" | "wave" | "beam" | "ripple" | "fountain" | "curtain" | "orbit";
+export type VfxEffect = "field" | "wave" | "beam" | "ripple" | "fountain" | "curtain" | "orbit" | "shaft";
+export type VfxParticle = VfxEffect | "shaft_upright";
 
 export const VFX_LIMITS = {
     range: [0.65, 1.6],
@@ -34,6 +36,7 @@ export type NumericParameter = keyof typeof VFX_LIMITS;
 export type VfxOptions = Partial<Record<NumericParameter, number> & Record<`${VfxEffect}Color`, string>>;
 export interface VfxEmitter {
     effect: VfxEffect;
+    particle?: VfxParticle;
     offset: Vec3;
     variables: Record<string, number>;
     /** Upper bounds used only for reservations and diagnostics. */
@@ -46,9 +49,9 @@ export interface VfxCue {
     emitters: VfxEmitter[];
 }
 
-const palette: Record<VfxEffect, string> = {
+export const VFX_COLORS: Readonly<Record<VfxEffect, string>> = {
     field: "#A6B7FB", wave: "#79BCDD", beam: "#FFD8B2", ripple: "#8AE4DB",
-    fountain: "#FFDDA8", curtain: "#8C9EEF", orbit: "#D4A9FE",
+    fountain: "#FFDDA8", curtain: "#8C9EEF", orbit: "#D4A9FE", shaft: "#A8DFFF",
 };
 const origin = { x: 0, y: 0, z: 0 };
 const ticksPerSecond = 20;
@@ -71,7 +74,7 @@ export function validateVfxOptions(options: unknown): VfxOptions {
             if ((key === "lanes" || key === "segments") && !Number.isInteger(value)) {
                 throw new Error(`${key} 需要是整数`);
             }
-        } else if (!key.endsWith("Color") || !Object.hasOwn(palette, key.slice(0, -5)) ||
+        } else if (!key.endsWith("Color") || !Object.hasOwn(VFX_COLORS, key.slice(0, -5)) ||
             typeof value !== "string" || !/^#[a-f\d]{6}$/i.test(value)) {
             throw new Error(`无效参数 ${key}，颜色格式为 #RRGGBB`);
         }
@@ -80,7 +83,7 @@ export function validateVfxOptions(options: unknown): VfxOptions {
 }
 
 function tint(effect: VfxEffect, options: VfxOptions, opacity: number) {
-    const code = options[`${effect}Color`] ?? palette[effect];
+    const code = options[`${effect}Color`] ?? VFX_COLORS[effect];
     return {
         red: parseInt(code.slice(1, 3), 16) / 255,
         green: parseInt(code.slice(3, 5), 16) / 255,
@@ -136,7 +139,7 @@ function wave(options: VfxOptions, opacity: number, amplitude: number, life: num
     return emitters;
 }
 
-function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst: boolean, previous = options): VfxEmitter[] {
+function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst: boolean, previous = options, silk = false): VfxEmitter[] {
     const range = options.range ?? 1;
     const life = 2.7 / (options.speed ?? 1);
     const lanes = options.lanes ?? defaultLanes;
@@ -158,7 +161,8 @@ function beam(options: VfxOptions, opacity: number, defaultLanes: number, burst:
                     span: (burst ? 2.75 : 4.8) * range, start: burst ? 0 : -2.4 * range,
                     bend: (options.bend ?? 0.56) * reverse,
                     length: (options.length ?? 1.36) * [1, 0.8, 0.55][segment],
-                    width: (options.width ?? 0.16) * (options.size ?? 1),
+                    width: (options.width ?? 0.16) * (options.size ?? 1) * (silk ? 2.2 : 1),
+                    silk: Number(silk),
                     life, delay: delay / ticksPerSecond, height_delta: (previous.height ?? 0) - (options.height ?? 0),
                     around: around ? 1 : 0, arc_phase: 35 + 360 / lanes * lane,
                     arc_sweep: (burst ? 136 : 212) * reverse,
@@ -199,8 +203,27 @@ function fountain(options: VfxOptions): VfxEmitter[] {
     }));
 }
 
-function curtain(options: VfxOptions): VfxEmitter[] {
+function curtain(options: VfxOptions, context: VfxEffectContext): VfxEmitter[] {
     const range = options.range ?? 1;
+    const layout = context.layout;
+    if (layout === "aurora" || layout === "wings") {
+        const length = options.length ?? 1.4;
+        const previous = context.previous.length ?? length;
+        const life = layout === "aurora" ? 2.4 : 1.8;
+        return stageVeils[layout].map(anchor => ({
+            effect: "curtain",
+            offset: { x: anchor.origin.x * range, y: anchor.origin.y + (options.height ?? 0), z: anchor.origin.z * range },
+            particles: 1,
+            lifetime: life,
+            variables: {
+                ...tint("curtain", options, anchor.gain),
+                life, phase: anchor.phase + (options.phase ?? 0), speed: options.speed ?? 1,
+                length: length * anchor.rise, previous_length: previous * anchor.rise,
+                width: (options.width ?? 0.22) * (options.size ?? 1) * anchor.span,
+                sheet: layout === "aurora" ? 1 : 2, roll: anchor.roll,
+            },
+        }));
+    }
     const life = 1.38;
     const columns = Math.max(2, Math.round(4 * (options.density ?? 1)));
     return Array.from({ length: 2 * columns }, (_, index) => {
@@ -215,6 +238,9 @@ function curtain(options: VfxOptions): VfxEmitter[] {
                 phase: index * 44 + (options.phase ?? 0), speed: options.speed ?? 1,
                 length: (options.length ?? 1.4) * (0.68 + 0.32 * Math.cos(z * 0.8)),
                 width: (options.width ?? 0.14) * (options.size ?? 1),
+                previous_length: 1.4,
+                sheet: 0,
+                roll: 0,
             },
         };
     });
@@ -233,17 +259,53 @@ function orbit(options: VfxOptions): VfxEmitter[] {
     }];
 }
 
+function shaft(options: VfxOptions, context: VfxEffectContext): VfxEmitter[] {
+    const range = options.range ?? 1;
+    const length = options.length ?? 1.45;
+    const previousLength = context.previous.length ?? length;
+    const life = 1.6;
+    const layout = context.layout === "aurora" || context.layout === "wings" ? "rails" : context.layout ?? "rails";
+    const upright = layout === "neon-sides" || layout === "neon-rear";
+    return stageLights[layout].map(anchor => {
+        const { x, y, z } = anchor.direction;
+        const magnitude = Math.hypot(x, y, z);
+        const haze = layout === "fan";
+        return {
+            effect: "shaft",
+            ...(upright ? { particle: "shaft_upright" as const } : {}),
+            offset: {
+                x: anchor.origin.x * range,
+                y: anchor.origin.y + (options.height ?? 0),
+                z: anchor.origin.z * range,
+            },
+            particles: 1,
+            lifetime: life,
+            variables: {
+                ...tint("shaft", options, anchor.gain),
+                life, length: length * anchor.length, previous_length: previousLength * anchor.length,
+                width: (options.width ?? 0.15) * (options.size ?? 1) * anchor.width *
+                    (haze ? 2.65 : layout === "rails" ? 1.4 : 1),
+                shaft_style: layout === "truss" ? 2 : Number(haze),
+                dir_x: x / magnitude, dir_y: y / magnitude, dir_z: z / magnitude,
+            },
+        };
+    });
+}
+
 export type VfxMode = "autonomous" | "trigger" | "continuous";
 export type VfxCategory = "atmosphere" | "line" | "surface" | "stage" | "geometry";
 export interface VfxEffectContext {
     music: Readonly<MusicFeatures>;
     previous: VfxOptions;
+    layout?: VfxLayout;
+    profile?: "silk";
 }
 interface VfxDefinition {
     category: VfxCategory;
     mode: VfxMode;
     interval: number;
     options: readonly NumericParameter[];
+    layouts?: readonly VfxLayout[];
     emit(options: VfxOptions, context: VfxEffectContext): VfxEmitter[];
 }
 const stageOptions = ["range", "height", "opacity", "size", "speed", "density"] as const;
@@ -257,15 +319,17 @@ export const VFX_EFFECTS: Record<VfxEffect, VfxDefinition> = {
         emit: (o, c) => wave(o, 1, 1, 2.35, c.previous) },
     beam: { category: "line", mode: "continuous", interval: 24,
         options: [...stageOptions, "heading", "length", "width", "bend", "lanes", "segments"],
-        emit: (o, c) => beam({ lanes: 2, segments: 2, ...o }, 0.73, 2, false, c.previous) },
+        emit: (o, c) => beam({ lanes: 2, segments: 2, ...o }, 0.73, 2, false, c.previous, c.profile === "silk") },
     ripple: { category: "geometry", mode: "trigger", interval: 16, options: stageOptions,
         emit: (o, c) => ripple(o, c.music) },
     fountain: { category: "stage", mode: "continuous", interval: 18, options: stageOptions,
         emit: fountain },
     curtain: { category: "surface", mode: "continuous", interval: 18,
-        options: [...stageOptions, "length", "width", "phase"], emit: curtain },
+        options: [...stageOptions, "length", "width", "phase"], layouts: VFX_VEIL_LAYOUTS, emit: curtain },
     orbit: { category: "geometry", mode: "autonomous", interval: 35,
         options: [...stageOptions, "phase"], emit: orbit },
+    shaft: { category: "stage", mode: "continuous", interval: 16,
+        options: ["range", "height", "opacity", "size", "length", "width"], layouts: VFX_LIGHT_LAYOUTS, emit: shaft },
 };
 
 export function effectEmitters(effect: VfxEffect, options: VfxOptions, context: VfxEffectContext = {

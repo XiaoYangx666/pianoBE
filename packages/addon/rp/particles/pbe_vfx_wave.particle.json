@@ -43,7 +43,7 @@
           "0.72 * ((variable.vfx_radius ?? 0.109)) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
-          "texture_width": 256,
+          "texture_width": 512,
           "texture_height": 256,
           "uv": [
             64,

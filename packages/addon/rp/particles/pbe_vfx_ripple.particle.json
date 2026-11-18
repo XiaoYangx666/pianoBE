@@ -32,7 +32,7 @@
           "((variable.vfx_radius ?? 2.15) * (0.16 + 0.84 * math.pow(math.clamp(variable.particle_age / variable.particle_lifetime, 0, 1), 0.65)) * (variable.vfx_size ?? 1) * (variable.vfx_stage_depth ?? 1)) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
-          "texture_width": 256,
+          "texture_width": 512,
           "texture_height": 256,
           "uv": [
             0,

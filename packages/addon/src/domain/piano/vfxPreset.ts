@@ -2,6 +2,7 @@ import {
     effectEmitters, VFX_EFFECTS, VFX_LIMITS, validateVfxOptions, type NumericParameter,
     type VfxEffect, type VfxEmitter, type VfxMode, type VfxOptions,
 } from "./vfxLab";
+import type { VfxLayout } from "./vfxLighting";
 import { clampUnit, mix, quietFeatures, type MusicFeatures } from "./vfxMusic";
 
 const inputs = ["live", "phrase", "note", "chord", "dense", "solo"] as const;
@@ -20,6 +21,8 @@ interface VfxMapping {
 }
 interface VfxLayer {
     effect: VfxEffect;
+    layout?: VfxLayout;
+    profile?: "silk";
     mode?: VfxMode;
     priority?: number;
     options?: VfxOptions;
@@ -35,44 +38,53 @@ export interface VfxPreset {
 
 export const VFX_PRESETS: Record<string, VfxPreset> = {
     galaxy: { layers: [
-        { effect: "field", mode: "continuous", map: [
-            { input: "activity", parameter: "intensity", from: 0.36, to: 0.9 },
-            { input: "velocity", parameter: "speed", from: 0.55, to: 1.25 },
+        { effect: "field", mode: "continuous", options: { range: 1.26, size: 0.72, density: 0.86, fieldColor: "#9EBCFF" }, map: [
+            { input: "activity", parameter: "intensity", from: 0.46, to: 0.83 },
+            { input: "sustain", parameter: "speed", from: 0.62, to: 0.9 },
         ] },
-        { effect: "beam", priority: 3, options: { width: 0.085, lanes: 1, beamColor: "#C1B9FD" }, map: [
-            { input: "pitch", parameter: "height", from: -0.5, to: 0.85 },
-            { input: "sustain", parameter: "length", from: 0.65, to: 1.85 },
-            { input: "activity", parameter: "intensity", from: 0.09, to: 0.7 },
+        { effect: "curtain", layout: "aurora", options: { width: 0.26, speed: 0.52, curtainColor: "#9CBAFF" }, map: [
+            { input: "activity", parameter: "intensity", from: 0.58, to: 0.85 },
+            { input: "sustain", parameter: "length", from: 1.12, to: 1.45 },
         ] },
-        { effect: "orbit", options: { density: 0.6, intensity: 0.52 } },
+        { effect: "beam", profile: "silk", priority: 3, options: { x: 2.67, z: 0.21, heading: 82, bend: 0.64, range: 1.18,
+            width: 0.23, lanes: 1, segments: 3, speed: 0.7, beamColor: "#A0CAFF" }, map: [
+            { input: "pitch", parameter: "height", from: -0.4, to: 0.62 },
+            { input: "sustain", parameter: "length", from: 1.72, to: 2.39 },
+            { input: "activity", parameter: "intensity", from: 0.46, to: 0.96 },
+        ] },
+        { effect: "beam", profile: "silk", options: { x: -2.86, z: 0.48, y: 0.66, heading: -102, bend: 0.86, range: 1.28,
+            width: 0.26, lanes: 1, segments: 2, speed: 0.56, beamColor: "#AF8AF6" }, map: [
+            { input: "sustain", parameter: "length", from: 1.52, to: 2.4 },
+            { input: "activity", parameter: "intensity", from: 0.4, to: 0.73 },
+        ] },
     ] },
     neon: { layers: [
-        { effect: "wave", priority: 3, options: { intensity: 0.81 }, map: [
-            { input: "density", parameter: "amplitude", from: 0.14, to: 0.62 },
-            { input: "velocity", parameter: "opacity", from: 0.38, to: 0.82 },
+        { effect: "shaft", layout: "neon-sides", priority: 3, options: { width: 0.21, shaftColor: "#70CCFF" }, map: [
+            { input: "activity", parameter: "intensity", from: 0.25, to: 0.57 },
+            { input: "sustain", parameter: "length", from: 1.42, to: 1.96 },
         ] },
-        { effect: "beam", options: { beamColor: "#FFBAAD", width: 0.103 }, map: [
-            { input: "activity", parameter: "intensity", from: 0.16, to: 0.83 },
-            { input: "pitch", parameter: "height", from: -0.35, to: 0.72 },
-        ] },
-        { effect: "ripple", gate: "chord", priority: 5, options: { intensity: 0.67 }, map: [
-            { input: "chord", parameter: "range", from: 0.88, to: 1.35 },
+        { effect: "shaft", layout: "neon-rear", options: { width: 0.18, shaftColor: "#B4A0FF" }, map: [
+            { input: "density", parameter: "intensity", from: 0.20, to: 0.47 },
+            { input: "density", parameter: "length", from: 1.72, to: 2.15 },
         ] },
     ] },
     stage: { layers: [
-        { effect: "fountain", priority: 3, map: [
-            { input: "density", parameter: "speed", from: 0.6, to: 1.36 },
-            { input: "density", parameter: "density", from: 0.4, to: 1.25 },
-            { input: "activity", parameter: "intensity", from: 0.06, to: 0.92 },
+        { effect: "curtain", layout: "wings", options: { width: 0.25, speed: 0.65, curtainColor: "#FFAD65" }, map: [
+            { input: "surge", parameter: "length", from: 0.68, to: 2.31 },
+            { input: "surge", parameter: "intensity", from: 0.07, to: 0.91 },
         ] },
-        { effect: "curtain", options: { curtainColor: "#9B97DD" }, map: [
-            { input: "density", parameter: "length", from: 0.58, to: 2.08 },
-            { input: "activity", parameter: "intensity", from: 0.22, to: 0.8 },
-            { input: "high", parameter: "speed", from: 0.64, to: 1.42 },
+        { effect: "shaft", layout: "backline", options: { z: 0.1, width: 0.26, shaftColor: "#B57BE4" }, map: [
+            { input: "activity", parameter: "intensity", from: 0.20, to: 0.49 },
+            { input: "surge", parameter: "length", from: 1.38, to: 2.35 },
         ] },
-        { effect: "ripple", gate: "chord", priority: 5, map: [
-            { input: "low", parameter: "range", from: 0.7, to: 1.42 },
-            { input: "chord", parameter: "intensity", from: 0.4, to: 0.73 },
+        { effect: "shaft", layout: "fan", priority: 3, options: { width: 0.24, shaftColor: "#FFB467" }, map: [
+            { input: "surge", parameter: "length", from: 0.46, to: 2.4 },
+            { input: "surge", parameter: "intensity", from: 0.0, to: 1.0 },
+        ] },
+        { effect: "fountain", options: { z: 2.61, range: 1.18, size: 0.8, fountainColor: "#FFB37A" }, map: [
+            { input: "surge", parameter: "intensity", from: 0, to: 0.62 },
+            { input: "surge", parameter: "density", from: 0.4, to: 0.92 },
+            { input: "surge", parameter: "speed", from: 0.64, to: 1.22 },
         ] },
     ] },
 };
@@ -111,11 +123,14 @@ export function validateVfxPreset(value: unknown): VfxPreset {
         fadeIn: fadeIn === undefined ? undefined : bounded(fadeIn, 0, 4, "fadeIn"),
         fadeOut: fadeOut === undefined ? undefined : bounded(fadeOut, 0, 4, "fadeOut"),
         layers: layers.map(layer => {
-            const { effect, mode, options, map, priority, gate } = record(layer);
+            const { effect, mode, options, map, priority, gate, layout, profile } = record(layer);
             if (!isVfxEffect(effect)) throw new Error(`未知特效 ${effect}`);
             if (mode !== undefined && mode !== "autonomous" && mode !== "continuous" && mode !== "trigger") throw new Error("无效的 mode");
             if (gate !== undefined && gate !== "onset" && gate !== "chord") throw new Error("gate 需要是 onset 或 chord");
             if (map !== undefined && (!Array.isArray(map) || map.length > 6)) throw new Error("图层最多 6 个参数映射");
+            const validLayout = VFX_EFFECTS[effect].layouts?.find(item => item === layout);
+            if (layout !== undefined && !validLayout) throw new Error("无效的图层布局");
+            if (profile !== undefined && (effect !== "beam" || profile !== "silk")) throw new Error("无效的流光纹理");
             const parameters = new Set<string>();
             const validatedMap = map?.map(value => {
                 const { input, parameter, from, to } = record(value);
@@ -130,7 +145,7 @@ export function validateVfxPreset(value: unknown): VfxPreset {
                 return { input: input as keyof MusicFeatures, parameter: parameter as NumericParameter,
                     from: bounded(from, min, max, "from"), to: bounded(to, min, max, "to") };
             });
-            return { effect, mode, gate, map: validatedMap,
+            return { effect, mode, gate, layout: validLayout, profile, map: validatedMap,
                 priority: priority === undefined ? undefined : bounded(priority, 0, 5, "priority"),
                 options: options === undefined ? undefined : validateEffectOptions(effect, options) };
         }),
@@ -182,9 +197,12 @@ export class VfxPresetPlayer {
                 options[mapping.parameter] = mix(mapping.from, mapping.to, weight);
             }
             options.intensity = envelope * (options.intensity ?? 1);
+            if (options.intensity < 0.005) continue;
             const emitters = effectEmitters(layer.effect, options, {
                 music: mode === "autonomous" ? quietFeatures : music,
                 previous: state.previous ?? options,
+                layout: layer.layout,
+                profile: layer.profile,
             });
             state.next = tick + effect.interval;
             state.previous = options;

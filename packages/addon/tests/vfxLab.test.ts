@@ -104,12 +104,26 @@ test("particle documents reference the original atlas and declare only supplied 
         const document = JSON.parse(source).particle_effect;
         expect(document.description.identifier).toBe(`pbe:vfx_${effect}`);
         expect(document.description.basic_render_parameters.texture).toBe("textures/particle/vfx_lab");
-        const uv = document.components["minecraft:particle_appearance_billboard"].uv;
+        const billboard = document.components["minecraft:particle_appearance_billboard"];
+        const uv = billboard.uv;
+        if (effect === "beam" || effect === "shaft") {
+            expect(billboard.direction.mode).toBe("custom");
+            expect(billboard.direction.custom_direction).toHaveLength(3);
+        }
         expect([uv.texture_width, uv.texture_height]).toEqual([width, height]);
-        const origins = effect === "field" ? [[0, 0], [32, 0]] : [uv.uv];
-        for (const [u, v] of origins) {
-            expect(u + uv.uv_size[0]).toBeLessThanOrEqual(width);
-            expect(v + uv.uv_size[1]).toBeLessThanOrEqual(height);
+        // Generated atlas switches list literal alternatives in descending variant order.
+        function coordinate(value: number | string, variant: number) {
+            if (typeof value === "number") return value;
+            const choices = [...value.matchAll(/\? (\d+)|: (\d+)\)*$/g)]
+                .map(match => Number(match[1] ?? match[2])).reverse();
+            expect(choices.length).toBeGreaterThan(1);
+            return choices[Math.min(variant, choices.length - 1)];
+        }
+        for (const variant of [0, 1, 2]) {
+            const [u, v] = uv.uv.map((value: number | string) => coordinate(value, variant));
+            const [w, h] = uv.uv_size.map((value: number | string) => coordinate(value, variant));
+            expect(u + w).toBeLessThanOrEqual(width);
+            expect(v + h).toBeLessThanOrEqual(height);
         }
         const variables = new Set(Object.keys(effectEmitters(effect, {})[0].variables));
         variables.add("right_x").add("right_z").add("scale").add("stage_depth");

@@ -1,4 +1,4 @@
-import { GRAND_PARTS } from "@data/grand.generated";
+import { GRAND_PARTS } from "../../data/grand.generated";
 
 /** Definitions describe an assembly relative to its anchor; positions are world-specific. */
 export interface InstrumentDefinition {

@@ -8,7 +8,9 @@
 | Effect | `domain/piano/vfxLab.ts` 的 `VFX_EFFECTS` | 分类、支持参数、默认运行模式、发射间隔，以及根据局部坐标和参数输出的发射描述 |
 | Preset | `domain/piano/vfxPreset.ts` | 图层、默认值、强度、优先级、音乐映射和进入退出包络 |
 | Music Reactive | `domain/piano/vfxMusic.ts` | 把同一架琴的演奏事件聚合为可采样的音乐特征 |
-| 预览适配 | `app/vfxLab.ts`、`platform/vfxParticle.ts` | 预览会话、运行时订阅、限额和朝向转换；最后调用 Bedrock 粒子系统 |
+| 布局 | `vfxLighting.ts`、`vfxStage.ts` | 排练锚点、朝向、琴尾深度、世界坐标与 Molang 输入 |
+| 预留与调度 | `vfxBudget.ts` | 在游戏刻上接收优先级批次，按寿命预留，每架琴每刻最多提交六个发射器 |
+| 宿主适配 | `app/vfxLab.ts`、`platform/vfxParticle.ts`、`packages/web/src/vfxLab/` | 游戏连接手弹/MIDI 和 Script API，Web 用同一批次驱动 Wintersky 与自由相机 |
 | Performance | `VfxPresetPlayer.update(tick, music)` 与 `effectEmitters` | 将来可由外部演出时钟调用的入口 |
 
 传统主题继续由原有 `summonParticle` 和七种粒子设置驱动。Lab 在预览启动后订阅同一架琴的 `PianoRuntime.noteSignal` 和 `transportSignal`。每个预览拥有独立特征聚合器。停止、自然到期、卸载或拆琴时解除订阅。没有活跃预览时，定时调度停止。
@@ -27,6 +29,7 @@
 | `pitch` | 按力度加权的活跃音高，在 88 键范围归一化 |
 | `low` / `middle` / `high` | 活跃音在三个音区的加权比例 |
 | `sustain` | 从最长的活跃音时值取样，用 1.7 秒作为映射高端 |
+| `surge` | 以密度为主、活动度为辅，有门槛与额外攻放平滑，驱动高能段逐渐展开 |
 | `onset` / `chord` | 当前窗的新音数量与同组不同音高数。三个不同音高起算和弦，均有上限 |
 
 密度表示当前事件有多密，舞台高潮由未来的演出提示和时间轴决定。
@@ -47,4 +50,6 @@ Script API 在创建发射器时提供 Molang 参数。持续音乐响应使用�
 2. 在 `VFX_EFFECTS` 注册分类、模式、间隔、可用参数和纯发射工厂。发射描述给出局部位置、Molang 参数、预计粒子上限和寿命。Lab 列出并直接预览注册项。
 3. 在预设里定义响应映射，并为重点图层声明相对优先级。运行图集检查、资源验证和映射测试后进入游戏观察。
 
-未来 Performance 层可以用乐曲时间选择预设、对图层参数自动化、叠加人工高潮，或在提示点调用 `effectEmitters` 发出一次效果。它可以复用现在的事件聚合器和声明式映射。`VfxPresetPlayer` 接收外部 tick、音乐特征，返回待调度的优先级批次。Bedrock 调度、粒子预算、会话解绑继续由宿主适配层持有；PBE2 乐曲协议保持原样。
+未来 Performance 层可以用乐曲时间选择预设、对图层参数自动化、叠加人工高潮，或在提示点调用 `effectEmitters` 发出一次效果。`VfxPresetPlayer` 接收外部 tick、音乐特征，返回交给 `VfxBudget` 的优先级批次。宿主保有自己的演出会话、时钟与音符订阅，发射后分别调用基岩版与 Web 粒子渲染器。PBE2 乐曲协议保持原样。
+
+Web 用 20 Hz 游戏刻决定批次，以 40 Hz 推进客户端粒子。跳转或修改参数时重建最近 11 秒的演奏与粒子历史，固定短乐句从起点复现。在独立截图入口中固定随机种子、时间和相机。Web 可按乐曲长度延展未指定时长的预设，游戏脚本仍以 45 秒为默认启动时长。

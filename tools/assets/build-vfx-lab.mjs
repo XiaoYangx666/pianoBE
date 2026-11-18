@@ -5,7 +5,7 @@ import { deflateSync } from "node:zlib";
 
 const root = new URL("../../packages/addon/rp/", import.meta.url);
 const check = process.argv.includes("--check");
-const width = 256;
+const width = 512;
 const height = 256;
 const texture = "textures/particle/vfx_lab";
 const tiles = {
@@ -16,6 +16,13 @@ const tiles = {
     spark: [128, 0, 32, 32],
     beam: [0, 48, 256, 48],
     ripple: [0, 104, 128, 128],
+    shaft: [128, 109, 128, 64],
+    haze: [128, 225, 128, 30],
+    flow: [128, 175, 128, 48],
+    aurora: [256, 0, 256, 112],
+    drape: [256, 112, 256, 92],
+    bar: [256, 204, 256, 48],
+    upright: [164, 2, 48, 44],
 };
 
 function write(path, contents) {
@@ -47,10 +54,11 @@ function paint([left, top, w, h], emissive, profile) {
             const v = (y + 0.5) / h * 2 - 1;
             const [light, alpha] = profile(u, v);
             const index = (top + y) * (width * 4 + 1) + (left + x) * 4 + 1;
-            pixels.fill(Math.round(clamp(light) * 255), index, index + 3);
+            const channels = Array.isArray(light) ? light : [light, light, light];
+            for (const [channel, value] of channels.entries()) pixels[index + channel] = Math.round(clamp(value) * 255);
             pixels[index + 3] = Math.round(clamp(alpha) * 255);
             const green = (top + y) * (width * 3 + 1) + (left + x) * 3 + 2;
-            merPixels[green] = Math.round(255 * emissive * clamp(alpha) * clamp(light));
+            merPixels[green] = Math.round(255 * emissive * clamp(alpha) * Math.max(...channels.map(clamp)));
         }
     }
 }
@@ -103,6 +111,68 @@ paint(tiles.ripple, 0.35, (x, y) => {
         grooves * (0.78 * gaussian(radius - 0.78, 0.021) + 0.27 * gaussian(radius - 0.71, 0.033))
         * smooth((0.92 - radius) / 0.12)];
 });
+paint(tiles.shaft, 0.46, (x, y) => {
+    const reach = (x + 1) / 2;
+    const falloff = smooth(reach / 0.065) * smooth((1 - reach) / 0.42);
+    const cross = y / (0.48 + 0.42 * reach);
+    const core = gaussian(cross, 0.10);
+    const air = gaussian(cross, 0.38) * smooth((0.94 - Math.abs(y)) / 0.28);
+    return [0.79 + 0.21 * core, falloff * (0.67 * core + 0.48 * air) * (1 - reach * 0.55)];
+});
+paint(tiles.haze, 0.31, (x, y) => {
+    const reach = (x + 1) / 2;
+    const falloff = smooth(reach / 0.10) * smooth((1 - reach) / 0.60);
+    const cross = y / (0.38 + 0.53 * reach);
+    const core = gaussian(cross, 0.17);
+    const air = gaussian(cross, 0.43) * smooth((0.94 - Math.abs(y)) / 0.33);
+    return [0.85 + 0.15 * core, falloff * (0.26 * core + 0.61 * air) * (1 - reach * 0.38)];
+});
+paint(tiles.flow, 0.30, (x, y) => {
+    const end = smooth((1 - Math.abs(x)) / 0.57);
+    const ribbon = y - 0.17 * Math.sin((x + 0.2) * 3.0);
+    const fold = gaussian(ribbon + 0.12, 0.11);
+    const rim = gaussian(ribbon - 0.20, 0.057);
+    const air = gaussian(ribbon, 0.34);
+    return [0.85 + 0.15 * fold, end * (0.45 * fold + 0.29 * rim + 0.29 * air)];
+});
+paint(tiles.aurora, 0.25, (x, y) => {
+    const sweep = -0.09 + 0.26 * Math.sin(3.05 * x - 0.37) + 0.13 * Math.sin(6.4 * x + 1.45);
+    const v = y - sweep;
+    const shelf = 0.20 * Math.sin(4.0 * x + 0.75);
+    const mask = smooth((0.97 - Math.abs(x)) / 0.31) * smooth((0.93 - Math.abs(y)) / 0.40);
+    const folds = 0.76 + 0.14 * Math.sin(59 * x + 9 * v) + 0.10 * Math.sin(133 * x - 14 * v);
+    const arc = gaussian(v + 0.02, 0.052);
+    const echo = gaussian(v + 0.24 + shelf, 0.070);
+    const mist = gaussian(v - 0.12, 0.29) * folds;
+    const stream = gaussian(v - 0.40 - shelf * 0.33, 0.13) * (0.60 + 0.40 * Math.cos(8 * x));
+    const violet = smooth((x + 0.76 + 0.75 * v) / 1.52);
+    return [[0.38 + 0.39 * violet, 0.94 - 0.23 * violet, 0.88 + 0.12 * violet],
+        mask * (0.40 * arc + 0.27 * echo + 0.30 * mist + 0.19 * stream)];
+});
+paint(tiles.drape, 0.37, (x, y) => {
+    const elevation = (1 - y) / 2;
+    const folds = x - 0.11 * Math.sin(4.0 * y) + 0.08 * y;
+    const opening = 0.26 + 0.44 * elevation;
+    const filigree = gaussian(folds - opening, 0.045) + 0.77 * gaussian(folds + opening, 0.061);
+    const vertical = 0.62 + 0.25 * Math.cos(58 * folds + 5 * y) + 0.13 * Math.sin(127 * x + 11 * y);
+    const plume = gaussian(Math.abs(folds) - opening, 0.25) * vertical;
+    const gate = smooth(elevation / 0.105) * smooth((1 - elevation) / 0.42) * smooth((0.95 - Math.abs(x)) / 0.30);
+    return [[1, 0.67 + 0.25 * (1 - elevation), 0.58 + 0.33 * (1 - elevation)],
+        gate * (0.42 * filigree + 0.53 * plume)];
+});
+paint(tiles.bar, 0.55, (x, y) => {
+    const end = smooth((0.99 - Math.abs(x)) / 0.03);
+    const core = gaussian(y, 0.10);
+    const aura = gaussian(y, 0.34);
+    return [0.80 + 0.20 * core, end * (0.79 * core + 0.33 * aura)];
+});
+paint(tiles.upright, 0.14, (x, y) => {
+    const along = (1 - y) * 0.5;
+    const core = gaussian(x, 0.17);
+    const halo = gaussian(x, 0.37);
+    const ends = smooth(along / 0.09) * smooth((1 - along) / 0.22);
+    return [0.72 + 0.24 * core, ends * (0.72 * core + 0.21 * halo) * (1 - 0.20 * along)];
+});
 
 function chunk(type, data) {
     const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
@@ -149,6 +219,16 @@ const scaled = (expr) => `(${expr}) * ${param("scale", 1)}`;
 const position = (x, y, z) => rotate(x, y, z).map(scaled);
 const stageDepth = param("stage_depth", 1);
 const uv = ([x, y, w, h]) => ({ texture_width: width, texture_height: height, uv: [x, y], uv_size: [w, h] });
+function alternateUv(base, alternate, name) {
+    const coordinate = index => base[index] === alternate[index] ? base[index]
+        : `${param(name, 0)} > 0.5 ? ${alternate[index]} : ${base[index]}`;
+    return { ...uv(base), uv: [coordinate(0), coordinate(1)], uv_size: [coordinate(2), coordinate(3)] };
+}
+function thirdUv(base, middle, last, name) {
+    const coordinate = index => base[index] === middle[index] && middle[index] === last[index] ? base[index]
+        : `${param(name, 0)} > 1.5 ? ${last[index]} : (${param(name, 0)} > 0.5 ? ${middle[index]} : ${base[index]})`;
+    return { ...uv(base), uv: [coordinate(0), coordinate(1)], uv_size: [coordinate(2), coordinate(3)] };
+}
 const tint = ([r, g, b], alpha) => ({ color: [param("red", r), param("green", g), param("blue", b), `${param("opacity", 0.75)} * ${alpha}`] });
 const localSpace = { position: true, rotation: true };
 const point = { offset: [0, 0, 0] };
@@ -250,13 +330,13 @@ particle("beam", {
         size: [scaled(`0.5 * ${param("length", 1.36)} * (0.64 + 0.36 * math.sin(180 * ${progress}))`),
             scaled(`0.5 * ${param("width", 0.16)}`)],
         direction: {
-            mode: "custom_direction",
+            mode: "custom",
             custom_direction: rotate(
                 arcOrLine(`-(${arcSign}) * math.sin(${arcAngle})`, `${dirX} - (${crossSlope}) * ${dirZ}`),
                 arcOrLine(`(${arcSign}) * 0.59 * ${bend} * math.cos(${arcAngle} - 24) / ${arcRadius}`, lineSlopeY),
                 arcOrLine(`(${arcSign}) * math.cos(${arcAngle}) * ${arcDepth}`, `${dirZ} + (${crossSlope}) * ${dirX}`)),
         },
-        uv: uv(tiles.beam),
+        uv: alternateUv(tiles.beam, tiles.flow, "silk"),
     },
     "minecraft:particle_appearance_tinting": tint([1, 0.85, 0.70], fade(0.22, 0.53, elapsed, life)),
 });
@@ -293,20 +373,27 @@ particle("fountain", {
 
 const curtainLife = param("life", 1.38);
 const curtainPhase = `${param("phase", 0)} + 130 * ${param("speed", 1)} * ${age}`;
+const sheet = param("sheet", 0);
+const curtainLength = param("length", 1.4);
+const sheetHeight = `math.lerp(${param("previous_length", 1.4)}, ${curtainLength}, ${saturate(`${age} / 0.86`)})`;
+const curtainY = `${sheet} > 1.5 ? (0.5 * ${sheetHeight} + 0.08 * math.sin(${curtainPhase})) : (${sheet} > 0.5 ? 0.16 * math.sin(${curtainPhase}) : 0.16 * math.sin(${curtainPhase}) - 0.32 * ${age})`;
+const curtainX = `${sheet} > 0.5 ? 0.18 * math.cos(${curtainPhase}) : 0`;
 particle("curtain", {
     "minecraft:emitter_rate_instant": { num_particles: 1 },
     "minecraft:emitter_lifetime_once": { active_time: curtainLife },
     "minecraft:emitter_local_space": localSpace,
     "minecraft:emitter_shape_point": point,
-    "minecraft:particle_motion_parametric": { relative_position: position(0,
-        `0.16 * math.sin(${curtainPhase}) - 0.32 * ${age}`, `0.21 * math.cos(${curtainPhase})`) },
+    "minecraft:particle_initial_spin": { rotation: param("roll", 0) },
+    "minecraft:particle_motion_parametric": { relative_position: position(curtainX, curtainY,
+        `(${sheet} > 0.5 ? 0.14 : 0.21) * math.cos(${curtainPhase})`) },
     "minecraft:particle_lifetime_expression": { max_lifetime: curtainLife },
     "minecraft:particle_appearance_billboard": {
         facing_camera_mode: "lookat_y",
-        size: [scaled(`0.5 * ${param("width", 0.14)}`), scaled(`0.5 * ${param("length", 1.4)}`)],
-        uv: uv(tiles.curtain),
+        size: [scaled(`0.5 * ${param("width", 0.14)}`), scaled(`0.5 * (${sheet} > 0.5 ? ${sheetHeight} : ${curtainLength})`)],
+        uv: thirdUv(tiles.curtain, tiles.aurora, tiles.drape, "sheet"),
     },
-    "minecraft:particle_appearance_tinting": tint([0.55, 0.62, 0.94], fade(0.34, 0.52)),
+    "minecraft:particle_appearance_tinting": tint([0.55, 0.62, 0.94],
+        `(${sheet} > 0.5 ? ${fade(0.89, 0.89)} * (0.79 + 0.14 * math.sin(${curtainPhase})) : ${fade(0.34, 0.52)})`),
 });
 
 const orbitLife = param("life", 2.45);
@@ -327,6 +414,41 @@ particle("orbit", {
         facing_camera_mode: "rotate_xyz", size: [orbitSize, orbitSize], uv: uv(tiles.glint),
     },
     "minecraft:particle_appearance_tinting": tint([0.83, 0.66, 0.99], fade(0.38, 0.6)),
+});
+
+const shaftLife = param("life", 1.6);
+const shaftLength = `math.lerp(${param("previous_length", 2)}, ${param("length", 2)}, ${saturate(`${age} / 0.8`)})`;
+const shaftDirection = [param("dir_x", 0), param("dir_y", 1), param("dir_z", 0)];
+particle("shaft_upright", {
+    "minecraft:emitter_rate_instant": { num_particles: 1 },
+    "minecraft:emitter_lifetime_once": { active_time: shaftLife },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_motion_parametric": { relative_position: position(0, `0.5 * (${shaftLength})`, 0) },
+    "minecraft:particle_lifetime_expression": { max_lifetime: shaftLife },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "lookat_y",
+        size: [scaled(`0.5 * ${param("width", 0.15)}`), scaled(`0.5 * (${shaftLength})`)],
+        uv: uv(tiles.upright),
+    },
+    "minecraft:particle_appearance_tinting": tint([0.66, 0.87, 1], fade(0.8, 0.8)),
+});
+particle("shaft", {
+    "minecraft:emitter_rate_instant": { num_particles: 1 },
+    "minecraft:emitter_lifetime_once": { active_time: shaftLife },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_motion_parametric": {
+        relative_position: position(...shaftDirection.map(axis => `0.5 * (${shaftLength}) * (${axis})`)),
+    },
+    "minecraft:particle_lifetime_expression": { max_lifetime: shaftLife },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "lookat_direction",
+        size: [scaled(`0.5 * (${shaftLength})`), scaled(`0.5 * ${param("width", 0.15)}`)],
+        direction: { mode: "custom", custom_direction: rotate(...shaftDirection) },
+        uv: thirdUv(tiles.shaft, tiles.haze, tiles.bar, "shaft_style"),
+    },
+    "minecraft:particle_appearance_tinting": tint([0.66, 0.87, 1], fade(0.8, 0.8)),
 });
 
 console.log(check ? "VFX Lab: checked particles, RGBA atlas and emissive texture set" : "VFX Lab: built particles, RGBA atlas and emissive texture set");

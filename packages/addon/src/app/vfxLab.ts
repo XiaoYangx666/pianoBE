@@ -1,6 +1,7 @@
 import { Player, ScriptEventSource, system } from "@minecraft/server";
-import { parseVfxOptions, planVfxScene, VFX_EFFECTS, VFX_SCENES, VFX_EMITTERS_PER_TICK,
-    type VfxCue, type VfxEmitter, type VfxOptions, type VfxScene } from "@domain/piano/vfxLab";
+import { parseVfxOptions, planVfxScene, VFX_EFFECTS, VFX_SCENES,
+    type VfxCue, type VfxOptions, type VfxScene } from "@domain/piano/vfxLab";
+import { VFX_MAX_PIANOS, VfxBudget } from "@domain/piano/vfxBudget";
 import { quietFeatures, simulatedVfxNotes, VfxMusic, type MusicFeatures } from "@domain/piano/vfxMusic";
 import { isVfxEffect, validateEffectOptions, validateVfxPreset, vfxInput, VFX_PRESETS, VfxPresetPlayer,
     type VfxBatch, type VfxInput, type VfxPreset } from "@domain/piano/vfxPreset";
@@ -20,14 +21,10 @@ interface Preview {
     ended: boolean;
     start: number;
     duration: number;
-    pending: { priority: number; emitters: VfxEmitter[]; index: number }[];
-    live: { expires: number; particles: number }[];
-    reserved: number;
+    budget: VfxBudget;
     features: Readonly<MusicFeatures>;
 }
 
-const maxPianos = 4;
-const maxParticlesPerPiano = 275;
 const previews = new Map<string, Preview>();
 let timer: number | undefined;
 let sent = 0;
@@ -36,18 +33,11 @@ let dropped = 0;
 let peakCalls = 0;
 let peakMs = 0;
 
-function clearPending(preview: Preview) {
-    for (const batch of preview.pending) {
-        for (let i = batch.index; i < batch.emitters.length; i++) preview.reserved -= batch.emitters[i].particles;
-    }
-    preview.pending.length = 0;
-}
-
 function stop(preview: Preview) {
     preview.ended = true;
     preview.producer?.detach?.();
     preview.producer = undefined;
-    clearPending(preview);
+    preview.budget.clearPending();
 }
 
 function createProducer(preview: Preview): NonNullable<Preview["producer"]> | undefined {
@@ -79,7 +69,7 @@ function createProducer(preview: Preview): NonNullable<Preview["producer"]> | un
         piano.transportSignal.subscribe(event => {
             music.transport(event);
             if (event.type !== "resume" && event.type !== "start") {
-                clearPending(preview);
+                preview.budget.clearPending();
                 player.reset(system.currentTick - preview.start);
             }
         }),
@@ -98,60 +88,35 @@ function createProducer(preview: Preview): NonNullable<Preview["producer"]> | un
     };
 }
 
-function enqueue(preview: Preview, candidates: VfxBatch[]) {
-    for (const candidate of candidates) {
-        const cost = candidate.emitters.reduce((sum, emitter) => sum + emitter.particles, 0);
-        if (preview.reserved + cost > maxParticlesPerPiano) {
-            // Evict only complete, lower-priority batches. An in-progress wave must not lose columns.
-            for (let i = preview.pending.length - 1; i >= 0 && preview.reserved + cost > maxParticlesPerPiano; i--) {
-                const pending = preview.pending[i];
-                if (pending.index || pending.priority >= candidate.priority) continue;
-                preview.pending.splice(i, 1);
-                preview.reserved -= pending.emitters.reduce((sum, emitter) => sum + emitter.particles, 0);
-                dropped++;
-            }
-        }
-        if (preview.reserved + cost > maxParticlesPerPiano) { dropped++; continue; }
-        preview.reserved += cost;
-        preview.pending.push({ ...candidate, index: 0 });
-    }
-    if (candidates.length) preview.pending.sort((a, b) => b.priority - a.priority);
-}
-
 function update() {
     const tick = system.currentTick;
     const started = Date.now();
     let calls = 0;
     for (const [key, preview] of previews) {
-        preview.live = preview.live.filter(entry => {
-            if (entry.expires > tick) return true;
-            preview.reserved -= entry.particles;
-            return false;
-        });
+        preview.budget.expire(tick);
         const elapsed = tick - preview.start;
         if (!preview.ended && (elapsed === 0 || tick % 20 === 0) && inspectInstrument(preview.location) !== "complete") stop(preview);
         if (!preview.ended && elapsed >= 0) {
             try {
                 preview.producer ??= createProducer(preview);
                 if (!preview.producer || elapsed >= preview.duration) stop(preview);
-                else enqueue(preview, preview.producer.update(tick, elapsed));
-                for (let count = 0; count < VFX_EMITTERS_PER_TICK && preview.pending.length; count++) {
-                    const batch = preview.pending[0];
-                    const emitter = batch.emitters[batch.index];
+                else {
+                    const before = preview.budget.dropped;
+                    preview.budget.enqueue(preview.producer.update(tick, elapsed));
+                    dropped += preview.budget.dropped - before;
+                }
+                preview.budget.dispatch(tick, emitter => {
                     calls++;
                     spawnVfxEmitter(preview.location, emitter, elapsed / 20);
-                    batch.index++;
-                    if (batch.index === batch.emitters.length) preview.pending.shift();
-                    preview.live.push({ expires: tick + Math.ceil(emitter.lifetime * 20) + 2, particles: emitter.particles });
                     sent++;
-                }
+                });
             } catch (error) {
                 failures++;
                 console.warn("[piano-vfx] 预览失败", error);
                 stop(preview);
             }
         }
-        if (preview.ended && !preview.live.length) previews.delete(key);
+        if (preview.ended && !preview.budget.active) previews.delete(key);
     }
     peakCalls = Math.max(peakCalls, calls);
     if (calls) peakMs = Math.max(peakMs, Date.now() - started);
@@ -164,12 +129,11 @@ function update() {
 function startPreview(location: InstrumentLocation, request: Request) {
     const key = instrumentKey(location.dimension, location.pos);
     const previous = previews.get(key);
-    if (!previous && previews.size >= maxPianos) throw new Error("已有 4 架琴占用预览预算，请等待粒子消退");
+    if (!previous && previews.size >= VFX_MAX_PIANOS) throw new Error("已有 4 架琴占用预览预算，请等待粒子消退");
     if (previous) stop(previous);
-    const live = previous?.live ?? [];
-    const start = live.reduce((latest, entry) => Math.max(latest, entry.expires), system.currentTick + 1);
-    previews.set(key, { location, request, start, duration: 0, ended: false, live, pending: [], features: quietFeatures,
-        reserved: live.reduce((sum, entry) => sum + entry.particles, 0) });
+    const budget = previous?.budget ?? new VfxBudget();
+    const start = budget.nextAvailableTick(system.currentTick + 1);
+    previews.set(key, { location, request, start, duration: 0, ended: false, budget, features: quietFeatures });
     timer ??= system.runInterval(update);
     return (start - system.currentTick - 1) / 20;
 }
@@ -180,8 +144,8 @@ function status() {
     let reserved = 0;
     for (const preview of previews.values()) {
         if (!preview.ended) active++;
-        emitters += preview.live.length;
-        reserved += preview.reserved;
+        emitters += preview.budget.active;
+        reserved += preview.budget.reserved;
     }
     return `预览 ${active} / ${previews.size} 架占用 · 发射批次 ${emitters} · 预留粒子 ${reserved} · 已提交 ${sent} · 预算丢弃 ${dropped} 批 · 失败 ${failures} · 峰值 ${peakCalls} 调用/刻，${peakMs} ms/发射刻`;
 }

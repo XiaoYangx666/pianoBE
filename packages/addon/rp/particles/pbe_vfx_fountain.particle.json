@@ -45,7 +45,7 @@
           "1.45 * ((0.036 + 0.035 * variable.particle_random_3) * (variable.vfx_size ?? 1)) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
-          "texture_width": 256,
+          "texture_width": 512,
           "texture_height": 256,
           "uv": [
             128,

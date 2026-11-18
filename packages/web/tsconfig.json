@@ -9,7 +9,8 @@
         "noEmit": true,
         "skipLibCheck": true,
         "useDefineForClassFields": true,
-        "types": ["vite/client"]
+        "types": ["vite/client"],
+        "paths": { "@domain/*": ["../addon/src/domain/*"] }
     },
     "include": ["src", "vite.config.ts"]
 }

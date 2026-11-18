@@ -1,5 +1,30 @@
 # PianoBE VFX Lab 视觉研究与设计
 
+## 舞台预设
+
+| 参考影像 | 构图观察与 PianoBE 转译 |
+| --- | --- |
+| [Ólafur Arnalds · 慕尼黑现场摄影](https://sonicboomevents.de/4040/olafur-arnalds) · [Harpa 现场 0:43](https://www.youtube.com/watch?v=Q4MBK2rs9lQ&t=43s) | 深色空间把钢琴和演奏者留在较小的亮区，纵向冷光从后面标出空间。Neon 把最亮的线留给侧翼，中央给琴和人。 |
+| [光·遇 AURORA 演出 1:59](https://www.youtube.com/watch?v=lzUg5ffOyOo&t=119s) | 入场段中，侧面高低不同的暗色轮廓保留纵深，光与散点沿同一个视觉方向流动。Galaxy 将上方星云、侧面丝带和点状星尘分层，保持暗处可见。 |
+| [Fortnite · Rift Tour](https://www.fortnite.com/rift-tour/) · [演出影像 2:38](https://www.youtube.com/watch?v=RiM0moNk74o&t=158s) | 大尺度背景和近处路径分别组织注意力，段落变化会改变空间角色。银河的流动主要发生在画面边缘，高能段则通过后景升起和向外展开改变轮廓。 |
+| [初音未来 Magical Mirai 2023 演出摘要 1:22](https://www.youtube.com/watch?v=BLUQVBWqzeo&t=82s) | 灯阵和屏幕以有限几何轮廓组织舞台，主角保持在留出的视觉窗口。Neon 用对称青蓝侧灯和淡紫背灯留出中央演奏区。 |
+| [Afterlife · Brooklyn Mirage 现场影像](https://www.after.life/newyork) · [Anyma · Sphere 演出 1:37](https://www.youtube.com/watch?v=QN2BgUsFq7A&t=97s) | 纵向形体和从两翼打开的光线扩大舞台尺度，Sphere 段落仍以明亮的人形对比暗色背景几何。Stage 在持续密集时才启用宽扇束和光幕，并缩短幕布寿命给休止留出退场空间。 |
+| [Shapescape · Minecraft Music Concert](https://www.youtube.com/watch?v=RE4m8Qr8XHs) | 约 0:56 的镜头里，实体或方块排成灯位和背屏，漂移粒子负责短拍触发。PianoBE 把持续形状交给有方向的大平面，把点粒子留给星尘或高潮火花。 |
+
+### 三套预设的形与动
+
+- **Galaxy** 的主画面是错开高度、滚转和深度的三张星云帷幕。冷青到紫蓝色来自图集，随演奏活动度改变光度。两个反向移动的丝带层从远近两侧穿过，延音拉长帷幕或丝带。星尘留在低亮度和小粒径。
+- **Neon** 用两组错层竖直灯柱框住演奏区。基岩版实机中，自定义方向的门架和导线出现交叉斜线，因此预设切换到固定竖轴的 Billboard，并单独压低贴图发光。音乐改变灯柱的延展和明暗。
+- **Stage** 保留低亮度紫色背灯。聚合后的密度和活动度越过阈值后，暖色幕布从两翼升起，扇束稍后随长短与亮度展开，琴尾区域少量火花强调高潮。稀疏段与短和弦保留安静基线，长间歇会使外展回落。
+
+### 预览器选型与可比范围
+
+[Snowstorm](https://github.com/JannisX11/snowstorm) 适合独立调整单个 Bedrock JSON，本身使用 [Wintersky](https://github.com/JannisX11/wintersky)。Lab 直接接入其 MIT 许可的渲染层，复用 MolangJS 执行项目粒子定义。Blockbench 可对单个效应和骨骼挂点做对照，项目里的多层预算、音符聚合和舞台锚点由两端共用的 PianoBE 代码计算。
+
+方向模式直接使用两端共同支持的 `custom`，向量字段为 `custom_direction`。适配器补齐向量初速的长度及连续发射的分数速率。浏览器使用实际 RGBA 图集、尺寸、运动和透明度曲线。世界照明、MER/Vibrant Visuals、客户端采样、混合与网络时序保留为实机检查项。排练台、演奏代理模型及环境布光提供固定观测条件。
+
+首次重做时，使用同一固定镜头回看发现，细线稿的 Neon 和 Stage 仍像画在空地上的调试效果。加上实体排练台后，重拍旧预设作对照。两侧门架、星云大形、暖色幕后纵深是随后加入的主要变化。回看同条件的弱奏与高潮后，压低台沿反光，并缩短 Stage 光幕存活时间以缩短退场。
+
 ## 作品与取舍
 
 | 参考 | 观察与转译 |
@@ -49,6 +74,6 @@
 
 ## 合成与资源
 
-七种效果共用一张原创 256 × 256 RGBA 图集。同尺寸的 MER 图集用绿通道标记自发光，光芯最强，半透明边缘逐渐变暗，透明区为零。Vibrant Visuals 通过粒子 Texture Set 读取发光图。波面及后景的发光低于光条，以保留亮度层次。粒子时间包络和纹理透明度分别计算。Billboard 的 `size` 按半宽和半高设置。[Microsoft Particle Effects](https://learn.microsoft.com/en-us/minecraft/creator/documents/particleeffects?view=minecraft-bedrock-stable) · [Vibrant Visuals Texture Sets](https://learn.microsoft.com/en-us/minecraft/creator/documents/vibrantvisuals/vvresourcepacks?view=minecraft-bedrock-stable)
+Lab 效果共用一张原创 512 × 256 RGBA 图集。同尺寸的 MER 图集用绿通道标记自发光，光芯最强，半透明边缘逐渐变暗，透明区为零。Vibrant Visuals 通过粒子 Texture Set 读取发光图。波面及后景的发光低于光条，粒子时间包络和纹理透明度分别计算。Billboard 的 `size` 按半宽和半高设置。[Microsoft Particle Effects](https://learn.microsoft.com/en-us/minecraft/creator/documents/particleeffects?view=minecraft-bedrock-stable) · [Vibrant Visuals Texture Sets](https://learn.microsoft.com/en-us/minecraft/creator/documents/vibrantvisuals/vvresourcepacks?view=minecraft-bedrock-stable)
 
 资料依据：[Microsoft 粒子介绍](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/particlesreference/particlesintroduction)、[组件文档](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/particlesreference/examples/particlecomponents/particle_effect?view=minecraft-bedrock-stable)、[Mojang 粒子组件和变量说明](https://mojang.github.io/bedrock-samples/Particles.html)、[Dimension.spawnParticle](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/dimension?view=minecraft-bedrock-stable)。

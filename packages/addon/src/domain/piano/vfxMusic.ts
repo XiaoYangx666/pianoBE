@@ -13,13 +13,14 @@ export interface MusicFeatures {
     middle: number;
     high: number;
     sustain: number;
+    surge: number;
     chord: number;
     onset: number;
 }
 
 export const quietFeatures: Readonly<MusicFeatures> = {
     density: 0, velocity: 100 / 127, dynamics: 0, activity: 0, pitch: 0.5,
-    low: 0, middle: 0, high: 0, sustain: 0, chord: 0, onset: 0,
+    low: 0, middle: 0, high: 0, sustain: 0, surge: 0, chord: 0, onset: 0,
 };
 
 /** One aggregator per enabled piano. State is bounded by the MIDI key range and game ticks. */
@@ -102,18 +103,21 @@ export class VfxMusic {
 
         const activeMean = activeCount ? activeVelocity / activeCount : quietFeatures.velocity;
         const density = clampUnit(count / 16);
+        const activity = clampUnit(weight / 4 + density * 0.45);
         const chord = this.chordSize >= 3 ? clampUnit((this.chordSize - 2) / 4) : 0;
         const target: MusicFeatures = {
             density, velocity: activeMean,
             dynamics: this.measured ? this.velocitySum / this.measured - quietFeatures.velocity : 0,
-            activity: clampUnit(weight / 4 + density * 0.45), pitch: weight ? pitch / weight : 0.5,
+            activity, pitch: weight ? pitch / weight : 0.5,
             low: weight ? low / weight : 0, middle: weight ? middle / weight : 0, high: weight ? high / weight : 0,
-            sustain, chord, onset: clampUnit(this.hits / 4),
+            sustain, surge: clampUnit((0.72 * density + 0.28 * activity - 0.31) / 0.38),
+            chord, onset: clampUnit(this.hits / 4),
         };
         this.clearAttacks();
         for (const key of Object.keys(target) as (keyof MusicFeatures)[]) {
             const old = this.values[key];
-            const tau = key === "pitch" ? 0.3 : target[key] > old ? 0.18 : 0.72;
+            const rising = target[key] > old;
+            const tau = key === "pitch" ? 0.3 : key === "surge" ? (rising ? 0.48 : 0.85) : (rising ? 0.18 : 0.72);
             this.values[key] = mix(old, target[key], 1 - Math.exp(-delta / tau));
         }
         // Chord/onset also carry a one-frame gate, separate from the smoothed continuous features.

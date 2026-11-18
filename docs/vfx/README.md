@@ -2,6 +2,27 @@
 
 [视觉研究、组件和引擎限制](design.md) · [音乐事件、映射和扩展接口](architecture.md)
 
+## Web 排练
+
+```powershell
+npm run dev:web
+```
+
+在命令打印的本机地址后访问 `/vfx-lab`（开发工具，不显示在管理页导航中）。选择三角钢琴或 P-88、朝向、舞台/演奏/自由视角。自由视角拖动旋转，滚轮拉近，右键拖动平移。排练台和场景布光是 Web 的观测环境，右侧可切换到平地。
+
+- 用标准乐句的弱奏、长音、和弦、高潮和回落提示定位。打开本地 MIDI 后，可在钢琴卷帘或时间条上跳转，设置循环首尾。音频用项目采样库播放。
+- 每个图层可显隐、调色、修改空间位置和音乐映射。已有映射的参数可直接调整映射范围。预设 JSON 导出后可粘贴到游戏里的 `compose` 或 `save` 命令。
+- 展开图层查看该效果的存活粒子、预算预留与近一秒发射次数。右侧可以打开网格、发射点和轨迹，验收画面时建议关闭。
+
+### 固定画面与版本对照
+
+```powershell
+node tools/assets/capture-vfx-lab.mjs
+node tools/assets/capture-vfx-lab.mjs --preset stage --time 8.7 --time 11.4 --piano p88 --direction east --view performer --out build/vfx-stage-p88
+```
+
+截图脚本使用本机 Chrome，可用 `--browser` 指定可执行文件。默认输出 1440 × 900 的三种预设，时间为 3.75 秒弱奏、8.70 秒高潮、11.40 秒回落，随图生成 `metrics.json`。加 `--flat` 可比较平地，在同一相机和素材条件下可用 `--presets path/to/presets.json` 载入旧版预设表。
+
 ## 在基岩版预览
 
 用仓库现有构建流程安装行为包和资源包。在有命令权限的世界里，站在 12 格内，准星对准 P-88 或三角钢琴的任意琴体方块。正 X 沿键列，正 Z 从演奏位指向琴体远端。默认舞台以琴体和标准演奏位的共同范围为中心，三角钢琴沿琴尾方向加长。可坐到琴凳，从第三人称检查左右翼、琴外侧和演奏者身后的轨迹。
@@ -21,9 +42,9 @@
 
 | 预设 | 联动 |
 | --- | --- |
-| `galaxy` · 梦幻星河 | 活跃度控制悬浮星尘的强弱，力度控制漂移。持续音的加权音高改变光带的高度，长音拉长光带。倾斜的星芒轨道作为低亮度底层持续运行。 |
-| `neon` · 霓虹音乐会 | 音符密度抬高波幅，力度调节波面透明度，光带跟随音区和活跃度。和弦触发层叠扩散的低位同心波纹。 |
-| `stage` · 高能舞台 | 密集段落逐渐加快并加密两侧喷泉，左右翼光幕拉长。高音区加快光幕运动，低音区影响和弦波纹的范围。休止后喷泉和光幕恢复到低强度。 |
+| `galaxy` · 梦幻星河 | 上方与后景是错层的青紫帷幕，琴体两侧是反向游动的丝带，稀疏星尘给出远近参照。长音牵引帷幕呼吸和丝带延展。 |
+| `neon` · 霓虹音乐会 | 六根固定的青蓝侧灯和淡紫背灯形成对称灯阵，按活动度、密度和延音缓慢改变长短与亮度。 |
+| `stage` · 高能舞台 | 后场紫色灯柱先确定空间，持续密集后，左右翼抬升暖色光幕并外展，火花仅作为高潮点缀。休止后光幕与扇束收回。 |
 
 `live` 接收这架琴的手弹和播放器 MIDI。启动后可用钢琴原来的播放器选曲、暂停、继续、拖动进度或切歌。`phrase` 固定轮播休止、琶音、长音、和弦和密集段。`note`、`chord`、`dense` 分别模拟单音、和弦和密集段。`solo` 将图层作为自主效果预览。模拟输入直接送入视觉分析。`status` 对准琴时还会显示当前密度、活跃度、力度、音高和延音值。
 
@@ -37,6 +58,8 @@
 ```
 
 最多六个图层，每个图层最多六条标量映射。预设默认 45 秒，可设置 5–180 秒。`compose` 直接试演，`save` 保存到当前世界，最多 12 个自定义预设。`list` 自动列出注册效果和已保存的预设。预览和预设命令要求玩家瞄准一架钢琴；列表和预设管理可直接运行。
+
+`shaft` 图层的 `layout` 可选 `rails`、`backline`、`fan`、`truss`、`neon-sides`、`neon-rear`，`curtain` 可选 `aurora`、`wings`。`beam` 的 `profile: "silk"` 使用柔边双丝贴图。布局与纹理选项位于图层本身，颜色和位置仍位于 `options`。
 
 ### 原有独立场景
 
@@ -78,7 +101,7 @@
 | `density` | 0.4–1.4 | 悬浮发射频率和波浪横向采样密度，波浪设有采样下限 |
 | `size` | 0.6–1.6 | 悬浮粒子尺寸、波线及光条粗细 |
 | `speed` | 0.5–1.8 | 悬浮漂移速度、行波角速度、光条穿场速度的乘数 |
-| `fieldColor` / `waveColor` / `beamColor` / `rippleColor` / `fountainColor` / `curtainColor` / `orbitColor` | `#RRGGBB` | 各效果色调 |
+| `fieldColor` / `waveColor` / `beamColor` / `rippleColor` / `fountainColor` / `curtainColor` / `orbitColor` / `shaftColor` | `#RRGGBB` | 各效果色调 |
 | `amplitude` | 0.08–1.1 格 | 波浪的基准振幅，默认 0.37 |
 | `period` | 1.2–6 秒 | 行波基准周期，默认 2.9 |
 | `wavelength` | 2.5–9 格 | 环形行波的目标波长，默认 5.2。就近匹配整数个周期使首尾相接 |
@@ -108,6 +131,8 @@ node tools/assets/build-vfx-lab.mjs --check
 npm run test -w @piano/addon
 npm run verify:addon-build
 ```
+
+本机安装用 `npm run build`。在开发世界分别对准三角钢琴与 P-88 运行 `/scriptevent pbe:vfx preset <galaxy|neon|stage> phrase`，等乐句完整走过休止、弱奏和高潮。第三人称绕到琴尾与演奏位两侧，观察 Neon 灯柱方向、光幕是否遮脸、扇束是否在休止收回。用 `live` 复测手弹、MIDI 暂停及切歌。标准图形和 Vibrant Visuals 分别检查一次透明遮挡、发光和亮度。四架琴同时运行时用 `/scriptevent pbe:vfx status` 观察预留、丢批、失败和峰值调用。
 
 最多四架琴同时占用预览槽，退场也计入槽位。每架琴每刻最多提交 6 个发射器，全局上限 24 个。每架琴的活跃与待发批次共预留最多 275 个粒子。预算紧张时优先保留高优先级批次和已开始的形状批次。`status` 可查看预留量、丢弃批数、发送峰值、脚本耗时和失败数。可以对四架琴分别运行 `preset stage dense`，再用 `status` 对照客户端帧率。客户端帧率需要在目标设备采样，脚本耗时可以用官方 profiler 进一步定位。[Minecraft Script Profiler](https://learn.microsoft.com/en-us/minecraft/creator/documents/scripting/script-performance?view=minecraft-bedrock-stable)
 
