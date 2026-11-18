@@ -1,4 +1,4 @@
-export type { MidiSong, MidiSongMeta, MidiTrack, MidiTrackInstrument, PlaylistMeta, NoteInfo } from "@piano/core";
+export type { MidiSong, MidiSongMeta, MidiTrack, MidiTrackInstrument, NoteInfo } from "@piano/core";
 
 export type Cardinal_Direction = "east" | "west" | "north" | "south";
 

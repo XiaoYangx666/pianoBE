@@ -25,6 +25,14 @@ export interface AmtResult {
     midi: Uint8Array<ArrayBuffer>;
     elapsedMs: number;
     log: string;
+    /** --events 统计到的 note-on 数量（仅供参考，最终以解析 MIDI 为准） */
+    noteCount: number;
+}
+
+export interface AmtProgress {
+    /** 已解码到的音频时间（秒） */
+    audioTime: number;
+    noteCount: number;
 }
 
 export class AmtUnavailableError extends Error {}
@@ -119,8 +127,14 @@ export class AmtService {
     /**
      * 转录一个本地音频文件，返回 MIDI 字节。
      * 调用方负责提供音频路径（临时文件也由调用方清理）。
+     *
+     * 通过 `--events` 读取 amt-cli 实时输出的音符事件，把「已解码音频时间」
+     * 作为进度回调；事件按音频时间推进，可用于长音频的百分比进度。
      */
-    async transcribe(audioPath: string): Promise<AmtResult> {
+    async transcribe(
+        audioPath: string,
+        options: { onProgress?: (progress: AmtProgress) => void } = {}
+    ): Promise<AmtResult> {
         const runtime = this.runtime;
         if (!runtime) throw new AmtUnavailableError(this.status().message ?? "AMT 不可用");
 
@@ -139,6 +153,7 @@ export class AmtService {
                 "--threads",
                 String(this.config.amtThreads),
                 "--no-spin",
+                "--events",
                 "-q",
             ];
             if (this.config.amtEco) {
@@ -162,13 +177,55 @@ export class AmtService {
                 }
             }, this.config.amtTimeoutMs);
 
+            let audioTime = 0;
+            let noteCount = 0;
+            let lastReport = 0;
+
+            // 逐行读取 --events 的 JSON 事件；stderr 同时消费避免管道写满
+            const readEvents = async () => {
+                const reader = proc.stdout.getReader();
+                const decoder = new TextDecoder();
+                let buffered = "";
+                try {
+                    for (;;) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffered += decoder.decode(value, { stream: true });
+                        let newline = buffered.indexOf("\n");
+                        while (newline >= 0) {
+                            const line = buffered.slice(0, newline).trim();
+                            buffered = buffered.slice(newline + 1);
+                            newline = buffered.indexOf("\n");
+                            if (!line.startsWith("{")) continue;
+                            try {
+                                const event = JSON.parse(line) as { type?: string; time?: number };
+                                if (typeof event.time === "number" && event.time > audioTime) {
+                                    audioTime = event.time;
+                                }
+                                if (event.type === "on") noteCount++;
+                            } catch {
+                                // 非事件行（摘要/警告）忽略
+                            }
+                        }
+                        const now = performance.now();
+                        if (options.onProgress && now - lastReport >= 150) {
+                            lastReport = now;
+                            options.onProgress({ audioTime, noteCount });
+                        }
+                    }
+                } finally {
+                    reader.releaseLock();
+                }
+            };
+
+            const stderrText = new Response(proc.stderr).text();
+            const eventsTask = readEvents();
+
             try {
-                const [code, stdout, stderr] = await Promise.all([
-                    proc.exited,
-                    new Response(proc.stdout).text(),
-                    new Response(proc.stderr).text(),
-                ]);
-                const log = `${stdout}${stderr}`.trim();
+                const [code, stderr] = await Promise.all([proc.exited, stderrText]);
+                await eventsTask;
+                if (options.onProgress) options.onProgress({ audioTime, noteCount });
+                const log = stderr.trim();
                 if (timedOut) throw new AmtTimeoutError("转录超时，请缩短音频或调大 AMT_TIMEOUT_MS");
                 if (code !== 0 || !existsSync(outPath)) {
                     throw new Error(`amt-cli 退出码 ${code}${log ? `：${tail(log)}` : ""}`);
@@ -177,6 +234,7 @@ export class AmtService {
                     midi: Uint8Array.from(readFileSync(outPath)),
                     elapsedMs: Math.round(performance.now() - started),
                     log,
+                    noteCount,
                 };
             } finally {
                 clearTimeout(timer);

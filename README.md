@@ -20,7 +20,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 |---|---|
 | **附加包（addon）** | 游戏内钢琴方块：实时弹奏、MIDI 播放器、播放队列与多钢琴支持 |
 | **在线生成器（generator）** | 网页端将 `.mid` 文件与内置曲库打包为 `.mcaddon`，Cloudflare Workers Static Assets 部署；D1 记录试听播放量 |
-| **自托管后端（server + web）** | Hono + SQLite 文件曲库与播放列表服务，配套 React 管理页；BDS 服务器经 server-net 远程拉取曲目 |
+| **自托管后端（server + web）** | Hono + SQLite 文件曲库服务，配套 React 管理页；BDS 服务器经 server-net 远程拉取曲目 |
 | **音频转 MIDI（AMT）** | 生成器内置浏览器端转录（多线程 WASM）；server 调用 Rust `amt-cli`，支持上传音频与 B 站视频链接 |
 | **共享核心库（core）** | MIDI 转换/打包、曲库编解码、音符映射、存储端口等无游戏依赖的领域逻辑 |
 
@@ -54,7 +54,7 @@ FluidR3 GM，各音色的来源与授权见 `packages/addon/rp/THIRD_PARTY_NOTIC
 ```bash
 # 启动后端（Docker，根目录 compose；镜像内含 core/web 构建产物）
 docker compose up -d
-# 管理页 http://<host>:35050 登录 → 上传曲目、创建播放列表、签发令牌
+# 管理页 http://<host>:35050 登录 → 上传曲目、生成导入码、签发令牌
 # （.env 中 BOOTSTRAP_TOKEN 为管理员令牌；对外端口 35050，容器内 3000）
 
 # 构建服务器专用包
@@ -89,7 +89,7 @@ pianoBE/
 
 **依赖方向**：`addon`、`server`、`generator` → `core`；`web`、`generator` → `ui`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
 
-**前端约定**：两个 React 应用共用 `@piano/ui` 的 Tailwind 设计系统、基础控件（按钮/输入框/下拉/标签）、`AppLayout`（桌面侧栏 / 移动底部导航）、`PlayerBar` 与歌曲行组件；深浅色通过 `data-theme` + `--pb-*` 变量切换。`generator` 的播放器绑定模板音色，`web` 的播放器读取 `/piano` 采样；两者都基于 `@piano/core/player`，跨路由保持播放。
+**前端约定**：两个 React 应用共用 `@piano/ui` 的 Tailwind 设计系统、基础控件（按钮/输入框/下拉/标签）、`AppLayout`（桌面侧栏 / 移动底部导航）、`PlayerBar`、`AppPlayer`（MIDI 采样与原音频试听的统一外壳）与歌曲行组件；深浅色通过 `data-theme` + `--pb-*` 变量切换。`generator` 的播放器绑定模板音色，`web` 的播放器读取 `/piano` 采样；两者都基于 `@piano/core/player`，共享音色切换、逐曲响度归一化与音符卷帘，跨路由保持播放。
 
 ### 两个 Addon 包（同一份源码，注入式条件编译）
 
@@ -107,10 +107,10 @@ pianoBE/
 
 - 曲目 `id = crc32(.mid 内容)`，内容寻址；后端、内嵌曲库、生成器三端同一算法，天然对账
 - 统一运行时格式 **PBE2**：40 tick/秒时间差分 + VarInt + 同时刻分组 + Raw DEFLATE，播放器用共享 `SongCache` + `EventCursor` 增量读取（README「曲目格式」）
-- 播放列表：meta 与 items 同记录原子更新，owner/public 视图派生（读取即修复，无需索引维护）
+- 音频转 MIDI：服务端任务式转录（原音频 + MIDI 先预览，确认后入库），进度由 `amt-cli --events` 实时音符事件估算
 - 调度：20 TPS 下采用“最近 tick”（提前半个游戏 tick 触发），把量化误差从整体拖后改成居中；子 tick 方案仍只做可行性记录
 - 双端存储驱动：addon 使用世界动态属性（DPDataBase），后端使用 SQLite（meta）+ 文件（内容），共享同一套 core 端口与契约测试
-- Audio Lab：`web` 的 `/lab` 实验页隔离对比力度层、50ms tick 量化与 Note Off 释放；纯逻辑在 `@piano/core/audioLab`，与正式播放器/游戏包解耦。结论见 `tools/audio-lab-report.md`
+- Audio Lab：纯逻辑保留在 `@piano/core/audioLab`，供离线分析脚本复用；管理页不再提供实验入口
 - 声部上限：Bedrock 客户端同时最多混 32 个音效。运行时按 28 的钢琴预算主动回收实例（`SoundReleaseQueue`），导入时由 `@piano/core` 的 `estimateVoiceLoad` 预计算峰值并提示超限曲目；离线数据见 `tools/voice-load-report.md`
 
 ---

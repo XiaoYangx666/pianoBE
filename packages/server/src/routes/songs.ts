@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { encodeBase64Url } from "@piano/core";
+import { encodeBase64Url, planImportChunks } from "@piano/core";
 import type { AppDeps } from "../app.js";
 import { requireRole, type AppVariables } from "../auth.js";
 
@@ -30,6 +30,19 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         const raw = deps.songPort.getRaw(c.req.param("id") ?? "");
         if (!raw) return c.json({ error: "曲目内容不存在" }, 404);
         return c.body(raw, 200, { "content-type": "audio/midi" });
+    });
+
+    // GET /api/songs/:id/code —— 游戏内导入码（PBE2 分段）
+    app.get("/:id/code", readRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        const pbe2 = deps.songPort.getPbe2(id);
+        if (!pbe2) return c.json({ error: "曲目不存在" }, 404);
+        const meta = deps.songPort.getMeta(id);
+        return c.json({
+            name: meta?.name ?? id,
+            chunks: planImportChunks(pbe2),
+            bytes: pbe2.byteLength,
+        });
     });
 
     // GET /api/songs/:id —— 游戏播放器曲目（统一 PBE2，Base64URL 传输）

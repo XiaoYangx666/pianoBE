@@ -11,17 +11,6 @@ CREATE TABLE IF NOT EXISTS songs (
     created_at INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS playlists (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    owner      TEXT NOT NULL,         -- 创建者令牌身份
-    name       TEXT NOT NULL,
-    public     INTEGER NOT NULL DEFAULT 0,
-    play_count INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    items      TEXT NOT NULL DEFAULT '[]'  -- song id 数组 JSON（与 meta 同记录原子更新）
-);
-
 CREATE TABLE IF NOT EXISTS tokens (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     label      TEXT NOT NULL UNIQUE,  -- 身份名（如 bootstrap / my-uploader）

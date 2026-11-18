@@ -8,5 +8,4 @@ export * from "./midi/normalize.js";
 export * from "./pbe2/index.js";
 export * from "./music/index.js";
 export * from "./store/ports.js";
-export * from "./store/playlistStore.js";
 export * from "./store/memory.js";

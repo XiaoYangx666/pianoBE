@@ -1,14 +1,13 @@
 import type { Database } from "bun:sqlite";
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { MidiSong, MidiSongMeta, PlaylistMeta, PlaylistPort, SongPort } from "@piano/core";
+import type { MidiSong, MidiSongMeta, SongPort } from "@piano/core";
 import { encodePbe2, readPbe2Header } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 
 /**
- * SQLite 存储驱动：实现 core 的 SongPort / PlaylistPort。
- * 单记录 = 单行原子读写（sqlite 单语句自带原子性），无显式事务；
- * 播放列表 meta 与 items 同记录（JSON 列），天然消除孤儿残留。
+ * SQLite 存储驱动：实现 core 的 SongPort。
+ * 单记录 = 单行原子读写（sqlite 单语句自带原子性），无显式事务。
  *
  * 曲目内容策略（v3）：SQLite 仅存元数据，完整曲目以 `.mid` 源文件保存；
  * 对游戏播放器统一按需编码为 PBE2（内存 LRU 缓存最近使用的曲目），
@@ -20,17 +19,6 @@ interface SongRow {
     name: string;
     duration: number;
     created_at: number;
-}
-
-interface PlaylistRow {
-    id: number;
-    owner: string;
-    name: string;
-    public: number;
-    play_count: number;
-    created_at: number;
-    updated_at: number;
-    items: string;
 }
 
 /**
@@ -234,98 +222,6 @@ export class SqliteSongPort implements SongPort {
             if (existsSync(p)) rmSync(p);
         }
     }
-}
-
-export class SqlitePlaylistPort implements PlaylistPort {
-    constructor(private readonly db: Database) {}
-
-    /** max(id)+1：顺序创建不碰撞，删除后可复用（与内存驱动契约一致） */
-    nextId(): number {
-        const r = this.db.query(`SELECT MAX(id) AS m FROM playlists`).get() as {
-            m: number | null;
-        };
-        return (r.m ?? 0) + 1;
-    }
-
-    getMeta(id: number): PlaylistMeta | undefined {
-        const r = this.db.query(`SELECT * FROM playlists WHERE id=?`).get(id) as
-            | PlaylistRow
-            | null;
-        return r ? rowToMeta(r) : undefined;
-    }
-
-    listAllMetas(): PlaylistMeta[] {
-        return (
-            this.db.query(`SELECT * FROM playlists ORDER BY id`).all() as PlaylistRow[]
-        ).map(rowToMeta);
-    }
-
-    setMeta(meta: PlaylistMeta): void {
-        // UPSERT：items 列不参与更新（meta 更新不触碰列表内容），单语句原子
-        this.db
-            .query(
-                `INSERT INTO playlists(id,owner,name,public,play_count,created_at,updated_at,items)
-                 VALUES(?,?,?,?,?,?,?,'[]')
-                 ON CONFLICT(id) DO UPDATE SET
-                     name=excluded.name, public=excluded.public,
-                     play_count=excluded.play_count, updated_at=excluded.updated_at`
-            )
-            .run(
-                meta.id,
-                meta.owner,
-                meta.name,
-                meta.public ? 1 : 0,
-                meta.playCount,
-                meta.createdAt,
-                meta.updatedAt
-            );
-    }
-
-    deleteMeta(id: number): void {
-        this.db.query(`DELETE FROM playlists WHERE id=?`).run(id);
-    }
-
-    getContent(id: number): string[] {
-        const r = this.db.query(`SELECT items FROM playlists WHERE id=?`).get(id) as
-            | Pick<PlaylistRow, "items">
-            | null;
-        if (!r) return [];
-        try {
-            const parsed = JSON.parse(r.items);
-            return Array.isArray(parsed) ? (parsed as string[]) : [];
-        } catch {
-            return [];
-        }
-    }
-
-    setContent(id: number, items: string[]): void {
-        // 单行原子更新
-        this.db.query(`UPDATE playlists SET items=? WHERE id=?`).run(
-            JSON.stringify(items),
-            id
-        );
-    }
-
-    deleteContent(id: number): void {
-        // meta 与 content 同记录：删除整行即清理两者
-        this.deleteMeta(id);
-    }
-
-    deletePlaylist(id: number): void {
-        this.deleteMeta(id);
-    }
-}
-
-function rowToMeta(r: PlaylistRow): PlaylistMeta {
-    return {
-        id: r.id,
-        owner: r.owner,
-        name: r.name,
-        public: !!r.public,
-        playCount: r.play_count,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-    };
 }
 
 /** 音符总数：各轨道 notes 四元组数之和 */

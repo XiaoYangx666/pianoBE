@@ -59,6 +59,8 @@ export interface BiliVideo {
     quality: string;
     codecs: string;
     bandwidth: number;
+    /** 当前分 P 的时长（秒）；接口未提供时缺省 */
+    durationSec?: number;
 }
 
 interface BiliAudioTrack {
@@ -73,7 +75,8 @@ interface BiliViewData {
     aid?: number;
     cid?: number;
     title?: string;
-    pages?: Array<{ page?: number; cid?: number; part?: string }>;
+    duration?: number;
+    pages?: Array<{ page?: number; cid?: number; part?: string; duration?: number }>;
 }
 
 /* ---------------- 会话与限速 ---------------- */
@@ -278,6 +281,8 @@ export async function resolveBiliVideo(
             ? String(info.title ?? bvid)
             : `${info.title ?? bvid} - P${selected.page ?? page} ${selected.part ?? ""}`;
 
+    const duration = Number(selected.duration ?? info.duration ?? 0);
+
     return {
         bvid,
         aid: info.aid ?? 0,
@@ -290,6 +295,7 @@ export async function resolveBiliVideo(
         quality: QUALITY[best.id ?? 0] ?? String(best.id ?? "?"),
         codecs: best.codecs ?? "",
         bandwidth: best.bandwidth ?? 0,
+        durationSec: duration > 0 ? duration : undefined,
     };
 }
 

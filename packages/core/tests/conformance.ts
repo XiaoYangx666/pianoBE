@@ -1,4 +1,4 @@
-import type { PlaylistPort, SongPort, PlaylistMeta, MidiSong } from "../src/index.js";
+import type { SongPort, MidiSong } from "../src/index.js";
 
 /**
  * 存储端口契约用例：任何驱动（内存/SQLite/游戏内动态属性）都必须通过。
@@ -59,62 +59,6 @@ export function songPortCases(make: () => SongPort): ConformanceCase[] {
                 assert(p.getMeta("aaa") === undefined, "remove 后 getMeta=undefined");
                 assert(p.getSong("aaa") === undefined, "remove 后 getSong=undefined");
                 eq(p.listMetas().length, 0, "remove 后 list 为空");
-            },
-        },
-    ];
-}
-
-export function playlistPortCases(make: () => PlaylistPort): ConformanceCase[] {
-    function meta(id: number, owner = "o1"): PlaylistMeta {
-        return { id, owner, name: `n${id}`, public: false, playCount: 0, createdAt: id, updatedAt: id };
-    }
-    return [
-        {
-            name: "setMeta/getMeta/listAllMetas 主记录读写（返回副本）",
-            fn() {
-                const p = make();
-                p.setMeta(meta(1));
-                eq(p.getMeta(1), meta(1), "getMeta 返回写入值");
-                eq(p.listAllMetas(), [meta(1)], "listAllMetas 全扫");
-                const got = p.getMeta(1)!;
-                got.name = "changed";
-                eq(p.getMeta(1)!.name, "n1", "外部变更不污染存储");
-            },
-        },
-        {
-            name: "setContent 整体替换（原子）；getContent 返回副本",
-            fn() {
-                const p = make();
-                p.setMeta(meta(1));
-                p.setContent(1, ["a", "b"]);
-                const arr = p.getContent(1);
-                arr.push("c");
-                eq(p.getContent(1), ["a", "b"], "副本变更不落库");
-                p.setContent(1, ["z"]);
-                eq(p.getContent(1), ["z"], "整体替换生效");
-            },
-        },
-        {
-            name: "deletePlaylist 幂等，删除后 meta/content 均无残留",
-            fn() {
-                const p = make();
-                p.setMeta(meta(5));
-                p.setContent(5, ["a"]);
-                p.deletePlaylist(5);
-                p.deletePlaylist(5); // 再次删除不抛错
-                assert(p.getMeta(5) === undefined, "meta 已删除");
-                eq(p.getContent(5), [], "content 已删除");
-                eq(p.listAllMetas().length, 0, "全扫为空");
-            },
-        },
-        {
-            name: "崩溃残留自愈：只有 content 没有 meta 时不可见，delete 幂等清理",
-            fn() {
-                const p = make();
-                p.setContent(99, ["a"]); // 模拟 create 中途崩溃
-                eq(p.listAllMetas(), [], "孤儿 content 不出现在全扫");
-                p.deletePlaylist(99);
-                eq(p.getContent(99), [], "幂等清理");
             },
         },
     ];

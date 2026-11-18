@@ -1,7 +1,7 @@
 {
     "name": "@piano/core",
     "version": "0.1.0",
-    "description": "PianoBE 共享核心库：MIDI 转换/打包、曲库与播放列表领域模型与存储端口",
+    "description": "PianoBE 共享核心库：MIDI 转换/打包、曲库领域模型与存储端口",
     "type": "module",
     "license": "GPL-3.0-only",
     "private": true,

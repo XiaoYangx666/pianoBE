@@ -1,17 +1,13 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { extname, join } from "node:path";
+import { streamSSE } from "hono/streaming";
+import { extname } from "node:path";
 import type { AppDeps } from "../app.js";
 import { requireRole, type AppVariables } from "../auth.js";
-import { AmtBusyError, AmtTimeoutError, AmtUnavailableError } from "../services/amt.js";
 import {
-    BiliError,
-    downloadBiliAudio,
-    resolveBiliVideo,
-    searchBiliVideos,
-} from "../services/bilibili.js";
+    TranscribeJobStore,
+    type TranscribeJobSnapshot,
+} from "../services/transcribeJobs.js";
+import { searchBiliVideos } from "../services/bilibili.js";
 
 /** 音频上传上限：B 站无损音频通常不到 30 MB，100 MB 足够覆盖长录音 */
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
@@ -28,13 +24,30 @@ const AUDIO_EXTENSIONS = new Set([
     ".wma",
 ]);
 
-function cleanName(raw: string | undefined, fallback = "未命名转录"): string {
-    let value = raw ?? "";
+const AUDIO_MIME: Record<string, string> = {
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".m4s": "audio/mp4",
+    ".aac": "audio/aac",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".wma": "audio/x-ms-wma",
+};
+
+function decodeHeader(raw: string | undefined): string {
+    const value = raw ?? "";
     try {
-        value = decodeURIComponent(value);
+        return decodeURIComponent(value);
     } catch {
-        // 保留原始值
+        return value;
     }
+}
+
+function cleanName(raw: string | undefined, fallback = "未命名转录"): string {
+    let value = decodeHeader(raw);
     value = value.replace(/\.(mp3|m4a|mp4|m4s|aac|wav|flac|ogg|opus|wma|mid|midi)$/i, "");
     value = value.replace(/[\\/:*?"<>|\r\n\t]/g, "_").trim().slice(0, 100);
     return value || fallback;
@@ -51,27 +64,21 @@ function audioExtension(name: string | undefined, contentType: string | undefine
     return ".audio";
 }
 
-function mapError(c: Context<{ Variables: AppVariables }>, error: unknown) {
-    if (error instanceof AmtUnavailableError) {
-        return c.json({ error: error.message }, 503);
-    }
-    if (error instanceof AmtBusyError) {
-        return c.json({ error: error.message }, 429);
-    }
-    if (error instanceof AmtTimeoutError) {
-        return c.json({ error: error.message }, 504);
-    }
-    if (error instanceof BiliError) {
-        return c.json({ error: error.message }, 502);
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[transcribe]", error);
-    return c.json({ error: `转录失败：${message}` }, 500);
+function audioMime(ext: string, contentType: string | undefined): string {
+    if (contentType && /^(audio|video)\//.test(contentType)) return contentType;
+    return AUDIO_MIME[ext] ?? "application/octet-stream";
 }
 
 export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
     const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const jobs = new TranscribeJobStore({
+        songPort: deps.songPort,
+        config: deps.config,
+        amt: deps.amt,
+    });
+
+    const jobOr404 = (id: string) => jobs.get(id);
 
     // GET /api/transcribe/status —— 前端据此提示 AMT 是否部署完成
     app.get("/status", readRole(), (c) => {
@@ -95,60 +102,15 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             const items = await searchBiliVideos(q, limit, deps.config.biliSessdata);
             return c.json({ items });
         } catch (error) {
-            return mapError(c, error);
-        }
-    });
-
-    // POST /api/transcribe/bilibili —— { input, page?, name? }
-    app.post("/bilibili", requireRole("write"), async (c) => {
-        if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
-        const body = (await c.req.json().catch(() => null)) as
-            | { input?: unknown; page?: unknown; name?: unknown }
-            | null;
-        const input = typeof body?.input === "string" ? body.input.trim() : "";
-        if (!input) return c.json({ error: "缺少视频链接或 BV 号" }, 400);
-        const page = Math.max(1, Number(body?.page ?? 1) || 1);
-
-        const work = mkdtempSync(join(tmpdir(), "pianobe-bili-"));
-        try {
-            const video = await resolveBiliVideo(input, page, deps.config.biliSessdata);
-            const audioPath = join(work, "audio.m4s");
-            await downloadBiliAudio(video, audioPath, deps.config.biliSessdata);
-
-            const result = await deps.amt.transcribe(audioPath);
-            const name = cleanName(
-                typeof body?.name === "string" ? body.name : video.title,
-                "B站转录"
+            return c.json(
+                { error: error instanceof Error ? error.message : String(error) },
+                502
             );
-            const song = deps.songPort.saveMidiFile(result.midi, name);
-            const meta = deps.songPort
-                .listMetasWithStats()
-                .find((item) => item.id === song.id) ?? song;
-
-            return c.json({
-                song: meta,
-                source: {
-                    kind: "bilibili",
-                    bvid: video.bvid,
-                    cid: video.cid,
-                    title: video.title,
-                    page: video.page,
-                    pageCount: video.pageCount,
-                    quality: video.quality,
-                    codecs: video.codecs,
-                    bandwidth: video.bandwidth,
-                },
-                elapsedMs: result.elapsedMs,
-            }, 201);
-        } catch (error) {
-            return mapError(c, error);
-        } finally {
-            rmSync(work, { recursive: true, force: true });
         }
     });
 
-    // POST /api/transcribe —— 原始音频字节；文件名走 X-File-Name 头
-    app.post("/", requireRole("write"), async (c) => {
+    // POST /api/transcribe/jobs —— 上传音频，返回任务（不写入曲目库）
+    app.post("/jobs", requireRole("write"), async (c) => {
         if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
 
         const length = Number(c.req.header("Content-Length") ?? 0);
@@ -163,32 +125,179 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             return c.json({ error: "音频超过大小限制（100 MB）" }, 413);
         }
 
-        const rawName = c.req.header("X-File-Name") ?? "";
-        const ext = audioExtension(rawName, c.req.header("Content-Type"));
-        const name = cleanName(rawName, "上传转录");
-        const work = mkdtempSync(join(tmpdir(), "pianobe-audio-"));
+        const rawName = decodeHeader(c.req.header("X-File-Name"));
+        const contentType = c.req.header("Content-Type");
+        const ext = audioExtension(rawName, contentType);
+        const durationRaw = Number(c.req.header("X-Audio-Duration") ?? 0);
+        const durationSec = Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : undefined;
 
-        try {
-            const audioPath = join(work, `audio${ext}`);
-            writeFileSync(audioPath, new Uint8Array(buffer));
-            const result = await deps.amt.transcribe(audioPath);
-            const song = deps.songPort.saveMidiFile(result.midi, name);
-            const meta = deps.songPort
-                .listMetasWithStats()
-                .find((item) => item.id === song.id) ?? song;
-            return c.json(
-                {
-                    song: meta,
-                    source: { kind: "upload", fileName: name },
-                    elapsedMs: result.elapsedMs,
-                },
-                201
-            );
-        } catch (error) {
-            return mapError(c, error);
-        } finally {
-            rmSync(work, { recursive: true, force: true });
+        const job = jobs.startUpload({
+            buffer: new Uint8Array(buffer),
+            ext,
+            mime: audioMime(ext, contentType),
+            name: cleanName(rawName, "上传转录"),
+            durationSec,
+            fileName: rawName || undefined,
+        });
+        return c.json(job, 201);
+    });
+
+    // POST /api/transcribe/jobs/bilibili —— { input, page?, name? }
+    app.post("/jobs/bilibili", requireRole("write"), async (c) => {
+        if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
+        const body = (await c.req.json().catch(() => null)) as
+            | { input?: unknown; page?: unknown; name?: unknown }
+            | null;
+        const input = typeof body?.input === "string" ? body.input.trim() : "";
+        if (!input) return c.json({ error: "缺少视频链接或 BV 号" }, 400);
+        const page = Math.max(1, Number(body?.page ?? 1) || 1);
+        const name = typeof body?.name === "string" ? cleanName(body.name) : undefined;
+
+        const job = jobs.startBilibili({ url: input, page, name });
+        return c.json(job, 201);
+    });
+
+    // GET /api/transcribe/jobs/:id —— 任务状态（轮询/刷新后恢复）
+    app.get("/jobs/:id", readRole(), (c) => {
+        const job = jobOr404(c.req.param("id") ?? "");
+        if (!job) return c.json({ error: "任务不存在或已过期" }, 404);
+        return c.json(job);
+    });
+
+    // GET /api/transcribe/jobs/:id/events —— SSE 进度
+    app.get("/jobs/:id/events", readRole(), async (c) => {
+        const id = c.req.param("id") ?? "";
+        const initial = jobOr404(id);
+        if (!initial) return c.json({ error: "任务不存在或已过期" }, 404);
+
+        c.header("Cache-Control", "no-cache");
+        c.header("X-Accel-Buffering", "no");
+
+        return streamSSE(c, async (stream) => {
+            let closed = false;
+            let writeChain = Promise.resolve();
+            let finish!: () => void;
+            const finished = new Promise<void>((resolve) => {
+                finish = resolve;
+            });
+
+            const send = (snapshot: TranscribeJobSnapshot) => {
+                if (closed) return;
+                writeChain = writeChain
+                    .then(() =>
+                        stream.writeSSE({ event: "progress", data: JSON.stringify(snapshot) })
+                    )
+                    .catch(() => {
+                        closed = true;
+                    });
+            };
+
+            send(initial);
+            if (initial.stage === "done" || initial.stage === "error") {
+                await writeChain;
+                return;
+            }
+
+            const unsubscribe = jobs.subscribe(id, (snapshot) => {
+                send(snapshot);
+                if (snapshot.stage === "done" || snapshot.stage === "error") finish();
+            });
+            const heartbeat = setInterval(() => {
+                if (closed) return;
+                writeChain = writeChain
+                    .then(() => stream.writeSSE({ event: "ping", data: "1" }))
+                    .catch(() => {
+                        closed = true;
+                    });
+            }, 15000);
+            (heartbeat as unknown as { unref?: () => void }).unref?.();
+
+            const stop = () => {
+                clearInterval(heartbeat);
+                unsubscribe();
+                finish();
+            };
+            stream.onAbort(stop);
+
+            await finished;
+            await writeChain;
+            stop();
+        });
+    });
+
+    // PATCH /api/transcribe/jobs/:id —— { name } 改任务名
+    app.patch("/jobs/:id", requireRole("write"), async (c) => {
+        const id = c.req.param("id") ?? "";
+        const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
+        const name = typeof body?.name === "string" ? body.name.trim() : "";
+        if (!name) return c.json({ error: "曲名不能为空" }, 400);
+        const job = jobs.rename(id, name);
+        if (!job) return c.json({ error: "任务不存在或已过期" }, 404);
+        return c.json(job);
+    });
+
+    // POST /api/transcribe/jobs/:id/save —— 显式保存到曲目库
+    app.post("/jobs/:id/save", requireRole("write"), async (c) => {
+        const id = c.req.param("id") ?? "";
+        const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
+        const name = typeof body?.name === "string" ? body.name.trim() : undefined;
+        if (name !== undefined && !name) return c.json({ error: "曲名不能为空" }, 400);
+        const job = jobs.save(id, name);
+        if (!job) return c.json({ error: "任务不存在、尚未转录完成或曲名无效" }, 404);
+        return c.json(job);
+    });
+
+    // GET /api/transcribe/jobs/:id/code —— 游戏内导入码
+    app.get("/jobs/:id/code", readRole(), (c) => {
+        const code = jobs.code(c.req.param("id") ?? "");
+        if (!code) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
+        return c.json(code);
+    });
+
+    // GET /api/transcribe/jobs/:id/audio —— 原始音频（支持 Range，用于试听）
+    app.get("/jobs/:id/audio", readRole(), async (c) => {
+        const audio = jobs.audio(c.req.param("id") ?? "");
+        if (!audio) return c.json({ error: "任务不存在或音频未就绪" }, 404);
+
+        const file = Bun.file(audio.path);
+        const size = file.size;
+        const headers = new Headers({
+            "content-type": audio.mime,
+            "accept-ranges": "bytes",
+            "cache-control": "no-store",
+        });
+
+        const range = c.req.header("range");
+        if (!range) {
+            headers.set("content-length", String(size));
+            return new Response(file, { headers });
         }
+
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+        if (!match) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+        const start = match[1] ? Number(match[1]) : 0;
+        const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+        if (!Number.isFinite(start) || start >= size || end < start) {
+            return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+        }
+        const blob = file.slice(start, end + 1);
+        headers.set("content-length", String(end - start + 1));
+        headers.set("content-range", `bytes ${start}-${end}/${size}`);
+        return new Response(blob, { status: 206, headers });
+    });
+
+    // GET /api/transcribe/jobs/:id/midi —— 转录结果原始 MIDI（试听）
+    app.get("/jobs/:id/midi", readRole(), (c) => {
+        const midi = jobs.midi(c.req.param("id") ?? "");
+        if (!midi) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
+        return c.body(midi, 200, { "content-type": "audio/midi", "cache-control": "no-store" });
+    });
+
+    // DELETE /api/transcribe/jobs/:id —— 放弃任务并清理临时文件
+    app.delete("/jobs/:id", requireRole("write"), (c) => {
+        const removed = jobs.remove(c.req.param("id") ?? "");
+        if (!removed) return c.json({ error: "任务不存在或已过期" }, 404);
+        return c.body(null, 204);
     });
 
     return app;

@@ -29,14 +29,3 @@ export interface MidiSong {
     duration: number;
     tracks: MidiTrack[];
 }
-
-/** 播放列表元信息（单条记录，items 单独存储） */
-export interface PlaylistMeta {
-    id: number;
-    owner: string;
-    name: string;
-    public: boolean;
-    playCount: number;
-    createdAt: number;
-    updatedAt: number;
-}

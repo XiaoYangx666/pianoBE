@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { openDb } from "../src/db";
 import { createApp, type AppDeps } from "../src/app";
 import { createToken, ensureBootstrapToken, getTokenInfo } from "../src/auth";
-import { SqlitePlaylistPort, SqliteSongPort } from "../src/drivers/sqlitePorts";
+import { SqliteSongPort } from "../src/drivers/sqlitePorts";
 import { loadConfig } from "../src/config";
-import { PlaylistStore, decodeBase64Url, readPbe2Header } from "@piano/core";
+import { decodeBase64Url, readPbe2Header } from "@piano/core";
 
 /** 最小 SMF：format 0、1 轨道、division 96 */
 function minimalMidi(note = 0x3c): Uint8Array {
@@ -23,7 +23,6 @@ const ADMIN = "admin-token-abc";
 let deps: AppDeps;
 let app: ReturnType<typeof createApp>;
 let writerToken = "";
-let writer2Token = "";
 let readerToken = "";
 let songId = "";
 let midisDir = "";
@@ -48,12 +47,10 @@ beforeAll(() => {
     deps = {
         db,
         songPort,
-        playlistStore: new PlaylistStore(new SqlitePlaylistPort(db)),
         config: loadConfig({}),
     };
     app = createApp(deps);
     writerToken = createToken(db, "writer", "write").token;
-    writer2Token = createToken(db, "writer2", "write").token;
     readerToken = createToken(db, "reader", "read").token;
 });
 
@@ -70,7 +67,7 @@ describe("健康检查与鉴权", () => {
 
     test("无令牌访问受保护接口 → 401", async () => {
         expect((await req("/api/songs")).status).toBe(401);
-        expect((await req("/api/playlists")).status).toBe(401);
+        expect((await req("/api/tokens")).status).toBe(401);
     });
 
     test("错误令牌 → 401", async () => {
@@ -195,107 +192,6 @@ describe("曲库 API", () => {
         expect(missing.status).toBe(404);
 
         await req(`/api/songs/${id}`, { token: writerToken, method: "DELETE" });
-    });
-});
-
-describe("播放列表 API", () => {
-    let listId = 0;
-
-    test("创建 → 列表 → 详情", async () => {
-        const res = await req("/api/playlists", {
-            token: writerToken,
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: "我的歌单" }),
-        });
-        expect(res.status).toBe(201);
-        listId = (await j<{ id: number }>(res)).id;
-
-        const own = await j<{ items: { id: number }[] }>(await req("/api/playlists?owner=writer", { token: readerToken }));
-        expect(own.items).toHaveLength(1);
-
-        const detail = await j<{ items: string[] }>(await req(`/api/playlists/${listId}`, { token: readerToken }));
-        expect(detail.items).toEqual([]);
-    });
-
-    test("创建可携带 owner（游戏内玩家临时 id）", async () => {
-        const res = await req("/api/playlists", {
-            token: writerToken,
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: "玩家私有歌单", owner: "game-player-123" }),
-        });
-        expect(res.status).toBe(201);
-        const meta = (await res.json()) as { owner: string };
-        expect(meta.owner).toBe("game-player-123");
-
-        // 按玩家 owner 可查
-        const byOwner = await j<{ items: { owner: string }[] }>(await req("/api/playlists?owner=game-player-123", { token: readerToken }));
-        expect(byOwner.items.some((m) => m.owner === "game-player-123")).toBe(true);
-        // 不污染令牌 label 的列表
-        const byWriter = await j<{ items: { owner: string }[] }>(await req("/api/playlists?owner=writer", { token: readerToken }));
-        expect(byWriter.items.every((m) => m.owner === "writer")).toBe(true);
-    });
-
-    test("改名/设公开（仅 owner 或 admin）", async () => {
-        const otherRes = await req("/api/playlists", {
-            token: writer2Token, method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: "他人列表" }),
-        });
-        expect(otherRes.status).toBe(201);
-        const other = (await otherRes.json()) as { id: number };
-        // writer2 改 writer 的列表 → 403（非 owner）
-        const forbidden = await req(`/api/playlists/${listId}`, {
-            token: writer2Token, method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: "x" }),
-        });
-        expect(forbidden.status).toBe(403);
-        // writer 自己改 → 200
-        const ok = await req(`/api/playlists/${listId}`, {
-            token: writerToken, method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: "新名字", public: true }),
-        });
-        expect(ok.status).toBe(200);
-        // admin 可改任何人的
-        const adminOk = await req(`/api/playlists/${other.id}`, {
-            token: ADMIN, method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: "管理员改名" }),
-        });
-        expect(adminOk.status).toBe(200);
-    });
-
-    test("公开广场可见 + items 整体替换", async () => {
-        const pub = await j<{ items: { id: number }[] }>(await req("/api/playlists?public=1", { token: readerToken }));
-        expect(pub.items.map((m: { id: number }) => m.id)).toContain(listId);
-
-        const items = await req(`/api/playlists/${listId}/items`, {
-            token: writerToken, method: "PUT",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ items: ["aaa", "bbb"] }),
-        });
-        expect((await j<{ items: string[] }>(items)).items).toEqual(["aaa", "bbb"]);
-        const detail = await j<{ items: string[] }>(await req(`/api/playlists/${listId}`, { token: readerToken }));
-        expect(detail.items).toEqual(["aaa", "bbb"]);
-    });
-
-    test("播放计数：同令牌每日一次", async () => {
-        const p1 = await j<{ playCount: number }>(await req(`/api/playlists/${listId}/play`, { token: readerToken, method: "POST" }));
-        await req(`/api/playlists/${listId}/play`, { token: readerToken, method: "POST" });
-        const p2 = await j<{ playCount: number }>(await req(`/api/playlists/${listId}/play`, { token: writerToken, method: "POST" }));
-        expect(p1.playCount).toBe(1);
-        expect(p2.playCount).toBe(2); // 不同令牌再计一次
-    });
-
-    test("删除（他人 403 / owner 204）", async () => {
-        const other = await j<{ items: { id: number }[] }>(await req("/api/playlists?owner=writer", { token: readerToken }));
-        const otherId = other.items[0].id;
-        expect((await req(`/api/playlists/${otherId}`, { token: readerToken, method: "DELETE" })).status).toBe(403);
-        expect((await req(`/api/playlists/${otherId}`, { token: writerToken, method: "DELETE" })).status).toBe(204);
-        expect((await req(`/api/playlists/${otherId}`, { token: readerToken })).status).toBe(404);
     });
 });
 
