@@ -76,9 +76,9 @@ describe("声部负载估算", () => {
         expect(fromSong.peakVoices).toBe(6);
         expect(fromSong.excess).toBe(2);
 
-        const fromPbe2 = estimatePbe3VoiceLoad(encodePbe3(song), { limit: 4 });
-        expect(fromPbe2.peakVoices).toBe(6);
-        expect(fromPbe2.peakTime).toBeCloseTo(fromSong.peakTime, 5);
+        const fromPbe3 = estimatePbe3VoiceLoad(encodePbe3(song), { limit: 4 });
+        expect(fromPbe3.peakVoices).toBe(6);
+        expect(fromPbe3.peakTime).toBeCloseTo(fromSong.peakTime, 5);
     });
 
     it("生成可读警告，未超限时不返回", () => {

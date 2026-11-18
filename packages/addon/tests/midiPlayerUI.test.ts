@@ -115,11 +115,11 @@ function makeMidi() {
         {
             acquire: async () => {
                 const { buildPbe3SeekIndex, encodePbe3, readPbe3Events } = await import("@piano/core");
-                const pbe2 = encodePbe3({
+                const pbe3 = encodePbe3({
                     ...SONG,
                     tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 40, 90] }],
                 });
-                const { header, events } = readPbe3Events(pbe2);
+                const { header, events } = readPbe3Events(pbe3);
                 return {
                     song: {
                         key: header.id,

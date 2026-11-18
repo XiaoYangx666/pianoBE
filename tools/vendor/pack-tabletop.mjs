@@ -2,7 +2,7 @@
  * 从本地 tabletop 检出重新打包 vendor 依赖。
  *
  * @begame/tabletop 是私有包，不发布到 npm，也不随本仓库公开（vendor/*.tgz 已被忽略）。
- * 构建 addon 前需要自行准备 tarball：node tools/pack-tabletop.mjs [tabletop 检出路径]
+ * 构建 addon 前需要自行准备 tarball：node tools/vendor/pack-tabletop.mjs [tabletop 检出路径]
  * 默认读取 ../tabletop；npm pack 的 prepack 会先执行 tabletop 的 build。
  */
 import { execSync } from "node:child_process";

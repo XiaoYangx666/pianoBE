@@ -24,7 +24,7 @@ export interface ImportCodeDialogProps {
     onClose: () => void;
     songName: string;
     chunks: string[];
-    /** 完整 PBE2 字节数；用于在弹窗里显示曲目大小 */
+    /** 完整 PBE3 字节数；用于在弹窗里显示曲目大小 */
     bytes?: number;
 }
 

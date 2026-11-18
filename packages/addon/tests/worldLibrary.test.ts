@@ -80,7 +80,7 @@ describe("世界全局曲库", () => {
         expect(stats.ids).toBe(0);
     });
 
-    test("非法 PBE2 被拒绝，不留下目录记录", () => {
+    test("非法曲目数据被拒绝，不留下目录记录", () => {
         const library = new WorldMusicLibrary();
         library.reload();
         expect(() => library.save(new Uint8Array([1, 2, 3]))).toThrow();

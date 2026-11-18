@@ -79,7 +79,7 @@ describe("音乐存储：提交与读取", () => {
         expect(store.get(entry.id)).toBeUndefined();
     });
 
-    test("非法/损坏的 PBE2 被拒绝，且不会留下可见记录", () => {
+    test("非法/损坏的曲目数据被拒绝，且不会留下可见记录", () => {
         const kv = new MemoryKv();
         const store = collection(kv, () => 64 * 1024);
         expect(() => store.save(new Uint8Array([1, 2, 3]))).toThrow(MusicValidationError);

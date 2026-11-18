@@ -12,7 +12,7 @@ export interface MusicStorage {
     list(): StoredMusicEntry[];
     has(id: string): boolean;
     get(id: string): Uint8Array | undefined;
-    save(pbe2: Uint8Array): StoredMusicEntry;
+    save(bytes: Uint8Array): StoredMusicEntry;
     remove(id: string): boolean;
     rename(id: string, name: string): StoredMusicEntry | undefined;
     /** 调整曲目在存储中的顺序（存储卡播放列表）。 */

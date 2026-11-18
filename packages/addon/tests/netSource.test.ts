@@ -6,7 +6,7 @@ import {
 } from "../src/platform/server/admin/netSource";
 
 const SONG_META = { id: "aaa", name: "A", duration: 100 };
-const PBE2 = encodePbe3({
+const PBE3 = encodePbe3({
     ...SONG_META,
     tracks: [{ instrument: { family: "piano", number: 0, name: "x" }, notes: [60, 0, 50, 100] }],
 });
@@ -14,7 +14,7 @@ const REMOTE_SONG = {
     id: SONG_META.id,
     name: SONG_META.name,
     duration: SONG_META.duration,
-    data: encodeBase64Url(PBE2),
+    data: encodeBase64Url(PBE3),
 };
 
 function makeFetch(
@@ -43,7 +43,7 @@ describe("RemoteMidiSource", () => {
         expect(calls).toBe(0);
     });
 
-    test("get：拉取 PBE2（Base64URL 解码后字节一致）", async () => {
+    test("get：拉取 PBE3（Base64URL 解码后字节一致）", async () => {
         const src = new RemoteMidiSource({
             baseUrl: BASE,
             fetch: makeFetch({ [`${BASE}/api/songs/aaa`]: { status: 200, body: REMOTE_SONG } }),
@@ -51,7 +51,7 @@ describe("RemoteMidiSource", () => {
         const bytes = await src.get("aaa");
         expect(bytes).toBeDefined();
         expect(readPbe3Header(bytes!).id).toBe(SONG_META.id);
-        expect(Array.from(bytes!)).toEqual(Array.from(PBE2));
+        expect(Array.from(bytes!)).toEqual(Array.from(PBE3));
     });
 
     test("远程源不做单曲缓存：每次 get 都请求，缓存统一交给 SongCache", async () => {
