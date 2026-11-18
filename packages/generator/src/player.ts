@@ -10,11 +10,11 @@ export type { NoteEvent } from "@piano/core/player";
  * 生成器预览播放器（薄壳）：WebAudio 采样播放引擎在 core（@piano/core/player，
  * 与管理端 web 共用同一引擎），这里只负责：
  * - 采样源：从已加载模板 mcaddon 的 rp/sounds 提取（不重复存放音效文件）
- * - 事件来源：SongEntry 中的 PBE2 事件流
+ * - 事件来源：SongEntry 中的 PBE3 事件流
  * 播放行为（调度/变调/包络/兜底）与游戏一致，由 core 引擎保证。
  */
 
-/** SongEntry → 音符事件（PBE2 事件流解码） */
+/** SongEntry → 音符事件（PBE3 事件流解码） */
 export function songEntryToEvents(entry: SongEntry): NoteEvent[] {
     return entry.data ? songToNoteEvents(entry.data) : [];
 }

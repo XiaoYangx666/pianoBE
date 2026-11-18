@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import {
-    collectNoteCount,
+    collectSongNoteCount,
     encodeSong,
     metasToAddonIndex,
     songToAddonModule,
@@ -81,10 +81,10 @@ for (const file of files) {
         id: song.id,
         name: song.name,
         duration: song.duration,
-        noteCount: collectNoteCount(song),
+        noteCount: collectSongNoteCount(song),
         bytes: pbe3.length,
     });
-    notes += collectNoteCount(song);
+    notes += collectSongNoteCount(song);
     jsBytes += moduleText.length;
     pbe3Bytes += pbe3.length;
 }

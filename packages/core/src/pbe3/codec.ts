@@ -114,10 +114,9 @@ export function velocityBitsFor(paletteCount: number): number {
 /**
  * 每首歌最多保留多少个力度级别。
  *
- * 全库实测（含 keyDuration）：
- * - 16 级 + keyDuration 1/50s：约 +0.6%（基本与旧格式打平）
- * - 8 级 + keyDuration 1/50s：约 -1.7%（比旧格式小）
- * - 4 级 + keyDuration 1/50s：约 -4.9%，但平均音量误差约 2 dB
+ * 全库实测（含 keyDuration，25ms 网格）：
+ * - 8 级：约 -10.8%（比旧格式小）
+ * - 4 级：更小，但平均音量误差约 2 dB
  *
  * 默认 8 级：3 bit 索引，平均误差约 1 dB，P95 约 1.75 dB，
  * 比 2 bit 的 2 dB/4 dB 明显好，同时仍能比旧格式更小。
@@ -139,16 +138,16 @@ function buildPalette(notes: readonly EncodedNote[]): number[] {
     if (!unique.length) return [100];
     if (unique.length <= MAX_PBE3_VELOCITY_LEVELS) return unique;
 
-    // 固定 0~127 的均匀 16 级：不同歌曲共享同一套级别，索引分布更稳定，
-    // DEFLATE 压缩率比按歌曲 min/max 动态分级更好（实测 +1.4% vs +3.2%）。
+    // 固定 1~127 的均匀 8 级：不能从 0 开始，否则源力度 1~9 会被量化成 0，
+    // 播放器会把 0 当作静音直接跳过。
     const levels: number[] = [];
     for (let i = 0; i < MAX_PBE3_VELOCITY_LEVELS; i++) {
-        levels.push(Math.round((i / (MAX_PBE3_VELOCITY_LEVELS - 1)) * 127));
+        levels.push(Math.round(1 + (126 * i) / (MAX_PBE3_VELOCITY_LEVELS - 1)));
     }
     return [...new Set(levels)].sort((a, b) => a - b);
 }
 
-/** 找到最接近的调色板索引（调色板已升序，最多 16 项，线性查找足够快）。 */
+/** 找到最接近的调色板索引（调色板已升序，最多 8 项，线性查找足够快）。 */
 function nearestPaletteIndex(palette: readonly number[], velocity: number): number {
     let best = 0;
     let bestDiff = Infinity;
@@ -168,6 +167,11 @@ function readVelocityBits(
     count: number,
     bits: number
 ): { indices: number[]; next: number } {
+    // 每个音符至少需要 2 字节（midiAndFlag + soundDuration VarInt）。
+    // 先做上界检查，避免攻击者用超大的 group count 触发无界分配。
+    if (count > Math.floor((events.length - offset) / 2)) {
+        throw new Error("[pbe3] 事件组音符数异常");
+    }
     if (bits === 0) return { indices: new Array(count).fill(0), next: offset };
     const bytes = Math.ceil((count * bits) / 8);
     if (offset + bytes > events.length) throw new Error("[pbe3] 力度索引数据被截断");
@@ -332,6 +336,7 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         throw new Error(`[pbe3] 版本不兼容：${version}（期望 ${PBE3_VERSION}）`);
     }
     const flags = data[5];
+    if ((flags & ~PBE3_FLAG_COMPRESSED) !== 0) throw new Error("[pbe3] 保留标志位非 0");
     const id = readString(data, 6);
     const name = readString(data, id.next);
     const fixed = name.next;
@@ -348,6 +353,7 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
     for (let i = 0; i < paletteCount; i++) {
         const value = data[offset++];
         if (value > 127) throw new Error("[pbe3] 力度值越界");
+        if (i > 0 && value <= palette[i - 1]) throw new Error("[pbe3] 力度调色板必须升序且不重复");
         palette.push(value);
     }
     const velocityBits = data[offset++];
@@ -388,14 +394,13 @@ export function readPbe3Events(
         throw new Error(`[pbe3] 事件流超过安全上限（${header.uncompressedLength} 字节）`);
     }
     const payload = data.subarray(header.eventOffset);
-    let events: Uint8Array;
-    if (header.compressed) {
-        events = inflateSync(payload);
-        if (events.length !== header.uncompressedLength) {
-            throw new Error(`[pbe3] 解压长度不匹配：${events.length} 字节 ${header.uncompressedLength}`);
-        }
-    } else {
-        events = payload;
+    const events = !header.compressed
+        ? payload
+        : header.uncompressedLength === 0
+          ? new Uint8Array(0)
+          : inflateSync(payload, { out: new Uint8Array(header.uncompressedLength) });
+    if (events.length !== header.uncompressedLength) {
+        throw new Error(`[pbe3] 解压长度不匹配：${events.length} 字节 ${header.uncompressedLength}`);
     }
     if (crc32(events) !== header.checksum) {
         throw new Error("[pbe3] 事件流校验失败（CRC32）");
@@ -407,7 +412,8 @@ export function readPbe3Events(
 export function readAllPbe3Notes(
     events: Uint8Array,
     palette: readonly number[],
-    velocityBits: number
+    velocityBits: number,
+    maxNotes = Infinity
 ): Pbe3Note[] {
     const notes: Pbe3Note[] = [];
     const out: VarintResult = { value: 0, next: 0 };
@@ -421,6 +427,12 @@ export function readAllPbe3Notes(
         const count = out.value;
         pos = out.next;
         if (count === 0) throw new Error("[pbe3] 事件组音符数为 0");
+        if (notes.length + count > maxNotes) {
+            throw new Error("[pbe3] 事件组音符数超过头部声明");
+        }
+        if (count > Math.floor((events.length - pos) / 2)) {
+            throw new Error("[pbe3] 事件组音符数异常");
+        }
 
         const velocities = readVelocityBits(events, pos, count, velocityBits);
         pos = velocities.next;
@@ -453,7 +465,7 @@ export function decodePbe3(data: Uint8Array): MidiSong {
     const { header, events } = readPbe3Events(data);
     const notes: number[] = [];
     const keyDurations: number[] = [];
-    for (const note of readAllPbe3Notes(events, header.palette, header.velocityBits)) {
+    for (const note of readAllPbe3Notes(events, header.palette, header.velocityBits, header.noteCount)) {
         notes.push(note.midi, note.time, Math.round((note.soundDuration * OTHER_SCALE) / TIME_SCALE), note.velocity);
         keyDurations.push(Math.round((note.keyDuration * OTHER_SCALE) / TIME_SCALE));
     }

@@ -30,20 +30,20 @@ export interface RemoteSourceOptions {
     extraHeaders?: () => Record<string, unknown>;
 }
 
-/** 后端单曲 PBE2 响应 */
+/** 后端单曲 PBE3 响应 */
 interface RemoteSongPayload {
     id?: string;
     name?: string;
     duration?: number;
-    /** Base64URL(PBE2) */
+    /** Base64URL(PBE3) */
     data?: string;
 }
 
 /**
- * 远程曲库来源：通过 server-net 从后端 API 拉取 PBE2 曲目。
+ * 远程曲库来源：通过 server-net 从后端 API 拉取 PBE3 曲目。
  * - 列表 UI：page() 服务端分页按需取页（q 走服务端搜索），不下载全量
  * - 批量操作（一键添加）：metaAll(q) 分页取全
- * - 单曲：get() 每次返回 PBE2 数据；缓存与淘汰统一由 SongCache 负责
+ * - 单曲：get() 每次返回 PBE3 数据；缓存与淘汰统一由 SongCache 负责
  * - list()：远程源不提供全量列表，返回空数组
  * - 网络错误：列表返回空数组并告警；单曲返回 undefined
  */
@@ -121,7 +121,7 @@ export class RemoteMidiSource {
         return all;
     }
 
-    /** 获取 PBE2 数据；远程源不做单曲缓存，交给统一 SongCache */
+    /** 获取 PBE3 数据；远程源不做单曲缓存，交给统一 SongCache */
     async get(id: string): Promise<Uint8Array | undefined> {
         try {
             const url = this.base(`/api/songs/${encodeURIComponent(id)}`);

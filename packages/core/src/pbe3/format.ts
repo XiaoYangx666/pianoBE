@@ -46,7 +46,7 @@ export interface Pbe3Header {
     byteLength: number;
 }
 
-/** 事件流中的一条音符（时间单位均为内部 tick：40/秒，时长 100/秒） */
+/** 事件流中的一条音符（时间与时长单位均为内部 tick：40/秒） */
 export interface Pbe3Note {
     /** 绝对起始时间（40 tick/秒） */
     time: number;

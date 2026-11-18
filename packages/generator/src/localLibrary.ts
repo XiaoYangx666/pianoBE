@@ -1,9 +1,10 @@
 import type { SongEntry } from "./types";
+import { readSongHeader } from "@piano/core";
 
 /**
  * 我的音乐：浏览器本地持久库（IndexedDB）。
  *
- * 只保存转码后的 PBE2 数据与展示元信息，不保留原始 .mid 文件。
+ * 只保存转码后的 PBE3 数据与展示元信息，不保留原始 .mid 文件。
  * 附加包页的 songs 只是当前工作区，不会写回这里。
  */
 
@@ -45,7 +46,18 @@ export async function listLocalSongs(): Promise<StoredSong[]> {
     const db = await openDb();
     const tx = db.transaction(STORE, "readonly");
     const rows = await requestToPromise(tx.objectStore(STORE).getAll() as IDBRequest<StoredSong[]>);
-    return rows.sort((a, b) => b.createdAt - a.createdAt);
+    // 旧版本可能存了 PBE2；运行时只支持 PBE3，过滤并提示重新导入。
+    const valid = rows.filter((row) => {
+        if (!row.data) return false;
+        try {
+            readSongHeader(row.data);
+            return true;
+        } catch {
+            console.warn(`[localLibrary] 跳过旧格式曲目 ${row.id}（需要重新导入）`);
+            return false;
+        }
+    });
+    return valid.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export async function putLocalSongs(songs: StoredSong[]): Promise<void> {

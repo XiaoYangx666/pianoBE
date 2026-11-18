@@ -6,6 +6,7 @@ import {
     encodePbe3,
     encodePbe3Events,
     pbe3ToNoteEvents,
+    readAllPbe3Notes,
     readPbe3Events,
     readPbe3Header,
     renamePbe3,
@@ -82,6 +83,36 @@ describe("PBE3 力度调色板", () => {
         expect(header.compressed).toBe(true);
         expect(header.byteLength).toBe(data.length);
         expect(readPbe3Events(data).events.length).toBe(header.uncompressedLength);
+    });
+});
+
+describe("PBE3 安全性", () => {
+    function varint(value: number): number[] {
+        const out: number[] = [];
+        let v = value >>> 0;
+        while (v >= 0x80) {
+            out.push((v & 0x7f) | 0x80);
+            v >>>= 7;
+        }
+        out.push(v);
+        return out;
+    }
+
+    it("最低力度不会量化成 0（0 会被播放器当成静音）", () => {
+        const decoded = decodePbe3(encodePbe3(song([60, 0, 100, 1])));
+        expect(decoded.tracks[0].notes[3]).toBe(1);
+    });
+
+    it("超大的事件组音符数在分配前被拒绝", () => {
+        // timeDelta = 0, noteCount = 1,000,000，后面没有音符数据
+        const events = new Uint8Array([0, ...varint(1_000_000)]);
+        expect(() => readAllPbe3Notes(events, [100], 0)).toThrow(/事件组音符数/);
+    });
+
+    it("保留标志位非 0 时拒绝解析", () => {
+        const data = encodePbe3(song([60, 0, 100, 100]));
+        data[5] |= 0x02;
+        expect(() => readPbe3Header(data)).toThrow(/保留标志位/);
     });
 });
 

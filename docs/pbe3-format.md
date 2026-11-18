@@ -52,7 +52,7 @@ offset  size  field
 velocityBits = ceil(log2(paletteCount))
 ```
 
-- 编码器最多保留 **8 个力度级别**。如果歌曲实际使用的力度超过 8 种，会按 0~127 均匀量化为 8 级，再按最接近的值映射。这样做的代价约为平均 1 dB 音量误差，换取明显更小的文件。
+- 编码器最多保留 **8 个力度级别**。如果歌曲实际使用的力度超过 8 种，会按 **1~127** 均匀量化为 8 级，再按最接近的值映射。这样做的代价约为平均 1 dB 音量误差，换取明显更小的文件。
 - `velocityBits` 必须与 `paletteCount` 匹配，否则解码报错。
 
 ## 3. 事件流
@@ -103,9 +103,9 @@ velocity = 100
 ## 4. 压缩与校验
 
 - 编码器默认使用 `fflate` 的 Raw DEFLATE（level 9）。
-- 只有压缩后比原始事件流小至少 8 字节时才启用压缩。
+- 只有压缩后比原始事件流至少小 9 字节时才启用压缩。
 - `checksum` 始终是**未压缩事件流**的 CRC32。
-- 解码时先校验 `uncompressedLength` 安全上限（32 MiB），再解压并校验 CRC32。
+- 解码时先校验 `uncompressedLength` 安全上限（32 MiB），再使用固定大小的输出缓冲区解压并校验 CRC32。
 
 ## 5. 跳转索引
 
@@ -155,9 +155,9 @@ createSongCursor(loadedSong)
 | 格式 | 总体积 |
 |---|---:|
 | PBE2 | 2,965,449 B（2.83 MiB） |
-| PBE3 | 2,645,823 B（2.52 MiB） |
+| PBE3 | 2,648,259 B（2.53 MiB） |
 
-PBE3 比 PBE2 **小 10.8%**，同时额外携带了 keyDuration。
+PBE3 比 PBE2 **小 10.7%**，同时额外携带了 keyDuration。
 
 默认参数：
 

@@ -136,6 +136,11 @@ export class MusicCollection {
             const bytes = decodeBase64Url(shards.join(""));
             if (bytes.length !== entry.bytes) return undefined;
             if (crc32Hex(bytes) !== entry.checksum) return undefined;
+            // 旧 PBE2 数据不再被运行时支持：给出明确提示，避免静默失败。
+            if (bytes[0] === 0x50 && bytes[1] === 0x42 && bytes[2] === 0x45 && bytes[3] === 0x32) {
+                console.warn(`[music] 旧 PBE2 曲目 ${entry.id} 需要重新导入为 PBE3`);
+                return undefined;
+            }
             if (readPbe3Header(bytes).id !== entry.id) return undefined;
             return bytes;
         } catch {

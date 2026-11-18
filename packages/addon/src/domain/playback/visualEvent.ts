@@ -5,7 +5,7 @@ export interface PianoVisualNote {
     tick: number;
     source: "manual" | "midi" | "simulation";
     songTime?: number;
-    /** False when the PBE2 decoder supplied its fixed default velocity. */
+    /** False when the PBE3 decoder supplied its fixed default velocity. */
     hasVelocity: boolean;
 }
 

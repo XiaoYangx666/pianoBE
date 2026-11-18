@@ -39,7 +39,7 @@ assert(templateInfo.bpManifest.header?.name, "bp manifest 解析成功");
 // 2. 构造"含内嵌曲目的模板"：注入曲目 A 的 PBE3 模块 + index
 const songA = midiBufferToSong(new Uint8Array(readFileSync(MIDI_A)), "Beyond - 海阔天空");
 assert(songA.id === "4beea226", `曲目 A 转换 id 正确：${songA.id}`);
-const pbe3A = encodePbe3(songA, { includeVelocity: true });
+const pbe3A = encodePbe3(songA);
 const moduleA = pbe3ToAddonModule(pbe3A);
 const tplAddon = templateInfo.addon;
 tplAddon.writeText(`bp/scripts/midis/${songA.id}.js`, moduleA);
@@ -55,7 +55,7 @@ assert(embEvents.length > 0, `内嵌曲目可从 PBE3 转为试听事件：${emb
 
 // 3. 添加新曲目 B，导出
 const songB = midiBufferToSong(new Uint8Array(readFileSync(MIDI_B)), "ChiliChill - 让风告诉你");
-const pbe3B = encodePbe3(songB, { includeVelocity: true });
+const pbe3B = encodePbe3(songB);
 const songs = [
     ...embTemplate.songs,
     {

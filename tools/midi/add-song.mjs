@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-    collectNoteCount,
+    collectSongNoteCount,
     encodeSong,
     metasToAddonIndex,
     songToAddonModule,
@@ -68,7 +68,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         id: song.id,
         name: song.name,
         duration: song.duration,
-        noteCount: collectNoteCount(song),
+        noteCount: collectSongNoteCount(song),
         bytes: pbe3.length,
     };
     const pos = index.findIndex((m) => m.id === song.id);

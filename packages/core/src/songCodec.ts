@@ -26,6 +26,11 @@ export type SongHeader = Pbe3Header;
 export type SongNote = Pbe3Note;
 export type SongNoteEvent = Pbe3NoteEvent;
 
+/** MidiSong → 音符总数 */
+export function collectSongNoteCount(song: MidiSong): number {
+    return song.tracks.reduce((sum, track) => sum + Math.floor(track.notes.length / 4), 0);
+}
+
 /** MidiSong → 曲目二进制 */
 export function encodeSong(song: MidiSong, options?: EncodePbe3Options): Uint8Array {
     return encodePbe3(song, options);
@@ -49,12 +54,12 @@ export function readSongEvents(bytes: Uint8Array) {
 /** 曲目二进制 → 全部音符（含 soundDuration / keyDuration / velocity） */
 export function readAllSongNotes(bytes: Uint8Array): SongNote[] {
     const { header, events } = readPbe3Events(bytes);
-    return readAllPbe3Notes(events, header.palette, header.velocityBits);
+    return readAllPbe3Notes(events, header.palette, header.velocityBits, header.noteCount);
 }
 
 /** 已加载曲目 → 全部音符（复用共享事件流，不重复解压） */
 export function readLoadedSongNotes(song: LoadedSong): SongNote[] {
-    return readAllPbe3Notes(song.events, song.header.palette, song.header.velocityBits);
+    return readAllPbe3Notes(song.events, song.header.palette, song.header.velocityBits, song.header.noteCount);
 }
 
 /** 曲目二进制 → 秒制音符事件 */

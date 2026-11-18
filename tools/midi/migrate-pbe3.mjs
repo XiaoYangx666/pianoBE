@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-    collectNoteCount,
+    collectSongNoteCount,
     decodePbe3,
     encodePbe3,
     metasToAddonIndex,
@@ -74,10 +74,19 @@ for (const meta of library) {
             song.name = meta.name;
         }
     }
+    // 兜底歌曲可能带着旧的 duration；按最后一个音的结束时间补齐。
+    let maxEndTicks = 0;
+    for (const track of song.tracks) {
+        for (let i = 0; i + 3 < track.notes.length; i += 4) {
+            const end = track.notes[i + 1] + Math.round((track.notes[i + 2] / 100) * 40);
+            maxEndTicks = Math.max(maxEndTicks, end);
+        }
+    }
+    song.duration = Math.max(song.duration, maxEndTicks);
     const pbe3 = encodePbe3(song);
     writeFileSync(`midis/library/${meta.id}.pbe3`, pbe3);
     writeFileSync(`midis/js/${meta.id}.js`, pbe3ToAddonModule(pbe3), "utf-8");
-    const noteCount = collectNoteCount(song);
+    const noteCount = collectSongNoteCount(song);
     metas.push({
         id: song.id,
         name: song.name,

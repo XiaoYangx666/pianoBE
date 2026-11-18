@@ -11,7 +11,7 @@ import { decodePbe3, encodePbe3 } from "../src/pbe3/codec.js";
  * - 没有源 keyDuration 时，keyDuration 等于 soundDuration；
  * - id/name/duration 不变。
  *
- * 这些样本的力度种类都 ≤16，因此不会触发力度量化。
+ * 这些样本的力度种类都 ≤8，因此不会触发力度量化。
  */
 const fixtures = [
     { name: "Secret（全程踏板）", file: "secret.pbe2" },

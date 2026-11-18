@@ -65,7 +65,7 @@ export function validateMusic(
     } catch {
         throw new MusicValidationError("曲目数据损坏（事件流无法解压）");
     }
-    if (readAllPbe3Notes(events, header.palette, header.velocityBits).length !== header.noteCount) {
+    if (readAllPbe3Notes(events, header.palette, header.velocityBits, header.noteCount).length !== header.noteCount) {
         throw new MusicValidationError("曲目音符数量校验失败");
     }
     return { header, checksum: crc32Hex(pbe3), encoded: encodeBase64Url(pbe3) };

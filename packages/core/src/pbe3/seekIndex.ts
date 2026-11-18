@@ -24,6 +24,9 @@ export function buildPbe3SeekIndex(
         const count = out.value;
         pos = out.next;
         if (count === 0) throw new Error("[pbe3] 事件组音符数为 0");
+        if (count > Math.floor((events.length - pos) / 2)) {
+            throw new Error("[pbe3] 事件组音符数异常");
+        }
 
         if (time >= nextMark) {
             index.push({ ticks: time, offset: headerOffset, noteIndex });
@@ -181,6 +184,9 @@ export class Pbe3EventCursor {
         this.groupCount = this.out.value;
         this.pos = this.out.next;
         if (this.groupCount <= 0) throw new Error("[pbe3] 事件组音符数非法");
+        if (this.groupCount > Math.floor((this.events.length - this.pos) / 2)) {
+            throw new Error("[pbe3] 事件组音符数异常");
+        }
 
         const bytes = Math.ceil((this.groupCount * this.velocityBits) / 8);
         if (this.pos + bytes > this.events.length) throw new Error("[pbe3] 力度索引数据被截断");

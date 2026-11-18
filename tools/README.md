@@ -11,7 +11,7 @@
 | `convert.js` | 全量重建 `midis/js` + `midis/library`（需完整源文件） | `npm run convert` |
 | `show-song.mjs` | 按关键词查曲目信息 | `npm run show-song -- <关键词>` |
 | `import-midis.mjs` | 批量上传到 BDS 后端曲库 | `npm run import:midis` |
-| `bench-pbe2.mjs` | PBE2 编解码 / SongCache 性能基准 | `npm run bench:pbe2` |
+| `bench-pbe3.mjs` | PBE3 体积 / SongCache 性能基准 | `npm run bench:pbe3` |
 
 ## `model/` — 模型与资源生成
 
