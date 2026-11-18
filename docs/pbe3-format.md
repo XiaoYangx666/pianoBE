@@ -167,13 +167,4 @@ PBE3 比 PBE2 **小 10.7%**，同时额外携带了 keyDuration。
 
 ## 8. 旧格式
 
-PBE2 编解码只保留在 `packages/core/src/pbe2/`，用于：
-
-- 迁移脚本；
-- 回归测试样本（`packages/core/tests/fixtures/*.pbe2`）。
-
-它不再从 `@piano/core` 根入口导出，也不会进入 addon 运行时 bundle。需要显式访问时使用子路径：
-
-```ts
-import { decodePbe2 } from "@piano/core/pbe2";
-```
+PBE2 编解码已完全移除。仓库中不再保留 PBE2 代码、测试样本或 @piano/core/pbe2 入口；旧 .pbe2 文件只在 Git 历史中可见。

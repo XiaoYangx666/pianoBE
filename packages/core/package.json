@@ -28,10 +28,6 @@
         "./audioLab": {
             "types": "./dist/audioLab/index.d.ts",
             "import": "./dist/audioLab/index.js"
-        },
-        "./pbe2": {
-            "types": "./dist/pbe2/index.d.ts",
-            "import": "./dist/pbe2/index.js"
         }
     },
     "files": [
