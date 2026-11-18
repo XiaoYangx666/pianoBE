@@ -16,3 +16,4 @@ export * from "./components/ImportCodeDialog";
 export * from "./components/FileDropzone";
 export * from "./components/VirtualSongList";
 export * from "./components/NoteRoll";
+export * from "./player/appPlayer";

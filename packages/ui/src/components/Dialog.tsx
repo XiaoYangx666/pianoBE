@@ -27,6 +27,11 @@ export function Dialog({
     closeOnClickOutside = true,
 }: DialogProps) {
     const panelRef = useRef<HTMLDivElement>(null);
+    // onClose 通常是内联箭头函数：用 ref 保存，避免每次父组件渲染都重跑焦点/键盘副作用
+    const onCloseRef = useRef(onClose);
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     useEffect(() => {
         if (!opened) return;
@@ -35,7 +40,7 @@ export function Dialog({
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 event.stopPropagation();
-                onClose();
+                onCloseRef.current();
                 return;
             }
             if (event.key !== "Tab") return;
@@ -68,15 +73,18 @@ export function Dialog({
         document.body.style.overflow = "hidden";
 
         const panel = panelRef.current;
-        const autofocus = panel?.querySelector<HTMLElement>("[data-autofocus]");
-        (autofocus ?? panel)?.focus();
+        // 输入框等元素可能已经通过 autoFocus 取得焦点：不要把它抢回面板
+        if (panel && !panel.contains(document.activeElement)) {
+            const autofocus = panel.querySelector<HTMLElement>("[data-autofocus]");
+            (autofocus ?? panel).focus();
+        }
 
         return () => {
             document.removeEventListener("keydown", onKeyDown, true);
             document.body.style.overflow = previousOverflow;
             previouslyFocused?.focus?.();
         };
-    }, [opened, onClose]);
+    }, [opened]);
 
     if (!opened) return null;
 
