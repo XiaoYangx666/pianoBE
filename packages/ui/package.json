@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "PianoBE 共享设计系统：主题、布局与业务组件（Tailwind）",
   "type": "module",
-  "license": "GPL-3.0-only",
+  "license": "CC-BY-NC-4.0",
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",

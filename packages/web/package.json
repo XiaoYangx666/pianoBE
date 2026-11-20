@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "PianoBE 曲库管理页面（React + Vite，由 server 托管）",
     "type": "module",
-    "license": "GPL-3.0-only",
+    "license": "CC-BY-NC-4.0",
     "private": true,
     "scripts": {
         "dev": "vite",

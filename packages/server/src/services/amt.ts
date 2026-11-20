@@ -1,6 +1,16 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+    accessSync,
+    closeSync,
+    constants,
+    existsSync,
+    mkdtempSync,
+    openSync,
+    readFileSync,
+    readSync,
+    rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import type { ServerConfig } from "../config.js";
 
 /**
@@ -46,6 +56,9 @@ interface AmtRuntime {
 
 const PACKAGE_ROOT = resolve(import.meta.dir, "../..");
 
+/** 模型优先级：静态 int8（约 3.9 MB，默认）→ fp32 回退（约 15 MB） */
+const AMT_MODEL_NAMES = ["run4_int8.onnx", "run4_best.onnx"] as const;
+
 function firstExisting(paths: Array<string | undefined>): string | undefined {
     for (const p of paths) {
         if (p && existsSync(p)) return p;
@@ -53,25 +66,100 @@ function firstExisting(paths: Array<string | undefined>): string | undefined {
     return undefined;
 }
 
-/** 解析 CLI 与模型路径（支持环境变量、包内 amt/ 目录和 PATH） */
-function resolveRuntime(config: ServerConfig): AmtRuntime | undefined {
+/** 读取文件头判断二进制平台；shell 脚本等无法判断时当作 other。 */
+function binaryKind(file: string): "pe" | "elf" | "other" {
+    let fd: number | undefined;
+    try {
+        fd = openSync(file, "r");
+        const head = Buffer.alloc(4);
+        if (readSync(fd, head, 0, 4, 0) < 4) return "other";
+        if (head[0] === 0x4d && head[1] === 0x5a) return "pe"; // MZ
+        if (head[0] === 0x7f && head.toString("ascii", 1, 4) === "ELF") return "elf";
+        return "other";
+    } catch {
+        return "other";
+    } finally {
+        if (fd !== undefined) closeSync(fd);
+    }
+}
+
+/** 自动发现的 CLI 必须与当前平台一致，避免同步过 Windows 版后在 Linux 上直接 spawn 失败。 */
+function platformMatches(file: string): boolean {
+    const kind = binaryKind(file);
+    if (kind === "pe") return process.platform === "win32";
+    if (kind === "elf") return process.platform === "linux";
+    return true;
+}
+
+function isExecutable(file: string): boolean {
+    if (process.platform === "win32") return true;
+    try {
+        accessSync(file, constants.X_OK);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function pathCandidates(exeNames: string[]): string[] {
+    const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+    return dirs.flatMap((dir) => exeNames.map((name) => join(dir, name)));
+}
+
+interface AmtResolution {
+    runtime?: AmtRuntime;
+    message?: string;
+}
+
+/** 解析 CLI 与模型路径（支持环境变量、包内 amt/ 目录、vendor/ 和 PATH） */
+function resolveRuntime(config: ServerConfig): AmtResolution {
     const exeNames = process.platform === "win32" ? ["amt-cli.exe", "amt-cli"] : ["amt-cli"];
-    const cli = firstExisting([
-        config.amtCli ? resolve(config.amtCli) : undefined,
+    const autoCandidates = [
         ...exeNames.map((name) => join(PACKAGE_ROOT, "amt", name)),
         ...exeNames.map((name) => join(PACKAGE_ROOT, "..", "..", "vendor", "amt", name)),
-    ]);
-    if (!cli) return undefined;
+        ...pathCandidates(exeNames),
+    ];
+
+    let cli: string | undefined;
+    if (config.amtCli) {
+        cli = resolve(config.amtCli);
+        if (!existsSync(cli)) {
+            return { message: `AMT_CLI 指向的文件不存在：${cli}` };
+        }
+        if (!platformMatches(cli)) {
+            return { message: `AMT_CLI 与本机平台不匹配（当前 ${process.platform}）：${cli}` };
+        }
+    } else {
+        cli = autoCandidates.find((p) => existsSync(p) && platformMatches(p));
+        if (!cli) {
+            const wrong = autoCandidates.find((p) => existsSync(p) && !platformMatches(p));
+            return {
+                message: wrong
+                    ? `找到的 amt-cli 与本机平台不匹配（当前 ${process.platform}）：${wrong}；请重新运行 npm run sync:amt（Docker 用 AMT_PLATFORM=linux）`
+                    : "未找到 amt-cli：请运行 npm run sync:amt，或设置 AMT_CLI",
+            };
+        }
+    }
+
+    if (!isExecutable(cli)) {
+        return { message: `amt-cli 缺少执行权限：chmod +x ${cli}` };
+    }
 
     const model = firstExisting([
         config.amtModel ? resolve(config.amtModel) : undefined,
-        join(PACKAGE_ROOT, "amt", "run4_best.onnx"),
-        join(dirname(cli), "run4_best.onnx"),
-        join(dirname(cli), "..", "models", "run4_best.onnx"),
+        ...AMT_MODEL_NAMES.map((name) => join(PACKAGE_ROOT, "amt", name)),
+        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), name)),
+        ...AMT_MODEL_NAMES.map((name) => join(PACKAGE_ROOT, "amt", "models", name)),
+        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), "models", name)),
+        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), "..", "models", name)),
     ]);
-    if (!model) return undefined;
+    if (!model) {
+        return {
+            message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：请运行 npm run sync:amt，或设置 AMT_MODEL`,
+        };
+    }
 
-    return { cli, model };
+    return { runtime: { cli, model } };
 }
 
 /** 串行队列：AMT 推理很吃内存，默认同一时间只跑一个任务 */
@@ -104,10 +192,13 @@ class TaskQueue {
 
 export class AmtService {
     private readonly runtime: AmtRuntime | undefined;
+    private readonly resolutionMessage: string | undefined;
     private readonly queue = new TaskQueue();
 
     constructor(private readonly config: ServerConfig) {
-        this.runtime = resolveRuntime(config);
+        const { runtime, message } = resolveRuntime(config);
+        this.runtime = runtime;
+        this.resolutionMessage = message;
     }
 
     status(): AmtStatus {
@@ -120,7 +211,7 @@ export class AmtService {
             eco: this.config.amtEco,
             message: this.runtime
                 ? undefined
-                : "未找到 amt-cli 或 ONNX 模型：请运行 npm run sync:amt，或设置 AMT_CLI / AMT_MODEL",
+                : (this.resolutionMessage ?? "未找到 amt-cli 或 ONNX 模型：请运行 npm run sync:amt，或设置 AMT_CLI / AMT_MODEL"),
         };
     }
 

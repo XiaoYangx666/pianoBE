@@ -102,7 +102,8 @@ export function AboutPage() {
                     <div className="flex items-start gap-2.5">
                         <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ore-dimmer" />
                         <span>
-                            项目以 <b className="font-medium text-ore-text">GPL-3.0-only</b> 许可发布。
+                            项目以 <b className="font-medium text-ore-text">CC BY-NC 4.0</b>{" "}
+                            许可发布（禁止商业使用）。转录模型来自 gityag/AMT，同为 CC BY-NC 4.0，仅限非商业使用。
                             钢琴音色采样来自 FluidR3、VCSL、Salamander 等开源音源，
                             具体来源与处理方式见仓库中的第三方声明。
                         </span>

@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "PianoBE 后端曲库管理服务（Hono + bun:sqlite）",
     "type": "module",
-    "license": "GPL-3.0-only",
+    "license": "CC-BY-NC-4.0",
     "private": true,
     "scripts": {
         "start": "bun src/index.ts",

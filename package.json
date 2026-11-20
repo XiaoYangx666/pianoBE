@@ -1,7 +1,7 @@
 {
     "name": "pianobe",
     "type": "module",
-    "license": "GPL-3.0-only",
+    "license": "CC-BY-NC-4.0",
     "private": true,
     "workspaces": [
         "packages/*"

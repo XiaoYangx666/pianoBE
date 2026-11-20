@@ -150,19 +150,29 @@ npm run dev:generator    # 生成器开发模式（predev 自动同步底包与�
 音频转录（生成器浏览器端 + server 端 Rust CLI）依赖 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription) 的模型与运行时。这些文件体积较大且模型为 CC BY-NC 4.0，不随仓库提交：
 
 ```bash
-# 指向本地 AMT 仓库（其中需已 cargo build --release）
+# 指向本地 AMT 仓库（Windows 需已 cargo build --release；Linux 可用上游 dist 预编译包）
 # PowerShell:
 $env:AMT_DIR="E:\Project\muscriptor\Automated-Music-Transcription"
 # bash:
 export AMT_DIR=/path/to/Automated-Music-Transcription
 
 npm run sync:amt
-# 生成器 → packages/generator/public/amt/（模型 + ONNX Runtime WASM）
-# 后端   → packages/server/amt/（amt-cli + onnxruntime.dll + 模型）
+# 生成器 → packages/generator/public/amt/（模型 + ONNX Runtime WASM，浏览器端不变）
+# 后端   → packages/server/amt/（amt-cli + onnxruntime.dll/.so + int8 模型）
+
+# 为 Docker / Linux 准备（在 Windows 上交叉同步 Linux 版，自动解压 dist tar.gz）
+$env:AMT_PLATFORM="linux"; npm run sync:amt -w @piano/server   # PowerShell
+# AMT_PLATFORM=linux npm run sync:amt -w @piano/server          # bash
 ```
 
-未同步时两个页面会显示「AMT 不可用」，其他功能不受影响。服务器端也可用
-`AMT_CLI` / `AMT_MODEL` 直接指定二进制与模型路径。
+后端按当前平台自动选 `amt-cli` / `amt-cli.exe` 与 `.dll` / `.so`，模型优先
+`run4_int8.onnx`（约 3.9 MB），缺失时回退 `run4_best.onnx`；平台不匹配的二进制
+会被跳过并在状态接口里提示。未同步时两个页面会显示「AMT 不可用」，其他功能不受影响。
+服务器端也可用 `AMT_CLI` / `AMT_MODEL` 直接指定二进制与模型路径。
+
+> 模型权重来自 gityag/AMT，为 **CC BY-NC 4.0，仅限非商业使用**。随 release 或镜像
+> 分发模型时，请一并提供 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 中的署名
+> 与许可链接。
 
 ### Cloudflare 生成器播放统计
 
@@ -283,3 +293,13 @@ git push origin <分支>    # 提交 Pull Request
 ## 分支
 
 架构重构工作在 `refactor/monorepo-arch` 分支：五大阶段（core 抽取 → addon 接入 → 后端+管理页 → 生成器重构 → server-net 联调）+ 双目标构建。
+
+## 许可证
+
+- **除 addon 外的代码**（`core` / `generator` / `server` / `web` / `ui`）：
+  **CC BY-NC 4.0**（与 AMT 模型一致，见 [`LICENSE`](LICENSE)）——允许非商业使用、修改和再分发，
+  **禁止商业使用**，再分发需保留署名。
+- **`packages/addon`**：专有软件，**All Rights Reserved**（见 [`packages/addon/LICENSE`](packages/addon/LICENSE)）。
+  仅允许最终用户安装和游玩，不得再分发、改包或复用其代码/素材；商业授权或其他授权请联系作者。
+- 第三方模型与运行时：见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。AMT 模型为
+  **CC BY-NC 4.0**，仅限非商业使用，需保留署名。

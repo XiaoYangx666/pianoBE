@@ -52,7 +52,9 @@ export function LicenseDisclosure({ modelReady, onClearModel }: LicenseDisclosur
                     </a>{" "}
                     授权，仅限非商业使用。
                 </p>
-                <p className="text-ore-dimmer">本页面代码遵循 PianoBE 的 GPL-3.0-only 许可。</p>
+                <p className="text-ore-dimmer">
+                    本页面代码遵循 CC BY-NC 4.0 许可（与转录模型一致，禁止商业使用）。
+                </p>
             </div>
         </details>
     );

@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "PianoBE 独立生成器：把 .mid 内嵌进 addon 模板并重新打包",
     "type": "module",
-    "license": "GPL-3.0-only",
+    "license": "CC-BY-NC-4.0",
     "private": true,
     "scripts": {
         "predev": "node scripts/sync-template.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",

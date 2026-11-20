@@ -8,7 +8,8 @@
 ```
 
 推理链路与 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription)
-的 `web_demo` 一致，模型使用 `run4_best_fp16.onnx`。
+的 `web_demo` 一致，模型使用 `run4_best_fp16.onnx`（CC BY-NC 4.0，见
+[`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md)）。
 
 模型与运行时**不会自动下载**：进入页面后需手动点击「下载模型」（约 22 MB），
 下载内容保存在浏览器 Cache Storage，之后转换完全离线。可在页面上随时清除缓存。
@@ -45,4 +46,5 @@ npm run sync:amt -w @piano/generator
   WebGPU 版运行时约 29 MB，会让 `wrangler deploy` 失败，因此浏览器端固定使用多线程 WASM。
 - **缓存**：`/amt/*` 建议设置长缓存（文件名固定，更新时改 `?v=` 或重新部署）。
 - **移动端**：默认使用较小推理分块并限制线程，内存占用更低。
-- **模型许可**：模型权重为 CC BY-NC 4.0，仅限非商业使用。
+- **模型许可**：模型权重来自 gityag/AMT，为 **CC BY-NC 4.0**，仅限非商业使用；
+  分发/部署时需保留署名和许可链接。

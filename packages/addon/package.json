@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "钢琴附加包（游戏内显示与播放）",
     "type": "module",
-    "license": "GPL-3.0-only",
+    "license": "UNLICENSED",
     "private": true,
     "scripts": {
         "pack": "bepack pack",
