@@ -5,7 +5,7 @@ import { stageLights, stageVeils, VFX_LIGHT_LAYOUTS, VFX_VEIL_LAYOUTS, type VfxL
 export const VFX_SCENES = ["field", "wave", "beam", "mix", "burst", "demo"] as const;
 export type VfxScene = typeof VFX_SCENES[number];
 export type VfxEffect = "field" | "wave" | "beam" | "ripple" | "fountain" | "curtain" | "orbit" | "shaft" | "shard";
-export type VfxParticle = VfxEffect | "shaft_upright" | `cinema_${"dust" | "filament" | "sweep" | "note" | "shock"}`;
+export type VfxParticle = VfxEffect | "shaft_upright" | "draw_point" | "draw_stroke" | "draw_plane" | `cinema_${"dust" | "filament" | "sweep" | "note" | "shock"}`;
 
 export const VFX_LIMITS = {
     range: [0.65, 1.6],

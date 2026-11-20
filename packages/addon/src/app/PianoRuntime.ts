@@ -23,6 +23,7 @@ import { CardAccess } from "@platform/storage/cardItem";
 import type { MusicStorage } from "@domain/music/storage";
 import { SoundReleaseQueue } from "@domain/playback/soundRelease";
 import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visualEvent";
+import type { PianoParticleOverride } from "@domain/piano/particleOverride";
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -55,6 +56,7 @@ export class PianoRuntime {
     /** 每次真正发声时发布；per-piano 键位视图用它聚合所有来源的按键。 */
     readonly noteSignal = new Signal<Pick<PianoVisualNote, "midi" | "duration"> & Partial<PianoVisualNote>>();
     readonly transportSignal = new Signal<PianoTransportEvent>();
+    readonly settingsSignal = new Signal<PianoSettings>();
     /** 运行时每 tick 发布，UI 等订阅者用来做到期清理，避免自己挂定时器。 */
     readonly tickSignal = new Signal<number>();
     private display?: PianoDisplay;
@@ -65,6 +67,7 @@ export class PianoRuntime {
     private textValue?: string;
     private midi?: MidiPlayer;
     private midiHandsThisTick = 0;
+    private particleOverrideProvider?: (songTime?: number) => PianoParticleOverride | undefined;
     private verifiedAt = -Infinity;
     private integrity: ReturnType<typeof inspectInstrument> = "unloaded";
     private visualRetryAt = 0;
@@ -97,6 +100,11 @@ export class PianoRuntime {
     }
 
     isAlive() { return !this.disposed; }
+
+    /** 由舞台演出模块注册，按需临时覆盖弹奏时的琴键粒子样式与配色。 */
+    setParticleOverrideProvider(provider?: (songTime?: number) => PianoParticleOverride | undefined) {
+        this.particleOverrideProvider = provider;
+    }
 
     /** 供 UI 等外部缓存挂清理；dispose 时无条件执行，不依赖 Signal 是否还能派发。 */
     onDispose(cleanup: () => void): () => void {
@@ -174,6 +182,7 @@ export class PianoRuntime {
             this.scoreRetryAt = 0;
             this.syncScore(system.currentTick);
         }
+        this.settingsSignal.publish(next);
         return true;
     }
 
@@ -337,7 +346,17 @@ export class PianoRuntime {
         this.noteSignal.publish({ midi: note.midi, duration: visualDuration, soundDuration, velocity, tick: system.currentTick,
             source: manual ? "manual" : "midi", songTime, hasVelocity });
         this.activate();
-        if (settings.particles) summonParticle(dimension, this.center, this.right, note.midi, settings, this.hitModel);
+        if (settings.particles) {
+            summonParticle(
+                dimension,
+                this.center,
+                this.right,
+                note.midi,
+                settings,
+                this.hitModel,
+                this.particleOverrideProvider?.(songTime),
+            );
+        }
         return true;
     }
 
@@ -424,6 +443,7 @@ export class PianoRuntime {
         this.disposedSignal.dispose();
         this.noteSignal.dispose();
         this.transportSignal.dispose();
+        this.settingsSignal.dispose();
         this.tickSignal.dispose();
         if (!removeVisual) {
             try {

@@ -11,6 +11,7 @@ const { values } = parseArgs({ options: {
     browser: { type: "string" },
     preset: { type: "string", multiple: true },
     presets: { type: "string" },
+    song: { type: "string" },
     view: { type: "string", default: "stage" },
     piano: { type: "string", default: "grand" },
     direction: { type: "string", default: "south" },
@@ -22,9 +23,13 @@ const project = fileURLToPath(new URL("../../", import.meta.url));
 const output = resolve(values.out);
 const origin = values.url ?? "http://127.0.0.1:5189";
 const definitions = values.presets ? JSON.parse(await readFile(values.presets, "utf8")) : undefined;
-const presets = values.preset ?? ["galaxy", "neon", "stage"];
+const songFile = values.song ? join(project, "midis/library", `${values.song}.pbe3`) : undefined;
+const songBase64 = songFile ? (await readFile(songFile)).toString("base64") : undefined;
+const presets = values.song ? [values.song] : values.preset ?? ["galaxy", "neon", "stage"];
 const fixtures = values.time?.map(seconds => [`t-${Number(seconds).toFixed(2)}`, Number(seconds)]) ??
-    (presets.length === 1 && ["secret", "secret-native"].includes(presets[0])
+    (values.song ? [["intro", 8], ["verse", 30], ["build", 75], ["chorus", 144], ["interlude", 180],
+        ["bridge", 200], ["final", 240], ["outro", 280]] :
+    presets.length === 1 && ["secret", "secret-native"].includes(presets[0])
         ? [["intro", 5.1], ["develop", 43.2], ["gather", 71.6], ["fracture", 72.8],
             ["climax", 75.05], ["coda", 82.3], ["end", 86.1]] :
         [["quiet", 3.75], ["climax", 8.7], ["release", 11.4]]);
@@ -65,12 +70,15 @@ try {
     if (initError) throw new Error(initError);
     const report = [];
     for (const preset of presets) {
-        const duration = ["secret", "secret-native"].includes(preset) ? await page.evaluate(() => window.pianoVfxLab.scoreDuration()) : 12;
+        const duration = values.song
+            ? await page.evaluate(base64 => window.pianoVfxLab.songDuration(base64), songBase64)
+            : ["secret", "secret-native"].includes(preset) ? await page.evaluate(() => window.pianoVfxLab.scoreDuration()) : 12;
         for (const [label, time] of fixtures) {
             if (time > duration) throw new Error(`Capture time ${time} exceeds ${preset} duration (${duration}s)`);
             const options = { preset, time, view: values.view, piano: values.piano, direction: values.direction, deck: !values.flat };
             const stats = await page.evaluate(options => window.pianoVfxLab.render(options),
-                { ...options, preset: definitions?.[preset] ?? preset });
+                { ...options, preset: values.song ? "galaxy" : definitions?.[preset] ?? preset,
+                    ...(values.song ? { songBase64 } : {}) });
             const image = `${preset}-${label}.png`;
             await page.locator("canvas").screenshot({ path: join(output, image) });
             report.push({ ...options, image, ...stats });

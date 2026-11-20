@@ -5,12 +5,13 @@ import type { Config, Emitter } from "wintersky";
 import type Molang from "molangjs";
 import atlasUrl from "../../../addon/rp/textures/particle/vfx_lab.png";
 import cinemaAtlasUrl from "../../../addon/rp/textures/particle/secret_cinema.png";
+import pianoFxUrl from "../../../addon/rp/textures/particle/piano_fx.png";
 import type { VfxEffect, VfxParticle } from "../../../addon/src/domain/piano/vfxLab";
 
 type Expression = number | string;
 interface Definition {
     particle_effect: {
-        description: { identifier: `pbe:vfx_${VfxParticle}` };
+        description: { identifier: string };
         components: {
             "minecraft:particle_initial_speed"?: [Expression, Expression, Expression] | Expression;
         };
@@ -30,7 +31,7 @@ interface RuntimeEmitter extends Emitter {
     params(): object;
 }
 
-const documents = import.meta.glob<Definition>("../../../addon/rp/particles/pbe_vfx_*.particle.json", {
+const documents = import.meta.glob<Definition>("../../../addon/rp/particles/*.particle.json", {
     eager: true, import: "default",
 });
 const stepRate = 40;
@@ -39,8 +40,12 @@ export const particleStep = 1 / stepRate;
 
 export async function loadParticles() {
     const loader = new TextureLoader();
-    const [texture, cinemaTexture] = await Promise.all([loader.loadAsync(atlasUrl), loader.loadAsync(cinemaAtlasUrl)]);
-    for (const sheet of [texture, cinemaTexture]) {
+    const [texture, cinemaTexture, pianoFxTexture] = await Promise.all([
+        loader.loadAsync(atlasUrl),
+        loader.loadAsync(cinemaAtlasUrl),
+        loader.loadAsync(pianoFxUrl),
+    ]);
+    for (const sheet of [texture, cinemaTexture, pianoFxTexture]) {
         sheet.magFilter = LinearFilter;
         sheet.minFilter = LinearFilter;
     }
@@ -48,12 +53,12 @@ export async function loadParticles() {
     scene.global_options.tick_rate = stepRate;
     scene.global_options.ground_collision = false;
     const configs = new Map<VfxParticle, Config>();
-    const rates = new Map<VfxParticle, Expression>();
+    const pianoConfigs = new Map<string, Config>();
+    const rates = new Map<string, Expression>();
     for (const doc of Object.values(documents)) {
-        const particle = doc.particle_effect.description.identifier.slice("pbe:vfx_".length) as VfxParticle;
+        const identifier = doc.particle_effect.description.identifier;
         const config = new Wintersky.Config(scene, doc);
         config.texture.dispose();
-        config.texture = particle.startsWith("cinema_") ? cinemaTexture : texture;
 
         // Wintersky normalizes vector initial speed. Restore its magnitude with the same Molang components.
         const initial = doc.particle_effect.components["minecraft:particle_initial_speed"];
@@ -61,17 +66,28 @@ export async function loadParticles() {
             config.particle_motion_linear_speed = `math.sqrt(${initial.map(expr =>
                 `((${expr}) * (${expr}))`).join(" + ")})`;
         }
-        // The built-in steady scheduler rounds 1/rate to whole ticks. Integrate the authored rate here.
-        if (config.emitter_rate_mode === "steady") {
-            rates.set(particle, config.emitter_rate_rate);
-            config.emitter_rate_rate = 0;
+        if (identifier.startsWith("pbe:vfx_")) {
+            const particle = identifier.slice("pbe:vfx_".length) as VfxParticle;
+            config.texture = particle.startsWith("cinema_") ? cinemaTexture : texture;
+            // The built-in steady scheduler rounds 1/rate to whole ticks. Integrate the authored rate here.
+            if (config.emitter_rate_mode === "steady") {
+                rates.set(particle, config.emitter_rate_rate);
+                config.emitter_rate_rate = 0;
+            }
+            configs.set(particle, config);
+        } else {
+            config.texture = pianoFxTexture;
+            if (config.emitter_rate_mode === "steady") {
+                rates.set(identifier, config.emitter_rate_rate);
+                config.emitter_rate_rate = 0;
+            }
+            pianoConfigs.set(identifier, config);
         }
-        configs.set(particle, config);
     }
 
     interface LiveEmitter {
-        effect: VfxEffect;
-        particle: VfxParticle;
+        effect?: VfxEffect;
+        particle: string;
         instance: RuntimeEmitter;
         carry: number;
     }
@@ -86,6 +102,24 @@ export async function loadParticles() {
         };
         try { fn(); } finally { Math.random = original; }
     }
+    function spawnInstance(
+        config: Config | undefined,
+        particle: string,
+        position: { x: number; y: number; z: number },
+        globalVars: Record<string, number>,
+        effect?: VfxEffect,
+    ) {
+        if (!config) return;
+        withSeededRandom(() => {
+            const instance = new Wintersky.Emitter(scene, config, {
+                loop_mode: "once", parent_mode: "world",
+            }) as RuntimeEmitter;
+            instance.Molang.global_variables = globalVars;
+            instance.global_space.position.set(position.x, position.y, position.z);
+            instance.start();
+            active.push({ effect, particle, instance, carry: 0 });
+        });
+    }
     function reset() {
         active.forEach(({ instance }) => instance.delete());
         active = [];
@@ -95,17 +129,30 @@ export async function loadParticles() {
         space: scene.space,
         get active() { return active; },
         spawn(effect: VfxEffect, particle: VfxParticle, position: { x: number; y: number; z: number }, values: Record<string, number>) {
-            withSeededRandom(() => {
-                const instance = new Wintersky.Emitter(scene, configs.get(particle)!, {
-                    loop_mode: "once", parent_mode: "world",
-                }) as RuntimeEmitter;
-                instance.Molang.global_variables = Object.fromEntries(Object.entries(values).map(
-                    ([key, value]) => [`variable.vfx_${key}`, value],
-                ));
-                instance.global_space.position.set(position.x, position.y, position.z);
-                instance.start();
-                active.push({ effect, particle, instance, carry: 0 });
-            });
+            spawnInstance(
+                configs.get(particle),
+                particle,
+                position,
+                Object.fromEntries(Object.entries(values).map(([key, value]) => [`variable.vfx_${key}`, value])),
+                effect,
+            );
+        },
+        spawnPianoParticle(id: string, position: { x: number; y: number; z: number }, values: Record<string, number>) {
+            if (id === "pbe:vfx_draw_point") {
+                spawnInstance(
+                    configs.get("draw_point"),
+                    "draw_point",
+                    position,
+                    Object.fromEntries(Object.entries(values).map(([key, value]) => [`variable.vfx_${key}`, value])),
+                );
+                return;
+            }
+            spawnInstance(
+                pianoConfigs.get(id),
+                id,
+                position,
+                Object.fromEntries(Object.entries(values).map(([key, value]) => [`variable.piano_${key}`, value])),
+            );
         },
         step() {
             withSeededRandom(() => {
@@ -127,6 +174,6 @@ export async function loadParticles() {
         },
         face(camera: Camera) { scene.updateFacingRotation(camera); },
         reset,
-        dispose() { reset(); texture.dispose(); cinemaTexture.dispose(); },
+        dispose() { reset(); texture.dispose(); cinemaTexture.dispose(); pianoFxTexture.dispose(); },
     };
 }

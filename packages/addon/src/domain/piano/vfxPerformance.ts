@@ -1,133 +1,296 @@
-import { PERFORMANCE_LAYERS, TIME_SCALE, type PerformanceCue } from "@piano/core";
-import { effectEmitters } from "./vfxLab";
-import { clampUnit, mix, quietFeatures, type MusicFeatures } from "./vfxMusic";
-import { VfxPresetPlayer, type VfxBatch, type VfxLayer } from "./vfxPreset";
+import {
+    parsePerformanceRgb, TIME_SCALE,
+    type PerformanceBrush, type PerformanceCue, type PerformanceMethod, type PerformanceMotion, type PerformanceZone,
+} from "@piano/core";
+import type { InstrumentDefinition } from "../instrument/definition";
+import { deriveAccentHex, rgbToHex } from "./vfxDraw";
+import { keyParticleOverrideFromCue, type PianoParticleOverride } from "./particleOverride";
+import { clampUnit, mix, type MusicFeatures, type VfxKeyNote } from "./vfxMusic";
+import { VFX_PAINTERS, type PainterContext, type PainterResult } from "./vfxPainters";
+import type { VfxBatch } from "./vfxPreset";
 
-export const PERFORMANCE_RECIPES: Readonly<Partial<Record<number, VfxLayer>>> = {
-    [PERFORMANCE_LAYERS.moonDust]: {
-        effect: "field", mode: "continuous", priority: 1,
-        options: { range: 1.22, density: 1.06, size: 1.14, fieldColor: "#ADC8FF" },
-        map: [
-            { input: "activity", parameter: "intensity", from: 0.55, to: 0.96 },
-            { input: "sustain", parameter: "speed", from: 0.55, to: 0.90 },
-        ],
-    },
-    [PERFORMANCE_LAYERS.rearLight]: {
-        effect: "curtain", layout: "aurora", priority: 3,
-        options: { z: 0.55, range: 1.17, width: 0.26, speed: 0.55, curtainColor: "#809AFF" },
-        map: [{ input: "sustain", parameter: "length", from: 0.82, to: 1.75 }],
-    },
-    [PERFORMANCE_LAYERS.silverThread]: {
-        effect: "beam", profile: "silk", priority: 2,
-        options: { x: -2.46, y: 0.45, z: 0.12, heading: -99, bend: 0.66, range: 1.18, speed: 0.84,
-            lanes: 1, segments: 2, width: 0.24, beamColor: "#C0E8FF" },
-        map: [
-            { input: "pitch", parameter: "height", from: -0.42, to: 0.82 },
-            { input: "sustain", parameter: "length", from: 1.3, to: 2.39 },
-        ],
-    },
-    [PERFORMANCE_LAYERS.amberWings]: {
-        effect: "curtain", layout: "wings", priority: 4,
-        options: { y: -0.16, range: 1.15, width: 0.26, speed: 0.79, curtainColor: "#FFBC79" },
-        map: [{ input: "surge", parameter: "length", from: 1.36, to: 2.36 }],
-    },
-    [PERFORMANCE_LAYERS.timeFan]: {
-        effect: "shaft", layout: "fan", priority: 5,
-        options: { width: 0.22, shaftColor: "#FFF0C7" },
-        map: [{ input: "sustain", parameter: "length", from: 1.1, to: 2.38 }],
-    },
-    [PERFORMANCE_LAYERS.goldSparks]: {
-        effect: "fountain", priority: 6,
-        options: { z: 2.64, range: 1.42, size: 1.07, density: 1.08, speed: 1.13, fountainColor: "#FFD59C" },
-    },
-    [PERFORMANCE_LAYERS.glassGather]: {
-        effect: "shard", priority: 7,
-        options: { flow: -1, range: 1.18, speed: 0.88, size: 0.94, density: 0.82, shardColor: "#73D2FF" },
-    },
-    [PERFORMANCE_LAYERS.glassBreak]: {
-        effect: "shard", priority: 7,
-        options: { flow: 1, range: 1.24, speed: 1.14, size: 1.18, density: 1.12, shardColor: "#FFE4AD" },
-    },
-};
+export function emitPerformanceMethod(method: PerformanceMethod, context: PainterContext): PainterResult {
+    return VFX_PAINTERS[method].emit(context);
+}
 
-interface Level { intensity: number; scale: number }
+interface ChannelState {
+    intensity: number;
+    scale: number;
+    r: number;
+    g: number;
+    b: number;
+    r2: number;
+    g2: number;
+    b2: number;
+    brush: PerformanceBrush;
+    zone: PerformanceZone;
+    motion: PerformanceMotion;
+}
+
 interface Transition {
     tick: number;
     fade: number;
-    from: Level;
-    to: Level;
+    from: ChannelState;
+    to: ChannelState;
 }
 
-const dark: Level = { intensity: 0, scale: 1 };
+interface ChannelTrack {
+    method: PerformanceMethod;
+    slot: number;
+    transitions: Transition[];
+    nextTick: number;
+    lastNoteTick: number;
+    previousLength?: number;
+    previousAmplitude?: number;
+}
 
-function sample(transitions: readonly Transition[], tick: number): Level {
+const DEFAULT_STATE: ChannelState = {
+    intensity: 0,
+    scale: 1,
+    r: 255, g: 255, b: 255,
+    r2: 255, g2: 255, b2: 255,
+    brush: "default",
+    zone: "stage",
+    motion: "normal",
+};
+
+function sampleTrack(transitions: readonly Transition[], tick: number): ChannelState {
     let index = transitions.length - 1;
     while (index >= 0 && transitions[index].tick > tick) index--;
     const transition = transitions[index];
-    if (!transition) return dark;
+    if (!transition) return DEFAULT_STATE;
     const progress = transition.fade ? clampUnit((tick - transition.tick) / transition.fade) : 1;
     const smooth = progress * progress * (3 - 2 * progress);
     return {
         intensity: mix(transition.from.intensity, transition.to.intensity, smooth),
         scale: mix(transition.from.scale, transition.to.scale, smooth),
+        r: mix(transition.from.r, transition.to.r, smooth),
+        g: mix(transition.from.g, transition.to.g, smooth),
+        b: mix(transition.from.b, transition.to.b, smooth),
+        r2: mix(transition.from.r2, transition.to.r2, smooth),
+        g2: mix(transition.from.g2, transition.to.g2, smooth),
+        b2: mix(transition.from.b2, transition.to.b2, smooth),
+        brush: transition.to.brush,
+        zone: transition.to.zone,
+        motion: transition.to.motion,
     };
 }
 
-/** Continuous state is a function of song time. Flashes are crossed only during playback. */
+/** Multi-slot cue player driving all 25 built-in methods; continuous tracks are pure functions of song time. */
 export class VfxPerformancePlayer {
-    private readonly transitions: Transition[][] = [];
+    private readonly tracks: ChannelTrack[] = [];
     private readonly flashes: PerformanceCue[] = [];
-    private readonly player: VfxPresetPlayer;
     private lastTick = -1;
     private flashIndex = 0;
+    private soloStep = 0;
 
-    constructor(cues: readonly PerformanceCue[], duration: number) {
-        const tracks = new Map<number, Transition[]>();
-        const layers: VfxLayer[] = [];
+    constructor(
+        cues: readonly PerformanceCue[],
+        private readonly duration: number,
+        private readonly definition?: InstrumentDefinition,
+    ) {
+        const byChannel = new Map<string, ChannelTrack>();
         for (const cue of cues) {
-            const recipe = PERFORMANCE_RECIPES[cue.layer];
-            if (!recipe) continue;
-            if (cue.op === "flash") {
+            const painter = VFX_PAINTERS[cue.method];
+            if (!painter) continue;
+            if (cue.op === "flash" || painter.instant) {
                 this.flashes.push(cue);
                 continue;
             }
-            let track = tracks.get(cue.layer);
+            const slot = cue.slot ?? 0;
+            const key = `${cue.method}:${slot}`;
+            let track = byChannel.get(key);
             if (!track) {
-                tracks.set(cue.layer, track = []);
-                this.transitions.push(track);
-                layers.push(recipe);
+                track = { method: cue.method, slot, transitions: [], nextTick: 0, lastNoteTick: -1 };
+                byChannel.set(key, track);
+                this.tracks.push(track);
             }
-            track.push({
-                tick: cue.tick, fade: cue.fade, from: sample(track, cue.tick),
-                to: { intensity: cue.level / 100, scale: cue.scale / 100 },
-            });
+            const [r, g, b] = parsePerformanceRgb(cue.color);
+            const resolvedColor2 = cue.color2 ?? deriveAccentHex(cue.color);
+            const [r2, g2, b2] = parsePerformanceRgb(resolvedColor2);
+            const target: ChannelState = {
+                intensity: cue.level / 100,
+                scale: cue.scale / 100,
+                r, g, b,
+                r2, g2, b2,
+                brush: cue.brush ?? "default",
+                zone: cue.zone ?? "stage",
+                motion: cue.motion ?? "normal",
+            };
+            const prev = sampleTrack(track.transitions, cue.tick);
+            const from: ChannelState = !track.transitions.length || prev.intensity <= 0.001
+                ? { ...target, intensity: 0 }
+                : prev;
+            const to: ChannelState = cue.level === 0
+                ? {
+                    ...prev,
+                    intensity: 0,
+                    brush: cue.brush ?? prev.brush,
+                    zone: cue.zone ?? prev.zone,
+                    motion: cue.motion ?? prev.motion,
+                }
+                : target;
+            track.transitions.push({ tick: cue.tick, fade: cue.fade, from, to });
         }
-        this.player = new VfxPresetPlayer({ layers, seconds: duration, fadeIn: 0, fadeOut: 0 });
     }
 
     seek(seconds: number, resetEmitters = true) {
         this.lastTick = seconds * TIME_SCALE;
-        if (resetEmitters) this.player.reset(Math.floor(this.lastTick / 2));
-        const next = this.flashes.findIndex(cue => cue.tick > this.lastTick);
+        const gameTick = Math.floor(this.lastTick / 2);
+        if (resetEmitters) {
+            for (const track of this.tracks) {
+                track.nextTick = gameTick;
+                track.lastNoteTick = -1;
+                track.previousLength = undefined;
+                track.previousAmplitude = undefined;
+            }
+            this.soloStep = 0;
+        }
+        const next = this.flashes.findIndex((cue) => cue.tick > this.lastTick);
         this.flashIndex = next < 0 ? this.flashes.length : next;
     }
 
-    update(seconds: number, music: Readonly<MusicFeatures>, emitFlashes = true): VfxBatch[] {
+    /** Active continuous channels at `seconds` for `/scriptevent pbe:vfx status` and Web Lab UI. */
+    activeSummary(seconds: number): { method: PerformanceMethod; label: string; slot: number; level: number }[] {
+        if (seconds >= this.duration) return [];
+        const tick = seconds * TIME_SCALE;
+        const list: { method: PerformanceMethod; label: string; slot: number; level: number }[] = [];
+        for (const track of this.tracks) {
+            const state = sampleTrack(track.transitions, tick);
+            if (state.intensity < 0.005) continue;
+            list.push({
+                method: track.method,
+                label: VFX_PAINTERS[track.method].label,
+                slot: track.slot,
+                level: Math.round(state.intensity * 100),
+            });
+        }
+        return list;
+    }
+
+    /** Active playing-particle override at `seconds` computed from `key_style` tracks. */
+    keyParticleOverride(seconds: number): PianoParticleOverride | undefined {
+        if (seconds < 0 || seconds >= this.duration) return undefined;
+        const tick = seconds * TIME_SCALE;
+        let matchedSlot = -1;
+        let matchedState: ChannelState | undefined;
+        for (const track of this.tracks) {
+            if (track.method !== "key_style") continue;
+            const state = sampleTrack(track.transitions, tick);
+            if (state.intensity < 0.005) continue;
+            if (track.slot >= matchedSlot) {
+                matchedSlot = track.slot;
+                matchedState = state;
+            }
+        }
+        if (!matchedState) return undefined;
+        return keyParticleOverrideFromCue({
+            brush: matchedState.brush,
+            motion: matchedState.motion,
+            color: rgbToHex(matchedState.r, matchedState.g, matchedState.b),
+            color2: rgbToHex(matchedState.r2, matchedState.g2, matchedState.b2),
+            intensity: matchedState.intensity,
+            scale: matchedState.scale,
+        });
+    }
+
+    update(
+        seconds: number,
+        music: Readonly<MusicFeatures>,
+        emitFlashes = true,
+        recentNotes?: readonly VfxKeyNote[],
+        solo = false,
+    ): VfxBatch[] {
         const tick = seconds * TIME_SCALE;
         if (tick < this.lastTick) this.seek(seconds);
+        const gameTick = Math.floor(tick / 2 + 1e-6);
         const batches: VfxBatch[] = [];
+
         while (this.flashIndex < this.flashes.length && this.flashes[this.flashIndex].tick <= tick) {
             const cue = this.flashes[this.flashIndex++];
             if (!emitFlashes || cue.tick <= this.lastTick) continue;
-            const layer = PERFORMANCE_RECIPES[cue.layer]!;
-            const options = { ...layer.options, intensity: cue.level / 100, scale: cue.scale / 100 };
-            batches.push({ priority: layer.priority ?? 6,
-                emitters: effectEmitters(layer.effect, options, {
-                    music: quietFeatures, previous: options, layout: layer.layout, profile: layer.profile,
-                }) });
+            const painter = VFX_PAINTERS[cue.method];
+            if (!painter) continue;
+            const color2 = cue.color2 ?? deriveAccentHex(cue.color);
+            const result = painter.emit({
+                color: cue.color,
+                color2,
+                intensity: cue.level / 100,
+                scale: cue.scale / 100,
+                brush: cue.brush,
+                zone: cue.zone,
+                motion: cue.motion,
+                music,
+                definition: this.definition,
+                phase: (cue.tick * 17) % 360,
+            });
+            if (result.emitters.length) {
+                batches.push({ priority: result.priority, emitters: result.emitters });
+            }
+            if (cue.method === "shockwave" || cue.method === "firework_bloom") {
+                for (const track of this.tracks) {
+                    if (track.method === "wing_ribbons") {
+                        track.nextTick = Math.max(track.nextTick, gameTick + 12);
+                    }
+                }
+            }
         }
+
+        if (seconds < this.duration) {
+            for (const track of this.tracks) {
+                if (track.method === "key_style") continue;
+                const painter = VFX_PAINTERS[track.method];
+                if (!painter) continue;
+                const state = sampleTrack(track.transitions, tick);
+                if (state.intensity < 0.005) continue;
+                if (gameTick < track.nextTick) continue;
+                let hasFresh = false;
+                if (painter.category === "keys") {
+                    hasFresh = Boolean(recentNotes?.some((note) => note.tick > track.lastNoteTick));
+                    if (!hasFresh && !solo) continue;
+                }
+                const result = painter.emit({
+                    color: rgbToHex(state.r, state.g, state.b),
+                    color2: rgbToHex(state.r2, state.g2, state.b2),
+                    intensity: state.intensity,
+                    scale: state.scale,
+                    brush: state.brush,
+                    zone: state.zone,
+                    motion: state.motion,
+                    music,
+                    recentNotes,
+                    lastNoteTick: track.lastNoteTick,
+                    definition: this.definition,
+                    previousLength: track.previousLength,
+                    previousAmplitude: track.previousAmplitude,
+                    phase: painter.category === "keys" ? this.soloStep : (gameTick * 9 + track.slot * 41) % 360,
+                    solo,
+                });
+                if (painter.category === "keys") {
+                    if (hasFresh) {
+                        for (const note of recentNotes ?? []) {
+                            if (note.tick > track.lastNoteTick) track.lastNoteTick = note.tick;
+                        }
+                        track.nextTick = gameTick + Math.max(1, painter.interval);
+                    } else {
+                        track.nextTick = gameTick + 8;
+                        this.soloStep += 5;
+                    }
+                } else {
+                    const interval = track.method === "wing_ribbons" && state.intensity > 0.70
+                        ? 20
+                        : painter.interval;
+                    track.nextTick = gameTick + Math.max(1, interval);
+                }
+                if (result.nextLength !== undefined) track.previousLength = result.nextLength;
+                if (result.nextAmplitude !== undefined) track.previousAmplitude = result.nextAmplitude;
+                if (result.emitters.length) {
+                    batches.push({ priority: result.priority, emitters: result.emitters });
+                }
+            }
+        }
+
         this.lastTick = tick;
-        return batches.concat(this.player.update(Math.floor(tick / 2), music, false,
-            this.transitions.map(track => sample(track, tick))));
+        return batches.sort((a, b) => b.priority - a.priority);
     }
 }

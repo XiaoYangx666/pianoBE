@@ -65,12 +65,27 @@
 .vfx-perf { margin-left: auto; font-variant-numeric: tabular-nums; }
 .vfx-inspector section:first-child { border-top: 0; }
 .vfx-inspector h2 { margin: 0 0 10px; font-size: 14px; font-weight: 660; }
-.vfx-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.vfx-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .vfx-presets button { display: flex; align-items: center; gap: 6px; font-weight: 650; text-align: left; padding: 7px; }
 .vfx-presets small { display: block; color: var(--muted); font-size: 10px; font-weight: 400; }
 .vfx-presets i { width: 7px; height: 22px; border-radius: 3px; flex: none; background: #a0a6ed; }
 .vfx-presets .neon { background: #8bddf8; }
 .vfx-presets .stage { background: #fac889; }
+.vfx-presets .sakura { background: #ffb7d5; }
+.vfx-presets .starlight { background: #68e4ff; }
+.vfx-presets .cathedral { background: #ffe29a; }
+.vfx-presets .carnival { background: #ff8da8; }
+.vfx-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.vfx-painter-grid { display: grid; gap: 8px; }
+.vfx-painter-grid label { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.vfx-painter-grid select, .vfx-painter-grid input[type=number] { width: 148px; }
+.vfx-colors { display: flex; gap: 12px; }
+.vfx-colors label { flex: 1; }
+.vfx-colors input[type=color] { width: 48px; height: 31px; }
+.vfx-channel-list { display: grid; gap: 4px; margin-top: 8px; font-size: 12px; }
+.vfx-channel-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: #1a2334; }
+.vfx-swatches { display: inline-flex; align-items: center; gap: 4px; }
+.vfx-swatches i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #ffffff30; display: inline-block; }
 .vfx-actions { margin-top: 8px; gap: 6px; }
 .vfx-section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; }
 .vfx-section-title span, .vfx-layer-stats { font-size: 11px; color: var(--muted); }

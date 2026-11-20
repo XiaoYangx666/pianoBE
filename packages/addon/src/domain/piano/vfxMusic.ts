@@ -23,9 +23,17 @@ export const quietFeatures: Readonly<MusicFeatures> = {
     low: 0, middle: 0, high: 0, sustain: 0, surge: 0, chord: 0, onset: 0,
 };
 
+export interface VfxKeyNote {
+    midi: number;
+    velocity: number;
+    duration: number;
+    tick: number;
+}
+
 /** One aggregator per enabled piano. State is bounded by the MIDI key range and game ticks. */
 export class VfxMusic {
     private readonly keys = new Map<number, { until: number; duration: number; velocity: number; source: PianoVisualNote["source"] }>();
+    private readonly recentNotes: VfxKeyNote[] = [];
     private readonly window = new Map<number, number>();
     private readonly chordKeys = new Set<number>();
     private chordStart = -Infinity;
@@ -42,6 +50,8 @@ export class VfxMusic {
         const velocity = event.hasVelocity ? clampUnit(event.velocity / 127) : quietFeatures.velocity;
         const duration = Math.max(0.05, Math.min(30, event.duration));
         this.keys.set(midi, { until: tick + Math.ceil(duration * 20), duration, velocity, source: event.source });
+        this.recentNotes.push({ midi, velocity, duration, tick });
+        if (this.recentNotes.length > 48) this.recentNotes.shift();
         this.window.set(tick, Math.min(64, (this.window.get(tick) ?? 0) + 1));
         if (tick - this.chordStart >= 3) {
             this.chordStart = tick;
@@ -56,9 +66,17 @@ export class VfxMusic {
         }
     }
 
+    recent(withinTicks = 24): readonly VfxKeyNote[] {
+        const latest = this.recentNotes.at(-1)?.tick;
+        if (latest === undefined) return [];
+        const cutoff = latest - withinTicks;
+        return this.recentNotes.filter((note) => note.tick >= cutoff);
+    }
+
     transport(event: PianoTransportEvent) {
         if (event.type === "resume") return;
         for (const [midi, key] of this.keys) if (key.source === "midi") this.keys.delete(midi);
+        this.recentNotes.length = 0;
         this.clearAttacks();
         this.window.clear();
         this.chordKeys.clear();

@@ -56,6 +56,7 @@ mock.module("sapi-pro", () => createSapiProMock(host));
 
 const { PianoSettingsPage } = await import("../src/app/ui/settingsUI");
 const { ParticleSettingsPage } = await import("../src/app/ui/particleSettingsUI");
+const { StageSettingsPage } = await import("../src/app/ui/stageSettingsUI");
 const { TextSettingsPage } = await import("../src/app/ui/textSettingsUI");
 const { PianoScorePage } = await import("../src/app/ui/scoreUI");
 
@@ -110,6 +111,7 @@ describe("钢琴设置（拆分为多个表单）", () => {
         const form = open(PianoSettingsPage, { piano });
 
         expect(form.buttonLabels()).toContain("粒子设置");
+        expect(form.buttonLabels()).toContain("舞台演出");
         expect(form.buttonLabels()).toContain("文字设置");
         expect(form.buttonLabels()).toContain("曲谱配置");
         // 主表单只有一个滑块（音量），文字相关控件已移出
@@ -154,6 +156,32 @@ describe("钢琴设置（拆分为多个表单）", () => {
         const third = open(PianoSettingsPage, { piano });
         third.click("曲谱配置");
         expect(host.nav.pushed.at(-1)!.form).toBe(PianoScorePage);
+
+        const fourth = open(PianoSettingsPage, { piano });
+        fourth.click("舞台演出");
+        expect(host.nav.pushed.at(-1)!.form).toBe(StageSettingsPage);
+    });
+
+    test("舞台演出子页可开关编排、替换弹奏粒子、切换默认主题并恢复默认", () => {
+        const { piano, getSettings } = makePiano();
+        const form = open(StageSettingsPage, { piano });
+
+        const toggles = form.components.filter(item => item.type === "toggle");
+        expect(toggles).toHaveLength(2);
+        (toggles[0].value as FakeObservable<boolean>).setData(false);
+        expect(getSettings().stageChoreography).toBe(false);
+        (toggles[1].value as FakeObservable<boolean>).setData(false);
+        expect(getSettings().stageKeyParticles).toBe(false);
+
+        const dropdown = form.components.find(item => item.type === "dropdown");
+        expect(dropdown).toBeDefined();
+        (dropdown!.value as FakeObservable<number>).setData(4);
+        expect(getSettings().stageTheme).toBe("sakura");
+
+        form.click("恢复本页默认");
+        expect(getSettings().stageChoreography).toBe(true);
+        expect(getSettings().stageKeyParticles).toBe(true);
+        expect(getSettings().stageTheme).toBe("off");
     });
 
     test("粒子子页的开关与样式直接写回钢琴设置", () => {
@@ -191,7 +219,7 @@ describe("钢琴设置（拆分为多个表单）", () => {
 describe("DDUI 页面栈", () => {
     test("子页面不再放冗余“返回”，只保留原生关闭", () => {
         const { piano } = makePiano();
-        for (const page of [ParticleSettingsPage, TextSettingsPage, PianoScorePage]) {
+        for (const page of [ParticleSettingsPage, StageSettingsPage, TextSettingsPage, PianoScorePage]) {
             const form = open(page, { piano });
             expect(form.buttonLabels()).not.toContain("返回");
             expect(form.components.some(item => item.type === "closeButton")).toBe(true);

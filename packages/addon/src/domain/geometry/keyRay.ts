@@ -1,6 +1,6 @@
 import type { Vec3 } from "./offsets";
-import { GRAND_CASE_HITBOXES, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PANEL_BOXES, GRAND_PARTICLE_LINE, SCORE_STAND } from "@data/grand.generated";
-import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "@data/hitboxes.generated";
+import { GRAND_CASE_HITBOXES, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PANEL_BOXES, GRAND_PARTICLE_LINE, SCORE_STAND } from "../../data/grand.generated";
+import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../../data/hitboxes.generated";
 
 type Vec = readonly [number, number, number];
 type Box = readonly [number, number, number, number, number, number];

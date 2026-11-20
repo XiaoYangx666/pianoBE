@@ -133,3 +133,74 @@ test("particle documents reference the original atlas and declare only supplied 
         }
     }
 });
+
+test("generic draw primitives reference the 1024x1024 atlas, valid brush UVs and custom direction", () => {
+    const resource = new URL("../rp/", import.meta.url);
+    const atlas = readFileSync(new URL("textures/particle/vfx_lab.png", resource));
+    const width = atlas.readUInt32BE(16);
+    const height = atlas.readUInt32BE(20);
+    expect([width, height]).toEqual([1024, 1024]);
+
+    const allowedPointVars = new Set([
+        "count", "life", "life_jitter", "brush", "spin", "spin_jitter", "spin_rate",
+        "phase", "phase_spread", "omega", "radius", "radius_end", "curve", "radial_jitter",
+        "depth_ratio", "tilt", "rise", "flutter", "spread_x", "spread_y", "spread_z",
+        "vx", "vy", "vz", "ax", "ay", "az", "size", "size_end", "size_jitter",
+        "red", "green", "blue", "red2", "green2", "blue2", "opacity", "fade_in", "fade_out", "twinkle",
+        "right_x", "right_z", "scale", "stage_depth",
+    ]);
+    const allowedStrokeVars = new Set([
+        "count", "life", "brush", "length", "length_end", "width",
+        "vx", "vy", "vz", "ax", "ay", "az", "tx", "ty", "tz",
+        "red", "green", "blue", "red2", "green2", "blue2", "opacity", "fade_in", "fade_out",
+        "right_x", "right_z", "scale", "stage_depth",
+    ]);
+    const allowedPlaneVars = new Set([
+        "life", "spin", "spin_rate", "vy", "radius_start", "radius_end", "curve", "style",
+        "red", "green", "blue", "red2", "green2", "blue2", "opacity", "fade_in", "fade_out",
+        "right_x", "right_z", "scale", "stage_depth",
+    ]);
+
+    const specs = [
+        ["draw_point", allowedPointVars],
+        ["draw_stroke", allowedStrokeVars],
+        ["draw_plane", allowedPlaneVars],
+    ] as const;
+
+    for (const [name, allowedVars] of specs) {
+        const source = readFileSync(new URL(`particles/pbe_vfx_${name}.particle.json`, resource), "utf8");
+        const doc = JSON.parse(source).particle_effect;
+        expect(doc.description.identifier).toBe(`pbe:vfx_${name}`);
+        expect(doc.description.basic_render_parameters.texture).toBe("textures/particle/vfx_lab");
+        const billboard = doc.components["minecraft:particle_appearance_billboard"];
+        const uv = billboard.uv;
+        expect([uv.texture_width, uv.texture_height]).toEqual([width, height]);
+        if (name === "draw_stroke") {
+            expect(billboard.facing_camera_mode).toBe("direction_x");
+            expect(billboard.direction.mode).toBe("custom");
+            expect(billboard.direction.custom_direction).toHaveLength(3);
+            expect(uv.uv[1]).toBe(896);
+            expect(uv.uv_size).toEqual([256, 96]);
+            for (let b = 0; b <= 3; b++) {
+                expect(b * 256 + 256).toBeLessThanOrEqual(width);
+                expect(896 + 96).toBeLessThanOrEqual(height);
+            }
+        } else if (name === "draw_point") {
+            expect(uv.uv[1]).toBe(768);
+            expect(uv.uv_size).toEqual([128, 128]);
+            for (let b = 0; b <= 7; b++) {
+                expect(b * 128 + 128).toBeLessThanOrEqual(width);
+                expect(768 + 128).toBeLessThanOrEqual(height);
+            }
+        } else {
+            expect(billboard.facing_camera_mode).toBe("emitter_transform_xz");
+            for (const val of [uv.uv_size[0], uv.uv_size[1]]) {
+                expect(typeof val === "string" || typeof val === "number").toBe(true);
+            }
+        }
+        for (const match of source.matchAll(/variable\.vfx_(\w+)/g)) expect(allowedVars.has(match[1])).toBe(true);
+        for (const match of source.matchAll(/variable\.(?!vfx_)(\w+)/g)) {
+            expect(/^(particle_age|particle_lifetime|particle_random_[1-4])$/.test(match[1])).toBe(true);
+        }
+    }
+});

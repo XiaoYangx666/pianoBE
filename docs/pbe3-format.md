@@ -5,7 +5,7 @@ PBE3 是 PianoBE 当前唯一的运行时曲目格式。它替代 PBE2，核心�
 1. **力度调色板**：歌曲级力度表，每个音只存索引；恒定力度时 `velocityBits = 0`。
 2. **keyDuration**：把“琴键实际按下时长”和“声音持续时长”分开存储。
 
-PBE3 音符流不包含左右手/轨道、独立 CC64 踏板事件或速度表。版本 2 可额外携带舞台演出提示。
+PBE3 音符流不包含左右手/轨道、独立 CC64 踏板事件或速度表。版本 3 可额外携带舞台演出提示（版本 2 为旧版格式，仅保留解码兼容）。
 
 ## 1. 数值约定
 
@@ -20,7 +20,7 @@ PBE3 音符流不包含左右手/轨道、独立 CC64 踏板事件或速度表�
 ```text
 offset  size  field
 0       4     magic = "PBE3" (0x50 0x42 0x45 0x33)
-4       1     version = 1（普通曲目）或 2（含演出）
+4       1     version = 1（普通曲目）或 3（含演出；2 为旧版）
 5       1     flags
 6       ...   id      (string)
 ...     ...   name    (string)
@@ -31,7 +31,7 @@ offset  size  field
 ...     1     paletteCount        u8, 1~128
 ...     N     palette             paletteCount 个 u8，升序、去重，值 0~127
 ...     1     velocityBits        u8, 0~7
-...     ...   performance        仅版本 2，见第 9 节
+...     ...   performance        仅版本 2/3，见第 9 节
 ...     ...   event payload       压缩或未压缩的事件流
 ```
 
@@ -170,18 +170,35 @@ PBE3 比 PBE2 **小 10.7%**，同时额外携带了 keyDuration。
 
 PBE2 编解码已完全移除。仓库中不再保留 PBE2 代码、测试样本或 @piano/core/pbe2 入口；旧 .pbe2 文件只在 Git 历史中可见。
 
-版本 1 的 PBE3 数据仍使用原解码路径。上一版仅接受版本 1，在读文件头时会以版本不兼容拒绝版本 2。需要发给该客户端时，可用 `attachSongPerformance(bytes, [])` 导出同一份音符和原压缩载荷的版本 1。
+版本 1 的 PBE3 数据仍使用原解码路径。解码器接受版本 1、2、3：版本 2 的演出区块为每条提示内联 RGB（仅保留解码兼容），版本 3 起改用区块内颜色表 + 索引，编码器始终写版本 3。需要发给旧版客户端时，可用 `attachSongPerformance(bytes, [])` 导出同一份音符和原压缩载荷的版本 1。
 
 ## 9. 演出区块
 
-版本 2 在调色板后、音符载荷前写入以下字段。现有音符 CRC、压缩和跳转索引只覆盖音符流。
+版本 3 在调色板后、音符载荷前写入以下字段。现有音符 CRC、压缩和跳转索引只覆盖音符流。
 
 | 字段 | 编码 |
 | --- | --- |
 | 区块长度 | u16，小端序 |
 | 区块校验 | u32 CRC32，小端序 |
-| 提示列表 | 读到区块末尾，1–192 条，每区块最多 2,496 字节 |
+| 颜色表 | `u8` 数量（1–255）+ 每项 `u8 × 3` RGB |
+| 提示列表 | 读到区块末尾，1–256 条，每区块最多 5,374 字节 |
 
-每个提示依次写入相对上一条的 40 Hz `timeDelta`（VarInt）、`u8` 操作与图层 ID（最高位 0 为渐变、1 为一次性发射，低 7 位为 ID）、`u8` 强度（0–100%）、`u8` 缩放（50–170%）。渐变再写一个 40 Hz `fade`（VarInt）。相同时间的提示按源文件顺序处理。提示和渐变终点均位于曲目时长内。
+每个提示依次写入：
+1. 相对上一条的 40 Hz `timeDelta`（VarInt）
+2. `u8` 标志 `flags`：
+   - bit 7 (`0x80`)：`0` 为持续渐变 `set`，`1` 为瞬时触发 `flash`
+   - bit 6 (`0x40`)：`hasColor2`（是否存在副色索引）
+   - bit 5 (`0x20`)：`hasStyle`（是否存在样式修饰字节）
+   - bits 3–4 (`0x18`)：保留，必须为 `0`
+   - bits 0–2 (`0x07`)：`slot`（0–7，同一绘制方法允许并行占用的独立通道槽位）
+3. `u8` 内置绘制方法 `methodId`（1–255；当前已注册 25 种，对应 `PERFORMANCE_METHODS`，含 `25: key_style` 弹奏粒子替换通道）
+4. `u8` 强度（0–100%；对 `key_style` 而言，`level = 0` 表示解除覆盖恢复默认弹奏粒子，`level > 0` 表示启用覆盖并以 `color` / `color2` 作为 88 键渐变配色）
+5. `u8` 缩放（50–170%）
+6. `u8` 主色索引（指向颜色表；打包工具支持 `PERFORMANCE_PALETTES` 色板名或 `#RRGGBB`，编码时按首次出现顺序去重）
+7. 若 `hasStyle = 1`：`u8` 样式修饰 `(motionId << 6) | (zoneId << 4) | brushId`（`PERFORMANCE_MOTIONS`、`PERFORMANCE_ZONES`、`PERFORMANCE_BRUSHES`；当方法为 `key_style` 时，`brush` 依次映射默认保留样式 / `blue_tears` / `stardust` / `sakura_drift` / `snow` / `neon_note` / `prism_shards` / `magic_trail` / `pulse_ring`，`motion` 中 `gentle` 仅保留琴键微光 `key_glimmer`，`reverse` 则完全关闭主弹奏粒子与琴键微光）
+8. 若 `hasColor2 = 1`：`u8` 副色索引
+9. 若 `flash = 0`（`set`）：40 Hz `fade`（VarInt）；持续通道按 `(method, slot)` 独立插值强度、缩放与主/副 RGB 颜色。
 
-资源编号由 `PERFORMANCE_LAYERS` 定义。支持版本 2 的播放器忽略未知图层，仍播放音符。粒子资源与每层的颜色、位置和音乐映射存于附加包，多个曲目可以引用同一图层。单曲存储上限仍为 2 MiB。
+相同时间的提示按源文件顺序处理。提示和渐变终点均位于曲目时长内。
+
+内置绘制方法由 `PERFORMANCE_METHODS`（25 种：`starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain`、`wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave`、`light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch`、`key_notes`、`key_fountain`、`key_constellation`、`floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom`、`key_style`）定义，笔刷由 `PERFORMANCE_BRUSHES`、空间高度由 `PERFORMANCE_ZONES`、运动修饰由 `PERFORMANCE_MOTIONS` 定义。解码器遇到未知 `methodId` 时会完整跳过该条提示而不报错，遇到未知 `brushId` 时降级为 `default`，仍正常播放音符。单曲存储上限仍为 2 MiB。

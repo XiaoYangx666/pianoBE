@@ -27,6 +27,11 @@ export function placeVfxEmitter(
     const axisX = right.x * Math.cos(angle) + right.z * Math.sin(angle);
     const axisZ = right.z * Math.cos(angle) - right.x * Math.sin(angle);
     const depth = stage.centerZ + (transform.z ?? 0);
+    // Draw-brush emitters reuse the beam/wave effects without their motion
+    // variables; only advance the phase when the emitter actually carries it.
+    const phase = variables.phase ?? 0;
+    const angularSpeed = variables.angular_speed ?? 0;
+    const arcPhase = variables.arc_phase;
     return {
         position: {
             x: center.x + right.x * (transform.x ?? 0) + right.z * depth
@@ -38,8 +43,8 @@ export function placeVfxEmitter(
         variables: {
             ...variables,
             right_x: axisX, right_z: axisZ, scale, stage_depth: stage.depth,
-            ...(emitter.effect === "wave" ? { phase: variables.phase - variables.angular_speed * sceneAge } : {}),
-            ...(emitter.effect === "beam" ? { arc_phase: variables.arc_phase + 82 * sceneAge } : {}),
+            ...(emitter.effect === "wave" ? { phase: phase - angularSpeed * sceneAge } : {}),
+            ...(emitter.effect === "beam" && arcPhase !== undefined ? { arc_phase: arcPhase + 82 * sceneAge } : {}),
         },
     };
 }

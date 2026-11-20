@@ -1,23 +1,42 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, ChevronDown, CircleHelp, Eye, EyeOff, FileUp, Maximize2, Pause, Play, Repeat2, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { createSecretScore, readSongHeader, songToNoteEvents, TIME_SCALE, type PerformanceCue } from "@piano/core";
+import {
+    createSecretScore, PERFORMANCE_BRUSHES, PERFORMANCE_METHODS, PERFORMANCE_MOTIONS, PERFORMANCE_ZONES,
+    readSongHeader, songToNoteEvents, TIME_SCALE,
+    type PerformanceBrush, type PerformanceCue, type PerformanceMethod, type PerformanceMotion, type PerformanceZone,
+} from "@piano/core";
 import secretUrl from "../../../../midis/library/e1563b03.pbe3?url";
 import secret from "../../../../midis/performances/e1563b03.json";
 import { VFX_COLORS, VFX_EFFECTS, VFX_LIMITS, type NumericParameter, type VfxEffect, type VfxOptions } from "../../../addon/src/domain/piano/vfxLab";
 import { VFX_PARTICLES_PER_PIANO } from "../../../addon/src/domain/piano/vfxBudget";
 import type { VfxLayout } from "../../../addon/src/domain/piano/vfxLighting";
 import { quietFeatures, simulatedVfxNotes, type MusicFeatures } from "../../../addon/src/domain/piano/vfxMusic";
+import { isVfxStageTheme, VFX_PAINTERS, VFX_STAGE_THEMES, type VfxStageThemeName } from "../../../addon/src/domain/piano/vfxPainters";
 import { validateVfxPreset, VFX_PRESETS, type VfxPreset } from "../../../addon/src/domain/piano/vfxPreset";
 import { MidiPlayer, parseMidi, type NoteEvent } from "../midiPlayer";
-import { createStage, type Direction, type PreviewStats, type Stage, type Track, type View } from "./stage";
+import { createStage, type Direction, type PainterConfig, type PreviewStats, type Stage, type Track, type View } from "./stage";
 import type { PianoModel } from "./models";
 import { MusicStrip } from "./MusicStrip";
 import "./vfxLab.css";
 
 const names: Record<string, [string, string]> = {
-    galaxy: ["Galaxy", "星河"],
-    neon: ["Neon", "霓虹"],
-    stage: ["Stage", "舞台"],
+    galaxy: ["Galaxy", "梦幻星河"],
+    neon: ["Neon", "霓虹音乐会"],
+    stage: ["Stage", "高能舞台"],
+    sakura: ["Sakura", "落樱星庭"],
+    starlight: ["Starlight", "星空法阵"],
+    cathedral: ["Cathedral", "圣光时空"],
+    carnival: ["Carnival", "璀璨烟花夜"],
+};
+const brushNames: Record<PerformanceBrush, string> = {
+    default: "默认笔刷", mote: "柔光球", star: "星芒", petal: "樱花瓣",
+    snow: "雪花晶", note: "八分音符", shard: "玻璃棱晶", spark: "烟花火花", ring: "双缘圆环",
+};
+const zoneNames: Record<PerformanceZone, string> = {
+    stage: "舞台基准", low: "低空贴地", mid: "中空环绕", high: "高空天顶",
+};
+const motionNames: Record<PerformanceMotion, string> = {
+    normal: "标准", reverse: "反向", intense: "强力", gentle: "轻柔",
 };
 const effectNames: Record<VfxEffect, string> = {
     field: "星尘", orbit: "环绕星芒", beam: "流光", wave: "波带", ripple: "地面波纹", fountain: "火花", curtain: "光幕",
@@ -206,8 +225,19 @@ function LayerEditor({ layer, update, remove }: { layer: Layer; update: (next: L
 }
 
 export default function VfxLabPage() {
+    const [inspectorMode, setInspectorMode] = useState<"preset" | "painter">("preset");
     const [presetId, setPresetId] = useState("galaxy");
     const [preset, setPreset] = useState<VfxPreset>(VFX_PRESETS.galaxy);
+    const [painterConfig, setPainterConfig] = useState<PainterConfig>({
+        method: "magic_circle",
+        color: "#68E4FF",
+        color2: "#C58CFF",
+        brush: "default",
+        zone: "stage",
+        motion: "normal",
+        level: 85,
+        scale: 100,
+    });
     const [hidden, setHidden] = useState<Set<number>>(new Set());
     const [open, setOpen] = useState<number | null>(null);
     const [fixture, setFixture] = useState<Fixture>("phrase");
@@ -217,6 +247,8 @@ export default function VfxLabPage() {
     const [view, setView] = useState<View>("stage");
     const [deck, setDeck] = useState(true);
     const [debug, setDebug] = useState(false);
+    const [showKeyParticles, setShowKeyParticles] = useState(true);
+    const methodCount = Object.keys(PERFORMANCE_METHODS).length;
     const [loop, setLoop] = useState(true);
     const [loopIn, setLoopIn] = useState(0);
     const [loopOut, setLoopOut] = useState(12);
@@ -241,7 +273,7 @@ export default function VfxLabPage() {
     const track = useMemo(() => toTrack(events, midi?.duration ?? 12, midi ? "midi" : "simulation", midi?.performance), [events, midi]);
     const visiblePreset = useMemo(() => ({ ...preset, layers: preset.layers.filter((_, index) => !hidden.has(index)) }), [preset, hidden]);
 
-    function selectPreset(id: string, value = VFX_PRESETS[id]) {
+    function selectPreset(id: string, value = VFX_PRESETS[id] ?? VFX_PRESETS.galaxy) {
         setPresetId(id);
         setPreset(value);
         setHidden(new Set());
@@ -285,12 +317,21 @@ export default function VfxLabPage() {
 
     useEffect(() => {
         if (!ready) return;
-        stage.current!.configure(visiblePreset, track, model, direction, position.current);
-    }, [ready, visiblePreset, track, model, direction]);
+        const theme: VfxStageThemeName | undefined = inspectorMode === "preset" && isVfxStageTheme(presetId) ? presetId : undefined;
+        stage.current!.configure(
+            visiblePreset,
+            track,
+            model,
+            direction,
+            position.current,
+            inspectorMode === "painter" ? { painter: painterConfig } : theme ? { theme } : undefined,
+        );
+    }, [ready, visiblePreset, track, model, direction, inspectorMode, presetId, painterConfig]);
 
     useEffect(() => { stage.current?.setView(view); }, [ready, view]);
     useEffect(() => { stage.current?.setDeck(deck); }, [ready, deck]);
     useEffect(() => { stage.current?.setDebug(debug); }, [ready, debug]);
+    useEffect(() => { stage.current?.setKeyParticles(showKeyParticles); }, [ready, showKeyParticles]);
 
     useEffect(() => {
         if (!ready || capture) return;
@@ -324,13 +365,18 @@ export default function VfxLabPage() {
     useEffect(() => {
         if (!capture || !ready) return;
         let sample: Promise<LabSong> | undefined;
+        const decodeSong = (base64: string) => readPbe(Uint8Array.from(atob(base64), char => char.charCodeAt(0)));
         const lab = {
-            render: async (options: { preset: string | VfxPreset; time: number; view?: View; piano?: PianoModel; direction?: Direction; deck?: boolean }) => {
+            render: async (options: {
+                preset: string | VfxPreset; time: number; view?: View; piano?: PianoModel; direction?: Direction;
+                deck?: boolean; songBase64?: string;
+            }) => {
                 const instance = stage.current!;
                 instance.setView(options.view ?? "stage");
                 instance.setDeck(options.deck ?? true);
+                const custom = options.songBase64 ? decodeSong(options.songBase64) : undefined;
                 const native = options.preset === "secret-native";
-                const song = native || options.preset === "secret" ? await (sample ??= loadSecret()) : undefined;
+                const song = custom ?? (native || options.preset === "secret" ? await (sample ??= loadSecret()) : undefined);
                 const input = song ? toTrack(song.notes, song.duration, "midi", song.performance) : track;
                 if (native && song) input.nativeSecret = createSecretScore(song.notes, song.duration);
                 const selection = song ? VFX_PRESETS.galaxy :
@@ -339,7 +385,7 @@ export default function VfxLabPage() {
                 instance.configure(selection, input, options.piano ?? "grand",
                     options.direction ?? "south", options.time);
                 position.current = options.time;
-                return instance.stats();
+                return { ...instance.stats(), duration: song?.duration ?? track.duration };
             },
             advance: (time: number) => {
                 position.current = time;
@@ -348,6 +394,7 @@ export default function VfxLabPage() {
                 return stage.current!.stats();
             },
             scoreDuration: async () => (await (sample ??= loadSecret())).duration,
+            songDuration: (base64: string) => decodeSong(base64).duration,
         };
         Object.assign(window, { pianoVfxLab: lab });
         return () => { Reflect.deleteProperty(window, "pianoVfxLab"); };
@@ -493,71 +540,179 @@ export default function VfxLabPage() {
                 </section>
             </section>
             <aside className="vfx-inspector">
+                {stats?.keyParticle && <section>
+                    <div className="vfx-section-title">
+                        <h2>弹奏粒子</h2>
+                        <span>{stats.keyParticle.overridden ? "舞台替换中" : "钢琴默认"} · {stats.keyParticle.glimmer ? "含微光" : "无微光"}</span>
+                    </div>
+                    <div className="vfx-channel-item">
+                        <span>{stats.keyParticle.label} <small>({stats.keyParticle.style})</small></span>
+                        <span className="vfx-swatches">
+                            {stats.keyParticle.colors.map((hex, index) => (
+                                <i key={index} title={hex} style={{ background: hex }} />
+                            ))}
+                        </span>
+                    </div>
+                </section>}
                 {midi?.performance && <section>
                     <h2>{midi.title}</h2>
-                    <div>曲目图层 · 预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</div>
+                    <div>曲目编排 · {midi.performance.length} 条提示 · 预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</div>
+                    <div className="vfx-channel-list">
+                        {(stats?.activeChannels ?? []).map(channel => (
+                            <div className="vfx-channel-item" key={`${channel.method}:${channel.slot}`}>
+                                <span>{channel.label} <small>({channel.method}:{channel.slot})</small></span>
+                                <span>{channel.level}%</span>
+                            </div>
+                        ))}
+                        {!stats?.activeChannels?.length && <div className="vfx-layer-stats">当前时刻暂无活跃持续通道</div>}
+                    </div>
                     {Object.entries(stats?.effects ?? {}).map(([effect, fx]) =>
                         <div key={effect}>{effectNames[effect as VfxEffect]} · {fx.particles} 粒子</div>)}
                 </section>}
-                {!midi?.performance && <><section>
-                    <h2>预设</h2>
-                    <div className="vfx-presets">
-                        {Object.entries(names).map(([key, [name, label]]) => <button key={key} data-preset={key}
-                            aria-pressed={presetId === key} onClick={() => selectPreset(key)}>
-                            <i className={key} /><span>{name}<small>{label}</small></span>
-                        </button>)}
-                    </div>
-                    <div className="vfx-row vfx-actions">
-                        <button onClick={() => presetInput.current?.click()}>导入</button>
-                        <button onClick={() => exportPreset(preset)}>导出 JSON</button>
-                        <button aria-label="重置预设" title="重置预设" disabled={!VFX_PRESETS[presetId]}
-                            onClick={() => selectPreset(presetId)}><RotateCcw size={14} /></button>
-                        <input type="file" accept=".json" hidden ref={presetInput} onChange={async event => {
-                            const file = event.target.files?.[0];
-                            event.currentTarget.value = "";
-                            if (!file) return;
-                            try { selectPreset("custom", validateVfxPreset(JSON.parse(await file.text()))); setError(""); }
-                            catch (reason) { setError(String(reason)); }
-                        }} />
-                    </div>
-                </section>
-                <section>
-                    <div className="vfx-section-title"><h2>图层</h2><span>预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</span></div>
-                    {preset.layers.map((layer, index) => {
-                        const fx = stats?.effects[layer.effect];
-                        return <div className="vfx-layer" key={index}>
-                            <div className="vfx-layer-row">
-                                <button title={hidden.has(index) ? "显示图层" : "隐藏图层"} aria-pressed={!hidden.has(index)}
-                                    onClick={() => setHidden(previous => {
-                                        const next = new Set(previous);
-                                        if (next.has(index)) next.delete(index);
-                                        else next.add(index);
-                                        return next;
-                                    })}>{hidden.has(index) ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                                <button className="vfx-layer-name" aria-expanded={open === index}
-                                    onClick={() => setOpen(open === index ? null : index)}>
-                                    {layer.layout ? layoutNames[layer.layout] : effectNames[layer.effect]}
-                                    <small>{layer.effect}</small><ChevronDown size={14} /></button>
+                {!midi?.performance && <>
+                    <section>
+                        <div className="vfx-mode-tabs">
+                            <button type="button" aria-pressed={inspectorMode === "preset"}
+                                onClick={() => setInspectorMode("preset")}>主题 / 图层</button>
+                            <button type="button" aria-pressed={inspectorMode === "painter"}
+                                onClick={() => setInspectorMode("painter")}>绘制方法 ({methodCount})</button>
+                        </div>
+                    </section>
+                    {inspectorMode === "painter" && <section>
+                        <h2>内置粒子绘制（{methodCount} 种）</h2>
+                        <div className="vfx-painter-grid">
+                            <label>绘制方法
+                                <select aria-label="绘制方法" value={painterConfig.method} onChange={event =>
+                                    setPainterConfig(prev => ({ ...prev, method: event.target.value as PerformanceMethod }))}>
+                                    {(Object.keys(PERFORMANCE_METHODS) as PerformanceMethod[]).map(method => (
+                                        <option key={method} value={method}>{VFX_PAINTERS[method].label} ({method})</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <div className="vfx-colors">
+                                <label>主色 <input aria-label="主色" type="color" value={painterConfig.color}
+                                    onChange={event => setPainterConfig(prev => ({ ...prev, color: event.target.value }))} /></label>
+                                <label>副色 <input aria-label="副色" type="color" value={painterConfig.color2}
+                                    onChange={event => setPainterConfig(prev => ({ ...prev, color2: event.target.value }))} /></label>
                             </div>
-                            {open === index && <><div className="vfx-layer-stats">
-                                按效果汇总 · {fx?.particles ?? 0} 粒子 · {fx?.reserved ?? 0} 预留 · {fx?.rate ?? 0} 发射 / 秒
-                            </div><LayerEditor layer={layer} update={item => updateLayer(index, item)}
-                                remove={preset.layers.length > 1 ? () => {
-                                    setPreset(previous => ({ ...previous, layers: previous.layers.filter((_, i) => i !== index) }));
-                                    setHidden(previous => new Set([...previous].filter(i => i !== index).map(i => i > index ? i - 1 : i)));
-                                    setOpen(null);
-                                } : undefined} /></>}
-                        </div>;
-                    })}
-                    {preset.layers.length < 6 && <select aria-label="添加图层" value="" onChange={event => {
-                        const effect = event.target.value as VfxEffect;
-                        setOpen(preset.layers.length);
-                        setPreset(previous => ({ ...previous, layers: [...previous.layers, { effect }] }));
-                    }}>
-                        <option value="" disabled>添加图层</option>
-                        {Object.entries(effectNames).map(([effect, name]) => <option key={effect} value={effect}>{name}</option>)}
-                    </select>}
-                </section></>}
+                            <label>笔刷
+                                <select aria-label="笔刷" value={painterConfig.brush} onChange={event =>
+                                    setPainterConfig(prev => ({ ...prev, brush: event.target.value as PerformanceBrush }))}>
+                                    {(Object.keys(PERFORMANCE_BRUSHES) as PerformanceBrush[]).map(brush => (
+                                        <option key={brush} value={brush}>{brushNames[brush]}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label>高度区域
+                                <select aria-label="高度区域" value={painterConfig.zone} onChange={event =>
+                                    setPainterConfig(prev => ({ ...prev, zone: event.target.value as PerformanceZone }))}>
+                                    {(Object.keys(PERFORMANCE_ZONES) as PerformanceZone[]).map(zone => (
+                                        <option key={zone} value={zone}>{zoneNames[zone]}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label>运动修饰
+                                <select aria-label="运动修饰" value={painterConfig.motion} onChange={event =>
+                                    setPainterConfig(prev => ({ ...prev, motion: event.target.value as PerformanceMotion }))}>
+                                    {(Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[]).map(motion => (
+                                        <option key={motion} value={motion}>{motionNames[motion]}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label>强度 (%)
+                                <input aria-label="强度" type="number" min={10} max={100} value={painterConfig.level}
+                                    onChange={event => setPainterConfig(prev => ({
+                                        ...prev,
+                                        level: Math.max(10, Math.min(100, Math.round(Number(event.target.value) || 85))),
+                                    }))} />
+                            </label>
+                            <label>缩放 (%)
+                                <input aria-label="缩放" type="number" min={50} max={170} value={painterConfig.scale}
+                                    onChange={event => setPainterConfig(prev => ({
+                                        ...prev,
+                                        scale: Math.max(50, Math.min(170, Math.round(Number(event.target.value) || 100))),
+                                    }))} />
+                            </label>
+                            {VFX_PAINTERS[painterConfig.method].instant && <button type="button" onClick={() => {
+                                stage.current?.triggerFlash();
+                                if (!playing) void togglePlay();
+                            }}>触发一次（{VFX_PAINTERS[painterConfig.method].label}）</button>}
+                        </div>
+                        <div className="vfx-layer-stats">
+                            预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO} · 默认笔刷 {brushNames[VFX_PAINTERS[painterConfig.method].defaultBrush]}
+                        </div>
+                    </section>}
+                    {inspectorMode === "preset" && <><section>
+                        <h2>预设与舞台主题</h2>
+                        <div className="vfx-presets">
+                            {Object.entries(names).map(([key, [name, label]]) => <button key={key} data-preset={key}
+                                aria-pressed={presetId === key} onClick={() => selectPreset(key)}>
+                                <i className={key} /><span>{name}<small>{label}</small></span>
+                            </button>)}
+                        </div>
+                        {!isVfxStageTheme(presetId) && <div className="vfx-row vfx-actions">
+                            <button onClick={() => presetInput.current?.click()}>导入</button>
+                            <button onClick={() => exportPreset(preset)}>导出 JSON</button>
+                            <button aria-label="重置预设" title="重置预设" disabled={!VFX_PRESETS[presetId]}
+                                onClick={() => selectPreset(presetId)}><RotateCcw size={14} /></button>
+                            <input type="file" accept=".json" hidden ref={presetInput} onChange={async event => {
+                                const file = event.target.files?.[0];
+                                event.currentTarget.value = "";
+                                if (!file) return;
+                                try { selectPreset("custom", validateVfxPreset(JSON.parse(await file.text()))); setError(""); }
+                                catch (reason) { setError(String(reason)); }
+                            }} />
+                        </div>}
+                    </section>
+                    {isVfxStageTheme(presetId) && <section>
+                        <div className="vfx-section-title"><h2>{VFX_STAGE_THEMES[presetId].label}图层</h2><span>预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</span></div>
+                        <div className="vfx-channel-list">
+                            {VFX_STAGE_THEMES[presetId].layers.map((layer, index) => (
+                                <div className="vfx-channel-item" key={index}>
+                                    <span>{VFX_PAINTERS[layer.method].label} <small>({layer.method})</small></span>
+                                    <span>{typeof layer.level === "number" ? `${layer.level}%` : `${featureNames[layer.level.input]}`}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </section>}
+                    {!isVfxStageTheme(presetId) && <section>
+                        <div className="vfx-section-title"><h2>图层</h2><span>预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</span></div>
+                        {preset.layers.map((layer, index) => {
+                            const fx = stats?.effects[layer.effect];
+                            return <div className="vfx-layer" key={index}>
+                                <div className="vfx-layer-row">
+                                    <button title={hidden.has(index) ? "显示图层" : "隐藏图层"} aria-pressed={!hidden.has(index)}
+                                        onClick={() => setHidden(previous => {
+                                            const next = new Set(previous);
+                                            if (next.has(index)) next.delete(index);
+                                            else next.add(index);
+                                            return next;
+                                        })}>{hidden.has(index) ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                                    <button className="vfx-layer-name" aria-expanded={open === index}
+                                        onClick={() => setOpen(open === index ? null : index)}>
+                                        {layer.layout ? layoutNames[layer.layout] : effectNames[layer.effect]}
+                                        <small>{layer.effect}</small><ChevronDown size={14} /></button>
+                                </div>
+                                {open === index && <><div className="vfx-layer-stats">
+                                    按效果汇总 · {fx?.particles ?? 0} 粒子 · {fx?.reserved ?? 0} 预留 · {fx?.rate ?? 0} 发射 / 秒
+                                </div><LayerEditor layer={layer} update={item => updateLayer(index, item)}
+                                    remove={preset.layers.length > 1 ? () => {
+                                        setPreset(previous => ({ ...previous, layers: previous.layers.filter((_, i) => i !== index) }));
+                                        setHidden(previous => new Set([...previous].filter(i => i !== index).map(i => i > index ? i - 1 : i)));
+                                        setOpen(null);
+                                    } : undefined} /></>}
+                            </div>;
+                        })}
+                        {preset.layers.length < 6 && <select aria-label="添加图层" value="" onChange={event => {
+                            const effect = event.target.value as VfxEffect;
+                            setOpen(preset.layers.length);
+                            setPreset(previous => ({ ...previous, layers: [...previous.layers, { effect }] }));
+                        }}>
+                            <option value="" disabled>添加图层</option>
+                            {Object.entries(effectNames).map(([effect, name]) => <option key={effect} value={effect}>{name}</option>)}
+                        </select>}
+                    </section>}</>}
+                </>}
                 <section className="vfx-scene-controls">
                     <h2>场景</h2>
                     <label>钢琴 <select aria-label="钢琴" value={model} onChange={event => setModel(event.target.value as PianoModel)}>
@@ -569,6 +724,8 @@ export default function VfxLabPage() {
                     <label>布景 <select aria-label="布景" value={deck ? "deck" : "floor"} onChange={event => setDeck(event.target.value === "deck")}>
                         <option value="deck">排练台</option><option value="floor">平地</option>
                     </select></label>
+                    <label className="vfx-checkbox"><input type="checkbox" checked={showKeyParticles} onChange={event =>
+                        setShowKeyParticles(event.target.checked)} /> 显示弹奏粒子</label>
                     <label className="vfx-checkbox"><input type="checkbox" checked={debug} onChange={event =>
                         setDebug(event.target.checked)} /> 网格、发射点与轨迹</label>
                 </section>

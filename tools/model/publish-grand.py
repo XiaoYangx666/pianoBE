@@ -299,7 +299,8 @@ def write_runtime(parts, interaction_cells, full, keys):
         "GRAND_KEY_HITBOXES": keys,
         "GRAND_CASE_HITBOXES": [e["from"] + e["to"] for e in case],
         "GRAND_PANEL_BOXES": [i for i, e in enumerate(case) if e["name"] in panel],
-        "GRAND_PARTICLE_LINE": {"y": MODEL["model_point"]((0, 22.7, -2.9))[1], "z": MODEL["model_point"]((0, 22.7, -2.9))[2]},
+        # Particle emission line sits behind the keys and nameplate, above the folded fallboard cap.
+        "GRAND_PARTICLE_LINE": {"y": MODEL["model_point"]((0, 25.8, 1.4))[1], "z": MODEL["model_point"]((0, 25.8, 1.4))[2]},
         "SCORE_STAND": {"heights": SCORE_HEIGHTS, "z": SCORE_ORIGIN_Z, "pivot": SCORE_PIVOT,
                         "lean": SCORE_LEAN, "face": SCORE_FACE},
     }

@@ -51,8 +51,8 @@
           ]
         },
         "uv": {
-          "texture_width": 512,
-          "texture_height": 256,
+          "texture_width": 1024,
+          "texture_height": 1024,
           "uv": [
             "(variable.vfx_silk ?? 0) > 0.5 ? 128 : 0",
             "(variable.vfx_silk ?? 0) > 0.5 ? 175 : 48"

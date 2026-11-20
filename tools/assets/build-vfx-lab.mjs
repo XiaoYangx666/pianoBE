@@ -5,8 +5,8 @@ import { deflateSync } from "node:zlib";
 
 const root = new URL("../../packages/addon/rp/", import.meta.url);
 const check = process.argv.includes("--check");
-const width = 512;
-const height = 256;
+const width = 1024;
+const height = 1024;
 const texture = "textures/particle/vfx_lab";
 const tiles = {
     mote: [0, 0, 32, 32],
@@ -15,7 +15,8 @@ const tiles = {
     curtain: [96, 0, 32, 48],
     spark: [128, 0, 32, 32],
     beam: [0, 48, 256, 48],
-    ripple: [0, 104, 128, 128],
+    // Ground ring gets a dedicated 256² cell: it is stretched over several blocks.
+    ripple: [0, 512, 256, 256],
     shaft: [128, 109, 128, 64],
     haze: [128, 225, 128, 30],
     flow: [128, 175, 128, 48],
@@ -24,7 +25,22 @@ const tiles = {
     bar: [256, 204, 256, 48],
     upright: [164, 2, 48, 44],
     shard: [212, 0, 44, 48],
+    // 8 x 128² brush cells in a strip, then 4 x 256x96 stroke cells.
+    brush_mote: [0, 768, 128, 128],
+    brush_star: [128, 768, 128, 128],
+    brush_petal: [256, 768, 128, 128],
+    brush_snow: [384, 768, 128, 128],
+    brush_note: [512, 768, 128, 128],
+    brush_shard: [640, 768, 128, 128],
+    brush_spark: [768, 768, 128, 128],
+    brush_ring: [896, 768, 128, 128],
+    stroke_silk: [0, 896, 256, 96],
+    stroke_laser: [256, 896, 256, 96],
+    stroke_comet: [512, 896, 256, 96],
+    stroke_calligraphy: [768, 896, 256, 96],
 };
+const brushCell = tiles.brush_star[0] - tiles.brush_mote[0];
+const strokeCell = tiles.stroke_laser[0] - tiles.stroke_silk[0];
 
 function write(path, contents) {
     const file = fileURLToPath(new URL(path, root));
@@ -108,8 +124,8 @@ paint(tiles.ripple, 0.35, (x, y) => {
     const radius = Math.hypot(x, y);
     const angle = Math.atan2(y, x);
     const grooves = 0.84 + 0.16 * Math.cos(angle * 9 + 0.35 * Math.sin(angle * 4));
-    return [0.81 + 0.19 * gaussian(radius - 0.78, 0.02),
-        grooves * (0.78 * gaussian(radius - 0.78, 0.021) + 0.27 * gaussian(radius - 0.71, 0.033))
+    return [0.81 + 0.19 * gaussian(radius - 0.78, 0.024),
+        grooves * (0.78 * gaussian(radius - 0.78, 0.026) + 0.27 * gaussian(radius - 0.71, 0.040))
         * smooth((0.92 - radius) / 0.12)];
 });
 paint(tiles.shaft, 0.46, (x, y) => {
@@ -190,6 +206,124 @@ paint(tiles.shard, 0.72, (x, y) => {
     const facet = x > 0.13 - 0.61 * y ? 0.16 : 0.40;
     const light = 0.62 + 0.38 * Math.max(cut, seam);
     return [[light * 0.88, light * 0.96, light], facet * interior + 0.67 * cut + 0.74 * seam + glow];
+});
+
+// 8 brushes (64x64 at y=256) for generic draw_point primitives
+paint(tiles.brush_mote, 0.62, (x, y) => {
+    const r = Math.hypot(x, y);
+    const core = gaussian(r, 0.15);
+    const halo = gaussian(r, 0.37);
+    const rim = 0.12 * gaussian(r - 0.48, 0.08);
+    return [0.70 + 0.30 * core, (0.76 * core + 0.28 * halo + rim) * smooth((0.90 - r) / 0.28)];
+});
+paint(tiles.brush_star, 0.85, (x, y) => {
+    const r = Math.hypot(x, y);
+    const core = gaussian(r, 0.11);
+    const axis = gaussian(x, 0.052) * gaussian(y, 0.46) + gaussian(y, 0.052) * gaussian(x, 0.46);
+    const dx = (x + y) * 0.7071;
+    const dy = (x - y) * 0.7071;
+    const diag = 0.45 * (gaussian(dx, 0.045) * gaussian(dy, 0.28) + gaussian(dy, 0.045) * gaussian(dx, 0.28));
+    const halo = 0.24 * gaussian(r, 0.27);
+    return [0.76 + 0.24 * core, clamp(core + 0.78 * axis + diag + halo) * smooth((0.92 - r) / 0.22)];
+});
+paint(tiles.brush_petal, 0.48, (x, y) => {
+    const rx = x * 0.96 + y * 0.24;
+    const ry = -x * 0.24 + y * 0.96;
+    const widthCurve = 0.42 + 0.18 * smooth((0.4 - ry) / 0.9) - 0.28 * smooth((ry - 0.15) / 0.7);
+    const notch = ry < -0.25 ? 0.14 * gaussian(rx, 0.16) * smooth((-0.25 - ry) / 0.45) : 0;
+    const dist = Math.hypot(rx / Math.max(0.14, widthCurve), (ry + 0.05) / 0.72) + notch * 1.8;
+    const body = smooth((0.86 - dist) / 0.22);
+    const vein = 0.32 * gaussian(rx, 0.07) * smooth((0.68 - Math.abs(ry)) / 0.4);
+    const edgeGlow = 0.22 * gaussian(dist - 0.72, 0.09);
+    return [[0.94 + 0.06 * vein, 0.82 + 0.16 * body, 0.90 + 0.10 * vein], clamp(body * 0.78 + vein + edgeGlow)];
+});
+paint(tiles.brush_snow, 0.68, (x, y) => {
+    const r = Math.hypot(x, y);
+    const a = Math.atan2(y, x);
+    const sector = Math.PI / 3;
+    const folded = Math.abs((((a + Math.PI) % sector) + sector) % sector - sector / 2);
+    const axial = r * Math.cos(folded);
+    const perp = r * Math.sin(folded);
+    const arm = gaussian(perp, 0.042) * smooth((0.82 - axial) / 0.16);
+    const branch1 = gaussian(Math.abs(axial - 0.42 - perp * 1.45), 0.036) * smooth((0.55 - perp) / 0.22) * smooth((axial - 0.22) / 0.12);
+    const branch2 = gaussian(Math.abs(axial - 0.63 - perp * 1.45), 0.030) * smooth((0.36 - perp) / 0.18) * smooth((axial - 0.48) / 0.10);
+    const center = 0.62 * gaussian(r, 0.12);
+    const halo = 0.18 * gaussian(r, 0.42);
+    return [0.78 + 0.22 * clamp(center + arm), clamp(arm * 0.86 + branch1 * 0.75 + branch2 * 0.68 + center + halo) * smooth((0.92 - r) / 0.16)];
+});
+paint(tiles.brush_note, 0.78, (x, y) => {
+    // Glowing eighth-note silhouette
+    const hx = (x + 0.18) * 0.86 - (y - 0.32) * 0.50;
+    const hy = (x + 0.18) * 0.50 + (y - 0.32) * 0.86;
+    const headDist = Math.hypot(hx / 0.26, hy / 0.19);
+    const head = smooth((1.05 - headDist) / 0.26);
+    const stem = smooth((0.068 - Math.abs(x - 0.03)) / 0.036) * smooth((y + 0.52) / 0.06) * smooth((0.35 - y) / 0.06);
+    const flagT = clamp((y + 0.52) / 0.48);
+    const flagX = 0.03 + 0.36 * Math.sin(flagT * 1.7) * (1 - 0.25 * flagT);
+    const flag = gaussian(x - flagX, 0.052 * (1.1 - 0.55 * flagT)) * smooth((y + 0.54) / 0.06) * smooth((0.02 - y) / 0.12);
+    const shape = clamp(Math.max(head, stem, flag));
+    const aura = 0.35 * gaussian(Math.hypot(x, y), 0.46);
+    return [0.76 + 0.24 * shape, clamp(shape * 0.92 + aura) * smooth((0.95 - Math.hypot(x, y)) / 0.16)];
+});
+paint(tiles.brush_shard, 0.74, (x, y) => {
+    let edge = Infinity;
+    for (const [index, [ax, ay]] of glassOutline.entries()) {
+        const [bx, by] = glassOutline[(index + 1) % glassOutline.length];
+        edge = Math.min(edge, ((bx - ax) * (y - ay) - (by - ay) * (x - ax)) / Math.hypot(bx - ax, by - ay));
+    }
+    const interior = smooth((edge + 0.03) / 0.07);
+    const cut = interior * gaussian(edge, 0.09);
+    const seam = gaussian(x - (0.12 - 0.60 * y), 0.05) * interior;
+    const glow = 0.30 * gaussian(Math.min(0, edge), 0.09);
+    const facet = x > 0.12 - 0.60 * y ? 0.20 : 0.44;
+    const light = 0.66 + 0.34 * Math.max(cut, seam);
+    return [[light * 0.90, light * 0.97, light], clamp(facet * interior + 0.68 * cut + 0.72 * seam + glow)];
+});
+paint(tiles.brush_spark, 0.80, (x, y) => {
+    const r = 1.48 * Math.abs(x) + 0.66 * Math.abs(y);
+    const core = gaussian(r, 0.16);
+    const flare = gaussian(r, 0.30);
+    return [0.76 + 0.24 * core, clamp(0.84 * core + 0.46 * flare) * smooth((0.92 - r) / 0.28)];
+});
+paint(tiles.brush_ring, 0.64, (x, y) => {
+    const r = Math.hypot(x, y);
+    const angle = Math.atan2(y, x);
+    const shimmer = 0.88 + 0.12 * Math.cos(angle * 8);
+    const outer = gaussian(r - 0.72, 0.042);
+    const inner = 0.48 * gaussian(r - 0.54, 0.055);
+    return [0.78 + 0.22 * outer, shimmer * (outer + inner) * smooth((0.92 - r) / 0.14)];
+});
+
+// 4 strokes (128x48 at y=320) for generic draw_stroke primitives
+paint(tiles.stroke_silk, 0.48, (x, y) => {
+    const end = smooth((0.97 - Math.abs(x)) / 0.46);
+    const core = gaussian(y, 0.15);
+    const side = 0.24 * (gaussian(y - 0.26, 0.06) + gaussian(y + 0.26, 0.06));
+    const halo = 0.22 * gaussian(y, 0.42);
+    return [0.78 + 0.22 * core, end * smooth((0.92 - Math.abs(y)) / 0.22) * (0.76 * core + side + halo)];
+});
+paint(tiles.stroke_laser, 0.82, (x, y) => {
+    const end = smooth((0.98 - Math.abs(x)) / 0.20);
+    const core = gaussian(y, 0.085);
+    const aura = 0.34 * gaussian(y, 0.26);
+    return [0.84 + 0.16 * core, end * smooth((0.92 - Math.abs(y)) / 0.20) * (0.92 * core + aura)];
+});
+paint(tiles.stroke_comet, 0.70, (x, y) => {
+    const t = (x + 1) / 2;
+    const env = smooth((t - 0.02) / 0.55) * smooth((0.98 - t) / 0.16);
+    const cross = y / (0.34 + 0.62 * smooth((t - 0.15) / 0.85));
+    const core = gaussian(cross, 0.12);
+    const wake = 0.32 * gaussian(cross, 0.36);
+    const head = 0.72 + 0.28 * gaussian(x - 0.48, 0.26);
+    return [0.78 + 0.22 * core, env * head * smooth((0.90 - Math.abs(y)) / 0.22) * (0.82 * core + wake)];
+});
+paint(tiles.stroke_calligraphy, 0.54, (x, y) => {
+    const end = smooth((0.97 - Math.abs(x)) / 0.44);
+    const curve = y - 0.12 * Math.sin(x * 3.1);
+    const primary = gaussian(curve + 0.08, 0.10);
+    const echo = 0.52 * gaussian(curve - 0.16, 0.065);
+    const mist = 0.24 * gaussian(curve, 0.32);
+    return [0.82 + 0.18 * primary, end * smooth((0.92 - Math.abs(y)) / 0.22) * (0.76 * primary + echo + mist)];
 });
 
 function chunk(type, data) {
@@ -497,6 +631,111 @@ particle("shaft", {
         uv: thirdUv(tiles.shaft, tiles.haze, tiles.bar, "shaft_style"),
     },
     "minecraft:particle_appearance_tinting": tint([0.66, 0.87, 1], fade(0.8, 0.8)),
+});
+
+// 3 generic parameterized drawing primitives
+const drawAge = "math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1)";
+const drawCurve = `math.pow(${drawAge}, ${param("curve", 1)})`;
+const drawFade = `${fade(`math.max(0.01, ${param("fade_in", 0.16)})`, `math.max(0.01, ${param("fade_out", 0.35)})`)}`;
+const drawTint = {
+    color: [
+        `math.lerp(${param("red", 1)}, ${param("red2", param("red", 1))}, ${drawAge})`,
+        `math.lerp(${param("green", 1)}, ${param("green2", param("green", 1))}, ${drawAge})`,
+        `math.lerp(${param("blue", 1)}, ${param("blue2", param("blue", 1))}, ${drawAge})`,
+        `${param("opacity", 0.8)} * ${drawFade}`,
+    ],
+};
+
+const ptAngle = `${param("phase", 0)} + ${param("phase_spread", 360)} * ${random(1)} + ${param("omega", 0)} * ${age}`;
+const ptRadius = `math.lerp(${param("radius", 0)}, ${param("radius_end", 0)}, ${drawCurve}) + ${param("radial_jitter", 0)} * (2 * ${random(3)} - 1)`;
+const ptFlutter = param("flutter", 0);
+const ptX = `${param("spread_x", 0)} * (2 * ${random(2)} - 1) + (${ptRadius}) * math.cos(${ptAngle}) + ${param("vx", 0)} * ${age} + 0.5 * ${param("ax", 0)} * ${age} * ${age} + (${ptFlutter}) * math.sin(170 * ${age} + 360 * ${random(2)})`;
+const ptY = `${param("spread_y", 0)} * (2 * ${random(3)} - 1) + ${param("tilt", 0)} * math.sin(${ptAngle}) + ${param("rise", 0)} * ${drawCurve} + ${param("vy", 0)} * ${age} + 0.5 * ${param("ay", 0)} * ${age} * ${age}`;
+const ptZ = `(${param("spread_z", 0)} * (2 * ${random(4)} - 1) + (${ptRadius}) * ${param("depth_ratio", 0.9)} * math.sin(${ptAngle}) + ${param("vz", 0)} * ${age} + 0.5 * ${param("az", 0)} * ${age} * ${age} + (${ptFlutter}) * math.cos(145 * ${age} + 360 * ${random(3)})) * ${stageDepth}`;
+const ptSize = scaled(`math.lerp(${param("size", 0.08)}, ${param("size_end", 0.08)}, ${drawAge}) * (1 + ${param("size_jitter", 0.25)} * (2 * ${random(4)} - 1))`);
+const ptTwinkle = `((1 - ${param("twinkle", 0)}) + ${param("twinkle", 0)} * (0.45 + 0.55 * math.sin(260 * ${age} + 360 * ${random(4)})))`;
+
+particle("draw_point", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
+    "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_initial_spin": {
+        rotation: `${param("spin", 0)} + ${param("spin_jitter", 0)} * (2 * ${random(2)} - 1)`,
+        rotation_rate: param("spin_rate", 0),
+    },
+    "minecraft:particle_motion_parametric": {
+        relative_position: position(ptX, ptY, ptZ),
+    },
+    "minecraft:particle_lifetime_expression": {
+        max_lifetime: `math.max(0.1, ${param("life", 1.5)} * (1 + ${param("life_jitter", 0.2)} * (2 * ${random(1)} - 1)))`,
+    },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "rotate_xyz",
+        size: [ptSize, ptSize],
+        uv: {
+            texture_width: width,
+            texture_height: height,
+            uv: [`math.floor(math.clamp(${param("brush", 0)}, 0, 7)) * ${brushCell}`, tiles.brush_mote[1]],
+            uv_size: [brushCell, brushCell],
+        },
+    },
+    "minecraft:particle_appearance_tinting": {
+        color: [drawTint.color[0], drawTint.color[1], drawTint.color[2], `${drawTint.color[3]} * ${ptTwinkle}`],
+    },
+});
+
+const strokeLen = scaled(`math.lerp(${param("length", 0.3)}, ${param("length_end", 0.3)}, ${drawAge})`);
+particle("draw_stroke", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
+    "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_motion_parametric": {
+        relative_position: position(
+            `${param("vx", 0)} * ${age} + 0.5 * ${param("ax", 0)} * ${age} * ${age}`,
+            `${param("vy", 0)} * ${age} + 0.5 * ${param("ay", 0)} * ${age} * ${age}`,
+            `(${param("vz", 0)} * ${age} + 0.5 * ${param("az", 0)} * ${age} * ${age}) * ${stageDepth}`,
+        ),
+    },
+    "minecraft:particle_lifetime_expression": { max_lifetime: `math.max(0.1, ${param("life", 1.4)})` },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "direction_x",
+        size: [`0.5 * (${strokeLen})`, scaled(`0.5 * ${param("width", 0.08)}`)],
+        direction: {
+            mode: "custom",
+            custom_direction: rotate(param("tx", 1), param("ty", 0), `${param("tz", 0)} * ${stageDepth}`),
+        },
+        uv: {
+            texture_width: width,
+            texture_height: height,
+            uv: [`math.floor(math.clamp(${param("brush", 0)}, 0, 3)) * ${strokeCell}`, tiles.stroke_silk[1]],
+            uv_size: [strokeCell, tiles.stroke_silk[3]],
+        },
+    },
+    "minecraft:particle_appearance_tinting": drawTint,
+});
+
+const planeR = scaled(`math.lerp(${param("radius_start", 0.4)}, ${param("radius_end", 2.4)}, math.pow(${drawAge}, ${param("curve", 0.7)})) * ${stageDepth}`);
+particle("draw_plane", {
+    "minecraft:emitter_rate_instant": { num_particles: 1 },
+    "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_initial_spin": {
+        rotation: param("spin", 0),
+        rotation_rate: param("spin_rate", 0),
+    },
+    "minecraft:particle_motion_parametric": {
+        relative_position: position(0, `${param("vy", 0)} * ${age}`, 0),
+    },
+    "minecraft:particle_lifetime_expression": { max_lifetime: `math.max(0.1, ${param("life", 1.2)})` },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "emitter_transform_xz",
+        size: [planeR, planeR],
+        uv: alternateUv(tiles.ripple, tiles.brush_ring, "style"),
+    },
+    "minecraft:particle_appearance_tinting": drawTint,
 });
 
 console.log(check ? "VFX Lab: checked particles, RGBA atlas and emissive texture set" : "VFX Lab: built particles, RGBA atlas and emissive texture set");

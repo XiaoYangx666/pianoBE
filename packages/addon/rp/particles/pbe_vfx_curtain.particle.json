@@ -46,8 +46,8 @@
           "(0.5 * ((variable.vfx_sheet ?? 0) > 0.5 ? math.lerp((variable.vfx_previous_length ?? 1.4), (variable.vfx_length ?? 1.4), math.clamp(variable.particle_age / 0.86, 0, 1)) : (variable.vfx_length ?? 1.4))) * (variable.vfx_scale ?? 1)"
         ],
         "uv": {
-          "texture_width": 512,
-          "texture_height": 256,
+          "texture_width": 1024,
+          "texture_height": 1024,
           "uv": [
             "(variable.vfx_sheet ?? 0) > 1.5 ? 256 : ((variable.vfx_sheet ?? 0) > 0.5 ? 256 : 96)",
             "(variable.vfx_sheet ?? 0) > 1.5 ? 112 : ((variable.vfx_sheet ?? 0) > 0.5 ? 0 : 0)"

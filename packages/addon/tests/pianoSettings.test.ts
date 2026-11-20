@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
-import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, readPianoSettings } from "../src/domain/piano/settings";
+import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, PIANO_STAGE_THEMES, readPianoSettings, stageThemeAt, stageThemeIndexOf } from "../src/domain/piano/settings";
 import { AVAILABLE_SCORES, DEFAULT_SCORE_ID } from "../src/domain/score/score";
 import { DEFAULT_MANUAL_VELOCITY, FOLLOW_PIANO_VELOCITY, manualVelocityAt, manualVelocityIndexOf, manualVelocityPresets, resolveManualVelocity } from "../src/domain/piano/soundTypes";
 
@@ -132,5 +132,30 @@ describe("piano manual velocity settings", () => {
         expect(resolveManualVelocity(FOLLOW_PIANO_VELOCITY, 116)).toBe(116);
         expect(resolveManualVelocity(FOLLOW_PIANO_VELOCITY, 96)).toBe(96);
         expect(resolveManualVelocity(99, 64)).toBe(64);
+    });
+});
+
+describe("piano stage choreography and theme settings", () => {
+    test("默认开启曲目自带舞台编排与舞台弹奏粒子替换，默认舞台主题为关闭，旧存档平滑迁移", () => {
+        expect(DEFAULT_PIANO_SETTINGS.stageChoreography).toBe(true);
+        expect(DEFAULT_PIANO_SETTINGS.stageKeyParticles).toBe(true);
+        expect(DEFAULT_PIANO_SETTINGS.stageTheme).toBe("off");
+        const migrated = readPianoSettings(JSON.stringify({ particles: false }));
+        expect(migrated.stageChoreography).toBe(true);
+        expect(migrated.stageKeyParticles).toBe(true);
+        expect(migrated.stageTheme).toBe("off");
+    });
+
+    test("合法舞台字段持久化，非法值回退默认", () => {
+        for (const theme of PIANO_STAGE_THEMES) {
+            expect(normalizePianoSettings({ stageTheme: theme.id }).stageTheme).toBe(theme.id);
+            expect(stageThemeAt(stageThemeIndexOf(theme.id))).toBe(theme.id);
+        }
+        expect(normalizePianoSettings({ stageChoreography: false }).stageChoreography).toBe(false);
+        expect(normalizePianoSettings({ stageChoreography: "no" }).stageChoreography).toBe(true);
+        expect(normalizePianoSettings({ stageKeyParticles: false }).stageKeyParticles).toBe(false);
+        expect(normalizePianoSettings({ stageKeyParticles: 123 }).stageKeyParticles).toBe(true);
+        expect(normalizePianoSettings({ stageTheme: "invalid" }).stageTheme).toBe("off");
+        expect(normalizePianoSettings({ stageTheme: 3 }).stageTheme).toBe("off");
     });
 });

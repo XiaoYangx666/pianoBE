@@ -2,6 +2,9 @@ import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES } from "@piano/core";
 import { DEFAULT_SCORE_ID, isValidScoreId } from "@domain/score/score";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
 import { DEFAULT_MANUAL_VELOCITY, isManualVelocity } from "./soundTypes";
+import { PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES } from "./particleOverride";
+
+export { PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES };
 
 /** 按启用列表过滤音色；空列表回退到默认音色，保证设置里至少有一个选项。 */
 export function availablePianoTimbres(enabled: readonly string[]) {
@@ -13,30 +16,34 @@ export function availablePianoTimbres(enabled: readonly string[]) {
 /** 当前包内可选的音色（生成器可能裁剪掉部分音色） */
 export const AVAILABLE_PIANO_TIMBRES = availablePianoTimbres(ENABLED_PIANO_TIMBRES);
 
-export const PIANO_PARTICLE_STYLES = [
-    { value: 3, label: "魔法流光", effect: "pbe:magic_trail" },
-    { value: 4, label: "蓝眼泪 · 发光气泡", effect: "pbe:blue_tears" },
-    { value: 0, label: "霓虹音符", effect: "pbe:neon_note" },
-    { value: 2, label: "电光涟漪", effect: "pbe:pulse_ring" },
-    { value: 5, label: "樱吹雪 · 粉色花瓣", effect: "pbe:sakura_drift" },
-    { value: 6, label: "星火 · 闪烁星芒", effect: "pbe:stardust" },
-    { value: 7, label: "棱光 · 彩色晶片", effect: "pbe:prism_shards" },
+export const PIANO_STAGE_THEMES = [
+    { value: 0, id: "off", label: "关闭（仅曲目自带编排）" },
+    { value: 1, id: "galaxy", label: "梦幻星河" },
+    { value: 2, id: "neon", label: "霓虹音乐会" },
+    { value: 3, id: "stage", label: "高能舞台" },
+    { value: 4, id: "sakura", label: "落樱星庭" },
+    { value: 5, id: "starlight", label: "星空法阵" },
+    { value: 6, id: "cathedral", label: "圣光时空" },
+    { value: 7, id: "carnival", label: "璀璨烟花夜" },
 ] as const;
 
-export const PIANO_PARTICLE_PALETTES = [
-    { value: 0, label: "极光 · 青蓝到淡紫", colors: ["#64DBF2", "#E1A0F7"] },
-    { value: 1, label: "琥珀 · 暖橙到浅金", colors: ["#E88F54", "#FFE0A1"] },
-    { value: 2, label: "森语 · 青绿到嫩黄", colors: ["#48C4AD", "#D4ED92"] },
-    { value: 3, label: "月白 · 冷白", colors: ["#D5E6FF", "#D5E6FF"] },
-    { value: 4, label: "虹谱 · 紫蓝、青、绿、金、橙红", colors: ["#9362F5", "#45CFFF", "#60E7A4", "#FADF65", "#FA694F"] },
-    { value: 5, label: "冰火 · 冰蓝、紫红、金橙", colors: ["#43DBFF", "#CD67F4", "#F5638A", "#FFC061"] },
-    { value: 6, label: "深海 · 深蓝到亮青", colors: ["#176FFF", "#29B6FF", "#4DE8FF"] },
-] as const;
+export type PianoStageThemeId = typeof PIANO_STAGE_THEMES[number]["id"];
+
+export function stageThemeIndexOf(id: PianoStageThemeId): number {
+    return PIANO_STAGE_THEMES.find(theme => theme.id === id)?.value ?? 0;
+}
+
+export function stageThemeAt(value: number): PianoStageThemeId | undefined {
+    return PIANO_STAGE_THEMES.find(theme => theme.value === value)?.id;
+}
 
 export type PianoSoundMode = "stereo" | "3d";
 
 export const DEFAULT_PIANO_SETTINGS = {
     particles: true,
+    stageChoreography: true,
+    stageKeyParticles: true,
+    stageTheme: "off" as PianoStageThemeId,
     scoreMounted: false,
     /** 谱架与面板同时显示的曲谱 id；生成器可替换可用曲谱列表 */
     scoreId: DEFAULT_SCORE_ID,
@@ -120,6 +127,14 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
     };
     return {
         particles: typeof saved.particles === "boolean" ? saved.particles : defaults.particles,
+        stageChoreography: typeof saved.stageChoreography === "boolean"
+            ? saved.stageChoreography
+            : defaults.stageChoreography,
+        stageKeyParticles: typeof saved.stageKeyParticles === "boolean"
+            ? saved.stageKeyParticles
+            : defaults.stageKeyParticles,
+        stageTheme: PIANO_STAGE_THEMES.find(theme => theme.id === saved.stageTheme)?.id
+            ?? defaults.stageTheme,
         scoreMounted: typeof saved.scoreMounted === "boolean" ? saved.scoreMounted : defaults.scoreMounted,
         scoreId: isValidScoreId(saved.scoreId) ? saved.scoreId : defaults.scoreId,
         particleStyle: PIANO_PARTICLE_STYLES.find(style => style.value === saved.particleStyle)?.value

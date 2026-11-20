@@ -13,8 +13,10 @@
 export const PBE3_MAGIC = [0x50, 0x42, 0x45, 0x33] as const;
 /** 当前格式版本 */
 export const PBE3_VERSION = 1;
-/** 带演出区块的版本；无演出曲目仍写版本 1。 */
-export const PBE3_PERFORMANCE_VERSION = 2;
+/** 带演出区块的版本；无演出曲目仍写版本 1。v3 起演出区块使用颜色表。 */
+export const PBE3_PERFORMANCE_VERSION = 3;
+/** 旧版演出区块（每条提示内联 RGB），仅保留解码兼容。 */
+export const PBE3_PERFORMANCE_LEGACY_VERSION = 2;
 
 /** 事件流使用 Raw DEFLATE 压缩 */
 export const PBE3_FLAG_COMPRESSED = 1 << 0;

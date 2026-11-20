@@ -4,6 +4,7 @@ import {
 } from "./vfxLab";
 import type { VfxLayout } from "./vfxLighting";
 import { clampUnit, mix, quietFeatures, type MusicFeatures } from "./vfxMusic";
+import { validateKeyParticleOverride, type PianoParticleOverride } from "./particleOverride";
 
 const inputs = ["live", "phrase", "note", "chord", "dense", "solo"] as const;
 export type VfxInput = typeof inputs[number];
@@ -31,13 +32,16 @@ export interface VfxLayer {
 }
 export interface VfxPreset {
     layers: VfxLayer[];
+    keyParticle?: PianoParticleOverride;
     seconds?: number;
     fadeIn?: number;
     fadeOut?: number;
 }
 
 export const VFX_PRESETS: Record<string, VfxPreset> = {
-    galaxy: { layers: [
+    galaxy: {
+        keyParticle: { style: "blue_tears", colors: ["#8EB8FF", "#C58CFF"], glimmer: true },
+        layers: [
         { effect: "field", mode: "continuous", options: { range: 1.26, size: 0.72, density: 0.86, fieldColor: "#9EBCFF" }, map: [
             { input: "activity", parameter: "intensity", from: 0.46, to: 0.83 },
             { input: "sustain", parameter: "speed", from: 0.62, to: 0.9 },
@@ -58,7 +62,9 @@ export const VFX_PRESETS: Record<string, VfxPreset> = {
             { input: "activity", parameter: "intensity", from: 0.4, to: 0.73 },
         ] },
     ] },
-    neon: { layers: [
+    neon: {
+        keyParticle: { style: "neon_note", colors: ["#4EEBFF", "#C58CFF"], glimmer: true },
+        layers: [
         { effect: "shaft", layout: "neon-sides", priority: 3, options: { width: 0.21, shaftColor: "#70CCFF" }, map: [
             { input: "activity", parameter: "intensity", from: 0.25, to: 0.57 },
             { input: "sustain", parameter: "length", from: 1.42, to: 1.96 },
@@ -68,7 +74,9 @@ export const VFX_PRESETS: Record<string, VfxPreset> = {
             { input: "density", parameter: "length", from: 1.72, to: 2.15 },
         ] },
     ] },
-    stage: { layers: [
+    stage: {
+        keyParticle: { style: "magic_trail", colors: ["#FFB870", "#FFE29A"], glimmer: true },
+        layers: [
         { effect: "curtain", layout: "wings", options: { width: 0.25, speed: 0.65, curtainColor: "#FFAD65" }, map: [
             { input: "surge", parameter: "length", from: 0.68, to: 2.31 },
             { input: "surge", parameter: "intensity", from: 0.07, to: 0.91 },
@@ -116,9 +124,10 @@ export function validateEffectOptions(effect: VfxEffect, value: unknown): VfxOpt
 }
 
 export function validateVfxPreset(value: unknown): VfxPreset {
-    const { layers, seconds, fadeIn, fadeOut } = record(value);
+    const { layers, keyParticle, seconds, fadeIn, fadeOut } = record(value);
     if (!Array.isArray(layers) || !layers.length || layers.length > 6) throw new Error("预设需要 1–6 个特效图层");
     return {
+        ...(keyParticle === undefined ? {} : { keyParticle: validateKeyParticleOverride(keyParticle) }),
         seconds: seconds === undefined ? undefined : bounded(seconds, 5, 180, "seconds"),
         fadeIn: fadeIn === undefined ? undefined : bounded(fadeIn, 0, 4, "fadeIn"),
         fadeOut: fadeOut === undefined ? undefined : bounded(fadeOut, 0, 4, "fadeOut"),
@@ -176,6 +185,10 @@ export class VfxPresetPlayer {
             state.next = tick;
             state.previous = undefined;
         }
+    }
+
+    keyParticleOverride(): PianoParticleOverride | undefined {
+        return this.preset.keyParticle;
     }
 
     update(tick: number, music: Readonly<MusicFeatures>, solo = false,

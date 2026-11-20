@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../src/data/hitboxes.generated";
-import { GRAND_INTERACTION_CELLS, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PARTICLE_LINE, GRAND_PARTS, SCORE_STAND } from "../src/data/grand.generated";
+import { GRAND_CASE_HITBOXES, GRAND_INTERACTION_CELLS, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PARTICLE_LINE, GRAND_PARTS, SCORE_STAND } from "../src/data/grand.generated";
 import { grandPianoHitModel, hitsGrandPanel, hitsPianoMenu, pickScorePage, pickPianoMenu, pickPianoPanel, pianoModelOffset, pianoParticleOrigin, pianoRay, pickPianoKey } from "../src/domain/geometry/keyRay";
 
 test("all grand keys play from the bench and keep the two emitters separate in every rotation", () => {
-    expect(GRAND_PARTICLE_LINE).toEqual({ y: 16.466049, z: -2.507613 });
+    expect(GRAND_PARTICLE_LINE).toEqual({ y: 19.146601, z: 1.210572 });
+    expect(GRAND_PARTICLE_LINE.z).toBeGreaterThan(GRAND_KEYBOARD_HITBOX[5]);
+    expect(GRAND_CASE_HITBOXES.some(box =>
+        box[2] <= GRAND_PARTICLE_LINE.z && GRAND_PARTICLE_LINE.z < box[5] &&
+        box[4] < GRAND_PARTICLE_LINE.y && GRAND_PARTICLE_LINE.y - box[4] < 2,
+    )).toBe(true);
     const seen = new Set<number>();
     for (const [midi, x, , z, X, Y, Z] of GRAND_KEY_HITBOXES) {
         if (seen.has(midi)) continue;

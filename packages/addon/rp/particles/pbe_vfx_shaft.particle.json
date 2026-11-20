@@ -51,8 +51,8 @@
           ]
         },
         "uv": {
-          "texture_width": 512,
-          "texture_height": 256,
+          "texture_width": 1024,
+          "texture_height": 1024,
           "uv": [
             "(variable.vfx_shaft_style ?? 0) > 1.5 ? 256 : ((variable.vfx_shaft_style ?? 0) > 0.5 ? 128 : 128)",
             "(variable.vfx_shaft_style ?? 0) > 1.5 ? 204 : ((variable.vfx_shaft_style ?? 0) > 0.5 ? 225 : 109)"

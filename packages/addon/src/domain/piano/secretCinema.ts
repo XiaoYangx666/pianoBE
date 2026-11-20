@@ -5,6 +5,8 @@ import {
 import { GRAND_KEY_HITBOXES } from "../../data/grand.generated";
 import { KEY_HITBOXES } from "../../data/hitboxes.generated";
 import { grandDefinition, type InstrumentDefinition } from "../instrument/definition";
+import { catmullRom, rgbToHex, segmentsAlong, type Point3, type Segment3 } from "./vfxDraw";
+import type { PianoParticleOverride } from "./particleOverride";
 import type { VfxEmitter, VfxParticle } from "./vfxLab";
 import type { VfxBatch } from "./vfxPreset";
 import { vfxStageFrame } from "./vfxStage";
@@ -44,88 +46,16 @@ function tint(warmth: number, opacity: number) {
     };
 }
 
-type Point = [number, number, number];
+type Point = Point3;
 
 /** Billboards per lane. The renderer re-emits the same curve from these samples. */
 export const SECRET_ARC_SAMPLES: readonly number[] = [26, 26];
-
-function direction(from: Point, to: Point): Point {
-    const x = to[0] - from[0];
-    const y = to[1] - from[1];
-    const z = to[2] - from[2];
-    const length = Math.hypot(x, y, z) || 1;
-    return [x / length, y / length, z / length];
-}
-
-type Segment = { point: Point; tangent: Point; spacing: number };
-
-/** Centripetal Catmull-Rom; uneven control spacing no longer produces cusps. */
-function catmullRom(points: readonly Point[], samples = 20): Point[] {
-    const at = (index: number) => points[Math.max(0, Math.min(points.length - 1, index))];
-    const mix = (a: Point, b: Point, t: number, from: number, to: number): Point => {
-        const span = to - from || 1e-4;
-        const u = (t - from) / span;
-        return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
-    };
-    const result: Point[] = [];
-    for (let i = 0; i < points.length - 1; i++) {
-        const p0 = at(i - 1);
-        const p1 = at(i);
-        const p2 = at(i + 1);
-        const p3 = at(i + 2);
-        const t0 = 0;
-        const t1 = t0 + Math.max(1e-3, Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]) ** 0.5);
-        const t2 = t1 + Math.max(1e-3, Math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]) ** 0.5);
-        const t3 = t2 + Math.max(1e-3, Math.hypot(p3[0] - p2[0], p3[1] - p2[1], p3[2] - p2[2]) ** 0.5);
-        for (let sample = 0; sample < samples; sample++) {
-            const t = t1 + (t2 - t1) * sample / samples;
-            const a1 = mix(p0, p1, t, t0, t1);
-            const a2 = mix(p1, p2, t, t1, t2);
-            const a3 = mix(p2, p3, t, t2, t3);
-            const b1 = mix(a1, a2, t, t0, t2);
-            const b2 = mix(a2, a3, t, t1, t3);
-            result.push(mix(b1, b2, t, t1, t2));
-        }
-    }
-    result.push(points[points.length - 1]);
-    return result;
-}
-
-/** Sample a polyline into evenly spaced points; each point faces the next one. */
-function segmentsAlong(points: readonly Point[], count: number): Segment[] {
-    const lengths = points.slice(1).map((point, index) => Math.hypot(
-        point[0] - points[index][0], point[1] - points[index][1], point[2] - points[index][2]));
-    const total = lengths.reduce((sum, length) => sum + length, 0) || 1;
-    const spacing = total / count;
-    const segments: Segment[] = [];
-    let index = 0;
-    let start = 0;
-    for (let sample = 0; sample < count; sample++) {
-        const target = spacing * (sample + 0.5);
-        while (index < lengths.length - 1 && start + lengths[index] < target) {
-            start += lengths[index++];
-        }
-        const t = Math.min(1, Math.max(0, (target - start) / (lengths[index] || 1)));
-        const a = points[index];
-        const b = points[index + 1];
-        segments.push({
-            point: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
-            tangent: [0, 0, 0], spacing,
-        });
-    }
-    for (let sample = 0; sample < count; sample++) {
-        segments[sample].tangent = sample === count - 1
-            ? segments[sample - 1].tangent
-            : direction(segments[sample].point, segments[sample + 1].point);
-    }
-    return segments;
-}
 
 /**
  * One billboard per sample. Neighbouring dashes overlap slightly, so the lane
  * reads as a single continuous arc instead of a row of blobs.
  */
-function segmentEmitters(particle: CinemaParticle, segments: readonly Segment[], life: number,
+function segmentEmitters(particle: CinemaParticle, segments: readonly Segment3[], life: number,
     color: { red: number; green: number; blue: number; opacity: number }, light: number,
     width: number, travel: number): VfxEmitter[] {
     return segments.map(({ point, tangent, spacing }, index) => {
@@ -210,6 +140,23 @@ export class SecretCinemaPlayer {
         this.keys = definition === grandDefinition ? grandKeys : uprightKeys;
         const stage = vfxStageFrame(definition);
         this.centerZ = stage.centerZ;
+    }
+
+    keyParticleOverride(seconds: number): PianoParticleOverride | undefined {
+        if (seconds < 0 || seconds >= this.score.duration) return undefined;
+        const now = this.score.at(seconds);
+        if (now.light < 0.03) return undefined;
+        const c1 = tint(now.warmth * 0.65, 1);
+        const c2 = tint(now.warmth * 0.9 + 0.2, 1);
+        return {
+            style: "stardust",
+            colors: [
+                rgbToHex(c1.red * 255, c1.green * 255, c1.blue * 255),
+                rgbToHex(c2.red * 255, c2.green * 255, c2.blue * 255),
+            ],
+            glimmer: true,
+            intensity: Math.min(1, Math.max(0.45, now.light)),
+        };
     }
 
     update(seconds: number): VfxBatch[] {

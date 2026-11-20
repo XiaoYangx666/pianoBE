@@ -4,16 +4,17 @@
 
 | 层 | 现有入口 | 职责 |
 | --- | --- | --- |
-| Particle Asset | `tools/assets/build-vfx-lab.mjs` 和 `rp/particles/pbe_vfx_*.particle.json` | 原创纹理、MER 发光区、出生后运动、透明度、寿命 |
+| Particle Asset | `tools/assets/build-vfx-lab.mjs` 和 `rp/particles/pbe_vfx_*.particle.json` | `1024 × 1024` RGBA + MER 图集（地面环 256²、8 笔刷 128²、4 笔触 256×96）及 `draw_point`/`draw_stroke`/`draw_plane` 通用原语 |
 | Effect | `domain/piano/vfxLab.ts` 的 `VFX_EFFECTS` | 分类、支持参数、默认运行模式、发射间隔，以及根据局部坐标和参数输出的发射描述 |
-| Preset | `domain/piano/vfxPreset.ts` | 图层、默认值、强度、优先级、音乐映射和进入退出包络 |
+| Draw & Painters | `vfxDraw.ts`、`vfxPainters.ts`、`particleOverride.ts` | 3D 样条/几何采样器、内置绘制方法（`VFX_PAINTERS`）、4 套主题（`VFX_STAGE_THEMES` / `VfxThemePlayer`）与弹奏粒子覆盖解析（`resolveKeyParticle`） |
+| Preset | `domain/piano/vfxPreset.ts` | 图层、默认值、强度、优先级、音乐映射、进入退出包络和可选 `keyParticle` 覆盖 |
 | Music Reactive | `domain/piano/vfxMusic.ts` | 把同一架琴的演奏事件聚合为可采样的音乐特征 |
-| 布局 | `vfxLighting.ts`、`vfxStage.ts` | 排练锚点、朝向、琴尾深度、世界坐标与 Molang 输入 |
+| 布局 | `vfxLighting.ts`、`vfxStage.ts`、`domain/geometry/keyRay.ts` | 排练锚点、朝向、琴尾深度、弹奏粒子坐标线（含三角钢琴 `GRAND_PARTICLE_LINE`）、世界坐标与 Molang 输入 |
 | 预留与调度 | `vfxBudget.ts` | 在游戏刻上接收优先级批次，按寿命预留，每架琴每刻最多提交六个发射器 |
-| 宿主适配 | `app/vfxLab.ts`、`platform/vfxParticle.ts`、`packages/web/src/vfxLab/` | 游戏连接手弹/MIDI 和 Script API，Web 用同一批次驱动 Wintersky 与自由相机 |
-| Performance | `vfxPerformance.ts`、`midis/performances/` | 从 PBE3 提示恢复图层状态，用曲目播放秒数演进渐变并触发一次性效果 |
+| 宿主适配 | `app/vfxLab.ts`、`app/ui/stageSettingsUI.ts`、`platform/particle.ts`、`platform/vfxParticle.ts`、`packages/web/src/vfxLab/` | 连接 DDUI「舞台演出」设置、弹奏粒子覆盖提供者（`PianoRuntime.setParticleOverrideProvider`）、手弹/MIDI 信号与 Script API；Web 排练台同步渲染弹奏粒子并支持绘制方法与 PBE3 演出预览 |
+| Performance | `vfxPerformance.ts`、`midis/performances/` | 从 PBE3 v3 提示（颜色表 + 索引）按 `(method, slot)` 独立建轨、平滑插值主副色/强度/缩放并驱动 `VFX_PAINTERS` 及 `key_style` 弹奏粒子覆盖 |
 
-传统主题继续由原有 `summonParticle` 和七种粒子设置驱动。Lab 在预览启动后订阅同一架琴的 `PianoRuntime.noteSignal` 和 `transportSignal`。每个预览拥有独立特征聚合器。停止、自然到期、卸载或拆琴时解除订阅。没有活跃预览时，定时调度停止。
+基础弹奏粒子由 `summonParticle` 与 `resolveKeyParticle` 统一解析：当未激活舞台替换或「允许舞台替换弹奏粒子」关闭时使用钢琴自选的七种样式与调色板；开启且舞台提供覆盖（`VfxPerformancePlayer` `key_style` 通道、`VFX_STAGE_THEMES` / `VFX_PRESETS` 的 `keyParticle`、`SecretCinemaPlayer` 或 `draw key_style`）时按当前曲目时刻与配色渐变替换，演出停止后自动恢复原设置。Lab 在预览启动后订阅同一架琴的 `PianoRuntime.noteSignal` 和 `transportSignal`。每个预览拥有独立特征聚合器。停止、自然到期、卸载或拆琴时解除订阅。没有活跃预览时，定时调度停止。
 
 ## 事件和采样
 
@@ -50,7 +51,7 @@ Script API 在创建发射器时提供 Molang 参数。持续音乐响应使用�
 2. 在 `VFX_EFFECTS` 注册分类、模式、间隔、可用参数和纯发射工厂。发射描述给出局部位置、Molang 参数、预计粒子上限和寿命。Lab 列出并直接预览注册项。
 3. 在预设里定义响应映射，并为重点图层声明相对优先级。运行图集检查、资源验证和映射测试后进入游戏观察。
 
-曲目图层使用 `vfxPerformance.ts` 中的共享配方。每条渐变在提示开始时采样上一条曲线，之后以平滑插值趋近目标强度和缩放。音乐映射继续调整延音、音高和密度等段内细节。运行时复用 `VfxPresetPlayer`、`effectEmitters` 和 `VfxBudget`，最多四架琴同时发射。曲目提示格式见 [PBE3 演出区块](../pbe3-format.md#9-演出区块)。
+曲目编排使用 `vfxPerformance.ts`、`vfxPainters.ts` 与 `vfxDraw.ts` 中的 25 种内置绘制方法。每条持续渐变按 `(method, slot)` 在提示开始时采样上一条曲线，之后以平滑插值趋近目标强度、缩放与主/副 RGB 颜色，同时按提示切换 `brush`、`zone` 与 `motion`。音乐映射继续调整延音、音高和密度等段内细节。运行时复用 `VfxThemePlayer`、`VfxPresetPlayer`、`effectEmitters` 和 `VfxBudget`，最多四架琴同时发射。曲目提示格式见 [PBE3 演出区块](../pbe3-format.md#9-演出区块)。
 
 基岩版读取 MIDI 播放器的曲内时钟。切歌、暂停、跳转后清空待发批次，恢复时按当前位置求出图层和渐变进度。一次性提示只在向前播放经过时触发。已提交给基岩客户端的粒子按资源包配置自行淡出。
 

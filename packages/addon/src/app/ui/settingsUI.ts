@@ -10,6 +10,7 @@ import { manualVelocityAt, manualVelocityIndexOf, manualVelocityPresets } from "
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { settingsEditor } from "./pianoSettings";
 import { ParticleSettingsPage } from "./particleSettingsUI";
+import { StageSettingsPage } from "./stageSettingsUI";
 import { TextSettingsPage } from "./textSettingsUI";
 import { PianoScorePage } from "./scoreUI";
 
@@ -68,6 +69,7 @@ export const PianoSettingsPage = DDUI.page<{ piano: PianoRuntime }>("钢琴设�
 
     ui.divider();
     ui.button("粒子设置", () => ui.push(ParticleSettingsPage, { piano }));
+    ui.button("舞台演出", () => ui.push(StageSettingsPage, { piano }));
     ui.button("文字设置", () => ui.push(TextSettingsPage, { piano }), { visible: editor.hasScreen });
     ui.button("曲谱配置", () => ui.push(PianoScorePage, { piano }));
     ui.divider();

@@ -9,6 +9,7 @@ import {
     MAX_PBE3_EVENT_BYTES,
     PBE3_FLAG_COMPRESSED,
     PBE3_MAGIC,
+    PBE3_PERFORMANCE_LEGACY_VERSION,
     PBE3_PERFORMANCE_VERSION,
     PBE3_VERSION,
     type Pbe3Header,
@@ -335,7 +336,8 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         if (data[i] !== PBE3_MAGIC[i]) throw new Error("[pbe3] 魔数不匹配");
     }
     const version = data[4];
-    if (version !== PBE3_VERSION && version !== PBE3_PERFORMANCE_VERSION) {
+    if (version !== PBE3_VERSION && version !== PBE3_PERFORMANCE_VERSION &&
+        version !== PBE3_PERFORMANCE_LEGACY_VERSION) {
         throw new Error(`[pbe3] 版本不兼容：${version}`);
     }
     const flags = data[5];
@@ -366,7 +368,7 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
     }
     let performance: PerformanceCue[] | undefined;
     let performanceBytes = 0;
-    if (version === PBE3_PERFORMANCE_VERSION) {
+    if (version === PBE3_PERFORMANCE_VERSION || version === PBE3_PERFORMANCE_LEGACY_VERSION) {
         if (offset + 6 > data.length) throw new Error("[pbe3] 演出区块头被截断");
         const length = data[offset] | (data[offset + 1] << 8);
         const expected = readU32(data, offset + 2);
@@ -374,7 +376,8 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         if (length > MAX_PERFORMANCE_BYTES || offset + length > data.length) throw new Error("[pbe3] 演出区块长度无效");
         const section = data.subarray(offset, offset + length);
         if (crc32(section) !== expected) throw new Error("[pbe3] 演出区块校验失败（CRC32）");
-        performance = decodePerformance(section, duration);
+        const decodedPerformance = decodePerformance(section, duration, version === PBE3_PERFORMANCE_VERSION);
+        if (decodedPerformance.length) performance = decodedPerformance;
         performanceBytes = 6 + length;
         offset += length;
     }
@@ -390,7 +393,8 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         palette,
         velocityBits,
         eventOffset: offset,
-        ...(performance ? { performance, performanceBytes } : {}),
+        ...(performance ? { performance } : {}),
+        ...(performanceBytes ? { performanceBytes } : {}),
         byteLength: data.length,
     };
 }

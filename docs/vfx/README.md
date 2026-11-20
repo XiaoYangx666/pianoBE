@@ -1,6 +1,6 @@
 # PianoBE VFX Lab
 
-[视觉研究、组件和引擎限制](design.md) · [音乐事件、映射和扩展接口](architecture.md)
+[视觉研究、组件和引擎限制](design.md) · [音乐事件、映射和扩展接口](architecture.md) · [创作与扩展指南](authoring.md)
 
 ## 《Secret》首演
 
@@ -26,28 +26,36 @@ npm run build
 
 在 `/vfx-lab` 的音乐片段里选「Secret · 时门」，按播放从头观看，或用乐段按钮定位。基岩版用钢琴的常规曲库搜索「周杰伦 - Secret」并播放，曲目会自动启动演出。对准钢琴运行 `/scriptevent pbe:vfx status` 可查看发射和预算。
 
-[编排源文件](../../midis/performances/e1563b03.json)中的 `sections` 是段落与观察目标，`cues` 按秒填写，最小步长为 0.025 秒。`level` 是强度百分比，`scale` 是缩放百分比。普通提示用 `fade` 填入渐变秒数，一次性发射用 `"op": "flash"`。
+[编排源文件](../../midis/performances/e1563b03.json)中的 `sections` 是段落与观察目标，`cues` 按秒填写，最小步长为 0.025 秒。`method` 指定 25 种内置粒子绘制方法之一（见下文，含 `key_style` 弹奏粒子样式通道），可选 `slot`（`0..7` 允许同方法多通道并行叠加）、主色 `color`、渐变副色 `color2`、笔刷 `brush`（`default`/`mote`/`star`/`petal`/`snow`/`note`/`shard`/`spark`/`ring`）、高度区域 `zone`（`stage`/`low`/`mid`/`high`）与运动修饰 `motion`（`normal`/`reverse`/`intense`/`gentle`）。`level` 是强度百分比，`scale` 是缩放百分比。持续提示用 `fade` 填入渐变秒数，瞬时绘制方法或显式 `"op": "flash"` 触发一次性爆发。
 
-原创「时间碎片」在两侧不同高度和纵深上发射玻璃切面。乐段再现时，`glassGather` 让冰蓝碎片倒流聚拢。高潮中，`glassBreak` 将同一形态改成从近处向侧后方散开的金色碎片。可用 `shard` 单独试放，`flow` 从 −1（聚拢）到 +1（散开）。
+示例曲目《Secret · 时门》在各幕同步编排了舞台特效与 `key_style` 弹奏粒子过渡（从星火、蓝眼泪、魔法流光、雪晶到棱光晶片并在尾声释放恢复默认）。
 
 ```powershell
 npm run build:core
 npm run export:performance
-node tools/assets/capture-vfx-lab.mjs --preset secret --out build/secret-performance --video
 ```
 
-导出改写 `midis/library/e1563b03.pbe3` 及曲库字节数，有本地内嵌模块时同时更新 `midis/js`。选曲可以直接读该 PBE3。后续曲目可在 `midis/performances/<曲库 ID>.json` 中重新排列已注册图层，并用 `npm run export:performance -- <曲库 ID>` 导出。
+导出改写 `midis/library/e1563b03.pbe3` 及曲库字节数，有本地内嵌模块时同时更新 `midis/js`。后续曲目可在 `midis/performances/<曲库 ID>.json` 中自由组合 25 种内置绘制方法，并用 `npm run export:performance -- <曲库 ID>` 导出。
 
-### 首演验收记录
+### 25 种内置绘制方法
+
+| 分类 | 绘制方法（`method`） | 表现与特性 |
+| --- | --- | --- |
+| 氛围（`atmosphere`） | `starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain` | Bokeh 星尘雾海、双侧飘落花瓣/雪花、地面升腾流萤、极光天幕、双翼光幕 |
+| 曲线（`curve`） | `wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave` | 双翼 Catmull-Rom 丝带、双螺旋星轨、倾斜行星环、穿场丝带、律动音浪环、旋涡漏斗、3D 利萨如织光 |
+| 舞台（`stage`） | `light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch` | 霓虹灯柱阵、圣光扇束冠冕、门架光框、旋转六芒星辰法阵、时空光拱门 |
+| 琴键（`keys`） | `key_notes`、`key_fountain`、`key_constellation`、`key_style` | 实时琴键飞音符、琴键重力音泉喷涌、活跃音符星座连线；`key_style` 用于在演出中动态替换/渐变弹奏粒子样式与配色（`style` 别名或 `brush`/`motion`，`level: 0` 恢复默认） |
+| 瞬时（`accent`） | `floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom` | 地面彗星扫光弧、双环扩散冲击波、棱晶回卷（`reverse` 为向外裂变）、高空重力烟花盛放 |
+
+### 验收记录
 
 | 项目 | 结果 |
 | --- | --- |
 | 曲目 | 原 MIDI 982 音，首尾起音约 1.643 / 81.683 秒。PBE3 首尾起音 1.625 / 81.675 秒，含踏板尾音共 86.1 秒 |
-| 编解码 | 43 条提示，1,553 → 1,787 字节。去掉演出区块后与原曲目逐字节一致，另 605 首版本 1 曲目通过校验 |
-| 固定镜头 | `build/secret-performance/` 中有全曲录制，以及前奏、发展、聚拢、第一波裂开、高潮、尾奏、结束的连续播放抽帧 |
-| 播放与预算 | Web 通过选曲、暂停、继续、切歌及跳转检查。曲中跳转恢复正在过渡的图层，后续碎片正常触发。全曲 Web 峰值预留 253 / 275，丢弃 0 批。四琴错峰测试通过 |
-| 本机基岩版 | 客户端、服务端构建验证通过，已部署客户端开发包。曲目、调度脚本、碎片 JSON 和两张图集的 SHA256 与构建一致。已静态核对 `direction.mode: "custom"` 以及 `custom_direction` 向量字段 |
-| 待实机复核 | 基岩版未进入世界，本机配置的文件内容日志处于关闭状态。游戏画面的方向、亮度、遮挡及运行时内容日志待实机确认 |
+| 编解码 | 62 条提示，1,553 → 2,115 字节（+562 B，颜色表版本 3）。去掉演出区块后与原曲目逐字节一致，支持未知 `methodId` 向前兼容跳过；`@piano/core` 74 项测试全过 |
+| 预算与调度 | `@piano/addon` 254 项测试全过，含全部 25 种绘制方法与弹奏粒子覆盖校验、4 套新主题与新版《Secret · 时门》4 琴错峰全曲压测（峰值 ≤ 275 粒子、≤ 24 调用/刻，丢弃 0 批） |
+| 资源与构建 | `1024 × 1024` 图集（地面环 256²、笔刷 128²、笔画 256×96）、MER 贴图及 `draw_point`/`draw_stroke`/`draw_plane` 等粒子文档通过校验，Web 与 Addon 编译构建通过 |
+| 待实机复核 | 基岩版游戏世界内的视觉亮度、MER 发光、遮挡与实机帧率待进世界复核 |
 
 ## Web 排练
 
@@ -80,22 +88,39 @@ node tools/assets/capture-vfx-lab.mjs --preset stage --time 8.7 --time 11.4 --pi
 
 检查自发光时，在客户端视频设置的图形模式里选择 Vibrant Visuals。图集附带独立的 MER 发光图，标准模式也可看到粒子贴图自身的亮芯和柔边。[Vibrant Visuals 资源包说明](https://learn.microsoft.com/en-us/minecraft/creator/documents/vibrantvisuals/vvresourcepacks?view=minecraft-bedrock-stable)
 
-### 音乐响应预设
+### 游戏内「舞台演出」设置与音乐响应主题
+
+普通玩家可在钢琴设置主界面进入 **「舞台演出」** 子页（[stageSettingsUI.ts](../../packages/addon/src/app/ui/stageSettingsUI.ts)）：
+- **启用曲目自带舞台编排**（默认开启）：播放带 PBE3 演出区块的曲目时自动呈现定制舞台；
+- **允许舞台替换弹奏粒子**（默认开启）：开启后，曲目编排或舞台主题可替换弹奏时的琴键粒子样式与配色（内置 7 套主题也各带有匹配的弹奏粒子配置）；
+- **默认舞台主题**（默认关闭）：可从 7 套内置音乐响应主题中任选一套，供普通 MIDI 曲目与手弹（无操作 8 秒自动休眠）使用。
+
+此外，三角钢琴的弹奏粒子发射基准线 `GRAND_PARTICLE_LINE` 位于琴键与铭牌后方的琴盖台面上方（`y = 19.146601, z = 1.210572`），与 P-88 保持统一的落点比例。
+
+开发者指令预览：
 
 ```mcfunction
 /scriptevent pbe:vfx list
-/scriptevent pbe:vfx list surface
+/scriptevent pbe:vfx painters
+/scriptevent pbe:vfx painters curve
+/scriptevent pbe:vfx draw magic_circle phrase {"color":"ice","color2":"violet","brush":"star"}
+/scriptevent pbe:vfx draw key_style live {"style":"snow","color":"ice"}
+/scriptevent pbe:vfx theme sakura live
 /scriptevent pbe:vfx preview ripple {"range":1.15,"rippleColor":"#AFFCE9"}
 /scriptevent pbe:vfx preset galaxy phrase
 /scriptevent pbe:vfx preset neon live
 /scriptevent pbe:vfx preset stage dense
 ```
 
-| 预设 | 联动 |
+| 主题 | 联动 |
 | --- | --- |
 | `galaxy` · 梦幻星河 | 上方与后景是错层的青紫帷幕，琴体两侧是反向游动的丝带，稀疏星尘给出远近参照。长音牵引帷幕呼吸和丝带延展。 |
 | `neon` · 霓虹音乐会 | 六根固定的青蓝侧灯和淡紫背灯形成对称灯阵，按活动度、密度和延音缓慢改变长短与亮度。 |
 | `stage` · 高能舞台 | 后场紫色灯柱先确定空间，持续密集后，左右翼抬升暖色光幕并外展，火花仅作为高潮点缀。休止后光幕与扇束收回。 |
+| `sakura` · 落樱星庭 | 高空落樱花瓣、低位流萤、延音丝带与琴键樱花喷泉联动。 |
+| `starlight` · 星空法阵 | 旋转星辰法阵、双螺旋星轨与活跃音符星座连线联动。 |
+| `cathedral` · 圣光时空 | 极光天幕、时空光拱门、圣光冠冕与高蓄势棱晶回卷联动。 |
+| `carnival` · 璀璨烟花夜 | 暖金双翼流光、霓虹灯柱阵与和弦触发的高空烟花盛放联动。 |
 
 `live` 接收这架琴的手弹和播放器 MIDI。启动后可用钢琴原来的播放器选曲、暂停、继续、拖动进度或切歌。`phrase` 固定轮播休止、琶音、长音、和弦和密集段。`note`、`chord`、`dense` 分别模拟单音、和弦和密集段。`solo` 将图层作为自主效果预览。模拟输入直接送入视觉分析。`status` 对准琴时还会显示当前密度、活跃度、力度、音高和延音值。
 

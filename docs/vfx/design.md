@@ -74,6 +74,6 @@
 
 ## 合成与资源
 
-Lab 效果共用一张原创 512 × 256 RGBA 图集。同尺寸的 MER 图集用绿通道标记自发光，光芯最强，半透明边缘逐渐变暗，透明区为零。Vibrant Visuals 通过粒子 Texture Set 读取发光图。波面及后景的发光低于光条，粒子时间包络和纹理透明度分别计算。Billboard 的 `size` 按半宽和半高设置。[Microsoft Particle Effects](https://learn.microsoft.com/en-us/minecraft/creator/documents/particleeffects?view=minecraft-bedrock-stable) · [Vibrant Visuals Texture Sets](https://learn.microsoft.com/en-us/minecraft/creator/documents/vibrantvisuals/vvresourcepacks?view=minecraft-bedrock-stable)
+Lab 效果共用一张原创 1024 × 1024 RGBA 图集。同尺寸的 MER 图集用绿通道标记自发光，光芯最强，半透明边缘逐渐变暗，透明区为零。地面光环独占 256² 单元、绘制笔刷各占 128²、笔画条为 256 × 96，避免远距离拉伸发糊。Vibrant Visuals 通过粒子 Texture Set 读取发光图。波面及后景的发光低于光条，粒子时间包络和纹理透明度分别计算。Billboard 的 `size` 按半宽和半高设置。[Microsoft Particle Effects](https://learn.microsoft.com/en-us/minecraft/creator/documents/particleeffects?view=minecraft-bedrock-stable) · [Vibrant Visuals Texture Sets](https://learn.microsoft.com/en-us/minecraft/creator/documents/vibrantvisuals/vvresourcepacks?view=minecraft-bedrock-stable)
 
 资料依据：[Microsoft 粒子介绍](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/particlesreference/particlesintroduction)、[组件文档](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/particlesreference/examples/particlecomponents/particle_effect?view=minecraft-bedrock-stable)、[Mojang 粒子组件和变量说明](https://mojang.github.io/bedrock-samples/Particles.html)、[Dimension.spawnParticle](https://learn.microsoft.com/en-us/minecraft/creator/scriptapi/minecraft/server/dimension?view=minecraft-bedrock-stable)。
