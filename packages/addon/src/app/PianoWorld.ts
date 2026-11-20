@@ -13,9 +13,11 @@ import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
 import { playerVelocity } from "@app/playerSound";
 import { animateMidiPerformance, animatePianoPress, MIDI_PERFORMANCE_INTERVAL } from "@app/playerPerformance";
 import { processNote } from "@domain/util/note";
+import { Signal } from "@domain/util/signal";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
 
 class PianoWorld {
+    readonly created = new Signal<PianoRuntime>();
     private readonly pianos = new Map<string, PianoRuntime>();
     private readonly active = new Set<PianoRuntime>();
     private nearby = new Map<string, Vector3[]>();
@@ -82,6 +84,7 @@ class PianoWorld {
                 return;
             }
             this.pianos.set(key, runtime);
+            this.created.publish(runtime);
             piano = runtime;
         } else if (piano.verify(tick) !== "complete") {
             return;

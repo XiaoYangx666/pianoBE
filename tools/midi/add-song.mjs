@@ -15,6 +15,7 @@ import {
     songToAddonModule,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
+import { readPerformance } from "./performance.mjs";
 
 const libDir = path.resolve("./midis/library");
 const jsDir = path.resolve("./midis/js");
@@ -63,7 +64,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         new Uint8Array(fs.readFileSync(file)),
         path.basename(file).replace(/\.midi?$/i, "")
     );
-    const pbe3 = encodeSong(song);
+    const pbe3 = encodeSong({ ...song, performance: readPerformance(song.id) });
     const entry = {
         id: song.id,
         name: song.name,
@@ -78,7 +79,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         console.warn(`⚠️  同名不同内容: 「${song.name}」曲库已有另一首 (${index.find((m) => m.name === song.name && m.id !== song.id).id})，仍会添加 (${song.id})`);
     }
     if (pos >= 0) {
-        if (index[pos].name === song.name && index[pos].noteCount === entry.noteCount) {
+        if (index[pos].name === song.name && index[pos].noteCount === entry.noteCount && index[pos].bytes === entry.bytes) {
             status = "跳过"; // 内容与元数据完全一致 → 幂等跳过
             skipped++;
         } else {

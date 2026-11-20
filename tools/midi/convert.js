@@ -7,6 +7,7 @@ import {
     songToAddonModule,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
+import { readPerformance } from "./performance.mjs";
 
 // ===== 1. 读取路径 =====
 // 用法：
@@ -71,7 +72,7 @@ let pbe3Bytes = 0;
 for (const file of files) {
     const buffer = fs.readFileSync(path.join(inputDir, file));
     const song = midiBufferToSong(buffer, file.replace(/\.midi?$/i, ""));
-    const pbe3 = encodeSong(song);
+    const pbe3 = encodeSong({ ...song, performance: readPerformance(song.id) });
     const moduleText = songToAddonModule(pbe3);
 
     fs.writeFileSync(path.join(jsDir, `${song.id}.js`), moduleText, "utf-8");

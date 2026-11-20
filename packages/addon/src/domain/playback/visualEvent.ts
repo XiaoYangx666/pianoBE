@@ -1,6 +1,7 @@
 export interface PianoVisualNote {
     midi: number;
     duration: number;
+    soundDuration?: number;
     velocity: number;
     tick: number;
     source: "manual" | "midi" | "simulation";

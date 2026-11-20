@@ -199,13 +199,12 @@ export class MidiPlayer {
         // 先收掉跳转前的所有实例，避免旧音符继续发声到原定释放时间。
         this.output.stopNotes();
         this.cursor.seek(target * TIME_SCALE);
-        this.output.transport?.({ type: "seek", position: target });
-
         if (this.state === "idle" || this.state === "stopped") {
             this.state = "playing";
             this.output.playing(true);
             this.lastTime = Date.now();
         }
+        this.output.transport?.({ type: "seek", position: target });
 
         this.signal.publish();
     }
@@ -410,6 +409,21 @@ export class MidiPlayer {
 
     getState(): PlayerState {
         return this.state;
+    }
+
+    get performance() {
+        const song = this.song?.song;
+        const cues = song?.header.performance;
+        if (!song || !cues) return;
+        return { cues, duration: song.duration / TIME_SCALE };
+    }
+
+    get loadedSong() {
+        return this.song?.song;
+    }
+
+    get position() {
+        return this.currentTime;
     }
 
     getInfo() {

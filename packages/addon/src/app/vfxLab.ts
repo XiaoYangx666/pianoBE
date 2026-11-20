@@ -1,7 +1,12 @@
 import { Player, ScriptEventSource, system } from "@minecraft/server";
+import type { SecretScore } from "@piano/core";
 import { parseVfxOptions, planVfxScene, VFX_EFFECTS, VFX_SCENES,
     type VfxCue, type VfxOptions, type VfxScene } from "@domain/piano/vfxLab";
 import { VFX_MAX_PIANOS, VfxBudget } from "@domain/piano/vfxBudget";
+import { VfxPerformancePlayer } from "@domain/piano/vfxPerformance";
+import { SecretCinemaPlayer, secretScoreForSong } from "@domain/piano/secretCinema";
+import type { PianoTransportEvent } from "@domain/playback/visualEvent";
+import type { MidiPlayer } from "@domain/playback/player";
 import { quietFeatures, simulatedVfxNotes, VfxMusic, type MusicFeatures } from "@domain/piano/vfxMusic";
 import { isVfxEffect, validateEffectOptions, validateVfxPreset, vfxInput, VFX_PRESETS, VfxPresetPlayer,
     type VfxBatch, type VfxInput, type VfxPreset } from "@domain/piano/vfxPreset";
@@ -9,11 +14,17 @@ import { inspectInstrument, instrumentDestroyed, instrumentKey, resolveInstrumen
 import { spawnVfxEmitter } from "@platform/vfxParticle";
 import { loadVfxPresets, saveVfxPreset } from "@platform/storage/vfxPresets";
 import { pianoWorld } from "./PianoWorld";
+import type { PianoRuntime } from "./PianoRuntime";
 
-type Request = { scene: VfxScene; options: VfxOptions } | { preset: VfxPreset; input: VfxInput; name: string };
+type SongRequest = {
+    piano: PianoRuntime;
+    midi: MidiPlayer;
+    transport: PianoTransportEvent;
+} & ({ score: SecretScore } | { performance: NonNullable<MidiPlayer["performance"]> });
+type LabRequest = { scene: VfxScene; options: VfxOptions } | { preset: VfxPreset; input: VfxInput; name: string };
 interface Preview {
     location: InstrumentLocation;
-    request: Request;
+    request: LabRequest | SongRequest;
     producer?: {
         update(tick: number, elapsed: number): VfxBatch[];
         detach?(): void;
@@ -40,8 +51,63 @@ function stop(preview: Preview) {
     preview.budget.clearPending();
 }
 
+function syncSongVfx(piano: PianoRuntime, transport: PianoTransportEvent) {
+    const key = instrumentKey(piano.location.dimension, piano.location.pos);
+    const previous = previews.get(key);
+    const songPreview = previous && "midi" in previous.request ? previous : undefined;
+    if (transport.type === "pause" || transport.type === "stop" || transport.type === "track") {
+        if (songPreview) stop(songPreview);
+        return;
+    }
+    const midi = piano.getMidiPlayer();
+    if (!midi.isPlaying() || (!previous && previews.size >= VFX_MAX_PIANOS)) return;
+    const score = secretScoreForSong(midi.loadedSong);
+    const performance = midi.performance;
+    const binding = { piano, midi, transport };
+    const request = score ? { ...binding, score } : performance ? { ...binding, performance } : undefined;
+    if (!request) return;
+    if (previous) stop(previous);
+    const preview: Preview = {
+        location: piano.location,
+        request,
+        start: system.currentTick,
+        duration: Infinity,
+        ended: false,
+        budget: previous?.budget ?? new VfxBudget(),
+        features: quietFeatures,
+    };
+    previews.set(key, preview);
+    preview.producer = createProducer(preview);
+    timer ??= system.runInterval(update);
+}
+
 function createProducer(preview: Preview): NonNullable<Preview["producer"]> | undefined {
     const { request, location } = preview;
+    if ("performance" in request) {
+        const { piano, midi, performance, transport } = request;
+        const player = new VfxPerformancePlayer(performance.cues, performance.duration);
+        if (transport.type !== "start") player.seek(transport.position);
+        const music = new VfxMusic();
+        const detachNote = piano.noteSignal.subscribe(note => {
+            const { midi, velocity, tick, source, hasVelocity, songTime } = note;
+            if (source === "midi" && velocity !== undefined && tick !== undefined && hasVelocity !== undefined) {
+                music.note({ midi, velocity, tick, source, hasVelocity, songTime, duration: note.soundDuration ?? note.duration });
+            }
+        });
+        const detachPiano = piano.onDispose(() => stop(preview));
+        return {
+            update(tick, elapsed) {
+                if (elapsed % 4 === 0) preview.features = music.sample(tick);
+                return player.update(midi.position, preview.features);
+            },
+            detach() { detachNote(); detachPiano(); },
+        };
+    }
+    if ("score" in request) {
+        const { piano, midi, score, transport } = request;
+        const player = new SecretCinemaPlayer(score, location.definition, transport.position, transport.type === "start");
+        return { update: () => player.update(midi.position), detach: piano.onDispose(() => stop(preview)) };
+    }
     if ("scene" in request) {
         const cues: VfxCue[] = planVfxScene(request.scene, request.options);
         let cursor = 0;
@@ -107,7 +173,8 @@ function update() {
                 }
                 preview.budget.dispatch(tick, emitter => {
                     calls++;
-                    spawnVfxEmitter(preview.location, emitter, elapsed / 20);
+                    const seconds = "midi" in preview.request ? preview.request.midi.position : elapsed / 20;
+                    spawnVfxEmitter(preview.location, emitter, seconds);
                     sent++;
                 });
             } catch (error) {
@@ -126,7 +193,7 @@ function update() {
     }
 }
 
-function startPreview(location: InstrumentLocation, request: Request) {
+function startPreview(location: InstrumentLocation, request: LabRequest) {
     const key = instrumentKey(location.dimension, location.pos);
     const previous = previews.get(key);
     if (!previous && previews.size >= VFX_MAX_PIANOS) throw new Error("已有 4 架琴占用预览预算，请等待粒子消退");
@@ -156,6 +223,9 @@ function words(message: string): [string, string] {
 }
 
 export function registerVfxLab() {
+    pianoWorld.created.subscribe(piano => {
+        piano.transportSignal.subscribe(event => syncSongVfx(piano, event));
+    });
     instrumentDestroyed.subscribe(location => {
         const preview = previews.get(instrumentKey(location.dimension, location.pos));
         if (preview) stop(preview);
@@ -188,6 +258,9 @@ export function registerVfxLab() {
             const previous = location && previews.get(instrumentKey(location.dimension, location.pos));
             if (action === "status") {
                 say(status());
+                if (previous && "midi" in previous.request) {
+                    say(`${"score" in previous.request ? "Secret 电影版" : "曲目演出"} · ${previous.request.midi.position.toFixed(2)} 秒`);
+                }
                 if (previous && "input" in previous.request) {
                     const { density, activity, velocity, pitch, sustain } = previous.features;
                     say(`${previous.request.name} / ${previous.request.input} · 密度 ${density.toFixed(2)} · 活跃 ${activity.toFixed(2)} · 力度 ${velocity.toFixed(2)} · 音高 ${pitch.toFixed(2)} · 延音 ${sustain.toFixed(2)}`);
@@ -202,8 +275,12 @@ export function registerVfxLab() {
             }
             const [name, detail] = words(args);
             const scene = VFX_SCENES.find(value => value === action);
-            let request: Request;
+            let request: LabRequest;
             if (action === "reset" && previous) {
+                if ("midi" in previous.request) {
+                    void previous.request.midi.restart();
+                    return;
+                }
                 request = "scene" in previous.request ? { scene: previous.request.scene, options: {} } : previous.request;
             } else if (scene) {
                 request = { scene, options: parseVfxOptions(args) };

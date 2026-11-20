@@ -19,7 +19,7 @@ interface VfxMapping {
     from: number;
     to: number;
 }
-interface VfxLayer {
+export interface VfxLayer {
     effect: VfxEffect;
     layout?: VfxLayout;
     profile?: "silk";
@@ -162,7 +162,6 @@ export interface VfxBatch {
     emitters: VfxEmitter[];
 }
 
-/** Future score drivers can supply the same presets with features and an external tick clock. */
 export class VfxPresetPlayer {
     private readonly states: LayerState[];
     readonly duration: number;
@@ -179,7 +178,8 @@ export class VfxPresetPlayer {
         }
     }
 
-    update(tick: number, music: Readonly<MusicFeatures>, solo = false): VfxBatch[] {
+    update(tick: number, music: Readonly<MusicFeatures>, solo = false,
+        levels?: readonly { intensity: number; scale: number }[]): VfxBatch[] {
         if (tick >= this.duration) return [];
         const rise = (this.preset.fadeIn ?? 0.48) * 20;
         const fall = (this.preset.fadeOut ?? 1.45) * 20;
@@ -196,7 +196,9 @@ export class VfxPresetPlayer {
                 const weight = clampUnit(mapping.input === "dynamics" ? (value + 1) / 2 : value);
                 options[mapping.parameter] = mix(mapping.from, mapping.to, weight);
             }
-            options.intensity = envelope * (options.intensity ?? 1);
+            const level = levels?.[index];
+            options.intensity = envelope * (options.intensity ?? 1) * (level?.intensity ?? 1);
+            if (level) options.scale = level.scale;
             if (options.intensity < 0.005) continue;
             const emitters = effectEmitters(layer.effect, options, {
                 music: mode === "autonomous" ? quietFeatures : music,

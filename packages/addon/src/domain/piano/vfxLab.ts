@@ -4,8 +4,8 @@ import { stageLights, stageVeils, VFX_LIGHT_LAYOUTS, VFX_VEIL_LAYOUTS, type VfxL
 
 export const VFX_SCENES = ["field", "wave", "beam", "mix", "burst", "demo"] as const;
 export type VfxScene = typeof VFX_SCENES[number];
-export type VfxEffect = "field" | "wave" | "beam" | "ripple" | "fountain" | "curtain" | "orbit" | "shaft";
-export type VfxParticle = VfxEffect | "shaft_upright";
+export type VfxEffect = "field" | "wave" | "beam" | "ripple" | "fountain" | "curtain" | "orbit" | "shaft" | "shard";
+export type VfxParticle = VfxEffect | "shaft_upright" | `cinema_${"dust" | "filament" | "sweep" | "note" | "shock"}`;
 
 export const VFX_LIMITS = {
     range: [0.65, 1.6],
@@ -22,6 +22,7 @@ export const VFX_LIMITS = {
     width: [0.025, 0.26],
     heading: [-180, 180],
     bend: [0, 1.4],
+    flow: [-1, 1],
     lanes: [1, 6],
     segments: [1, 3],
     x: [-5, 5],
@@ -51,7 +52,7 @@ export interface VfxCue {
 
 export const VFX_COLORS: Readonly<Record<VfxEffect, string>> = {
     field: "#A6B7FB", wave: "#79BCDD", beam: "#FFD8B2", ripple: "#8AE4DB",
-    fountain: "#FFDDA8", curtain: "#8C9EEF", orbit: "#D4A9FE", shaft: "#A8DFFF",
+    fountain: "#FFDDA8", curtain: "#8C9EEF", orbit: "#D4A9FE", shaft: "#A8DFFF", shard: "#95DCFF",
 };
 const origin = { x: 0, y: 0, z: 0 };
 const ticksPerSecond = 20;
@@ -203,6 +204,25 @@ function fountain(options: VfxOptions): VfxEmitter[] {
     }));
 }
 
+function shards(options: VfxOptions): VfxEmitter[] {
+    const count = Math.round(5 * (options.density ?? 1));
+    const speed = options.speed ?? 1;
+    return [-1, 1].flatMap(side => [
+        { x: 1.25, y: 1.35, z: -0.72 },
+        { x: 1.68, y: 0.82, z: 0.30 },
+        { x: 1.05, y: 1.91, z: 1.22 },
+    ].map(({ x, y, z }, index) => ({
+        effect: "shard",
+        offset: { x: side * x, y: y + (options.height ?? 0), z: z + 0.20 * side },
+        particles: count,
+        lifetime: 0.10 + 1.83 / speed,
+        variables: {
+            ...tint("shard", options, [0.76, 1, 0.92][index]),
+            side, count, speed, flow: options.flow ?? 1, range: options.range ?? 1, size: options.size ?? 1,
+        },
+    })));
+}
+
 function curtain(options: VfxOptions, context: VfxEffectContext): VfxEmitter[] {
     const range = options.range ?? 1;
     const layout = context.layout;
@@ -324,6 +344,8 @@ export const VFX_EFFECTS: Record<VfxEffect, VfxDefinition> = {
         emit: (o, c) => ripple(o, c.music) },
     fountain: { category: "stage", mode: "continuous", interval: 18, options: stageOptions,
         emit: fountain },
+    shard: { category: "geometry", mode: "trigger", interval: 40,
+        options: [...stageOptions, "flow"], emit: shards },
     curtain: { category: "surface", mode: "continuous", interval: 18,
         options: [...stageOptions, "length", "width", "phase"], layouts: VFX_VEIL_LAYOUTS, emit: curtain },
     orbit: { category: "geometry", mode: "autonomous", interval: 35,

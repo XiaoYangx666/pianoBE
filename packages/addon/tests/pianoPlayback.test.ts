@@ -1,8 +1,10 @@
 import { expect, mock, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
     buildPbe3SeekIndex,
     encodePbe3,
     readPbe3Events,
+    SongCache,
     type MidiSongMeta,
     type SongHandle,
 } from "@piano/core";
@@ -50,6 +52,37 @@ const { MidiPlayer } = await import("../src/domain/playback/player");
 const record = readPlaybackRecord(JSON.stringify({
     version: 1, songs: [song, song], index: 1, mode: "loop", state: "playing", seconds: 2,
 }))!;
+
+test("Secret and a legacy PBE3 use the same player clock across pause, seek, resume and switch", async () => {
+    const data = readFileSync(new URL("../../../midis/library/e1563b03.pbe3", import.meta.url));
+    const secret = { id: "e1563b03", name: "Secret", duration: 3444 };
+    const cache = new SongCache(async id => id === secret.id ? data : undefined);
+    const transport: PianoTransportEvent[] = [];
+    const notes: number[] = [];
+    const midi = new MidiPlayer({ acquire: ref => ref.id === secret.id ? cache.acquire(ref.id) : loader.acquire() }, {
+        note: (_info, _duration, _velocity, _gain, time) => notes.push(time),
+        playing: () => {}, stopNotes: () => {}, transport: event => transport.push(event),
+    });
+    await midi.playNow(secret);
+    expect(midi.performance?.duration).toBe(86.1);
+    expect(midi.performance?.cues.some(cue => cue.op === "flash")).toBe(true);
+    midi.pause();
+    midi.seek(73.25);
+    midi.tick(Date.now() + 100);
+    expect(midi.position).toBe(73.25);
+    expect(notes).toEqual([]);
+    midi.resume();
+    let now = Date.now();
+    for (let i = 0; i < 12; i++) midi.tick(now += 50);
+    expect(midi.position).toBeGreaterThan(73.25);
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes.every(time => time >= 73.25)).toBe(true);
+    await midi.playNow(song);
+    expect(midi.performance).toBeUndefined();
+    expect(midi.position).toBe(0);
+    expect(transport.map(event => event.type)).toEqual(["track", "start", "pause", "seek", "resume", "track", "start"]);
+    midi.end();
+});
 
 function fixture() {
     const notes: number[] = [];
