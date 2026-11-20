@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { createSongCursor, readLoadedSongNotes, OTHER_SCALE, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
+import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";

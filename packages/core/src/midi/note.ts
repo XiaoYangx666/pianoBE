@@ -123,7 +123,6 @@ export function processNote(midi: number, shift: boolean): NoteInfo {
     // 防止负数取模出错
     const noteIndex = ((midi % 12) + 12) % 12;
 
-    let bestBaseIndex = 0;
     let bestDiff = Infinity;
 
     for (const baseIndex of baseIndexes) {
@@ -131,7 +130,6 @@ export function processNote(midi: number, shift: boolean): NoteInfo {
 
         if (Math.abs(diff) < Math.abs(bestDiff)) {
             bestDiff = diff;
-            bestBaseIndex = baseIndex;
         }
     }
 

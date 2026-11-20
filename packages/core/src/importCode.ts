@@ -1,4 +1,4 @@
-import { crc32, crc32Hex } from "./midi/crc32.js";
+import { crc32Hex } from "./midi/crc32.js";
 import { decodeBase64Url, encodeBase64Url } from "./binary/base64url.js";
 import { readPbe3Header } from "./pbe3/codec.js";
 

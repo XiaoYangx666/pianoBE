@@ -31,7 +31,6 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
         const midi = piano.getMidiPlayer();
         const queue = midi.queue;
         const refs = queue.getRefs();
-        const info = midi.getInfo();
         state.index = queue.getIndex();
         state.maxPage = pageCount(refs.length);
         if (state.page > state.maxPage) {

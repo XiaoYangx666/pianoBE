@@ -47,7 +47,7 @@ export const PbeSettingsForm = CommonForm.ConfigForm<PbeSettingsArgs>().create(
     {
         title: "PianoBE 设置",
         submitButton: "保存",
-        initialValues: (player, args) => args.settings ?? loadPbeSettings(),
+        initialValues: (_player, args) => args.settings ?? loadPbeSettings(),
         onSubmit(result, player) {
             if (!isPbeAdmin(player)) {
                 player.sendMessage("§c只有管理员可以修改该设置。");

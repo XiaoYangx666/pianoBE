@@ -1,5 +1,5 @@
 import * as toneMidi from "@tonejs/midi";
-import { SampledMidiPlayer, type NoteEvent, type PlayerState } from "@piano/core/player";
+import { SampledMidiPlayer, type NoteEvent } from "@piano/core/player";
 import { collectSustainSegments, sustainExtensionSeconds } from "@piano/core/convert";
 import { AppPlayer } from "@piano/ui";
 
