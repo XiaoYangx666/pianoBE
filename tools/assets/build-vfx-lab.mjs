@@ -23,6 +23,7 @@ const tiles = {
     drape: [256, 112, 256, 92],
     bar: [256, 204, 256, 48],
     upright: [164, 2, 48, 44],
+    shard: [212, 0, 44, 48],
 };
 
 function write(path, contents) {
@@ -172,6 +173,23 @@ paint(tiles.upright, 0.14, (x, y) => {
     const halo = gaussian(x, 0.37);
     const ends = smooth(along / 0.09) * smooth((1 - along) / 0.22);
     return [0.72 + 0.24 * core, ends * (0.72 * core + 0.21 * halo) * (1 - 0.20 * along)];
+});
+
+// Uneven facets with a bright cut edge, a translucent face and a thin split in the glass.
+const glassOutline = [[-0.53, 0.67], [-0.21, -0.46], [0.55, -0.82], [0.43, -0.13], [0.09, 0.3]];
+paint(tiles.shard, 0.72, (x, y) => {
+    let edge = Infinity;
+    for (const [index, [ax, ay]] of glassOutline.entries()) {
+        const [bx, by] = glassOutline[(index + 1) % glassOutline.length];
+        edge = Math.min(edge, ((bx - ax) * (y - ay) - (by - ay) * (x - ax)) / Math.hypot(bx - ax, by - ay));
+    }
+    const interior = smooth((edge + 0.025) / 0.065);
+    const cut = interior * gaussian(edge, 0.088);
+    const seam = gaussian(x - (0.13 - 0.61 * y), 0.05) * interior;
+    const glow = 0.28 * gaussian(Math.min(0, edge), 0.084);
+    const facet = x > 0.13 - 0.61 * y ? 0.16 : 0.40;
+    const light = 0.62 + 0.38 * Math.max(cut, seam);
+    return [[light * 0.88, light * 0.96, light], facet * interior + 0.67 * cut + 0.74 * seam + glow];
 });
 
 function chunk(type, data) {
@@ -369,6 +387,36 @@ particle("fountain", {
         facing_camera_mode: "rotate_xyz", size: [sparkSize, `1.45 * ${sparkSize}`], uv: uv(tiles.spark),
     },
     "minecraft:particle_appearance_tinting": tint([1, 0.86, 0.65], fade(0.09, 0.46)),
+});
+
+const shardLife = `(1.3 + 0.53 * ${random(3)}) / ${param("speed", 1)}`;
+const shardProgress = `math.pow(${saturate(`${age} / (${shardLife})`)}, 0.76)`;
+const shardFlow = param("flow", 1);
+const shardDistance = `math.lerp(1 - (${shardProgress}), ${shardProgress}, 0.5 + 0.5 * ${shardFlow})`;
+const shardSpread = `(0.35 + 0.65 * ${random(1)}) * (${shardDistance}) * ${extent}`;
+const shardWidth = scaled(`(0.092 + 0.115 * ${random(4)}) * ${param("size", 1)}`);
+particle("shard", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 5) },
+    "minecraft:emitter_lifetime_once": { active_time: 0.06 },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_initial_spin": {
+        rotation: `-30 + 60 * ${random(2)}`,
+        rotation_rate: `${param("side", 1)} * (29 + 95 * ${random(3)}) * ${shardFlow}`,
+    },
+    "minecraft:particle_motion_parametric": { relative_position: position(
+        `${param("side", 1)} * (1.33 * ${shardSpread} + 0.23 * ${random(4)})`,
+        `0.13 + 0.31 * ${random(2)} + (0.25 + 0.74 * ${random(4)}) * math.sin(105 * (${shardDistance}))`,
+        `(0.33 * (2 * ${random(1)} - 1) + (0.46 + 0.81 * ${random(2)}) * ${shardSpread}) * ${stageDepth}`) },
+    "minecraft:particle_lifetime_expression": { max_lifetime: shardLife },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "rotate_xyz",
+        size: [`(${shardWidth}) * (0.72 + 0.28 * math.abs(math.cos(210 * ${age} + 270 * ${random(1)})))`,
+            `(1.63 + 0.7 * ${random(1)}) * (${shardWidth})`],
+        uv: uv(tiles.shard),
+    },
+    "minecraft:particle_appearance_tinting": tint([0.55, 0.82, 1],
+        `${fade(0.15, 0.52)} * (0.48 + 0.52 * math.abs(math.cos(143 * ${age} + 360 * ${random(4)})))`),
 });
 
 const curtainLife = param("life", 1.38);

@@ -4,6 +4,7 @@ import Wintersky from "wintersky";
 import type { Config, Emitter } from "wintersky";
 import type Molang from "molangjs";
 import atlasUrl from "../../../addon/rp/textures/particle/vfx_lab.png";
+import cinemaAtlasUrl from "../../../addon/rp/textures/particle/secret_cinema.png";
 import type { VfxEffect, VfxParticle } from "../../../addon/src/domain/piano/vfxLab";
 
 type Expression = number | string;
@@ -37,9 +38,12 @@ const stepRate = 40;
 export const particleStep = 1 / stepRate;
 
 export async function loadParticles() {
-    const texture = await new TextureLoader().loadAsync(atlasUrl);
-    texture.magFilter = LinearFilter;
-    texture.minFilter = LinearFilter;
+    const loader = new TextureLoader();
+    const [texture, cinemaTexture] = await Promise.all([loader.loadAsync(atlasUrl), loader.loadAsync(cinemaAtlasUrl)]);
+    for (const sheet of [texture, cinemaTexture]) {
+        sheet.magFilter = LinearFilter;
+        sheet.minFilter = LinearFilter;
+    }
     const scene = new Wintersky.Scene();
     scene.global_options.tick_rate = stepRate;
     scene.global_options.ground_collision = false;
@@ -49,7 +53,7 @@ export async function loadParticles() {
         const particle = doc.particle_effect.description.identifier.slice("pbe:vfx_".length) as VfxParticle;
         const config = new Wintersky.Config(scene, doc);
         config.texture.dispose();
-        config.texture = texture;
+        config.texture = particle.startsWith("cinema_") ? cinemaTexture : texture;
 
         // Wintersky normalizes vector initial speed. Restore its magnitude with the same Molang components.
         const initial = doc.particle_effect.components["minecraft:particle_initial_speed"];
@@ -123,6 +127,6 @@ export async function loadParticles() {
         },
         face(camera: Camera) { scene.updateFacingRotation(camera); },
         reset,
-        dispose() { reset(); texture.dispose(); },
+        dispose() { reset(); texture.dispose(); cinemaTexture.dispose(); },
     };
 }

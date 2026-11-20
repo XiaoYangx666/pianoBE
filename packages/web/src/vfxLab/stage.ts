@@ -1,10 +1,13 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import type { PerformanceCue, SecretScore } from "@piano/core";
 import { grandDefinition, pianoDefinition } from "../../../addon/src/domain/instrument/definition";
 import { RightOffsets } from "../../../addon/src/domain/geometry/offsets";
 import { VfxBudget } from "../../../addon/src/domain/piano/vfxBudget";
 import { quietFeatures, VfxMusic, type MusicFeatures } from "../../../addon/src/domain/piano/vfxMusic";
 import { VfxPresetPlayer, type VfxPreset } from "../../../addon/src/domain/piano/vfxPreset";
+import { VfxPerformancePlayer } from "../../../addon/src/domain/piano/vfxPerformance";
+import { SecretCinemaPlayer } from "../../../addon/src/domain/piano/secretCinema";
 import { placeVfxEmitter, vfxStageFrame } from "../../../addon/src/domain/piano/vfxStage";
 import type { VfxEffect } from "../../../addon/src/domain/piano/vfxLab";
 import type { PianoVisualNote } from "../../../addon/src/domain/playback/visualEvent";
@@ -17,6 +20,8 @@ export type View = "stage" | "performer" | "orbit";
 export interface Track {
     duration: number;
     notes: ReadonlyMap<number, readonly PianoVisualNote[]>;
+    performance?: readonly PerformanceCue[];
+    nativeSecret?: SecretScore;
 }
 
 export interface PreviewStats {
@@ -92,7 +97,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
     const center = { x: 0, y: 0, z: 0 };
     let track: Track;
     let preset: VfxPreset;
-    let player: VfxPresetPlayer;
+    let player: VfxPresetPlayer | VfxPerformancePlayer | SecretCinemaPlayer;
     let budget: VfxBudget;
     let music: VfxMusic;
     let features: Readonly<MusicFeatures> = quietFeatures;
@@ -118,22 +123,29 @@ export async function createStage(canvas: HTMLCanvasElement) {
         orbit.update();
     }
 
-    function advance(time: number) {
+    function advance(time: number, seek = false) {
         const target = Math.floor(time / particleStep + 1e-7);
-        if (target < frame || target - frame > 120) {
+        const rebuild = seek || target < frame || target - frame > 120;
+        const definition = model === "grand" ? grandDefinition : pianoDefinition;
+        if (rebuild) {
             particles.reset();
             music = new VfxMusic();
             budget = new VfxBudget();
-            player = new VfxPresetPlayer({ ...preset, seconds: preset.seconds ?? Math.max(45, track.duration + 2) });
             features = quietFeatures;
             // Rebuild the visible history on a seek, including time for the longest batch to expire.
-            frame = Math.max(-1, (Math.floor(target / 2) - 220) * 2 - 1);
+            const firstTick = Math.max(0, Math.floor(target / 2) - (track.nativeSecret ? 46 : 220));
+            frame = firstTick * 2 - 1;
+            player = track.nativeSecret
+                ? new SecretCinemaPlayer(track.nativeSecret, definition, firstTick / 20, firstTick === 0)
+                : track.performance
+                    ? new VfxPerformancePlayer(track.performance, track.duration)
+                    : new VfxPresetPlayer({ ...preset, seconds: preset.seconds ?? Math.max(45, track.duration + 2) });
             emissions = [];
             anchors = [];
             lastPositions.clear();
             path = [];
         }
-        const stage = vfxStageFrame(model === "grand" ? grandDefinition : pianoDefinition);
+        const stage = vfxStageFrame(definition);
         for (; frame < target;) {
             frame++;
             const tick = frame / 2;
@@ -143,8 +155,12 @@ export async function createStage(canvas: HTMLCanvasElement) {
                 for (const note of track.notes.get(tick) ?? []) music.note(note);
                 if (tick % 4 === 0) {
                     features = music.sample(tick);
-                    budget.enqueue(player.update(tick, features));
+                    if (player instanceof VfxPresetPlayer) budget.enqueue(player.update(tick, features));
                 }
+                if (player instanceof VfxPerformancePlayer) {
+                    budget.enqueue(player.update(tick / 20, features, !rebuild || (target === 0 && !seek)));
+                }
+                if (player instanceof SecretCinemaPlayer) budget.enqueue(player.update(tick / 20));
                 budget.dispatch(tick, emitter => {
                     const placement = placeVfxEmitter(center, RightOffsets[direction], stage, emitter, tick / 20);
                     particles.spawn(emitter.effect, emitter.particle ?? emitter.effect, placement.position, placement.variables);
@@ -167,6 +183,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
                 path = path.slice(-2400);
             }
         }
+        if (rebuild && (seek || target > 0) && player instanceof VfxPerformancePlayer) player.seek(time, false);
         cast[model].pose(time, features.activity, features.pitch);
     }
 
@@ -222,6 +239,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
             frame = Infinity;
         },
         advance,
+        seek: (time: number) => advance(time, true),
         render,
         stats(): PreviewStats {
             const effects: PreviewStats["effects"] = {};

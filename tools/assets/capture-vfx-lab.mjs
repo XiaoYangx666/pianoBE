@@ -15,16 +15,24 @@ const { values } = parseArgs({ options: {
     piano: { type: "string", default: "grand" },
     direction: { type: "string", default: "south" },
     time: { type: "string", multiple: true },
+    video: { type: "boolean", default: false },
     flat: { type: "boolean", default: false },
 } });
 const project = fileURLToPath(new URL("../../", import.meta.url));
 const output = resolve(values.out);
 const origin = values.url ?? "http://127.0.0.1:5189";
 const definitions = values.presets ? JSON.parse(await readFile(values.presets, "utf8")) : undefined;
+const presets = values.preset ?? ["galaxy", "neon", "stage"];
 const fixtures = values.time?.map(seconds => [`t-${Number(seconds).toFixed(2)}`, Number(seconds)]) ??
-    [["quiet", 3.75], ["climax", 8.7], ["release", 11.4]];
-if (fixtures.some(([, time]) => !Number.isFinite(time) || time < 0 || time > 12)) {
-    throw new Error("Capture times must be in the 0–12 s fixture");
+    (presets.length === 1 && ["secret", "secret-native"].includes(presets[0])
+        ? [["intro", 5.1], ["develop", 43.2], ["gather", 71.6], ["fracture", 72.8],
+            ["climax", 75.05], ["coda", 82.3], ["end", 86.1]] :
+        [["quiet", 3.75], ["climax", 8.7], ["release", 11.4]]);
+if (fixtures.some(([, time]) => !Number.isFinite(time) || time < 0)) {
+    throw new Error("Capture times must be finite and nonnegative");
+}
+if (values.video && (presets.length !== 1 || presets[0] !== "secret")) {
+    throw new Error("--video requires --preset secret");
 }
 await mkdir(output, { recursive: true });
 
@@ -56,8 +64,10 @@ try {
     const initError = await page.locator(".vfx-capture p").textContent({ timeout: 50 }).catch(() => undefined);
     if (initError) throw new Error(initError);
     const report = [];
-    for (const preset of values.preset ?? ["galaxy", "neon", "stage"]) {
+    for (const preset of presets) {
+        const duration = ["secret", "secret-native"].includes(preset) ? await page.evaluate(() => window.pianoVfxLab.scoreDuration()) : 12;
         for (const [label, time] of fixtures) {
+            if (time > duration) throw new Error(`Capture time ${time} exceeds ${preset} duration (${duration}s)`);
             const options = { preset, time, view: values.view, piano: values.piano, direction: values.direction, deck: !values.flat };
             const stats = await page.evaluate(options => window.pianoVfxLab.render(options),
                 { ...options, preset: definitions?.[preset] ?? preset });
@@ -66,6 +76,72 @@ try {
             report.push({ ...options, image, ...stats });
             console.log(`${image} · ${stats.particles} live · ${stats.reserved} reserved`);
         }
+    }
+    if (values.video) {
+        await page.evaluate(options => window.pianoVfxLab.render(options), {
+            preset: "secret", time: 0, view: values.view, piano: values.piano,
+            direction: values.direction, deck: !values.flat,
+        });
+        const fullRun = await page.evaluate(async fixtures => {
+            const lab = window.pianoVfxLab;
+            const duration = await lab.scoreDuration();
+            const canvas = document.querySelector("canvas");
+            const stream = canvas.captureStream(30);
+            const recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp8", videoBitsPerSecond: 6_000_000 });
+            const chunks = [];
+            const captures = [];
+            const ordered = [...fixtures].sort((a, b) => a[1] - b[1]);
+            let peakReserved = 0;
+            let peakParticles = 0;
+            let dropped = 0;
+            recorder.ondataavailable = event => chunks.push(event.data);
+            const finished = new Promise((resolve, reject) => {
+                recorder.onstop = resolve;
+                recorder.onerror = event => reject(event.error);
+            });
+            async function replay() {
+                const start = performance.now();
+                return new Promise((resolve, reject) => {
+                    function frame(now) {
+                        try {
+                            const time = Math.min(duration, (now - start) / 1000);
+                            const stats = lab.advance(time);
+                            peakReserved = Math.max(peakReserved, stats.reserved);
+                            peakParticles = Math.max(peakParticles, stats.particles);
+                            dropped = stats.dropped;
+                            while (ordered.length && time >= ordered[0][1]) {
+                                const [label] = ordered.shift();
+                                captures.push({ label, time, image: canvas.toDataURL(), stats });
+                            }
+                            if (time < duration) requestAnimationFrame(frame);
+                            else resolve();
+                        } catch (error) { reject(error); }
+                    }
+                    requestAnimationFrame(frame);
+                });
+            }
+            recorder.start(1000);
+            await replay();
+            recorder.stop();
+            await finished;
+            stream.getTracks().forEach(track => track.stop());
+            const data = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(new Blob(chunks, { type: "video/webm" }));
+            });
+            return { data, captures, duration, peakReserved, peakParticles, dropped };
+        }, fixtures);
+        const { data, captures, ...stats } = fullRun;
+        const writeDataUrl = (name, url) => writeFile(join(output, name), Buffer.from(url.split(",")[1], "base64"));
+        await writeDataUrl("secret-full.webm", data);
+        const scenes = [];
+        for (const { label, time, image, stats } of captures) {
+            const file = `secret-live-${label}.png`;
+            await writeDataUrl(file, image);
+            scenes.push({ label, time, file, ...stats });
+        }
+        await writeFile(join(output, "playback.json"), JSON.stringify({ ...stats, scenes }, null, 2) + "\n");
     }
     if (failures.length) throw new Error(failures.join("\n"));
     await writeFile(join(output, "metrics.json"), JSON.stringify(report, null, 2) + "\n");

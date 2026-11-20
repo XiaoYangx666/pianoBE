@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, ChevronDown, CircleHelp, Eye, EyeOff, FileUp, Maximize2, Pause, Play, Repeat2, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { createSecretScore, readSongHeader, songToNoteEvents, TIME_SCALE, type PerformanceCue } from "@piano/core";
+import secretUrl from "../../../../midis/library/e1563b03.pbe3?url";
+import secret from "../../../../midis/performances/e1563b03.json";
 import { VFX_COLORS, VFX_EFFECTS, VFX_LIMITS, type NumericParameter, type VfxEffect, type VfxOptions } from "../../../addon/src/domain/piano/vfxLab";
 import { VFX_PARTICLES_PER_PIANO } from "../../../addon/src/domain/piano/vfxBudget";
 import type { VfxLayout } from "../../../addon/src/domain/piano/vfxLighting";
@@ -18,7 +21,7 @@ const names: Record<string, [string, string]> = {
 };
 const effectNames: Record<VfxEffect, string> = {
     field: "星尘", orbit: "环绕星芒", beam: "流光", wave: "波带", ripple: "地面波纹", fountain: "火花", curtain: "光幕",
-    shaft: "定向光束",
+    shaft: "定向光束", shard: "时间碎片",
 };
 const featureNames: Record<keyof MusicFeatures, string> = {
     density: "密度", velocity: "力度", dynamics: "力度变化", activity: "活动度", pitch: "音高", low: "低音",
@@ -32,13 +35,26 @@ const parameterNames: Partial<Record<NumericParameter, string>> = {
     x: "横向 X", y: "垂直 Y", z: "纵深 Z", rotation: "旋转", scale: "缩放", range: "范围",
     intensity: "亮度", opacity: "透明度", density: "数量", size: "粒径", speed: "速度", height: "高度",
     heading: "方向", bend: "曲率", lanes: "光轨数", segments: "分段", length: "长度", width: "宽度",
-    amplitude: "波幅", period: "周期", wavelength: "波长", phase: "相位",
+    amplitude: "波幅", period: "周期", wavelength: "波长", phase: "相位", flow: "聚拢／散开",
 };
 const basicOptions: NumericParameter[] = ["intensity", "scale", "x", "y", "z", "rotation"];
 const fixturePoints = [[0, "休止"], [3.75, "弱奏"], [5.5, "长音"], [6.6, "和弦"], [8.7, "高潮"], [11.4, "回落"]] as const;
 const fixtureModes = { phrase: "标准乐句", note: "长音", chord: "和弦", dense: "密集音符" } as const;
 type Fixture = keyof typeof fixtureModes;
 type Layer = VfxPreset["layers"][number];
+type LabSong = { title: string; notes: NoteEvent[]; duration: number; performance?: readonly PerformanceCue[]; sample?: boolean };
+
+function readPbe(bytes: Uint8Array): LabSong {
+    const header = readSongHeader(bytes);
+    return { title: header.name, notes: songToNoteEvents(bytes), duration: header.duration / TIME_SCALE,
+        performance: header.performance };
+}
+
+async function loadSecret(): Promise<LabSong> {
+    const response = await fetch(secretUrl);
+    if (!response.ok) throw new Error(`读取《Secret》失败 (${response.status})`);
+    return { ...readPbe(new Uint8Array(await response.arrayBuffer())), title: secret.title, sample: true };
+}
 
 function makeFixture(mode: Fixture): NoteEvent[] {
     return Array.from({ length: 240 }, (_, tick) => simulatedVfxNotes(tick, tick, mode).map(note => ({
@@ -46,16 +62,17 @@ function makeFixture(mode: Fixture): NoteEvent[] {
     }))).flat();
 }
 
-function toTrack(events: readonly NoteEvent[], duration: number, source: "midi" | "simulation"): Track {
+function toTrack(events: readonly NoteEvent[], duration: number, source: "midi" | "simulation",
+    performance?: readonly PerformanceCue[]): Track {
     const notes = new Map<number, NonNullable<ReturnType<Track["notes"]["get"]>>[number][]>();
     for (const note of events) {
-        const tick = Math.ceil(note.time * 20 - 1e-7);
+        const tick = source === "midi" ? Math.floor(note.time * 20 + 0.500001) : Math.ceil(note.time * 20 - 1e-7);
         const bucket = notes.get(tick) ?? [];
         bucket.push({ midi: note.midi, duration: note.duration, velocity: Math.round(note.velocity * 127),
             hasVelocity: true, source, tick, songTime: note.time });
         notes.set(tick, bucket);
     }
-    return { notes, duration };
+    return { notes, duration, performance };
 }
 
 function saveFile(url: string, name: string) {
@@ -194,7 +211,7 @@ export default function VfxLabPage() {
     const [hidden, setHidden] = useState<Set<number>>(new Set());
     const [open, setOpen] = useState<number | null>(null);
     const [fixture, setFixture] = useState<Fixture>("phrase");
-    const [midi, setMidi] = useState<{ title: string; notes: NoteEvent[]; duration: number }>();
+    const [midi, setMidi] = useState<LabSong>();
     const [model, setModel] = useState<PianoModel>("grand");
     const [direction, setDirection] = useState<Direction>("south");
     const [view, setView] = useState<View>("stage");
@@ -217,10 +234,11 @@ export default function VfxLabPage() {
     const position = useRef(0);
     const audio = useMemo(() => new MidiPlayer(), []);
     const playGeneration = useRef(0);
+    const selectionGeneration = useRef(0);
     const loaded = useRef(false);
     const capture = new URLSearchParams(location.search).has("capture");
     const events = useMemo(() => midi?.notes ?? makeFixture(fixture), [fixture, midi]);
-    const track = useMemo(() => toTrack(events, midi?.duration ?? 12, midi ? "midi" : "simulation"), [events, midi]);
+    const track = useMemo(() => toTrack(events, midi?.duration ?? 12, midi ? "midi" : "simulation", midi?.performance), [events, midi]);
     const visiblePreset = useMemo(() => ({ ...preset, layers: preset.layers.filter((_, index) => !hidden.has(index)) }), [preset, hidden]);
 
     function selectPreset(id: string, value = VFX_PRESETS[id]) {
@@ -233,6 +251,7 @@ export default function VfxLabPage() {
     function jump(to: number, sync = true) {
         position.current = Math.max(0, Math.min(track.duration, to));
         setTime(position.current);
+        if (sync) stage.current?.seek(position.current);
         if (sync && loaded.current) audio.seek(position.current);
     }
 
@@ -274,27 +293,23 @@ export default function VfxLabPage() {
     useEffect(() => { stage.current?.setDebug(debug); }, [ready, debug]);
 
     useEffect(() => {
-        if (!ready) return;
+        if (!ready || capture) return;
         const instance = stage.current!;
         let raf = 0;
         let last = performance.now();
         let published = -Infinity;
-        let prev = -1;
         function animate(now: number) {
             if (playing) {
                 if (muted) position.current += Math.min(0.12, (now - last) / 1000);
                 else position.current = audio.getState().currentTime;
                 if (position.current >= (loop ? loopOut : track.duration)) {
                     if (loop) jump(loopIn);
-                    else { setPlaying(false); audio.pause(); }
+                    else { position.current = track.duration; setPlaying(false); audio.pause(); }
                 }
             }
             last = now;
-            if (!capture || position.current !== prev) {
-                instance.advance(position.current);
-                instance.render();
-            }
-            prev = position.current;
+            instance.advance(position.current);
+            instance.render();
             if (now - published > 115) {
                 setTime(position.current);
                 setStats(instance.stats());
@@ -308,18 +323,31 @@ export default function VfxLabPage() {
 
     useEffect(() => {
         if (!capture || !ready) return;
+        let sample: Promise<LabSong> | undefined;
         const lab = {
-            render: (options: { preset: string | VfxPreset; time: number; view?: View; piano?: PianoModel; direction?: Direction; deck?: boolean }) => {
+            render: async (options: { preset: string | VfxPreset; time: number; view?: View; piano?: PianoModel; direction?: Direction; deck?: boolean }) => {
                 const instance = stage.current!;
                 instance.setView(options.view ?? "stage");
                 instance.setDeck(options.deck ?? true);
-                const selection = typeof options.preset === "string" ? VFX_PRESETS[options.preset] : validateVfxPreset(options.preset);
+                const native = options.preset === "secret-native";
+                const song = native || options.preset === "secret" ? await (sample ??= loadSecret()) : undefined;
+                const input = song ? toTrack(song.notes, song.duration, "midi", song.performance) : track;
+                if (native && song) input.nativeSecret = createSecretScore(song.notes, song.duration);
+                const selection = song ? VFX_PRESETS.galaxy :
+                    typeof options.preset === "string" ? VFX_PRESETS[options.preset] : validateVfxPreset(options.preset);
                 if (!selection) throw new Error("未知预设");
-                instance.configure(selection, track, options.piano ?? "grand",
+                instance.configure(selection, input, options.piano ?? "grand",
                     options.direction ?? "south", options.time);
                 position.current = options.time;
                 return instance.stats();
             },
+            advance: (time: number) => {
+                position.current = time;
+                stage.current!.advance(time);
+                stage.current!.render();
+                return stage.current!.stats();
+            },
+            scoreDuration: async () => (await (sample ??= loadSecret())).duration,
         };
         Object.assign(window, { pianoVfxLab: lab });
         return () => { Reflect.deleteProperty(window, "pianoVfxLab"); };
@@ -327,7 +355,8 @@ export default function VfxLabPage() {
 
     async function togglePlay() {
         if (playing) {
-            jump(muted ? position.current : audio.getState().currentTime);
+            if (!muted) position.current = audio.getState().currentTime;
+            setTime(position.current);
             audio.pause();
             setPlaying(false);
             return;
@@ -350,19 +379,33 @@ export default function VfxLabPage() {
         }
     }
 
-    async function loadMidi(file?: File) {
-        if (!file) return;
+    async function selectSong(load: () => Promise<LabSong>) {
+        const generation = ++selectionGeneration.current;
         try {
-            const notes = parseMidi(await file.arrayBuffer()).filter(note => note.midi >= 21 && note.midi <= 108);
-            if (!notes.length) throw new Error("MIDI 中没有钢琴音域内的音符");
-            const duration = Math.ceil(20 * notes.reduce((end, note) => Math.max(end, note.time + note.duration), 0)) / 20 + 2.5;
+            const song = await load();
+            if (generation !== selectionGeneration.current) return;
             resetAudio();
             jump(0, false);
             setLoopIn(0);
-            setLoopOut(duration);
-            setMidi({ title: file.name, notes, duration });
+            setLoopOut(song.duration);
+            setLoop(false);
+            setMidi(song);
             setError("");
-        } catch (reason) { setError("读取 MIDI 失败 · " + String(reason)); }
+        } catch (reason) {
+            if (generation === selectionGeneration.current) setError("读取曲目失败 · " + String(reason));
+        }
+    }
+
+    function loadMidi(file?: File) {
+        if (!file) return;
+        void selectSong(async () => {
+            const bytes = await file.arrayBuffer();
+            if (file.name.toLowerCase().endsWith(".pbe3")) return readPbe(new Uint8Array(bytes));
+            const notes = parseMidi(bytes).filter(note => note.midi >= 21 && note.midi <= 108);
+            if (!notes.length) throw new Error("MIDI 中没有钢琴音域内的音符");
+            const duration = Math.ceil(20 * notes.reduce((end, note) => Math.max(end, note.time + note.duration), 0)) / 20 + 2.5;
+            return { title: file.name, notes, duration };
+        });
     }
 
     function updateLayer(index: number, layer: Layer) {
@@ -372,7 +415,8 @@ export default function VfxLabPage() {
     if (capture) return <main className="vfx-capture"><canvas ref={canvas} />{error && <p>{error}</p>}</main>;
     return <main className="vfx-lab">
         <header className="vfx-header">
-            <div className="vfx-header-title"><a href="/">PianoBE</a><span>/</span><h1>VFX Lab</h1></div>
+            <div className="vfx-header-title"><a href="/">PianoBE</a><span>/</span><h1>VFX Lab</h1>
+                <a href="/vfx-lab/replay">回放《Secret》</a></div>
             <details className="vfx-help">
                 <summary><CircleHelp size={17} /> 渲染说明</summary>
                 <div>预览读取实际 Bedrock 粒子 JSON 与纹理，复用游戏内音乐分析、锚点和发射预算。
@@ -411,16 +455,19 @@ export default function VfxLabPage() {
                             {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
                         <button className="vfx-icon" aria-label="循环片段" aria-pressed={loop} onClick={() => setLoop(!loop)}><Repeat2 size={17} /></button>
                         <time>{seconds(time)} <small>/ {seconds(track.duration)}</small></time>
-                        <select aria-label="音乐片段" value={midi ? "midi" : fixture} onChange={event => {
+                        <select aria-label="音乐片段" value={midi?.sample ? "secret" : midi ? "midi" : fixture} onChange={event => {
+                            if (event.target.value === "secret") { void selectSong(loadSecret); return; }
+                            selectionGeneration.current++;
                             resetAudio(); jump(0, false); setLoopIn(0); setLoopOut(12); setMidi(undefined);
                             setFixture(event.target.value as Fixture);
                         }}>
                             {Object.entries(fixtureModes).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
-                            {midi && <option value="midi">{midi.title}</option>}
+                            <option value="secret">{secret.title}</option>
+                            {midi && !midi.sample && <option value="midi">{midi.title}</option>}
                         </select>
-                        <button className="vfx-load" onClick={() => midiInput.current?.click()}><FileUp size={15} /> 打开 MIDI</button>
-                        <input ref={midiInput} type="file" accept=".mid,.midi" hidden onChange={event => {
-                            void loadMidi(event.target.files?.[0]);
+                        <button className="vfx-load" onClick={() => midiInput.current?.click()}><FileUp size={15} /> 打开曲目</button>
+                        <input ref={midiInput} type="file" accept=".mid,.midi,.pbe3" hidden onChange={event => {
+                            loadMidi(event.target.files?.[0]);
                             event.target.value = "";
                         }} />
                     </div>
@@ -428,6 +475,8 @@ export default function VfxLabPage() {
                         loop={loop ? [loopIn, loopOut] : undefined} seek={jump} />
                     <input aria-label="时间" type="range" min="0" max={track.duration} step="0.05" value={time}
                         onChange={event => jump(event.target.valueAsNumber)} />
+                    {midi?.sample && <div className="vfx-cues">{secret.sections.map(section =>
+                        <button key={section.at} title={section.note} onClick={() => jump(section.at)}>{section.label}</button>)}</div>}
                     {midi || fixture !== "phrase" ? null : <div className="vfx-cues">{fixturePoints.map(([at, label]) =>
                         <button key={label} onClick={() => jump(at)}>{label}</button>)}</div>}
                     {loop && <div className="vfx-loop">
@@ -444,7 +493,13 @@ export default function VfxLabPage() {
                 </section>
             </section>
             <aside className="vfx-inspector">
-                <section>
+                {midi?.performance && <section>
+                    <h2>{midi.title}</h2>
+                    <div>曲目图层 · 预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</div>
+                    {Object.entries(stats?.effects ?? {}).map(([effect, fx]) =>
+                        <div key={effect}>{effectNames[effect as VfxEffect]} · {fx.particles} 粒子</div>)}
+                </section>}
+                {!midi?.performance && <><section>
                     <h2>预设</h2>
                     <div className="vfx-presets">
                         {Object.entries(names).map(([key, [name, label]]) => <button key={key} data-preset={key}
@@ -502,7 +557,7 @@ export default function VfxLabPage() {
                         <option value="" disabled>添加图层</option>
                         {Object.entries(effectNames).map(([effect, name]) => <option key={effect} value={effect}>{name}</option>)}
                     </select>}
-                </section>
+                </section></>}
                 <section className="vfx-scene-controls">
                     <h2>场景</h2>
                     <label>钢琴 <select aria-label="钢琴" value={model} onChange={event => setModel(event.target.value as PianoModel)}>

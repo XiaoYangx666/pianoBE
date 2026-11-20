@@ -2,11 +2,62 @@
 
 [视觉研究、组件和引擎限制](design.md) · [音乐事件、映射和扩展接口](architecture.md)
 
+## 《Secret》首演
+
+Web 端用 `/vfx-lab/replay` 对照游戏内效果：它按曲目时间运行真实的 `SecretCinemaPlayer` 批次，并直接渲染开发包里的 `cinema_*` 粒子 JSON。基岩版由开发包脚本驱动同一份曲目时间与音符分析。
+
+```powershell
+npm run build:core
+npm run dev:web
+```
+
+回放页的使用方法见下文「Web 排练」。
+
+### 基岩版编排
+
+新版开发包播放同一份《Secret》音符时会启动电影编排的基岩版实现。根据原曲 ID 与音符流 CRC 选择舞台，支持普通 PBE3 和带演出区块的 PBE3。基岩版的细小光点从琴键升起，成簇沿不同高度和纵深回旋，两个重拍分别向外推开不同力度的粒子波。两条丝带各由 26 段沿样条采样的贴片拼接，相邻贴片相互重叠，两端渐隐，按整条曲线一起淡入淡出；两次重拍另有 20 段贴片铺成地面弧线。两个版本共用 `@piano/core` 的曲目时间和音符分析，资源和实际着色由各自引擎负责。
+
+```powershell
+node tools/assets/build-secret-cinema.mjs
+node tools/assets/build-secret-cinema.mjs --check
+npm run build:core
+npm run build
+```
+
+在 `/vfx-lab` 的音乐片段里选「Secret · 时门」，按播放从头观看，或用乐段按钮定位。基岩版用钢琴的常规曲库搜索「周杰伦 - Secret」并播放，曲目会自动启动演出。对准钢琴运行 `/scriptevent pbe:vfx status` 可查看发射和预算。
+
+[编排源文件](../../midis/performances/e1563b03.json)中的 `sections` 是段落与观察目标，`cues` 按秒填写，最小步长为 0.025 秒。`level` 是强度百分比，`scale` 是缩放百分比。普通提示用 `fade` 填入渐变秒数，一次性发射用 `"op": "flash"`。
+
+原创「时间碎片」在两侧不同高度和纵深上发射玻璃切面。乐段再现时，`glassGather` 让冰蓝碎片倒流聚拢。高潮中，`glassBreak` 将同一形态改成从近处向侧后方散开的金色碎片。可用 `shard` 单独试放，`flow` 从 −1（聚拢）到 +1（散开）。
+
+```powershell
+npm run build:core
+npm run export:performance
+node tools/assets/capture-vfx-lab.mjs --preset secret --out build/secret-performance --video
+```
+
+导出改写 `midis/library/e1563b03.pbe3` 及曲库字节数，有本地内嵌模块时同时更新 `midis/js`。选曲可以直接读该 PBE3。后续曲目可在 `midis/performances/<曲库 ID>.json` 中重新排列已注册图层，并用 `npm run export:performance -- <曲库 ID>` 导出。
+
+### 首演验收记录
+
+| 项目 | 结果 |
+| --- | --- |
+| 曲目 | 原 MIDI 982 音，首尾起音约 1.643 / 81.683 秒。PBE3 首尾起音 1.625 / 81.675 秒，含踏板尾音共 86.1 秒 |
+| 编解码 | 43 条提示，1,553 → 1,787 字节。去掉演出区块后与原曲目逐字节一致，另 605 首版本 1 曲目通过校验 |
+| 固定镜头 | `build/secret-performance/` 中有全曲录制，以及前奏、发展、聚拢、第一波裂开、高潮、尾奏、结束的连续播放抽帧 |
+| 播放与预算 | Web 通过选曲、暂停、继续、切歌及跳转检查。曲中跳转恢复正在过渡的图层，后续碎片正常触发。全曲 Web 峰值预留 253 / 275，丢弃 0 批。四琴错峰测试通过 |
+| 本机基岩版 | 客户端、服务端构建验证通过，已部署客户端开发包。曲目、调度脚本、碎片 JSON 和两张图集的 SHA256 与构建一致。已静态核对 `direction.mode: "custom"` 以及 `custom_direction` 向量字段 |
+| 待实机复核 | 基岩版未进入世界，本机配置的文件内容日志处于关闭状态。游戏画面的方向、亮度、遮挡及运行时内容日志待实机确认 |
+
 ## Web 排练
 
 ```powershell
 npm run dev:web
 ```
+
+`/vfx-lab/replay` 不进游戏也能看真实粒子：它读取 `packages/addon/rp/particles/pbe_vfx_cinema_*.particle.json` 和图集，用 MoLang 求值，按 20 Hz 把 `SecretCinemaPlayer` 的真实 emitter 批次画成 billboard，并显示存活粒子、预算预留、丢弃数和发射器数。支持 `?t=74.2` 直接定位，页面右下角可暂停、拖动和跳章节。场景中的钢琴与演奏者来自 `models.ts`，与基岩版使用同一份模型数据。
+
+回放页的粒子副本由 `npm run sync:replay` 生成，`dev:web` 和 `build:web` 前会自动执行；不要手改 `packages/web/public/replay/`。
 
 在命令打印的本机地址后访问 `/vfx-lab`（开发工具，不显示在管理页导航中）。选择三角钢琴或 P-88、朝向、舞台/演奏/自由视角。自由视角拖动旋转，滚轮拉近，右键拖动平移。排练台和场景布光是 Web 的观测环境，右侧可切换到平地。
 

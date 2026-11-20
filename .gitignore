@@ -1,6 +1,7 @@
 build
 cache
 node_modules
+packages/web/public/replay
 /scripts
 output.zip
 /dist

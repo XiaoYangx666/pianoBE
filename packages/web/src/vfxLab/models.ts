@@ -64,17 +64,21 @@ async function pianoMesh(kind: PianoModel) {
     return mesh;
 }
 
-function performer(kind: PianoModel) {
+function performer(kind: PianoModel, film = false) {
     const group = new THREE.Group();
     const seatY = kind === "grand" ? 0.49 : 0.40625;
     const keyY = kind === "grand" ? 0.96 : 0.93;
     const seatZ = kind === "grand" ? 0.96 : 0.79;
 
-    function material(color: number) { return new THREE.MeshStandardMaterial({ color, roughness: 0.8 }); }
-    const cloth = material(0x292d45);
-    const cuff = material(0x8a90ad);
-    const skin = material(0xd6a383);
-    const hair = material(0x392821);
+    function material(color: number) {
+        const albedo = new THREE.Color(color);
+        if (film) albedo.convertSRGBToLinear();
+        return new THREE.MeshStandardMaterial({ color: albedo, roughness: 0.8 });
+    }
+    const cloth = material(film ? 0x353947 : 0x292d45);
+    const cuff = material(film ? 0xa09382 : 0x8a90ad);
+    const skin = material(film ? 0xbc866b : 0xd6a383);
+    const hair = material(film ? 0x423026 : 0x392821);
     const leather = material(0x12131a);
     const wood = material(0x332722);
     function box(size: Triple, at: Triple, finish: THREE.Material, parent: THREE.Object3D = group) {
@@ -137,10 +141,13 @@ function performer(kind: PianoModel) {
 }
 
 export async function createCast() {
-    const entries = await Promise.all((["grand", "p88"] as const).map(async kind => {
-        const ensemble = performer(kind);
-        ensemble.group.add(await pianoMesh(kind));
-        return [kind, ensemble] as const;
-    }));
+    const entries = await Promise.all((["grand", "p88"] as const).map(async kind =>
+        [kind, await createEnsemble(kind)] as const));
     return Object.fromEntries(entries) as Record<PianoModel, ReturnType<typeof performer>>;
+}
+
+export async function createEnsemble(kind: PianoModel, film = false) {
+    const ensemble = performer(kind, film);
+    ensemble.group.add(await pianoMesh(kind));
+    return ensemble;
 }
