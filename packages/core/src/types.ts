@@ -33,4 +33,5 @@ export interface MidiSong {
     name: string;
     duration: number;
     tracks: MidiTrack[];
+    performance?: readonly import("./pbe3/performance.js").PerformanceCue[];
 }

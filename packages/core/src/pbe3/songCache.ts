@@ -209,7 +209,7 @@ export class SongCache {
                 index,
                 refCount: 0,
                 lastAccess: this.now(),
-                byteSize: events.byteLength + index.length * 24,
+                byteSize: events.byteLength + index.length * 24 + (header.performance?.length ?? 0) * 64,
             };
             const previous = this.loaded.get(key);
             if (previous) {

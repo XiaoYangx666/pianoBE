@@ -1,6 +1,7 @@
 import type { MidiSong } from "./types.js";
 import type { LoadedSong } from "./pbe3/songCache.js";
 import {
+    attachPbe3Performance,
     decodePbe3,
     encodePbe3,
     pbe3ToNoteEvents,
@@ -10,6 +11,7 @@ import {
     renamePbe3,
     type EncodePbe3Options,
 } from "./pbe3/codec.js";
+import type { PerformanceCue } from "./pbe3/performance.js";
 import { Pbe3EventCursor } from "./pbe3/seekIndex.js";
 import type { Pbe3Header, Pbe3Note, Pbe3NoteEvent } from "./pbe3/format.js";
 import { validateMusic, type ValidatedMusic } from "./music/validate.js";
@@ -34,6 +36,10 @@ export function collectSongNoteCount(song: MidiSong): number {
 /** MidiSong → 曲目二进制 */
 export function encodeSong(song: MidiSong, options?: EncodePbe3Options): Uint8Array {
     return encodePbe3(song, options);
+}
+
+export function attachSongPerformance(bytes: Uint8Array, cues: readonly PerformanceCue[]): Uint8Array {
+    return attachPbe3Performance(bytes, cues);
 }
 
 /** 曲目二进制 → MidiSong（单轨视图，用于预览/测试/离线工具） */

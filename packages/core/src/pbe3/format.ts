@@ -13,6 +13,8 @@
 export const PBE3_MAGIC = [0x50, 0x42, 0x45, 0x33] as const;
 /** 当前格式版本 */
 export const PBE3_VERSION = 1;
+/** 带演出区块的版本；无演出曲目仍写版本 1。 */
+export const PBE3_PERFORMANCE_VERSION = 2;
 
 /** 事件流使用 Raw DEFLATE 压缩 */
 export const PBE3_FLAG_COMPRESSED = 1 << 0;
@@ -40,6 +42,9 @@ export interface Pbe3Header {
     palette: readonly number[];
     /** 每个音符的力度索引位数（0~7；0 表示所有音都用 palette[0]） */
     velocityBits: number;
+    performance?: readonly import("./performance.js").PerformanceCue[];
+    /** Encoded performance section size, including its length and checksum. */
+    performanceBytes?: number;
     /** 压缩数据在整份 PBE3 中的起始偏移 */
     eventOffset: number;
     /** 整份 PBE3 字节数 */

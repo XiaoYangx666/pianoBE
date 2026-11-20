@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     Pbe3EventCursor,
+    attachSongPerformance,
     buildPbe3SeekIndex,
     decodePbe3,
     encodePbe3,
@@ -12,6 +13,7 @@ import {
     renamePbe3,
     velocityBitsFor,
     type MidiSong,
+    type PerformanceCue,
 } from "../src/index.js";
 
 function song(notes: number[], keyDurations?: number[], duration = 400): MidiSong {
@@ -28,6 +30,42 @@ function song(notes: number[], keyDurations?: number[], duration = 400): MidiSon
         ],
     };
 }
+
+describe("PBE3 performance section", () => {
+    const cues: PerformanceCue[] = [
+        { tick: 0, layer: 1, level: 75, scale: 100, op: "set", fade: 80 },
+        { tick: 155, layer: 6, level: 100, scale: 140, op: "flash" },
+    ];
+
+    it.each([false, true])("preserves the original song payload, compressed=%s", compress => {
+        const original = song([60, 0, 100, 100, 64, 40, 200, 90], [40, 100]);
+        const legacy = encodePbe3(original, { compress });
+        const performance = attachSongPerformance(legacy, cues);
+        const plain = readPbe3Events(legacy);
+        const show = readPbe3Events(performance);
+        expect(legacy[4]).toBe(1);
+        expect(plain.header.performance).toBeUndefined();
+        expect(performance[4]).toBe(2);
+        expect(show.header.performance).toEqual(cues);
+        expect(show.events).toEqual(plain.events);
+        expect(performance.subarray(show.header.eventOffset)).toEqual(legacy.subarray(plain.header.eventOffset));
+        expect(attachSongPerformance(performance, [])).toEqual(legacy);
+        expect(attachSongPerformance(performance, cues)).toEqual(performance);
+        expect(encodePbe3(decodePbe3(performance), { compress })).toEqual(performance);
+        expect(readPbe3Header(renamePbe3(performance, "新曲名")).performance).toEqual(cues);
+    });
+
+    it("rejects malformed, unordered and out-of-range cues", () => {
+        const legacy = encodePbe3(song([60, 0, 100, 100]));
+        expect(() => attachSongPerformance(legacy, [...cues].reverse())).toThrow();
+        expect(() => attachSongPerformance(legacy, [{ ...cues[0], tick: 401 }])).toThrow();
+        const performance = attachSongPerformance(legacy, cues);
+        const crop = readPbe3Header(performance).eventOffset - 1;
+        expect(() => readPbe3Header(performance.slice(0, crop))).toThrow();
+        performance[crop] ^= 1;
+        expect(() => readPbe3Header(performance)).toThrow(/CRC32/);
+    });
+});
 
 describe("PBE3 力度调色板", () => {
     it("恒定力度使用 0 bit，不写索引位流", () => {

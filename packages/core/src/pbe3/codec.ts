@@ -4,10 +4,12 @@ import { crc32 } from "../midi/crc32.js";
 import type { MidiSong } from "../types.js";
 import { decodeUtf8, encodeUtf8 } from "../binary/utf8.js";
 import { readVarUint, varUintSize, writeVarUint, type VarintResult } from "../binary/varint.js";
+import { decodePerformance, encodePerformance, MAX_PERFORMANCE_BYTES, type PerformanceCue } from "./performance.js";
 import {
     MAX_PBE3_EVENT_BYTES,
     PBE3_FLAG_COMPRESSED,
     PBE3_MAGIC,
+    PBE3_PERFORMANCE_VERSION,
     PBE3_VERSION,
     type Pbe3Header,
     type Pbe3Note,
@@ -302,7 +304,8 @@ export function encodePbe3(song: MidiSong, options: EncodePbe3Options = {}): Uin
     writer.bytes(Uint8Array.from(palette));
     writer.put(velocityBits);
     writer.bytes(payload);
-    return writer.finish();
+    const bytes = writer.finish();
+    return song.performance?.length ? attachPbe3Performance(bytes, song.performance) : bytes;
 }
 
 function readU32(data: Uint8Array, offset: number): number {
@@ -332,8 +335,8 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         if (data[i] !== PBE3_MAGIC[i]) throw new Error("[pbe3] 魔数不匹配");
     }
     const version = data[4];
-    if (version !== PBE3_VERSION) {
-        throw new Error(`[pbe3] 版本不兼容：${version}（期望 ${PBE3_VERSION}）`);
+    if (version !== PBE3_VERSION && version !== PBE3_PERFORMANCE_VERSION) {
+        throw new Error(`[pbe3] 版本不兼容：${version}`);
     }
     const flags = data[5];
     if ((flags & ~PBE3_FLAG_COMPRESSED) !== 0) throw new Error("[pbe3] 保留标志位非 0");
@@ -361,8 +364,20 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
     if (velocityBits !== velocityBitsFor(paletteCount)) {
         throw new Error("[pbe3] 力度索引位数与调色板数量不匹配");
     }
-    const eventOffset = offset;
-    if (eventOffset > data.length) throw new Error("[pbe3] 事件流偏移越界");
+    let performance: PerformanceCue[] | undefined;
+    let performanceBytes = 0;
+    if (version === PBE3_PERFORMANCE_VERSION) {
+        if (offset + 6 > data.length) throw new Error("[pbe3] 演出区块头被截断");
+        const length = data[offset] | (data[offset + 1] << 8);
+        const expected = readU32(data, offset + 2);
+        offset += 6;
+        if (length > MAX_PERFORMANCE_BYTES || offset + length > data.length) throw new Error("[pbe3] 演出区块长度无效");
+        const section = data.subarray(offset, offset + length);
+        if (crc32(section) !== expected) throw new Error("[pbe3] 演出区块校验失败（CRC32）");
+        performance = decodePerformance(section, duration);
+        performanceBytes = 6 + length;
+        offset += length;
+    }
     return {
         id: id.value,
         name: name.value,
@@ -374,9 +389,30 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         compressed: (flags & PBE3_FLAG_COMPRESSED) !== 0,
         palette,
         velocityBits,
-        eventOffset,
+        eventOffset: offset,
+        ...(performance ? { performance, performanceBytes } : {}),
         byteLength: data.length,
     };
+}
+
+/** 替换演出区块，保留原始音符载荷和压缩设置。空列表恢复版本 1。 */
+export function attachPbe3Performance(data: Uint8Array, cues: readonly PerformanceCue[]): Uint8Array {
+    const header = readPbe3Header(data);
+    const start = header.eventOffset - (header.performanceBytes ?? 0);
+    const payload = data.subarray(header.eventOffset);
+    const writer = new ByteWriter(start + payload.length);
+    writer.bytes(data.subarray(0, start));
+    if (cues.length) {
+        const section = encodePerformance(cues, header.duration);
+        writer.put(section.length & 255);
+        writer.put(section.length >>> 8);
+        pushU32(writer, crc32(section));
+        writer.bytes(section);
+    }
+    writer.bytes(payload);
+    const out = writer.finish();
+    out[4] = cues.length ? PBE3_PERFORMANCE_VERSION : PBE3_VERSION;
+    return out;
 }
 
 export interface ReadPbe3EventsOptions {
@@ -473,6 +509,7 @@ export function decodePbe3(data: Uint8Array): MidiSong {
         id: header.id,
         name: header.name,
         duration: header.duration,
+        ...(header.performance ? { performance: header.performance } : {}),
         tracks: [
             {
                 instrument: { family: "", number: 0, name: "" },

@@ -223,6 +223,12 @@ export abstract class SampledMidiPlayer {
         return { ...this.state };
     }
 
+    /** Sample the same clock as the scheduler between state publications. */
+    getPlaybackTime(): number {
+        if (!this.ctx || this.state.status !== "playing" || this.timer === null) return this.state.currentTime;
+        return Math.min(this.state.duration, Math.max(0, this.ctx.currentTime - this.startTime));
+    }
+
     protected emit() {
         const snapshot = { ...this.state };
         for (const listener of this.listeners) listener(snapshot);
