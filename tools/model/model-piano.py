@@ -21,6 +21,8 @@ from PIL import Image, ImageDraw
 ADDON = Path(__file__).resolve().parents[2] / "packages/addon"
 RP = ADDON / "rp"
 BP = ADDON / "bp"
+# Blockbench 工程是编辑用源文件，不随资源包发布（游戏只读 .geo.json）。
+ASSETS = Path(__file__).resolve().parents[2] / "assets/piano"
 SIZE = 128
 CASE_WIDTH = 31.3
 HORIZONTAL_SCALE = 32 / CASE_WIDTH
@@ -497,7 +499,7 @@ def main():
     image.save(RP / "textures/blocks/piano.png")
     inventory_icon(image).save(RP / "textures/items/piano_item.png")
     native = [to_bedrock(p) for p in parts]
-    write(RP / "models/blocks/piano_full.bbmodel", project(native, image))
+    write(ASSETS / "piano_full.bbmodel", project(native, image))
     for name, center in (("left", -8), ("right", 8)):
         identifier = f"piano_{name}"
         write(RP / f"models/blocks/{identifier}.geo.json", geometry(identifier, cut_case(native, center), block=True))

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import grand from "../../../../assets/grand/grand_full.bbmodel?raw";
-import p88 from "../../../addon/rp/models/blocks/piano_full.bbmodel?raw";
+import p88 from "../../../../assets/piano/piano_full.bbmodel?raw";
 import grandTexture from "../../../addon/rp/textures/blocks/grand.png";
 import p88Texture from "../../../addon/rp/textures/blocks/piano.png";
 
