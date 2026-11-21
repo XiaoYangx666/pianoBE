@@ -29,6 +29,8 @@ export type VfxParticle =
     | "draw_plane"
     | "draw_cloud"
     | "draw_comet"
+    | "key_stream"
+    | "key_drift"
     | "dust"
     | "shock";
 

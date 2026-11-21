@@ -25,19 +25,26 @@
 
 ## 3. 新增普通弹奏粒子样式
 
-普通弹奏粒子与舞台粒子使用同一个 `pbe:vfx_draw_point` 和同一张 `vfx_lab` 图集。新增样式只需要在 `packages/vfx/src/keyParticles.ts` 的 `KEY_PARTICLE_STYLES` 添加一条：
+普通弹奏粒子与舞台粒子共用同一张 `vfx_lab` 图集。新增样式只需要在 `packages/vfx/src/keyParticles.ts` 的 `KEY_PARTICLE_STYLES` 添加一条，并在同一个定义里声明渲染方式与配色能力：
 
 ```ts
 my_style: {
     label: "我的键上粒子",
     value: 8,              // 出现在钢琴设置中；不写则仅作为 key_style 变体
+    render: "point",       // point = draw_point；stream = key_stream；drift = key_drift
     brush: "star",         // vfxAtlas 点画笔
     alpha: 0.9,
-    draw: { count: 3, life: 0.6, size: 0.05, velocity: [0, 1.2, 0], twinkle: 0.5 },
+    color: { mode: "free" }, // free / limited / fixed；fixed 使用 colors
+    draw: { count: 3, life: 0.6, size: 0.05, aspect: 1, velocity: [0, 1.2, 0], twinkle: 0.5 },
 },
 ```
 
-标签、设置下拉、`key_style` 变体、颜色渐变和变量校验都会自动派生，不需要再改粒子文档或 Python 脚本。运行 `npm run test:vfx` 会验证变量都在 `draw_point` 中声明。
+- `render: "point"` 使用共享 `pbe:vfx_draw_point`；`aspect` 可做非等比尺寸，`colorRandom` 可让每个粒子在双色间随机。
+- `render: "stream"` 使用加法混合、竖向拉伸和 `rotate_y` Billboard 的 `pbe:vfx_key_stream`（魔法流光）。
+- `render: "drift"` 使用普通透明混合、`lookat_xyz` Billboard 与自然飘落运动的 `pbe:vfx_key_drift`（樱吹雪、雪晶）。
+- 配色策略集中在样式定义里：`free` 使用四套全局预设；`limited` 自带专属调色板；`fixed` 由样式提供自然色，玩家设置直接隐藏配色项。演出编排中的显式 `colors` 仍是创作者覆盖，对任何样式都优先生效。
+
+标签、设置下拉、`key_style` 变体、颜色选项和变量校验都会自动派生，不需要再改粒子文档或 UI 样式名判断。运行 `npm run test:vfx` 会按实际 `render` 对应的粒子文档验证变量。
 
 ## 4. 新增或编辑舞台主题
 

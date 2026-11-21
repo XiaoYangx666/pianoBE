@@ -3,7 +3,7 @@ import { DEFAULT_SCORE_ID, isValidScoreId } from "@domain/score/score";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
 import { DEFAULT_MANUAL_VELOCITY, isManualVelocity } from "./soundTypes";
 import {
-    PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, VFX_THEMES, VFX_THEME_ORDER,
+    normalizeKeyParticlePalette, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, VFX_THEMES, VFX_THEME_ORDER,
 } from "@piano/vfx";
 
 export { PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES };
@@ -125,6 +125,11 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         const [min, max] = PIANO_SETTINGS_LIMITS[key];
         return Math.min(max, Math.max(min, Math.round(input)));
     };
+    const particleStyle = PIANO_PARTICLE_STYLES.find(style => style.value === saved.particleStyle)?.value
+        ?? defaults.particleStyle;
+    const savedPalette = typeof saved.particlePalette === "number" && Number.isFinite(saved.particlePalette)
+        ? saved.particlePalette
+        : defaults.particlePalette;
     return {
         particles: typeof saved.particles === "boolean" ? saved.particles : defaults.particles,
         stageChoreography: typeof saved.stageChoreography === "boolean"
@@ -137,10 +142,8 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
             ?? defaults.stageTheme,
         scoreMounted: typeof saved.scoreMounted === "boolean" ? saved.scoreMounted : defaults.scoreMounted,
         scoreId: isValidScoreId(saved.scoreId) ? saved.scoreId : defaults.scoreId,
-        particleStyle: PIANO_PARTICLE_STYLES.find(style => style.value === saved.particleStyle)?.value
-            ?? defaults.particleStyle,
-        particlePalette: PIANO_PARTICLE_PALETTES.find(palette => palette.value === saved.particlePalette)?.value
-            ?? defaults.particlePalette,
+        particleStyle,
+        particlePalette: normalizeKeyParticlePalette(particleStyle, savedPalette),
         volume: number("volume"),
         timbre: AVAILABLE_PIANO_TIMBRES.find(timbre => timbre.value === saved.timbre)?.value
             ?? defaults.timbre,

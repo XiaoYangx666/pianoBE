@@ -7,7 +7,7 @@ PianoBE 的舞台视觉系统围绕**一套统一的特效定义、一套编排�
 - **33 种内置特效 (`VFX_EFFECTS`)**：覆盖氛围环境（`atmosphere`）、三维曲线（`curve`）、舞台建筑（`stage`）、琴键联动（`keys`）、瞬时强调（`accent`）与状态控制（`control`，如 `key_style`）。
 - **7 套内置舞台主题 (`VFX_THEMES`)**：`galaxy`、`neon`、`stage`、`sakura`、`starlight`、`cathedral`、`carnival`，全部使用统一的图层组合与音乐特征映射数据模型。
 - **曲目级演出编排 (`PBE3 v3`)**：通过紧凑的曲目内部符号表 + 颜色表随 `.pbe3` 曲目分发（如 `e1563b03` 《Secret》、`c8159589` 《Secret Base》、`b0cae095` 《Sparkle》），无需新增专用播放器代码或修改运行时代码。
-- **统一图集与画笔 (`vfxAtlas.json`)**：1024×1024 单张粒子图集 + Vibrant Visuals MER 贴图，统一管理 9 种点状画笔与 4 种线条笔刷。普通弹奏粒子也复用 `pbe:vfx_draw_point`，样式只在 `keyParticles.ts` 的单一注册表里声明。
+- **统一图集与画笔 (`vfxAtlas.json`)**：1024×1024 单张粒子图集 + Vibrant Visuals MER 贴图，统一管理 9 种点状画笔与 4 种线条笔刷。弹奏粒子由 `keyParticles.ts` 的单一注册表管理：多数样式复用 `pbe:vfx_draw_point`，需要非等比流光或普通透明混合飘落的花瓣/雪晶使用专用 `pbe:vfx_key_stream` / `pbe:vfx_key_drift`。每种样式自带自由、限定或固定配色策略。
 - **Web VFX Lab (`/vfx-lab`)**：直接在浏览器中复用 `@piano/vfx` 引擎、特效定义、音乐特征采样、预算限制与 `.particle.json` 资源，不再维护独立的预览/回放实现。
 
 ## 2. 常用命令

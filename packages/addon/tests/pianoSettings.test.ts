@@ -11,6 +11,22 @@ test("old pianos start with the score off and the former peach selection becomes
     expect(readPianoSettings(JSON.stringify({ ...old, scoreMounted: true })).scoreMounted).toBe(true);
 });
 
+test("removed pulse ring value falls back without renumbering other styles", () => {
+    const migrated = readPianoSettings('{"particleStyle":2}');
+    expect(migrated.particleStyle).toBe(DEFAULT_PIANO_SETTINGS.particleStyle);
+    expect(PIANO_PARTICLE_STYLES.map(style => style.value)).toEqual([3, 4, 0, 5, 6, 7]);
+    expect(PIANO_PARTICLE_STYLES.find(style => style.value === 5)?.style).toBe("sakura_drift");
+    expect(PIANO_PARTICLE_STYLES.find(style => style.value === 7)?.style).toBe("prism_shards");
+});
+
+test("retired and style-incompatible palettes fall back safely", () => {
+    expect(readPianoSettings('{"particleStyle":3,"particlePalette":2}').particlePalette).toBe(0);
+    expect(readPianoSettings('{"particleStyle":3,"particlePalette":5}').particlePalette).toBe(0);
+    expect(readPianoSettings('{"particleStyle":4,"particlePalette":4}').particlePalette).toBe(0);
+    expect(readPianoSettings('{"particleStyle":4,"particlePalette":1}').particlePalette).toBe(1);
+    expect(readPianoSettings('{"particleStyle":5,"particlePalette":4}').particlePalette).toBe(0);
+});
+
 test("score selection keeps a published score and ignores unknown ids", () => {
     expect(readPianoSettings("{}").scoreId).toBe(DEFAULT_SCORE_ID);
     expect(readPianoSettings('{"scoreId":"missing"}').scoreId).toBe(DEFAULT_SCORE_ID);

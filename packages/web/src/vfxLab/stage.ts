@@ -5,8 +5,10 @@ import {
     createPerformanceProgram,
     createSingleEffectProgram,
     createThemeProgram,
+    DEFAULT_KEY_PARTICLE_SETTINGS,
     KEY_PARTICLE_STYLE_LABELS,
     keyParticleOrigin,
+    normalizeKeyParticlePalette,
     placeVfxEmitter,
     quietFeatures,
     resolveKeyParticle,
@@ -56,8 +58,6 @@ export interface PreviewStats {
         overridden: boolean;
     };
 }
-
-const DEFAULT_KEY_PARTICLE_SETTINGS = { particleStyle: 3, particlePalette: 0 };
 
 export async function createStage(canvas: HTMLCanvasElement) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -135,6 +135,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
     let path: number[] = [];
     let sampleDebug = false;
     let showKeyParticles = true;
+    let keyParticleSettings: { particleStyle: number; particlePalette: number } = { ...DEFAULT_KEY_PARTICLE_SETTINGS };
 
     function buildProgram(): VfxProgram {
         if (track.performance) {
@@ -197,10 +198,10 @@ export async function createStage(canvas: HTMLCanvasElement) {
                     music.note(note);
                     if (showKeyParticles) {
                         const override = engine!.keyParticleOverride(note.songTime ?? tick / 20, features);
-                        const resolved = resolveKeyParticle(note.midi, DEFAULT_KEY_PARTICLE_SETTINGS, right, override);
+                        const resolved = resolveKeyParticle(note.midi, keyParticleSettings, right, override);
                         for (const emitter of resolved.emitters) {
                             const origin = keyParticleOrigin(center, right, note.midi, emitter.onKey, instrument);
-                            if (origin) particles.spawn("key", "draw_point", origin, emitter.variables);
+                            if (origin) particles.spawn("key", emitter.particle, origin, emitter.variables);
                         }
                     }
                 }
@@ -297,6 +298,13 @@ export async function createStage(canvas: HTMLCanvasElement) {
             showKeyParticles = enabled;
             frame = Infinity;
         },
+        setKeyParticleSettings(settings: { particleStyle: number; particlePalette: number }) {
+            keyParticleSettings = {
+                particleStyle: settings.particleStyle,
+                particlePalette: normalizeKeyParticlePalette(settings.particleStyle, settings.particlePalette),
+            };
+            frame = Infinity;
+        },
         advance,
         seek: (time: number) => advance(time, true),
         render,
@@ -312,7 +320,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
             for (const { group } of emissions) bucket(group).rate++;
             const resolvedKey = resolveKeyParticle(
                 60,
-                DEFAULT_KEY_PARTICLE_SETTINGS,
+                keyParticleSettings,
                 VFX_RIGHT_OFFSETS[direction],
                 engine?.keyParticleOverride(simTime, features),
             );

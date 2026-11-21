@@ -1,18 +1,90 @@
 import { PERFORMANCE_PALETTES, resolvePerformanceColor } from "@piano/core";
 import { POINT_BRUSH_INDEX, type PointBrushId } from "./brushes";
 import { blendHex, colorVars, hexToUnitRgb } from "./color";
-import type { DrawPointsSpec } from "./primitives";
-import type { PianoParticleOverride, VfxEffectParams } from "./types";
+import type { Point3 } from "./geometry";
+import type { PianoParticleOverride, VfxEffectParams, VfxParticle } from "./types";
 
-type PointStyleDraw = Omit<DrawPointsSpec, "brush" | "color" | "color2" | "opacity">;
+export interface KeyParticlePalette {
+    value: number;
+    label: string;
+    colors: readonly string[];
+}
 
-interface PointStyle {
+/** Player-facing palettes for free-color styles. Values stay stable; retired slots are not reused. */
+export const PIANO_PARTICLE_PALETTES: readonly KeyParticlePalette[] = [
+    { value: 0, label: "极光 · 青蓝到淡紫", colors: ["#64DBF2", "#E1A0F7"] },
+    { value: 1, label: "琥珀 · 暖橙到浅金", colors: ["#E88F54", "#FFE0A1"] },
+    { value: 3, label: "月白 · 冷白与浅蓝", colors: ["#D5E6FF", "#9FC9FF"] },
+    { value: 4, label: "虹谱 · 紫蓝、青、绿、金、橙红", colors: ["#9362F5", "#45CFFF", "#60E7A4", "#FADF65", "#FA694F"] },
+];
+
+const BLUE_TEAR_PALETTES: readonly KeyParticlePalette[] = [
+    { value: 0, label: "冰蓝 · 深蓝到亮青", colors: ["#2F6BFF", "#6FE9FF"] },
+    { value: 1, label: "青碧 · 湖蓝到薄荷", colors: ["#1FB6D8", "#A6F5EA"] },
+    { value: 2, label: "月白 · 冰白到淡蓝", colors: ["#C8E6FF", "#7FB8FF"] },
+];
+
+const PRISM_PALETTES: readonly KeyParticlePalette[] = [
+    { value: 0, label: "棱彩 · 青蓝到紫金", colors: ["#4EEBFF", "#C58CFF", "#FFE29A"] },
+    { value: 1, label: "霞光 · 粉金到浅橙", colors: ["#FF8DA8", "#FFB870", "#FFE29A"] },
+    { value: 2, label: "极光棱 · 青蓝到淡紫", colors: ["#64DBF2", "#9E8CFF", "#E1A0F7"] },
+];
+
+const SAKURA_PALETTE = ["#F2A7C3", "#FFF4E8"] as const;
+const SNOW_PALETTE = ["#DCEBFF", "#FFFFFF"] as const;
+
+type KeyParticleColor =
+    /** Pitch-gradient over the four curated player palettes. */
+    | { mode: "free" }
+    /** Only the palettes declared by this style. */
+    | { mode: "limited"; palettes: readonly KeyParticlePalette[] }
+    /** Natural look: the style owns its colors and the player cannot recolor it. */
+    | { mode: "fixed"; colors: readonly string[] };
+
+interface KeyParticleDraw {
+    count: number;
+    life: number;
+    lifeJitter?: number;
+    size?: number;
+    sizeEnd?: number;
+    sizeJitter?: number;
+    /** Height multiplier for non-square billboards. */
+    aspect?: number;
+    /** Exponential drag used by the stream primitive. */
+    drag?: number;
+    /** >0.5 mixes each particle between color and highlight instead of fading over age. */
+    colorRandom?: number;
+    spin?: number;
+    spinJitter?: number;
+    spinRate?: number;
+    phase?: number;
+    phaseSpread?: number;
+    omega?: number;
+    radius?: number;
+    radiusEnd?: number;
+    curve?: number;
+    radialJitter?: number;
+    depthRatio?: number;
+    tilt?: number;
+    rise?: number;
+    flutter?: number;
+    spread?: Point3;
+    velocity?: Point3;
+    accel?: Point3;
+    fadeIn?: number;
+    fadeOut?: number;
+    twinkle?: number;
+}
+
+interface RenderStyle {
     label: string;
     /** Stable numeric value persisted in piano settings; undefined for cue-only styles. */
     value?: number;
+    render: "point" | "stream" | "drift";
     brush: PointBrushId;
     alpha: number;
-    draw: PointStyleDraw;
+    color: KeyParticleColor;
+    draw: KeyParticleDraw;
 }
 
 interface SpecialStyle {
@@ -20,32 +92,40 @@ interface SpecialStyle {
     special: "inherit" | "glimmer" | "none";
 }
 
-type KeyParticleStyle = PointStyle | SpecialStyle;
+type KeyParticleStyle = RenderStyle | SpecialStyle;
 
 /**
  * Single source of truth for every note particle. Adding a style means adding one
- * entry here; labels, the settings dropdown, cue variants and `resolveKeyParticle`
- * all derive from this table. Every sound style reuses `pbe:vfx_draw_point` and the
- * shared vfx_lab atlas, so it needs no dedicated Bedrock particle document.
+ * entry here; labels, the settings dropdown, color capability, cue variants and
+ * `resolveKeyParticle` all derive from this table.
+ *
+ * Most styles use the shared `draw_point` primitive. Only effects that genuinely
+ * need another material, billboard orientation or body shape get a dedicated
+ * primitive: `key_stream` (additive vertical streamer) and `key_drift` (normal
+ * blended, naturally falling petal/snow).
  */
 export const KEY_PARTICLE_STYLES = {
     inherit: { label: "沿用钢琴设置", special: "inherit" },
     magic_trail: {
         label: "魔法流光",
         value: 3,
+        render: "stream",
         brush: "spark",
         alpha: 0.92,
+        color: { mode: "free" },
         draw: {
-            count: 1, life: 0.62, size: 0.09, sizeEnd: 0.045,
-            velocity: [0, 1.35, 0], accel: [0, 0.16, 0],
-            twinkle: 0.18, fadeIn: 0.04, fadeOut: 0.34,
+            count: 1, life: 0.62, size: 0.075, sizeEnd: 0.04, sizeJitter: 0.18, aspect: 2.4, drag: 1.05,
+            velocity: [0, 1.35, 0], accel: [0, 0.16, 0], flutter: 0.02,
+            fadeIn: 0.04, fadeOut: 0.34,
         },
     },
     blue_tears: {
         label: "蓝眼泪 · 发光气泡",
         value: 4,
+        render: "point",
         brush: "mote",
         alpha: 0.9,
+        color: { mode: "limited", palettes: BLUE_TEAR_PALETTES },
         draw: {
             count: 5, life: 0.6, lifeJitter: 0.3, size: 0.045, sizeEnd: 0.028, sizeJitter: 0.32,
             spread: [0.05, 0.14, 0.05], velocity: [0, 1.5, 0], accel: [0, 0.34, 0],
@@ -55,30 +135,24 @@ export const KEY_PARTICLE_STYLES = {
     neon_note: {
         label: "霓虹音符",
         value: 0,
+        render: "point",
         brush: "note",
         alpha: 0.94,
+        color: { mode: "free" },
         draw: {
             count: 1, life: 0.48, size: 0.105, sizeEnd: 0.075, spinJitter: 10, spinRate: 24,
             velocity: [0, 1.1, 0], accel: [0, 0.24, 0], fadeIn: 0.03, fadeOut: 0.3,
         },
     },
-    pulse_ring: {
-        label: "电光涟漪",
-        value: 2,
-        brush: "ring",
-        alpha: 0.9,
-        draw: {
-            count: 1, life: 0.36, size: 0.05, sizeEnd: 0.19,
-            velocity: [0, 0.8, 0], accel: [0, 0.2, 0], fadeIn: 0.03, fadeOut: 0.3,
-        },
-    },
     sakura_drift: {
         label: "樱吹雪 · 粉色花瓣",
         value: 5,
+        render: "drift",
         brush: "petal",
         alpha: 0.94,
+        color: { mode: "fixed", colors: SAKURA_PALETTE },
         draw: {
-            count: 3, life: 0.85, lifeJitter: 0.2, size: 0.058, sizeEnd: 0.042, sizeJitter: 0.3,
+            count: 3, life: 0.85, lifeJitter: 0.2, size: 0.058, sizeEnd: 0.042, sizeJitter: 0.3, aspect: 1.15,
             spread: [0.06, 0.08, 0.06], velocity: [0, 1, 0], accel: [0, 0.12, 0],
             flutter: 0.12, spinJitter: 180, spinRate: 135, fadeIn: 0.05, fadeOut: 0.42,
         },
@@ -86,8 +160,10 @@ export const KEY_PARTICLE_STYLES = {
     stardust: {
         label: "星火 · 闪烁星芒",
         value: 6,
+        render: "point",
         brush: "star",
         alpha: 0.9,
+        color: { mode: "free" },
         draw: {
             count: 4, life: 0.55, lifeJitter: 0.3, size: 0.045, sizeEnd: 0.024, sizeJitter: 0.36,
             spread: [0.08, 0.1, 0.08], velocity: [0, 1.2, 0], accel: [0, 0.26, 0],
@@ -97,18 +173,22 @@ export const KEY_PARTICLE_STYLES = {
     prism_shards: {
         label: "棱光 · 彩色晶片",
         value: 7,
+        render: "point",
         brush: "shard",
         alpha: 0.86,
+        color: { mode: "limited", palettes: PRISM_PALETTES },
         draw: {
-            count: 3, life: 0.6, lifeJitter: 0.25, size: 0.062, sizeEnd: 0.034, sizeJitter: 0.3,
-            spread: [0.06, 0.1, 0.06], velocity: [0, 1.4, 0], accel: [0, 0.28, 0],
+            count: 3, life: 0.6, lifeJitter: 0.25, size: 0.052, sizeEnd: 0.028, sizeJitter: 0.3, aspect: 2.05,
+            colorRandom: 1, spread: [0.06, 0.1, 0.06], velocity: [0, 1.4, 0], accel: [0, 0.28, 0],
             spinJitter: 180, spinRate: 180, twinkle: 0.3, fadeOut: 0.32,
         },
     },
     snow: {
         label: "雪晶飘雪",
+        render: "drift",
         brush: "snow",
         alpha: 0.9,
+        color: { mode: "fixed", colors: SNOW_PALETTE },
         draw: {
             count: 4, life: 0.82, lifeJitter: 0.22, size: 0.056, sizeEnd: 0.03, sizeJitter: 0.28,
             spread: [0.05, 0.03, 0.04], velocity: [0, 0.92, 0], accel: [0, -0.42, 0],
@@ -134,22 +214,26 @@ export const PIANO_PARTICLE_STYLES = KEY_PARTICLE_STYLE_IDS.flatMap(id => {
         : [];
 });
 
-export const PIANO_PARTICLE_PALETTES = [
-    { value: 0, label: "极光 · 青蓝到淡紫", colors: ["#64DBF2", "#E1A0F7"] },
-    { value: 1, label: "琥珀 · 暖橙到浅金", colors: ["#E88F54", "#FFE0A1"] },
-    { value: 2, label: "森语 · 青绿到嫩黄", colors: ["#48C4AD", "#D4ED92"] },
-    { value: 3, label: "月白 · 冷白", colors: ["#D5E6FF", "#D5E6FF"] },
-    { value: 4, label: "虹谱 · 紫蓝、青、绿、金、橙红", colors: ["#9362F5", "#45CFFF", "#60E7A4", "#FADF65", "#FA694F"] },
-    { value: 5, label: "冰火 · 冰蓝、紫红、金橙", colors: ["#43DBFF", "#CD67F4", "#F5638A", "#FFC061"] },
-    { value: 6, label: "深海 · 深蓝到亮青", colors: ["#176FFF", "#29B6FF", "#4DE8FF"] },
-] as const;
+/** Shared default for addon settings and the Web lab. */
+export const DEFAULT_KEY_PARTICLE_SETTINGS = {
+    particleStyle: PIANO_PARTICLE_STYLES[0].value,
+    particlePalette: PIANO_PARTICLE_PALETTES[0].value,
+} as const;
+
+const RENDER_PARTICLE: Readonly<Record<RenderStyle["render"], VfxParticle>> = {
+    point: "draw_point",
+    stream: "key_stream",
+    drift: "key_drift",
+};
+
+export type KeyParticleColorMode = "free" | "limited" | "fixed" | "special";
 
 export type { PianoParticleOverride };
 
 const STYLE_SET = new Set<string>(KEY_PARTICLE_STYLE_IDS);
 
 export interface KeyParticleEmitter {
-    particle: "pbe:vfx_draw_point";
+    particle: VfxParticle;
     variables: Record<string, number>;
     /** Glimmer is anchored on the key surface instead of the shared emission line. */
     onKey?: boolean;
@@ -166,6 +250,59 @@ export interface ResolvedKeyParticle {
 
 export function isKeyParticleStyleId(value: unknown): value is KeyParticleStyleId {
     return typeof value === "string" && STYLE_SET.has(value);
+}
+
+/** Resolve a persisted numeric style value; retired values are intentionally absent. */
+export function keyParticleStyleAt(value: unknown): KeyParticleStyleId | undefined {
+    return typeof value === "number"
+        ? PIANO_PARTICLE_STYLES.find(option => option.value === value)?.style
+        : undefined;
+}
+
+export function keyParticleStyleValue(style: KeyParticleStyleId): number | undefined {
+    return PIANO_PARTICLE_STYLES.find(option => option.style === style)?.value;
+}
+
+/** Color capability is part of the style definition, not a UI-side style-name table. */
+export function keyParticleColorMode(style: KeyParticleStyleId | number): KeyParticleColorMode {
+    const id = typeof style === "number" ? keyParticleStyleAt(style) : style;
+    if (!id) return "special";
+    const definition = KEY_PARTICLE_STYLES[id];
+    if ("special" in definition) return "special";
+    return definition.color.mode;
+}
+
+/**
+ * Palettes shown for a style. `undefined` means the style has fixed natural colors
+ * and the settings UI must hide the color option entirely.
+ */
+export function keyParticleColorOptions(
+    style: KeyParticleStyleId | number,
+): readonly KeyParticlePalette[] | undefined {
+    const id = typeof style === "number" ? keyParticleStyleAt(style) : style;
+    if (!id) return undefined;
+    const definition = KEY_PARTICLE_STYLES[id];
+    if ("special" in definition) return undefined;
+    const color = definition.color;
+    if (color.mode === "free") return PIANO_PARTICLE_PALETTES;
+    if (color.mode === "limited") return color.palettes;
+    return undefined;
+}
+
+/** Keep a persisted palette valid when the selected style or palette table changes. */
+export function normalizeKeyParticlePalette(style: number, palette: number): number {
+    const options = keyParticleColorOptions(style);
+    if (!options) return 0;
+    return options.find(option => option.value === palette)?.value ?? options[0].value;
+}
+
+function colorsForStyle(style: KeyParticleStyleId, palette: number): readonly string[] {
+    const definition = KEY_PARTICLE_STYLES[style];
+    if ("special" in definition) return PIANO_PARTICLE_PALETTES[0].colors;
+    const color = definition.color;
+    if (color.mode === "fixed") return color.colors;
+    const options = color.mode === "free" ? PIANO_PARTICLE_PALETTES : color.palettes;
+    return (options.find(option => option.value === palette) ?? options[0]).colors;
 }
 
 /** 从 `key_style` 的独立 `variant` 字段直接解析弹奏粒子覆盖，不复用 brush/motion。 */
@@ -246,8 +383,8 @@ function samplePitchHex(colors: readonly string[], midi: number): string {
     return blendHex(low, high, position - index);
 }
 
-function pointVariables(
-    style: PointStyle,
+function styleVariables(
+    style: RenderStyle,
     color: string,
     color2: string,
     intensity: number,
@@ -266,6 +403,9 @@ function pointVariables(
         size: draw.size ?? 0.08,
         size_end: draw.sizeEnd ?? draw.size ?? 0.08,
         size_jitter: draw.sizeJitter ?? 0.22,
+        aspect: draw.aspect ?? 1,
+        drag: draw.drag ?? 0,
+        color_random: draw.colorRandom ?? 0,
         spin: draw.spin ?? 0,
         spin_jitter: draw.spinJitter ?? 0,
         spin_rate: draw.spinRate ?? 0,
@@ -311,10 +451,16 @@ export function resolveKeyParticle(
 ): ResolvedKeyParticle {
     const baseStyle = PIANO_PARTICLE_STYLES.find(option => option.value === settings.particleStyle) ?? PIANO_PARTICLE_STYLES[0];
     const baseStyleId = baseStyle.style;
-    const basePalette = PIANO_PARTICLE_PALETTES.find(option => option.value === settings.particlePalette) ?? PIANO_PARTICLE_PALETTES[0];
 
-    const style: KeyParticleStyleId = !override?.style || override.style === "inherit" ? baseStyleId : override.style;
-    const colors: readonly string[] = override?.colors?.length ? override.colors : basePalette.colors;
+    const style: KeyParticleStyleId = override?.style && override.style !== "inherit" && isKeyParticleStyleId(override.style)
+        ? override.style
+        : baseStyleId;
+    const definition = KEY_PARTICLE_STYLES[style];
+    const paletteColors = "special" in definition
+        ? colorsForStyle(baseStyleId, settings.particlePalette)
+        : colorsForStyle(style, settings.particlePalette);
+    // Explicit cue/theme colors are the documented creator override and win for every style.
+    const colors: readonly string[] = override?.colors?.length ? override.colors : paletteColors;
     const glimmer = override?.style === "none"
         ? (override.glimmer ?? false)
         : override?.glimmer ?? true;
@@ -335,21 +481,28 @@ export function resolveKeyParticle(
     const scale = Math.min(1.7, Math.max(0.5, override?.scale ?? 1));
     const emitters: KeyParticleEmitter[] = [];
 
-    const definition = KEY_PARTICLE_STYLES[style];
     if (!("special" in definition)) {
         emitters.push({
-            particle: "pbe:vfx_draw_point",
-            variables: pointVariables(definition, pitchHex, blendHex(pitchHex, highlightHex, 0.55), intensity, scale, right),
+            particle: RENDER_PARTICLE[definition.render],
+            variables: styleVariables(
+                definition,
+                pitchHex,
+                blendHex(pitchHex, highlightHex, 0.55),
+                intensity,
+                scale,
+                right,
+            ),
         });
     }
     if (glimmer) {
         emitters.push({
-            particle: "pbe:vfx_draw_point",
+            particle: "draw_point",
             variables: {
                 ...colorVars(pitchHex, highlightHex, GLIMMER.alpha * intensity),
                 count: 1, life: GLIMMER.life, life_jitter: 0,
                 brush: POINT_BRUSH_INDEX.mote,
                 size: GLIMMER.size, size_end: GLIMMER.sizeEnd, size_jitter: 0,
+                aspect: 1, color_random: 0,
                 fade_in: 0.02, fade_out: 0.2, scale,
             },
             onKey: true,

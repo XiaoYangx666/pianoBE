@@ -41,7 +41,7 @@ packages/addon (Bedrock 平台使用者)   packages/web (Three.js + Wintersky �
 
 - **琴型与舞台布局**：`@piano/vfx` 以 `"upright" | "grand"` 表示琴型，`vfxStageFrame()` 提供舞台中心与深度，`keyOriginFor()` / `keyParticleOrigin()` 提供共享琴键坐标。Addon 的装配定义只负责游戏实体，用 `vfxInstrumentFor(definition)` 映射到 VFX 琴型。
 - **模型数据的单一来源**：原始琴键命中盒仍由 `tools/model/*.py` 生成到 Addon；`build-vfx-lab.mjs` 从中派生 `packages/vfx/src/data/keys.generated.ts`，避免运行时跨包读取 Addon。
-- **粒子资源**：粒子 JSON、`vfx_lab` 图集与 MER 都生成到 `packages/vfx/assets`。普通弹奏粒子与舞台粒子共用 `pbe:vfx_draw_point` 和同一张图集，不再有独立纹理。Web 直接从这里加载；Addon 构建前通过 `sync:assets` 复制进 `packages/addon/rp`，因此同一份资源不会在仓库里提交两次。
+- **粒子资源**：粒子 JSON、`vfx_lab` 图集与 MER 都生成到 `packages/vfx/assets`。普通弹奏粒子与舞台粒子共用同一张图集；点状样式使用 `pbe:vfx_draw_point`，魔法流光与花瓣/雪晶分别使用专用 `pbe:vfx_key_stream` / `pbe:vfx_key_drift`，不再有独立纹理。Web 直接从这里加载；Addon 构建前通过 `sync:assets` 复制进 `packages/addon/rp`，因此同一份资源不会在仓库里提交两次。
 - **演出提示**：`.pbe3` 只保存符号与颜色，特效清单、画笔和变体语义全部属于 `@piano/vfx`。
 
 ## 4. 核心设计边界

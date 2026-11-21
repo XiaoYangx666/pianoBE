@@ -22,6 +22,10 @@ export interface DrawPointsSpec {
     size?: number;
     sizeEnd?: number;
     sizeJitter?: number;
+    /** Height multiplier for non-square point billboards. */
+    aspect?: number;
+    /** >0.5 mixes each particle between color and color2 instead of ageing the tint. */
+    colorRandom?: number;
     spin?: number;
     spinJitter?: number;
     spinRate?: number;
@@ -67,6 +71,8 @@ export function drawPoints(spec: DrawPointsSpec): VfxEmitter {
             size,
             size_end: spec.sizeEnd ?? size,
             size_jitter: spec.sizeJitter ?? 0.22,
+            aspect: spec.aspect ?? 1,
+            color_random: spec.colorRandom ?? 0,
             spin: spec.spin ?? 0,
             spin_jitter: spec.spinJitter ?? 0,
             spin_rate: spec.spinRate ?? 0,

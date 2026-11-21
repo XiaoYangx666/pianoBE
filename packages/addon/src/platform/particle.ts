@@ -20,6 +20,6 @@ export function summonParticle(
             // Molang rejects NaN/Infinity with a hard scripting error; degrade to 0.
             variables.setFloat(`variable.vfx_${name}`, Number.isFinite(value) ? value : 0);
         }
-        dim.spawnParticle(emitter.particle, origin, variables);
+        dim.spawnParticle(`pbe:vfx_${emitter.particle}`, origin, variables);
     }
 }

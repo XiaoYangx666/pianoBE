@@ -4,8 +4,11 @@ import { PERFORMANCE_PALETTES } from "@piano/core";
 import {
     createPerformanceProgram,
     createThemeProgram,
+    keyParticleColorOptions,
+    keyParticleColorMode,
     keyParticleOverrideFromParams,
     KEY_PARTICLE_STYLES,
+    normalizeKeyParticlePalette,
     PIANO_PARTICLE_PALETTES,
     PIANO_PARTICLE_STYLES,
     POINT_BRUSH_INDEX,
@@ -25,7 +28,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
         const resolved = resolveKeyParticle(21, baseSettings, right);
         expect(resolved.overridden).toBe(false);
         expect(resolved.style).toBe("magic_trail");
-        expect(resolved.emitters[0].particle).toBe("pbe:vfx_draw_point");
+        expect(resolved.emitters[0].particle).toBe("key_stream");
         expect(resolved.emitters[0].variables.brush).toBe(POINT_BRUSH_INDEX.spark);
         expect(resolved.glimmer).toBe(true);
         expect(resolved.colors).toEqual(PIANO_PARTICLE_PALETTES[0].colors);
@@ -35,16 +38,18 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
 
         const high = resolveKeyParticle(108, { particleStyle: 5, particlePalette: 1 }, right);
         expect(high.style).toBe("sakura_drift");
+        expect(high.emitters[0].particle).toBe("key_drift");
         expect(high.emitters[0].variables.brush).toBe(POINT_BRUSH_INDEX.petal);
-        expect(high.color.red).toBeCloseTo(0xff / 255, 3);
-        expect(high.color.green).toBeCloseTo(0xe0 / 255, 3);
-        expect(high.color.blue).toBeCloseTo(0xa1 / 255, 3);
+        expect(keyParticleColorOptions("sakura_drift")).toBeUndefined();
+        expect(high.colors).not.toEqual(PIANO_PARTICLE_PALETTES[1].colors);
+        expect(high.color.red).toBeCloseTo(1, 3);
     });
 
-    test("覆盖全部 7 种经典弹奏粒子样式并支持单色与多色音域渐变", () => {
+    test("六种玩家样式按渲染原语拆分，并保留显式多色音域渐变", () => {
+        const particles = { point: "draw_point", stream: "key_stream", drift: "key_drift" } as const;
         for (const option of PIANO_PARTICLE_STYLES) {
             const definition = KEY_PARTICLE_STYLES[option.style];
-            expect("brush" in definition).toBe(true);
+            if (!("render" in definition)) throw new Error(`${option.style} 应为渲染样式`);
             const resolved = resolveKeyParticle(64, baseSettings, right, {
                 style: option.style,
                 colors: ["#000000", "#FFFFFF"],
@@ -52,6 +57,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
             });
             expect(resolved.overridden).toBe(true);
             expect(resolved.style).toBe(option.style);
+            expect(resolved.emitters[0].particle).toBe(particles[definition.render]);
             expect(resolved.emitters[0].variables.brush).toBe(POINT_BRUSH_INDEX[definition.brush]);
             expect(resolved.color.red).toBeCloseTo(43 / 87, 2);
         }
@@ -65,9 +71,8 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
         expect(singleColor.color.blue).toBeCloseTo(0x40 / 255, 4);
     });
 
-    test("所有弹奏样式复用 draw_point，且变量均在粒子 JSON 中声明", () => {
-        const doc = readFileSync(new URL("../assets/particles/pbe_vfx_draw_point.particle.json", import.meta.url), "utf8");
-        const allowed = new Set([...doc.matchAll(/variable\.vfx_(\w+)/g)].map(match => match[1]));
+    test("弹奏粒子只使用已声明的变量，并允许非等比尺寸", () => {
+        const runtimeSupplied = new Set(["stage_depth"]);
         for (const option of PIANO_PARTICLE_STYLES) {
             const resolved = resolveKeyParticle(72, baseSettings, { x: 0, z: -1 }, {
                 style: option.style,
@@ -76,11 +81,16 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
                 scale: 1.2,
             });
             expect(resolved.emitters).toHaveLength(2);
-            expect(resolved.emitters.every(emitter => emitter.particle === "pbe:vfx_draw_point")).toBe(true);
             for (const emitter of resolved.emitters) {
                 expect(Object.values(emitter.variables).every(Number.isFinite)).toBe(true);
-                for (const key of Object.keys(emitter.variables)) {
-                    expect(allowed.has(key)).toBe(true);
+                if (emitter.onKey) continue;
+                const doc = readFileSync(
+                    new URL(`../assets/particles/pbe_vfx_${emitter.particle}.particle.json`, import.meta.url),
+                    "utf8",
+                );
+                const used = new Set([...doc.matchAll(/variable\.vfx_(\w+)/g)].map(match => match[1]));
+                for (const name of used) {
+                    if (!runtimeSupplied.has(name)) expect(emitter.variables).toHaveProperty(name);
                 }
             }
             expect(resolved.emitters[0].variables.scale).toBeCloseTo(1.2, 4);
@@ -90,6 +100,45 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
         }
     });
 
+    test("颜色能力由样式声明：自由、限定与固定互不串用", () => {
+        expect(keyParticleColorMode("magic_trail")).toBe("free");
+        expect(keyParticleColorOptions("magic_trail")).toEqual(PIANO_PARTICLE_PALETTES);
+        expect(PIANO_PARTICLE_PALETTES.map(palette => palette.value)).toEqual([0, 1, 3, 4]);
+
+        expect(keyParticleColorMode("blue_tears")).toBe("limited");
+        const tears = keyParticleColorOptions("blue_tears")!;
+        expect(tears.length).toBeGreaterThan(1);
+        expect(tears.every(palette => palette.colors.every(hex => /^#[0-9A-F]{6}$/i.test(hex)))).toBe(true);
+        expect(tears).not.toEqual(PIANO_PARTICLE_PALETTES);
+
+        expect(keyParticleColorMode("sakura_drift")).toBe("fixed");
+        expect(keyParticleColorOptions("sakura_drift")).toBeUndefined();
+        expect(keyParticleColorMode("snow")).toBe("fixed");
+
+        expect(normalizeKeyParticlePalette(0, 5)).toBe(0);
+        expect(normalizeKeyParticlePalette(4, 6)).toBe(tears[0].value);
+        expect(normalizeKeyParticlePalette(5, 4)).toBe(0);
+
+        const fixedLow = resolveKeyParticle(40, { particleStyle: 5, particlePalette: 0 }, right);
+        const fixedHigh = resolveKeyParticle(40, { particleStyle: 5, particlePalette: 4 }, right);
+        expect(fixedLow.colors).toEqual(fixedHigh.colors);
+
+        const limited = resolveKeyParticle(40, { particleStyle: 4, particlePalette: tears[1].value }, right);
+        expect(limited.colors).toEqual(tears[1].colors);
+
+        const recolor = resolveKeyParticle(40, { particleStyle: 5, particlePalette: 0 }, right, {
+            colors: ["#123456"], glimmer: false,
+        });
+        expect(recolor.colors).toEqual(["#123456"]);
+    });
+
+    test("电光涟漪已移除，旧存档数值安全回退", () => {
+        expect("pulse_ring" in KEY_PARTICLE_STYLES).toBe(false);
+        expect(PIANO_PARTICLE_STYLES.some(style => style.value === 2)).toBe(false);
+        const resolved = resolveKeyParticle(60, { particleStyle: 2, particlePalette: 0 }, right);
+        expect(resolved.style).toBe(PIANO_PARTICLE_STYLES[0].style);
+    });
+
     test("inherit 仅替换颜色而保留玩家自选样式；none 支持仅微光与完全静音", () => {
         const inheritCustomColor = resolveKeyParticle(60, { particleStyle: 6, particlePalette: 0 }, right, {
             style: "inherit",
@@ -97,7 +146,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
         });
         expect(inheritCustomColor.overridden).toBe(true);
         expect(inheritCustomColor.style).toBe("stardust");
-        expect(inheritCustomColor.emitters[0].particle).toBe("pbe:vfx_draw_point");
+        expect(inheritCustomColor.emitters[0].particle).toBe("draw_point");
 
         const glimmerOnly = resolveKeyParticle(60, baseSettings, right, {
             style: "none",

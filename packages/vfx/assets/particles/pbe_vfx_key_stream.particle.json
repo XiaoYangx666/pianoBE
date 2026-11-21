@@ -1,0 +1,72 @@
+{
+  "format_version": "1.10.0",
+  "particle_effect": {
+    "description": {
+      "identifier": "pbe:vfx_key_stream",
+      "basic_render_parameters": {
+        "material": "particles_add",
+        "texture": "textures/particle/vfx_lab"
+      }
+    },
+    "components": {
+      "minecraft:emitter_rate_instant": {
+        "num_particles": "(variable.vfx_count ?? 1)"
+      },
+      "minecraft:emitter_lifetime_once": {
+        "active_time": 0.05
+      },
+      "minecraft:emitter_local_space": {
+        "position": true,
+        "rotation": true
+      },
+      "minecraft:emitter_shape_point": {
+        "offset": [
+          0,
+          0,
+          0
+        ]
+      },
+      "minecraft:particle_initial_spin": {
+        "rotation": "(variable.vfx_spin ?? 0) + (variable.vfx_spin_jitter ?? 0) * (2 * variable.particle_random_2 - 1)",
+        "rotation_rate": "(variable.vfx_spin_rate ?? 0)"
+      },
+      "minecraft:particle_motion_parametric": {
+        "relative_position": [
+          "(((variable.vfx_spread_x ?? 0) * (2 * variable.particle_random_2 - 1) + (variable.vfx_vx ?? 0) * (1 - math.exp(-(math.max(0.05, (variable.vfx_drag ?? 1.05))) * variable.particle_age)) / math.max(0.05, (variable.vfx_drag ?? 1.05)) + ((variable.vfx_flutter ?? 0)) * math.sin(170 * variable.particle_age + 360 * variable.particle_random_2)) * (variable.vfx_right_x ?? 1) + (((variable.vfx_spread_z ?? 0) * (2 * variable.particle_random_4 - 1) + (variable.vfx_vz ?? 0) * (1 - math.exp(-(math.max(0.05, (variable.vfx_drag ?? 1.05))) * variable.particle_age)) / math.max(0.05, (variable.vfx_drag ?? 1.05)) + 0.5 * (variable.vfx_az ?? 0) * variable.particle_age * variable.particle_age + ((variable.vfx_flutter ?? 0)) * math.cos(145 * variable.particle_age + 360 * variable.particle_random_3)) * (variable.vfx_stage_depth ?? 1)) * (variable.vfx_right_z ?? 0)) * (variable.vfx_scale ?? 1)",
+          "((variable.vfx_spread_y ?? 0) * (2 * variable.particle_random_3 - 1) + (variable.vfx_vy ?? 0) * (1 - math.exp(-(math.max(0.05, (variable.vfx_drag ?? 1.05))) * variable.particle_age)) / math.max(0.05, (variable.vfx_drag ?? 1.05)) + 0.5 * (variable.vfx_ay ?? 0) * variable.particle_age * variable.particle_age) * (variable.vfx_scale ?? 1)",
+          "(((variable.vfx_spread_x ?? 0) * (2 * variable.particle_random_2 - 1) + (variable.vfx_vx ?? 0) * (1 - math.exp(-(math.max(0.05, (variable.vfx_drag ?? 1.05))) * variable.particle_age)) / math.max(0.05, (variable.vfx_drag ?? 1.05)) + ((variable.vfx_flutter ?? 0)) * math.sin(170 * variable.particle_age + 360 * variable.particle_random_2)) * (variable.vfx_right_z ?? 0) - (((variable.vfx_spread_z ?? 0) * (2 * variable.particle_random_4 - 1) + (variable.vfx_vz ?? 0) * (1 - math.exp(-(math.max(0.05, (variable.vfx_drag ?? 1.05))) * variable.particle_age)) / math.max(0.05, (variable.vfx_drag ?? 1.05)) + 0.5 * (variable.vfx_az ?? 0) * variable.particle_age * variable.particle_age + ((variable.vfx_flutter ?? 0)) * math.cos(145 * variable.particle_age + 360 * variable.particle_random_3)) * (variable.vfx_stage_depth ?? 1)) * (variable.vfx_right_x ?? 1)) * (variable.vfx_scale ?? 1)"
+        ]
+      },
+      "minecraft:particle_lifetime_expression": {
+        "max_lifetime": "math.max(0.1, (variable.vfx_life ?? 0.62) * (1 + (variable.vfx_life_jitter ?? 0.2) * (2 * variable.particle_random_1 - 1)))"
+      },
+      "minecraft:particle_appearance_billboard": {
+        "facing_camera_mode": "rotate_y",
+        "size": [
+          "(math.lerp((variable.vfx_size ?? 0.075), (variable.vfx_size_end ?? 0.04), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1)) * (1 + (variable.vfx_size_jitter ?? 0.18) * (2 * variable.particle_random_4 - 1))) * (variable.vfx_scale ?? 1)",
+          "((math.lerp((variable.vfx_size ?? 0.075), (variable.vfx_size_end ?? 0.04), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1)) * (1 + (variable.vfx_size_jitter ?? 0.18) * (2 * variable.particle_random_4 - 1))) * (variable.vfx_scale ?? 1)) * (variable.vfx_aspect ?? 2.4) * (0.8 + 0.2 * math.sin(150 * math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1) + 80 * variable.particle_random_2))"
+        ],
+        "uv": {
+          "texture_width": 1024,
+          "texture_height": 1024,
+          "uv": [
+            "0 + math.mod(math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 8)), 8) * 128",
+            "640 + math.floor((math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 8))) / 8) * 128"
+          ],
+          "uv_size": [
+            128,
+            128
+          ]
+        }
+      },
+      "minecraft:particle_appearance_tinting": {
+        "color": [
+          "math.lerp((variable.vfx_red ?? 1), (variable.vfx_red2 ?? (variable.vfx_red ?? 1)), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
+          "math.lerp((variable.vfx_green ?? 1), (variable.vfx_green2 ?? (variable.vfx_green ?? 1)), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
+          "math.lerp((variable.vfx_blue ?? 1), (variable.vfx_blue2 ?? (variable.vfx_blue ?? 1)), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
+          "(variable.vfx_opacity ?? 0.8) * math.clamp((variable.particle_age) / math.max(0.01, (variable.vfx_fade_in ?? 0.16)), 0, 1) * math.clamp((variable.particle_lifetime - (variable.particle_age)) / math.max(0.01, (variable.vfx_fade_out ?? 0.35)), 0, 1)"
+        ]
+      }
+    }
+  }
+}

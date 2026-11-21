@@ -44,7 +44,7 @@
         "facing_camera_mode": "rotate_xyz",
         "size": [
           "(math.lerp((variable.vfx_size ?? 0.08), (variable.vfx_size_end ?? 0.08), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1)) * (1 + (variable.vfx_size_jitter ?? 0.25) * (2 * variable.particle_random_4 - 1))) * (variable.vfx_scale ?? 1)",
-          "(math.lerp((variable.vfx_size ?? 0.08), (variable.vfx_size_end ?? 0.08), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1)) * (1 + (variable.vfx_size_jitter ?? 0.25) * (2 * variable.particle_random_4 - 1))) * (variable.vfx_scale ?? 1)"
+          "((math.lerp((variable.vfx_size ?? 0.08), (variable.vfx_size_end ?? 0.08), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1)) * (1 + (variable.vfx_size_jitter ?? 0.25) * (2 * variable.particle_random_4 - 1))) * (variable.vfx_scale ?? 1)) * (variable.vfx_aspect ?? 1)"
         ],
         "uv": {
           "texture_width": 1024,
@@ -61,9 +61,9 @@
       },
       "minecraft:particle_appearance_tinting": {
         "color": [
-          "math.lerp((variable.vfx_red ?? 1), (variable.vfx_red2 ?? (variable.vfx_red ?? 1)), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
-          "math.lerp((variable.vfx_green ?? 1), (variable.vfx_green2 ?? (variable.vfx_green ?? 1)), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
-          "math.lerp((variable.vfx_blue ?? 1), (variable.vfx_blue2 ?? (variable.vfx_blue ?? 1)), math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
+          "math.lerp((variable.vfx_red ?? 1), (variable.vfx_red2 ?? (variable.vfx_red ?? 1)), (variable.vfx_color_random ?? 0) > 0.5 ? variable.particle_random_1 : math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
+          "math.lerp((variable.vfx_green ?? 1), (variable.vfx_green2 ?? (variable.vfx_green ?? 1)), (variable.vfx_color_random ?? 0) > 0.5 ? variable.particle_random_1 : math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
+          "math.lerp((variable.vfx_blue ?? 1), (variable.vfx_blue2 ?? (variable.vfx_blue ?? 1)), (variable.vfx_color_random ?? 0) > 0.5 ? variable.particle_random_1 : math.clamp(variable.particle_age / math.max(0.01, variable.particle_lifetime), 0, 1))",
           "(variable.vfx_opacity ?? 0.8) * math.clamp((variable.particle_age) / math.max(0.01, (variable.vfx_fade_in ?? 0.16)), 0, 1) * math.clamp((variable.particle_lifetime - (variable.particle_age)) / math.max(0.01, (variable.vfx_fade_out ?? 0.35)), 0, 1) * ((1 - (variable.vfx_twinkle ?? 0)) + (variable.vfx_twinkle ?? 0) * (0.45 + 0.55 * math.sin(260 * variable.particle_age + 360 * variable.particle_random_4)))"
         ]
       }

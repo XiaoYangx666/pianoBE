@@ -29,6 +29,8 @@ const ALL_VFX_PARTICLES: readonly VfxParticle[] = [
     "draw_plane",
     "draw_cloud",
     "draw_comet",
+    "key_stream",
+    "key_drift",
     "dust",
     "shock",
 ];
@@ -60,7 +62,7 @@ test("single vfx_lab atlas and MER textures match declared dimensions without se
     expect(green(0, 48)).toBe(0);
 });
 
-test("all 17 pbe_vfx particle definitions use vfx_lab 1024x1024 atlas and clean Molang variables", () => {
+test("all 19 pbe_vfx particle definitions use vfx_lab 1024x1024 atlas and clean Molang variables", () => {
     const resource = new URL("../assets/", import.meta.url);
     for (const particle of ALL_VFX_PARTICLES) {
         const source = readFileSync(new URL(`particles/pbe_vfx_${particle}.particle.json`, resource), "utf8");

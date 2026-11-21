@@ -15,9 +15,14 @@ import secretUrl from "../../../../midis/library/e1563b03.pbe3?url";
 import secret from "../../../../midis/performances/e1563b03.json";
 import {
     deriveAccentHex,
+    DEFAULT_KEY_PARTICLE_SETTINGS,
     getVfxEffect,
     isVfxTheme,
     KEY_PARTICLE_STYLE_LABELS,
+    keyParticleColorOptions,
+    keyParticleColorMode,
+    normalizeKeyParticlePalette,
+    PIANO_PARTICLE_STYLES,
     POINT_BRUSHES,
     quietFeatures,
     simulatedVfxNotes,
@@ -412,6 +417,7 @@ export default function VfxLabPage() {
     const [deck, setDeck] = useState(true);
     const [debug, setDebug] = useState(false);
     const [showKeyParticles, setShowKeyParticles] = useState(true);
+    const [keyParticleSettings, setKeyParticleSettings] = useState<{ particleStyle: number; particlePalette: number }>({ ...DEFAULT_KEY_PARTICLE_SETTINGS });
     const effectCount = VFX_EFFECT_IDS.length;
     const [loop, setLoop] = useState(true);
     const [loopIn, setLoopIn] = useState(0);
@@ -440,6 +446,8 @@ export default function VfxLabPage() {
         layers: theme.layers.filter((_, index) => !hidden.has(index)),
     }), [theme, hidden]);
     const activeEffectDef = getVfxEffect(singleConfig.effect);
+    const keyColorOptions = keyParticleColorOptions(keyParticleSettings.particleStyle);
+    const keyColorMode = keyParticleColorMode(keyParticleSettings.particleStyle);
 
     function selectTheme(id: string, value: VfxTheme = isVfxTheme(id) ? VFX_THEMES[id] : VFX_THEMES.galaxy) {
         setThemeId(id);
@@ -495,6 +503,7 @@ export default function VfxLabPage() {
     useEffect(() => { stage.current?.setDeck(deck); }, [ready, deck]);
     useEffect(() => { stage.current?.setDebug(debug); }, [ready, debug]);
     useEffect(() => { stage.current?.setKeyParticles(showKeyParticles); }, [ready, showKeyParticles]);
+    useEffect(() => { stage.current?.setKeyParticleSettings(keyParticleSettings); }, [ready, keyParticleSettings]);
 
     useEffect(() => {
         if (!ready || capture) return;
@@ -725,6 +734,42 @@ export default function VfxLabPage() {
                         </span>
                     </div>
                 </section>}
+                <section>
+                    <div className="vfx-section-title">
+                        <h2>琴键粒子设置</h2>
+                        <span>{keyColorMode === "fixed" ? "固定配色" : keyColorMode === "limited" ? "限定配色" : "自由配色"}</span>
+                    </div>
+                    <div className="vfx-painter-grid">
+                        <label>粒子样式
+                            <select aria-label="琴键粒子样式" value={keyParticleSettings.particleStyle}
+                                onChange={event => {
+                                    const particleStyle = Number(event.target.value);
+                                    setKeyParticleSettings(previous => ({
+                                        particleStyle,
+                                        particlePalette: normalizeKeyParticlePalette(particleStyle, previous.particlePalette),
+                                    }));
+                                }}>
+                                {PIANO_PARTICLE_STYLES.map(style => (
+                                    <option key={style.style} value={style.value}>{style.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        {keyColorOptions ? <label>粒子配色
+                            <select aria-label="琴键粒子配色" value={keyParticleSettings.particlePalette}
+                                onChange={event => setKeyParticleSettings(previous => ({
+                                    ...previous,
+                                    particlePalette: Number(event.target.value),
+                                }))}>
+                                {keyColorOptions.map(palette => (
+                                    <option key={palette.value} value={palette.value}>{palette.label}</option>
+                                ))}
+                            </select>
+                        </label> : null}
+                    </div>
+                    {!keyColorOptions && <div className="vfx-layer-stats">
+                        该粒子自带自然配色，玩家设置中不提供换色。
+                    </div>}
+                </section>
                 {midi?.performance ? <section>
                     <h2>{midi.title}</h2>
                     <div>曲目编排 · {midi.performance.length} 条提示 · 预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</div>

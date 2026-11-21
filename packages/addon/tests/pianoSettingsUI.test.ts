@@ -60,8 +60,8 @@ const { StageSettingsPage } = await import("../src/app/ui/stageSettingsUI");
 const { TextSettingsPage } = await import("../src/app/ui/textSettingsUI");
 const { PianoScorePage } = await import("../src/app/ui/scoreUI");
 
-function makePiano(overrides: { hasScreen?: boolean } = {}) {
-    let settings = { ...DEFAULT_PIANO_SETTINGS } as any;
+function makePiano(overrides: { hasScreen?: boolean; settings?: Record<string, unknown> } = {}) {
+    let settings = { ...DEFAULT_PIANO_SETTINGS, ...overrides.settings } as any;
     const piano: any = {
         hasScreen: overrides.hasScreen ?? true,
         displayId: "display-1",
@@ -195,8 +195,25 @@ describe("钢琴设置（拆分为多个表单）", () => {
 
         const dropdowns = form.components.filter(item => item.type === "dropdown");
         expect(dropdowns).toHaveLength(2);
-        (dropdowns[0].value as FakeObservable<number>).setData(2);
-        expect(getSettings().particleStyle).toBe(2);
+        (dropdowns[0].value as FakeObservable<number>).setData(4);
+        expect(getSettings().particleStyle).toBe(4);
+        expect(getSettings().particlePalette).toBe(0);
+    });
+
+    test("粒子配色随样式显示、限定或隐藏", () => {
+        const free = open(ParticleSettingsPage, { piano: makePiano({ settings: { particleStyle: 3 } }).piano });
+        const freeDropdowns = free.components.filter(item => item.type === "dropdown");
+        expect(freeDropdowns).toHaveLength(2);
+        expect((freeDropdowns[1].items as unknown[]).length).toBe(4);
+
+        const limited = open(ParticleSettingsPage, { piano: makePiano({ settings: { particleStyle: 4 } }).piano });
+        const limitedDropdowns = limited.components.filter(item => item.type === "dropdown");
+        expect(limitedDropdowns).toHaveLength(2);
+        expect((limitedDropdowns[1].items as unknown[]).length).toBe(3);
+
+        const fixed = open(ParticleSettingsPage, { piano: makePiano({ settings: { particleStyle: 5 } }).piano });
+        expect(fixed.components.filter(item => item.type === "dropdown")).toHaveLength(1);
+        expect(fixed.labelTexts().join("\n")).toContain("固定");
     });
 
     test("文字子页在无屏幕的三角钢琴上只提示，不显示控件", () => {

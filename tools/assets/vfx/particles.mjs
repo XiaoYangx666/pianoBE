@@ -38,13 +38,13 @@ export function buildParticleDocuments(manifest) {
     const point = { offset: [0, 0, 0] };
 
     const docs = [];
-    function particle(name, components) {
+    function particle(name, components, material = "particles_add") {
         const document = {
             format_version: "1.10.0",
             particle_effect: {
                 description: {
                     identifier: `pbe:vfx_${name}`,
-                    basic_render_parameters: { material: "particles_add", texture },
+                    basic_render_parameters: { material, texture },
                 },
                 components,
             },
@@ -322,6 +322,8 @@ export function buildParticleDocuments(manifest) {
 
     const maxPointBrush = pointBrushes.length - 1;
     const ptBrush = `math.floor(math.clamp(${param("brush", 0)}, 0, ${maxPointBrush}))`;
+    const ptAspect = param("aspect", 1);
+    const ptColorMix = `${param("color_random", 0)} > 0.5 ? ${random(1)} : ${drawAge}`;
     particle("draw_point", {
         "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
         "minecraft:emitter_lifetime_once": { active_time: 0.05 },
@@ -337,7 +339,7 @@ export function buildParticleDocuments(manifest) {
         },
         "minecraft:particle_appearance_billboard": {
             facing_camera_mode: "rotate_xyz",
-            size: [ptSize, ptSize],
+            size: [ptSize, `(${ptSize}) * ${ptAspect}`],
             uv: {
                 texture_width: width,
                 texture_height: height,
@@ -349,9 +351,106 @@ export function buildParticleDocuments(manifest) {
             },
         },
         "minecraft:particle_appearance_tinting": {
-            color: [drawTint.color[0], drawTint.color[1], drawTint.color[2], `${drawTint.color[3]} * ${ptTwinkle}`],
+            color: [
+                `math.lerp(${param("red", 1)}, ${param("red2", param("red", 1))}, ${ptColorMix})`,
+                `math.lerp(${param("green", 1)}, ${param("green2", param("green", 1))}, ${ptColorMix})`,
+                `math.lerp(${param("blue", 1)}, ${param("blue2", param("blue", 1))}, ${ptColorMix})`,
+                `${param("opacity", 0.8)} * ${drawFade} * ${ptTwinkle}`,
+            ],
         },
     });
+
+    // Dedicated note-particle primitives. They keep the same vfx_* variable
+    // interface as draw_point, but own their material, billboard and body shape.
+
+    // Additive vertical streamer with exponential drag: magic_trail.
+    const streamProgress = saturate(`${age} / math.max(0.01, variable.particle_lifetime)`);
+    const streamDrag = `math.max(0.05, ${param("drag", 1.05)})`;
+    const streamTravel = `(1 - math.exp(-(${streamDrag}) * ${age})) / ${streamDrag}`;
+    const streamWidth = scaled(`math.lerp(${param("size", 0.075)}, ${param("size_end", 0.04)}, ${streamProgress}) * (1 + ${param("size_jitter", 0.18)} * (2 * ${random(4)} - 1))`);
+    const streamHeight = `(${streamWidth}) * ${param("aspect", 2.4)} * (0.8 + 0.2 * math.sin(150 * ${streamProgress} + 80 * ${random(2)}))`;
+    const streamX = `${param("spread_x", 0)} * (2 * ${random(2)} - 1) + ${param("vx", 0)} * ${streamTravel} + (${param("flutter", 0)}) * math.sin(170 * ${age} + 360 * ${random(2)})`;
+    const streamY = `${param("spread_y", 0)} * (2 * ${random(3)} - 1) + ${param("vy", 0)} * ${streamTravel} + 0.5 * ${param("ay", 0)} * ${age} * ${age}`;
+    const streamZ = `(${param("spread_z", 0)} * (2 * ${random(4)} - 1) + ${param("vz", 0)} * ${streamTravel} + 0.5 * ${param("az", 0)} * ${age} * ${age} + (${param("flutter", 0)}) * math.cos(145 * ${age} + 360 * ${random(3)})) * ${stageDepth}`;
+    particle("key_stream", {
+        "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
+        "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+        "minecraft:emitter_local_space": localSpace,
+        "minecraft:emitter_shape_point": point,
+        "minecraft:particle_initial_spin": {
+            rotation: `${param("spin", 0)} + ${param("spin_jitter", 0)} * (2 * ${random(2)} - 1)`,
+            rotation_rate: param("spin_rate", 0),
+        },
+        "minecraft:particle_motion_parametric": { relative_position: position(streamX, streamY, streamZ) },
+        "minecraft:particle_lifetime_expression": {
+            max_lifetime: `math.max(0.1, ${param("life", 0.62)} * (1 + ${param("life_jitter", 0.2)} * (2 * ${random(1)} - 1)))`,
+        },
+        "minecraft:particle_appearance_billboard": {
+            facing_camera_mode: "rotate_y",
+            size: [streamWidth, streamHeight],
+            uv: {
+                texture_width: width,
+                texture_height: height,
+                uv: [
+                    `${pointBrushGrid.originX} + math.mod(${ptBrush}, ${pointBrushGrid.cols}) * ${pointBrushGrid.cellSize}`,
+                    `${pointBrushGrid.originY} + math.floor((${ptBrush}) / ${pointBrushGrid.cols}) * ${pointBrushGrid.cellSize}`,
+                ],
+                uv_size: [pointBrushGrid.cellSize, pointBrushGrid.cellSize],
+            },
+        },
+        "minecraft:particle_appearance_tinting": {
+            color: [
+                `math.lerp(${param("red", 1)}, ${param("red2", param("red", 1))}, ${streamProgress})`,
+                `math.lerp(${param("green", 1)}, ${param("green2", param("green", 1))}, ${streamProgress})`,
+                `math.lerp(${param("blue", 1)}, ${param("blue2", param("blue", 1))}, ${streamProgress})`,
+                `${param("opacity", 0.8)} * ${drawFade}`,
+            ],
+        },
+    });
+
+    // Normal-blended drifting petal / snow with an always-facing billboard.
+    const driftProgress = saturate(`${age} / math.max(0.01, variable.particle_lifetime)`);
+    const driftWidth = scaled(`math.lerp(${param("size", 0.058)}, ${param("size_end", 0.042)}, ${driftProgress}) * (1 + ${param("size_jitter", 0.3)} * (2 * ${random(4)} - 1))`);
+    const driftHeight = `(${driftWidth}) * ${param("aspect", 1.15)} * (0.88 + 0.12 * math.sin(100 + 230 * ${driftProgress} + 90 * ${random(2)}))`;
+    const driftX = `${param("spread_x", 0)} * (2 * ${random(2)} - 1) + ${param("vx", 0)} * ${age} + (${param("flutter", 0)}) * math.sin(170 * ${age} + 360 * ${random(2)})`;
+    const driftY = `${param("spread_y", 0)} * (2 * ${random(3)} - 1) + ${param("vy", 0)} * ${age} + 0.5 * ${param("ay", 0)} * ${age} * ${age} + (${param("tilt", 0)}) * math.sin(140 * ${age} + 360 * ${random(1)})`;
+    const driftZ = `(${param("spread_z", 0)} * (2 * ${random(4)} - 1) + ${param("vz", 0)} * ${age} + 0.5 * ${param("az", 0)} * ${age} * ${age} + (${param("flutter", 0)}) * math.cos(145 * ${age} + 360 * ${random(3)})) * ${stageDepth}`;
+    const driftColorMix = `0.32 + 0.5 * ${random(1)}`;
+    particle("key_drift", {
+        "minecraft:emitter_rate_instant": { num_particles: param("count", 3) },
+        "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+        "minecraft:emitter_local_space": localSpace,
+        "minecraft:emitter_shape_point": point,
+        "minecraft:particle_initial_spin": {
+            rotation: `${param("spin", 0)} + ${param("spin_jitter", 180)} * (2 * ${random(2)} - 1)`,
+            rotation_rate: param("spin_rate", 0),
+        },
+        "minecraft:particle_motion_parametric": { relative_position: position(driftX, driftY, driftZ) },
+        "minecraft:particle_lifetime_expression": {
+            max_lifetime: `math.max(0.1, ${param("life", 0.85)} * (1 + ${param("life_jitter", 0.2)} * (2 * ${random(1)} - 1)))`,
+        },
+        "minecraft:particle_appearance_billboard": {
+            facing_camera_mode: "lookat_xyz",
+            size: [driftWidth, driftHeight],
+            uv: {
+                texture_width: width,
+                texture_height: height,
+                uv: [
+                    `${pointBrushGrid.originX} + math.mod(${ptBrush}, ${pointBrushGrid.cols}) * ${pointBrushGrid.cellSize}`,
+                    `${pointBrushGrid.originY} + math.floor((${ptBrush}) / ${pointBrushGrid.cols}) * ${pointBrushGrid.cellSize}`,
+                ],
+                uv_size: [pointBrushGrid.cellSize, pointBrushGrid.cellSize],
+            },
+        },
+        "minecraft:particle_appearance_tinting": {
+            color: [
+                `math.lerp(${param("red", 1)}, ${param("red2", param("red", 1))}, ${driftColorMix})`,
+                `math.lerp(${param("green", 1)}, ${param("green2", param("green", 1))}, ${driftColorMix})`,
+                `math.lerp(${param("blue", 1)}, ${param("blue2", param("blue", 1))}, ${driftColorMix})`,
+                `${param("opacity", 0.8)} * ${drawFade} * ${ptTwinkle}`,
+            ],
+        },
+    }, "particles_blend");
 
     const maxStrokeBrush = strokeBrushes.length - 1;
     const strokeLen = scaled(`math.lerp(${param("length", 0.3)}, ${param("length_end", 0.3)}, ${drawAge})`);
