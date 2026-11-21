@@ -331,12 +331,20 @@ function updateTick() {
             }
         }
 
-        session.budget.dispatch(tick, emitter => {
-            calls++;
-            const ageSeconds = session.midi ? session.midi.position : Math.max(0, elapsed) / 20;
-            spawnVfxEmitter(session.location, emitter, ageSeconds);
-            sent++;
-        });
+        try {
+            session.budget.dispatch(tick, emitter => {
+                calls++;
+                const ageSeconds = session.midi ? session.midi.position : Math.max(0, elapsed) / 20;
+                spawnVfxEmitter(session.location, emitter, ageSeconds);
+                sent++;
+            });
+        } catch (error) {
+            // A failed spawn must not leave the session half-dispatched: stop it so
+            // cleanup, pending reservations and the engine lifecycle all close.
+            failures++;
+            console.warn("[piano-vfx] 发射失败", error);
+            stopSession(session);
+        }
 
         if (session.ended && !session.budget.active) sessions.delete(key);
     }
