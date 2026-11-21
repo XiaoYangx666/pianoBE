@@ -23,7 +23,6 @@
 | `model-upright.py` | 构建立式钢琴并切块（被上面几个复用） |
 | `model-piano.py` | 构建电钢琴（FP-30X 风格）并导出 Bedrock 资源 |
 | `model-piano-bench.py` | 生成三角琴凳方块几何与材质 |
-| `model-piano-particles.py` | 生成粒子定义与 RGBA 图集 |
 | `publish-grand.py` | 发布三角钢琴的可用资源 |
 | `grand-item-icon.py` | 从模型渲染三角钢琴物品图标 |
 | `grand_score.py` | 发布本地测试曲谱页与空白谱架图集 |

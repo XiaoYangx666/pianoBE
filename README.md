@@ -77,6 +77,7 @@ addon 启动时动态导入 `@minecraft/server-admin` 读取配置、`@minecraft
 pianoBE/
 ├── packages/          # npm workspaces：共享库与各交付物
 │   ├── core/          # 共享核心库 @piano/core（零 MC 依赖）
+│   ├── vfx/           # 跨平台视觉库 @piano/vfx（琴型/琴键/舞台/特效/粒子资源，Addon 与 Web 共用）
 │   ├── ui/            # 共享设计系统 @piano/ui：Tailwind 主题、基础组件、布局、播放器
 │   ├── addon/         # 附加包 @piano/addon（双目标构建：模板包 / 服务器专用包）
 │   ├── server/        # 后端 @piano/server：Hono + bun:sqlite + 文件曲库
@@ -87,7 +88,7 @@ pianoBE/
 ```
 （sapi-pro 使用 npm 发布版，不再 vendor 内置）
 
-**依赖方向**：`addon`、`server`、`generator` → `core`；`web`、`generator` → `ui`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
+**依赖方向**：`addon`、`server`、`generator` → `core`；`addon`、`web` → `vfx` → `core`；`web`、`generator` → `ui`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
 
 **前端约定**：两个 React 应用共用 `@piano/ui` 的 Tailwind 设计系统、基础控件（按钮/输入框/下拉/标签）、`AppLayout`（桌面侧栏 / 移动底部导航）、`PlayerBar`、`AppPlayer`（MIDI 采样与原音频试听的统一外壳）与歌曲行组件；深浅色通过 `data-theme` + `--pb-*` 变量切换。`generator` 的播放器绑定模板音色，`web` 的播放器读取 `/piano` 采样；两者都基于 `@piano/core/player`，共享音色切换、逐曲响度归一化与音符卷帘，跨路由保持播放。
 
@@ -131,13 +132,14 @@ npm install
 
 # 构建共享库与各交付物
 npm run build:core       # @piano/core
+npm run build:vfx        # @piano/vfx（addon/web 的前置）
 npm run build:template   # addon 模板包（生成器底包，build:generator 的前置）
 npm run build:server     # addon 服务器专用包
 npm run build:generator  # 生成器
 npm run build:web        # 管理页
 
 # 测试
-npm test                 # core vitest
+npm test                 # core vitest + vfx bun test
 npm run test:server      # server bun test
 npm run test -w @piano/addon  # addon netSource 缓存/降级
 
@@ -217,7 +219,7 @@ npx wrangler deploy
 
 ```bash
 # 前置：本地构建 core/web 产物（dev compose 直接挂载本地文件）
-npm run build:core && npm run build:web
+npm run build:core && npm run build:vfx && npm run build:web
 
 # 启动开发容器：挂载本地 server 源码与 core/web 产物，bun --watch 热重载
 docker compose -f docker-compose.dev.yml up
