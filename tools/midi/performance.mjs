@@ -3,6 +3,7 @@ import {
     PERFORMANCE_MOTIONS,
     PERFORMANCE_ZONES,
     TIME_SCALE,
+    isValidPerformanceParamKey,
     isValidPerformanceSymbol,
     resolvePerformanceColor,
 } from "@piano/core";
@@ -42,6 +43,32 @@ export function readPerformance(songId) {
             throw new Error(`未知运动修饰 ${cue.motion}`);
         }
 
+        let params;
+        if (cue.params !== undefined) {
+            if (!cue.params || typeof cue.params !== "object" || Array.isArray(cue.params)) {
+                throw new Error(`无效参数对象 ${cue.effect}`);
+            }
+            const entries = Object.entries(cue.params);
+            if (entries.length > 16) {
+                throw new Error(`特效 ${cue.effect} 单条提示参数过多`);
+            }
+            if (entries.length > 0) {
+                params = {};
+                for (const [key, value] of entries) {
+                    if (!isValidPerformanceParamKey(key)) {
+                        throw new Error(`无效参数名称 ${key}`);
+                    }
+                    const validValue = typeof value === "boolean"
+                        || (typeof value === "number" && Number.isFinite(value))
+                        || (typeof value === "string" && isValidPerformanceSymbol(value));
+                    if (!validValue) {
+                        throw new Error(`无效参数值 ${key}=${String(value)}`);
+                    }
+                    params[key] = value;
+                }
+            }
+        }
+
         const out = {
             tick: ticks(cue.at),
             effect: cue.effect,
@@ -55,6 +82,7 @@ export function readPerformance(songId) {
         if (cue.variant !== undefined) out.variant = cue.variant;
         if (cue.zone !== undefined && cue.zone !== "stage") out.zone = cue.zone;
         if (cue.motion !== undefined && cue.motion !== "normal") out.motion = cue.motion;
+        if (params !== undefined) out.params = params;
 
         const op = cue.op ?? (cue.fade !== undefined ? "set" : "flash");
         if (op === "flash") {

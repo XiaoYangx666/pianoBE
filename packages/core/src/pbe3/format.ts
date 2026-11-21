@@ -18,6 +18,8 @@ export const PBE3_PERFORMANCE_VERSION = 3;
 
 /** 事件流使用 Raw DEFLATE 压缩 */
 export const PBE3_FLAG_COMPRESSED = 1 << 0;
+/** 演出区块使用 Raw DEFLATE 压缩（仅版本 3 有效） */
+export const PBE3_FLAG_PERFORMANCE_COMPRESSED = 1 << 1;
 
 /** 单曲事件流解压后的安全上限（防止压缩炸弹/损坏头部导致超大分配） */
 export const MAX_PBE3_EVENT_BYTES = 32 * 1024 * 1024;
@@ -45,6 +47,8 @@ export interface Pbe3Header {
     performance?: readonly import("./performance.js").PerformanceCue[];
     /** Encoded performance section size, including its length and checksum. */
     performanceBytes?: number;
+    /** 演出区块是否压缩 */
+    performanceCompressed?: boolean;
     /** 压缩数据在整份 PBE3 中的起始偏移 */
     eventOffset: number;
     /** 整份 PBE3 字节数 */

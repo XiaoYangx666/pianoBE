@@ -10,6 +10,7 @@ import {
     decodePbe3,
     encodePbe3,
     encodePbe3Events,
+    encodePerformance,
     parsePerformanceRgb,
     pbe3ToNoteEvents,
     readAllPbe3Notes,
@@ -58,12 +59,70 @@ describe("PBE3 performance section", () => {
         expect(show.header.performance).toEqual(cues);
         // 6B header + 符号表 (1 + (1+9) + (1+9) = 21B) + 颜色表 (1 + 2*3 = 7B) + cue1 (7B) + cue2 (7B) = 48B
         expect(show.header.performanceBytes).toBe(48);
+        // 区块太小，压缩收益不足 9 字节时保持裸数据
+        expect(show.header.performanceCompressed).toBe(false);
         expect(show.events).toEqual(plain.events);
         expect(performance.subarray(show.header.eventOffset)).toEqual(legacy.subarray(plain.header.eventOffset));
         expect(attachSongPerformance(performance, [])).toEqual(legacy);
         expect(attachSongPerformance(performance, cues)).toEqual(performance);
         expect(encodePbe3(decodePbe3(performance), { compress })).toEqual(performance);
         expect(readPbe3Header(renamePbe3(performance, "新曲名")).performance).toEqual(cues);
+    });
+
+    it("auto-compresses large performance sections and roundtrips", () => {
+        const dense: PerformanceCue[] = Array.from({ length: 64 }, (_, index) => ({
+            tick: index * 20,
+            effect: "double_helix",
+            color: "#8EB8FF",
+            level: 70,
+            scale: 100,
+            op: "set" as const,
+            fade: 20,
+            params: { radius: 2.8, angularSpeed: 180, particleSize: 0.06, height: 3.5 },
+        }));
+        const legacy = encodePbe3(song([60, 0, 100, 100], undefined, 1400));
+        const encoded = attachSongPerformance(legacy, dense);
+        const header = readPbe3Header(encoded);
+
+        expect(encoded[5] & 0x02).toBe(0x02);
+        expect(header.performanceCompressed).toBe(true);
+        expect(header.performance).toEqual(dense);
+        expect(header.performanceBytes!).toBeLessThan(encodePerformance(dense, 1400).length + 6);
+        expect(readPbe3Events(encoded).events).toEqual(readPbe3Events(legacy).events);
+        expect(attachSongPerformance(encoded, dense)).toEqual(encoded);
+        expect(attachSongPerformance(encoded, [])).toEqual(legacy);
+        expect(readPbe3Header(encoded.slice(0, header.eventOffset)).performance).toEqual(dense);
+    });
+
+    it("rejects corrupted or truncated compressed performance sections", () => {
+        const dense: PerformanceCue[] = Array.from({ length: 64 }, (_, index) => ({
+            tick: index * 20,
+            effect: "starfield",
+            color: PERFORMANCE_PALETTES.moon,
+            level: 70,
+            scale: 100,
+            op: "set" as const,
+            fade: 20,
+            params: { radius: 2.8, speed: 1.2 },
+        }));
+        const encoded = attachSongPerformance(
+            encodePbe3(song([60, 0, 100, 100], undefined, 1400)),
+            dense
+        );
+        const header = readPbe3Header(encoded);
+        const start = header.eventOffset - header.performanceBytes!;
+
+        const badCrc = encoded.slice();
+        badCrc[start + 4] ^= 0xff;
+        expect(() => readPbe3Header(badCrc)).toThrow(/CRC32/);
+
+        expect(() => readPbe3Header(encoded.slice(0, header.eventOffset - 1))).toThrow(/长度无效/);
+    });
+
+    it("rejects the performance compression flag when no performance section exists", () => {
+        const data = encodePbe3(song([60, 0, 100, 100]));
+        data[5] |= 0x02;
+        expect(() => readPbe3Header(data)).toThrow(/无演出区块/);
     });
 
     it("deduplicates symbol strings, colors, variants, brushes and roundtrips arbitrary effect names", () => {
@@ -172,6 +231,99 @@ describe("PBE3 performance section", () => {
             0, 0x88, 0, 80, 100, 0, 0x10, // FLAG_SPACE set, reserved bit 4 non-zero
         ]);
         expect(() => readPbe3Header(buildWithSection(3, badSpaceSection))).toThrow(/保留位/);
+
+        // Unknown param value tag or empty param list
+        const emptyParamSection = new Uint8Array([
+            1, 1, 97,
+            1, 255, 255, 255,
+            0, 0x88, 0, 80, 100, 0, 0x80, 0, // SPACE_FLAG_PARAMS set, paramCount=0
+        ]);
+        expect(() => readPbe3Header(buildWithSection(3, emptyParamSection))).toThrow(/参数数量/);
+
+        const badParamTagSection = new Uint8Array([
+            1, 1, 97,
+            1, 255, 255, 255,
+            0, 0x88, 0, 80, 100, 0, 0x80, 1, 0, 0x09, // tag=9 invalid
+        ]);
+        expect(() => readPbe3Header(buildWithSection(3, badParamTagSection))).toThrow(/参数类型/);
+
+        const paramKeyAsEffectSection = new Uint8Array([
+            1, 12, ...Buffer.from("angularSpeed"),
+            1, 255, 255, 255,
+            0, 0x80, 0, 80, 100, 0, // camelCase symbol used as effect name
+        ]);
+        expect(() => readPbe3Header(buildWithSection(3, paramKeyAsEffectSection))).toThrow(/格式无效/);
+    });
+
+    it("encodes and decodes custom cue params (int, scaled decimal, float32, boolean, enum) and deduplicates keys", () => {
+        const paramCues: PerformanceCue[] = [
+            {
+                tick: 0,
+                effect: "double_helix",
+                color: PERFORMANCE_PALETTES.aurora,
+                level: 85,
+                scale: 100,
+                op: "set",
+                fade: 80,
+                params: {
+                    radius: 2.8,
+                    height: 3.5,
+                    angularSpeed: -180,
+                    particleSize: 0.06,
+                    reverseSpin: false,
+                },
+            },
+            {
+                tick: 120,
+                effect: "firework_bloom",
+                color: PERFORMANCE_PALETTES.gold,
+                zone: "high",
+                motion: "intense",
+                level: 100,
+                scale: 120,
+                op: "flash",
+                params: {
+                    burstRadius: 2.35,
+                    burstShape: "ring",
+                    fountain: true,
+                    preciseFloat: Math.fround(0.123456),
+                },
+            },
+            {
+                tick: 160,
+                effect: "double_helix",
+                color: PERFORMANCE_PALETTES.ice,
+                level: 70,
+                scale: 100,
+                op: "set",
+                fade: 40,
+                params: {},
+            },
+        ];
+
+        const encoded = attachSongPerformance(encodePbe3(song([60, 0, 100, 100], undefined, 400)), paramCues);
+        const decoded = readPbe3Header(encoded).performance!;
+        expect(decoded[0]).toEqual(paramCues[0]);
+        expect(decoded[1]).toEqual(paramCues[1]);
+        expect(decoded[2]).toEqual({
+            tick: 160,
+            effect: "double_helix",
+            color: PERFORMANCE_PALETTES.ice,
+            level: 70,
+            scale: 100,
+            op: "set",
+            fade: 40,
+        });
+
+        // Reject invalid custom params
+        const legacy = encodePbe3(song([60, 0, 100, 100]));
+        expect(() => attachSongPerformance(legacy, [{ ...cues[0], params: { BadKey: 1 } }])).toThrow();
+        expect(() => attachSongPerformance(legacy, [{ ...cues[0], params: { bad_nan: Number.NaN } }])).toThrow();
+        expect(() => attachSongPerformance(legacy, [{ ...cues[0], params: { burstShape: "BadEnum" } }])).toThrow();
+        expect(() => attachSongPerformance(legacy, [{
+            ...cues[0],
+            params: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`p${i}`, i])),
+        }])).toThrow();
     });
 });
 
@@ -257,7 +409,7 @@ describe("PBE3 安全性", () => {
 
     it("保留标志位非 0 时拒绝解析", () => {
         const data = encodePbe3(song([60, 0, 100, 100]));
-        data[5] |= 0x02;
+        data[5] |= 0x04;
         expect(() => readPbe3Header(data)).toThrow(/保留标志位/);
     });
 });

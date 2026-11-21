@@ -8,6 +8,7 @@ import { decodePerformance, encodePerformance, MAX_PERFORMANCE_BYTES, type Perfo
 import {
     MAX_PBE3_EVENT_BYTES,
     PBE3_FLAG_COMPRESSED,
+    PBE3_FLAG_PERFORMANCE_COMPRESSED,
     PBE3_MAGIC,
     PBE3_PERFORMANCE_VERSION,
     PBE3_VERSION,
@@ -274,6 +275,26 @@ function pushU32(writer: ByteWriter, value: number) {
     writer.put((v >>> 24) & 0xff);
 }
 
+/** 压缩头比裸区块头多 4 字节，要求净收益至少 9 字节才值得解压开销 */
+const PERFORMANCE_COMPRESS_MARGIN = 9;
+
+interface PackedPerformanceSection {
+    payload: Uint8Array;
+    compressed: boolean;
+    rawLength: number;
+    checksum: number;
+}
+
+/** 与事件流一致的自动压缩策略：收益不足时回退裸数据 */
+function packPerformanceSection(section: Uint8Array): PackedPerformanceSection {
+    const packed = deflateSync(section, { level: 9 });
+    const checksum = crc32(section);
+    if (packed.length + 4 + PERFORMANCE_COMPRESS_MARGIN <= section.length) {
+        return { payload: packed, compressed: true, rawLength: section.length, checksum };
+    }
+    return { payload: section, compressed: false, rawLength: section.length, checksum };
+}
+
 /** 把 MidiSong 编码为 PBE3 二进制 */
 export function encodePbe3(song: MidiSong, options: EncodePbe3Options = {}): Uint8Array {
     const { events, palette, velocityBits, noteCount } = encodePbe3Events(song);
@@ -339,7 +360,9 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         throw new Error(`[pbe3] 版本不兼容：${version}`);
     }
     const flags = data[5];
-    if ((flags & ~PBE3_FLAG_COMPRESSED) !== 0) throw new Error("[pbe3] 保留标志位非 0");
+    if ((flags & ~(PBE3_FLAG_COMPRESSED | PBE3_FLAG_PERFORMANCE_COMPRESSED)) !== 0) {
+        throw new Error("[pbe3] 保留标志位非 0");
+    }
     const id = readString(data, 6);
     const name = readString(data, id.next);
     const fixed = name.next;
@@ -366,18 +389,43 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
     }
     let performance: PerformanceCue[] | undefined;
     let performanceBytes = 0;
+    let performanceCompressed = false;
     if (version === PBE3_PERFORMANCE_VERSION) {
-        if (offset + 6 > data.length) throw new Error("[pbe3] 演出区块头被截断");
-        const length = data[offset] | (data[offset + 1] << 8);
-        const expected = readU32(data, offset + 2);
-        offset += 6;
-        if (length > MAX_PERFORMANCE_BYTES || offset + length > data.length) throw new Error("[pbe3] 演出区块长度无效");
-        const section = data.subarray(offset, offset + length);
-        if (crc32(section) !== expected) throw new Error("[pbe3] 演出区块校验失败（CRC32）");
+        performanceCompressed = (flags & PBE3_FLAG_PERFORMANCE_COMPRESSED) !== 0;
+        let section: Uint8Array;
+        if (performanceCompressed) {
+            if (offset + 10 > data.length) throw new Error("[pbe3] 演出区块头被截断");
+            const rawLength = readU32(data, offset);
+            const expected = readU32(data, offset + 4);
+            const length = data[offset + 8] | (data[offset + 9] << 8);
+            offset += 10;
+            if (rawLength === 0 || rawLength > MAX_PERFORMANCE_BYTES || length === 0 || offset + length > data.length) {
+                throw new Error("[pbe3] 演出区块长度无效");
+            }
+            try {
+                section = inflateSync(data.subarray(offset, offset + length), { out: new Uint8Array(rawLength) });
+            } catch {
+                throw new Error("[pbe3] 演出区块解压失败");
+            }
+            if (section.length !== rawLength) throw new Error("[pbe3] 演出区块解压长度不匹配");
+            if (crc32(section) !== expected) throw new Error("[pbe3] 演出区块校验失败（CRC32）");
+            performanceBytes = 10 + length;
+            offset += length;
+        } else {
+            if (offset + 6 > data.length) throw new Error("[pbe3] 演出区块头被截断");
+            const length = data[offset] | (data[offset + 1] << 8);
+            const expected = readU32(data, offset + 2);
+            offset += 6;
+            if (length > MAX_PERFORMANCE_BYTES || offset + length > data.length) throw new Error("[pbe3] 演出区块长度无效");
+            section = data.subarray(offset, offset + length);
+            if (crc32(section) !== expected) throw new Error("[pbe3] 演出区块校验失败（CRC32）");
+            performanceBytes = 6 + length;
+            offset += length;
+        }
         const decodedPerformance = decodePerformance(section, duration);
         if (decodedPerformance.length) performance = decodedPerformance;
-        performanceBytes = 6 + length;
-        offset += length;
+    } else if (flags & PBE3_FLAG_PERFORMANCE_COMPRESSED) {
+        throw new Error("[pbe3] 无演出区块时设置演出压缩标志位");
     }
     return {
         id: id.value,
@@ -392,7 +440,7 @@ export function readPbe3Header(data: Uint8Array): Pbe3Header {
         velocityBits,
         eventOffset: offset,
         ...(performance ? { performance } : {}),
-        ...(performanceBytes ? { performanceBytes } : {}),
+        ...(performanceBytes ? { performanceBytes, performanceCompressed } : {}),
         byteLength: data.length,
     };
 }
@@ -402,18 +450,31 @@ export function attachPbe3Performance(data: Uint8Array, cues: readonly Performan
     const header = readPbe3Header(data);
     const start = header.eventOffset - (header.performanceBytes ?? 0);
     const payload = data.subarray(header.eventOffset);
-    const writer = new ByteWriter(start + payload.length);
+    const writer = new ByteWriter(start + payload.length + 16);
     writer.bytes(data.subarray(0, start));
+    let compressedPerformance = false;
     if (cues.length) {
         const section = encodePerformance(cues, header.duration);
-        writer.put(section.length & 255);
-        writer.put(section.length >>> 8);
-        pushU32(writer, crc32(section));
-        writer.bytes(section);
+        const packed = packPerformanceSection(section);
+        compressedPerformance = packed.compressed;
+        if (packed.compressed) {
+            pushU32(writer, packed.rawLength);
+            pushU32(writer, packed.checksum);
+            writer.put(packed.payload.length & 255);
+            writer.put(packed.payload.length >>> 8);
+        } else {
+            writer.put(packed.rawLength & 255);
+            writer.put(packed.rawLength >>> 8);
+            pushU32(writer, packed.checksum);
+        }
+        writer.bytes(packed.payload);
     }
     writer.bytes(payload);
     const out = writer.finish();
     out[4] = cues.length ? PBE3_PERFORMANCE_VERSION : PBE3_VERSION;
+    out[5] =
+        (out[5] & PBE3_FLAG_COMPRESSED) |
+        (compressedPerformance ? PBE3_FLAG_PERFORMANCE_COMPRESSED : 0);
     return out;
 }
 
