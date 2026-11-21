@@ -1329,6 +1329,636 @@ export const VFX_PAINTERS: Readonly<Record<PerformanceMethod, PainterDefinition>
             return { priority: 0, emitters: [] };
         },
     },
+
+    hanabi_launch: {
+        label: "龙势升空",
+        category: "accent",
+        instant: true,
+        interval: 0,
+        priority: 7,
+        defaultBrush: "spark",
+        emit({ color, color2, intensity, scale, brush, zone, motion }) {
+            const m = motionFactors(motion);
+            const yBase = zoneBaseY(zone, 0.35, 0.15);
+            const apex = yBase + (2.75 + 0.75 * intensity) * m.spread;
+            const side = motion === "intense" ? 0 : m.dir < 0 ? 1 : -1;
+            const xStart = side * 1.12 * m.spread;
+            const xPeak = side * 1.48 * m.spread;
+            const zLaunch = motion === "intense" ? 2.15 : 1.85;
+            const path = catmullRom([
+                [xStart, yBase, zLaunch],
+                [mix(xStart, xPeak, 0.35), mix(yBase, apex, 0.38), zLaunch + 0.08],
+                [mix(xStart, xPeak, 0.78), mix(yBase, apex, 0.76), zLaunch + 0.14],
+                [xPeak, apex, zLaunch + 0.18],
+            ], 8);
+            const resolvedBrush = resolveBrush(brush, 6);
+            const strokeBrush = resolveStrokeBrush(brush, 2);
+            const trail = drawStrokeSegments(path, {
+                count: 9,
+                life: 1.05,
+                brush: strokeBrush,
+                color,
+                color2,
+                opacity: 0.45 + 0.48 * intensity,
+                width: 0.085 + 0.03 * intensity,
+                scale,
+                travel: 0.52 * m.speed,
+                fadeIn: 0.06,
+                fadeOut: 0.42,
+            });
+            const embers = drawPoints({
+                count: 7,
+                life: 1.15,
+                lifeJitter: 0.18,
+                brush: resolvedBrush,
+                color: color2,
+                color2: color,
+                opacity: 0.55 + 0.40 * intensity,
+                scale,
+                offset: [xStart, yBase + 0.25, zLaunch],
+                size: 0.068 + 0.02 * intensity,
+                sizeEnd: 0.024,
+                sizeJitter: 0.3,
+                spread: [0.16, 0.14, 0.16],
+                velocity: [(xPeak - xStart) * 0.85, (apex - yBase) * 0.92 * m.speed, 0.12],
+                accel: [0, -0.55, 0],
+                flutter: 0.09,
+                twinkle: 0.75,
+                fadeIn: 0.04,
+                fadeOut: 0.36,
+            });
+            return { priority: 7, emitters: [...trail, embers] };
+        },
+    },
+
+    dandelion_drift: {
+        label: "夏风白絮",
+        category: "atmosphere",
+        instant: false,
+        interval: 18,
+        priority: 2,
+        defaultBrush: "blossom",
+        emit({ color, color2, intensity, scale, brush, zone, motion, music }) {
+            const m = motionFactors(motion);
+            const ascending = motion === "reverse";
+            const y = zoneBaseY(zone, ascending ? 0.65 : 1.75, 0.22);
+            const resolvedBrush = resolveBrush(brush, 8);
+            const vx = ascending
+                ? (0.14 + 0.08 * music.activity) * m.speed
+                : (0.38 + 0.18 * music.activity) * m.speed;
+            const vy = ascending
+                ? (0.32 + 0.18 * music.sustain) * m.speed
+                : (-0.09 - 0.05 * music.activity) * m.speed;
+            const ay = ascending ? 0.05 : -0.015;
+            return {
+                priority: 2,
+                emitters: [drawPoints({
+                    count: 9,
+                    life: 2.75,
+                    lifeJitter: 0.26,
+                    brush: resolvedBrush,
+                    color,
+                    color2,
+                    opacity: 0.28 + 0.52 * intensity,
+                    scale,
+                    offset: [ascending ? 0 : -1.05 * m.spread, y, 0.28],
+                    size: 0.072 + 0.028 * intensity,
+                    sizeEnd: ascending ? 0.036 : 0.056,
+                    sizeJitter: 0.34,
+                    spin: 12,
+                    spinJitter: 60,
+                    spinRate: (ascending ? 28 : 44) * m.speed,
+                    spread: [2.45 * m.spread, ascending ? 0.65 : 1.05, 1.95 * m.spread],
+                    velocity: [vx, vy, -0.08],
+                    accel: [0, ay, 0],
+                    flutter: (ascending ? 0.15 : 0.21) * m.energy,
+                    twinkle: ascending ? 0.55 : 0.22,
+                    fadeIn: 0.32,
+                    fadeOut: 0.55,
+                })],
+            };
+        },
+    },
+
+    horizon_glow: {
+        label: "暮色天际光幕",
+        category: "stage",
+        instant: false,
+        interval: 22,
+        priority: 2,
+        defaultBrush: "mote",
+        emit({ color, color2, intensity, scale, brush, zone, motion, music }) {
+            const m = motionFactors(motion);
+            const y = zoneBaseY(zone, 0.78, 0.18);
+            const span = (2.85 + 0.45 * music.sustain) * m.spread;
+            const depth = 2.35 + 0.25 * m.spread;
+            const lift = 0.28 + 0.22 * intensity + 0.14 * music.sustain;
+            const arc = catmullRom([
+                [-span, y - 0.10, depth - 0.32],
+                [-span * 0.48, y + lift * 0.72, depth + 0.12],
+                [0, y + lift, depth + 0.26],
+                [span * 0.48, y + lift * 0.72, depth + 0.12],
+                [span, y - 0.10, depth - 0.32],
+            ], 6);
+            const strokeBrush = resolveStrokeBrush(brush, 0);
+            const band = drawStrokeSegments(arc, {
+                count: 10,
+                life: 2.05,
+                brush: strokeBrush,
+                color,
+                color2,
+                opacity: 0.15 + 0.32 * intensity,
+                width: 0.34 + 0.10 * intensity,
+                scale,
+                travel: 0.04 * m.speed * m.dir,
+                fadeIn: 0.42,
+                fadeOut: 0.58,
+            });
+            const mist = drawPoints({
+                count: 6,
+                life: 2.35,
+                lifeJitter: 0.22,
+                brush: resolveBrush(brush, 0),
+                color: color2,
+                color2: color,
+                opacity: 0.14 + 0.26 * intensity,
+                scale,
+                offset: [0, y + lift * 0.45, depth + 0.18],
+                size: 0.11 + 0.04 * intensity,
+                sizeEnd: 0.08,
+                sizeJitter: 0.38,
+                spread: [span * 0.82, 0.38, 0.32],
+                velocity: [0, 0.04 * m.dir * m.speed, 0],
+                flutter: 0.07,
+                twinkle: 0.28,
+                fadeIn: 0.45,
+                fadeOut: 0.60,
+            });
+            return { priority: 2, emitters: [...band, mist] };
+        },
+    },
+
+    meteor_shower: {
+        label: "划空流星雨",
+        category: "atmosphere",
+        instant: false,
+        interval: 12,
+        priority: 3,
+        defaultBrush: "star",
+        emit({ color, color2, intensity, scale, brush, zone, motion, music, phase = 0 }) {
+            const m = motionFactors(motion);
+            const yBase = zoneBaseY(zone, 3.25, 1.95);
+            const count = motion === "intense" ? 3 : motion === "gentle" ? 1 : 2;
+            const resolvedBrush = resolveBrush(brush, 1);
+            const dirX = m.dir;
+            // Graceful Shinkai diagonal sweep across the night sky
+            const tx = dirX * 0.86;
+            const ty = -0.49;
+            const tz = -0.14;
+            const emitters: VfxEmitter[] = [];
+            for (let i = 0; i < count; i++) {
+                const seed = Math.abs(Math.sin((phase + 1) * 12.9898 + i * 78.233) * 43758.5453) % 1;
+                const seed2 = Math.abs(Math.sin((phase + 3) * 39.346 + i * 19.19) * 24634.6345) % 1;
+                const startX = -dirX * (0.6 + seed * 2.9) * m.spread + (seed2 - 0.5) * 1.4;
+                const startY = yBase + (seed2 - 0.20) * 1.45;
+                const startZ = 1.05 + seed * 2.35;
+                const speed = (2.65 + 0.95 * seed2 + 0.45 * music.activity) * m.speed;
+                const life = 0.95 + 0.35 * seed;
+                const len = (1.85 + 0.95 * seed2 + 0.55 * intensity) * scale;
+                const width = (0.30 + 0.14 * seed + 0.08 * intensity) * scale;
+                const streakColor = i % 2 === 0 ? color : color2;
+                const tailColor = i % 2 === 0 ? color2 : color;
+                // Seamless Makoto Shinkai meteor body (white-hot nucleus + feathered chromatic plasma tail)
+                emitters.push({
+                    effect: "beam",
+                    particle: "draw_comet",
+                    offset: { x: startX, y: startY, z: startZ },
+                    particles: 1,
+                    lifetime: life,
+                    transform: { x: 0, y: 0, z: 0, scale },
+                    variables: {
+                        count: 1,
+                        life,
+                        length: len * 0.72,
+                        length_end: len * 1.18,
+                        width,
+                        vx: tx * speed,
+                        vy: ty * speed,
+                        vz: tz * speed,
+                        ax: 0,
+                        ay: -0.16,
+                        az: 0,
+                        tx,
+                        ty,
+                        tz,
+                        ...colorVars(streakColor, tailColor, 0.58 + 0.42 * intensity),
+                        fade_in: 0.09,
+                        fade_out: 0.56,
+                    },
+                });
+                // Lingering shimmering star-dust wake left behind as the meteor burns across the sky
+                emitters.push(drawPoints({
+                    count: 3,
+                    life: life * 1.25,
+                    lifeJitter: 0.22,
+                    brush: resolvedBrush,
+                    color: "#FFF4DC",
+                    color2: tailColor,
+                    opacity: 0.36 + 0.40 * intensity,
+                    scale,
+                    offset: [startX - tx * 0.25, startY - ty * 0.25, startZ],
+                    size: 0.048 + 0.020 * intensity,
+                    sizeEnd: 0.016,
+                    sizeJitter: 0.35,
+                    spread: [0.22, 0.14, 0.16],
+                    velocity: [tx * speed * 0.38, ty * speed * 0.38, tz * speed * 0.38],
+                    accel: [0, -0.24, 0],
+                    flutter: 0.10,
+                    twinkle: 0.88,
+                    fadeIn: 0.12,
+                    fadeOut: 0.62,
+                }));
+            }
+            return { priority: 3, emitters };
+        },
+    },
+
+    comet_split: {
+        label: "彗星分裂",
+        category: "accent",
+        instant: true,
+        interval: 0,
+        priority: 8,
+        defaultBrush: "star",
+        emit({ color, color2, intensity, scale, brush, zone, motion }) {
+            const m = motionFactors(motion);
+            const yTop = zoneBaseY(zone, 3.85, 2.35);
+            const zBase = 2.65;
+            const resolvedBrush = resolveBrush(brush, 1);
+            const dir = m.dir;
+            // Gentle mode: a single lone Tiamat comet gliding silently across the night sky before splitting
+            if (motion === "gentle") {
+                const tx = dir * 0.92;
+                const ty = -0.36;
+                const tz = -0.14;
+                const speed = 1.05 * m.speed;
+                return {
+                    priority: 8,
+                    emitters: [
+                        {
+                            effect: "beam",
+                            particle: "draw_comet",
+                            offset: { x: -dir * 2.1, y: yTop + 0.35, z: zBase + 0.35 },
+                            particles: 1,
+                            lifetime: 3.6,
+                            transform: { x: 0, y: 0, z: 0, scale },
+                            variables: {
+                                count: 1,
+                                life: 3.6,
+                                length: 3.2 * scale,
+                                length_end: 3.9 * scale,
+                                width: 0.62 * scale,
+                                vx: tx * speed,
+                                vy: ty * speed,
+                                vz: tz * speed,
+                                ax: 0, ay: 0, az: 0,
+                                tx, ty, tz,
+                                ...colorVars(color, color2, 0.52 + 0.42 * intensity),
+                                fade_in: 0.45,
+                                fade_out: 0.85,
+                            },
+                        },
+                        drawPoints({
+                            count: 8,
+                            life: 3.0,
+                            lifeJitter: 0.25,
+                            brush: resolvedBrush,
+                            color: color2,
+                            color2: color,
+                            opacity: 0.34 + 0.36 * intensity,
+                            scale,
+                            offset: [-dir * 1.8, yTop + 0.25, zBase + 0.30],
+                            size: 0.058,
+                            sizeEnd: 0.022,
+                            sizeJitter: 0.35,
+                            spread: [0.65, 0.25, 0.25],
+                            velocity: [tx * speed * 0.72, ty * speed * 0.72, tz * speed * 0.72],
+                            flutter: 0.08,
+                            twinkle: 0.85,
+                            fadeIn: 0.35,
+                            fadeOut: 0.75,
+                        }),
+                    ],
+                };
+            }
+            // Full split: two seamless high-res comet bodies diverging from a blazing zenith core
+            const mainTx = -dir * 0.88;
+            const mainTy = -0.44;
+            const mainTz = -0.16;
+            const splitTx = dir * 0.72;
+            const splitTy = -0.66;
+            const splitTz = -0.20;
+            const mainSpeed = 1.65 * m.speed;
+            const splitSpeed = 2.05 * m.speed;
+            return {
+                priority: 8,
+                emitters: [
+                    {
+                        effect: "beam",
+                        particle: "draw_comet",
+                        offset: { x: -dir * 0.25, y: yTop, z: zBase },
+                        particles: 1,
+                        lifetime: 2.35,
+                        transform: { x: 0, y: 0, z: 0, scale },
+                        variables: {
+                            count: 1,
+                            life: 2.35,
+                            length: 3.1 * scale,
+                            length_end: 4.2 * scale,
+                            width: 0.68 * scale,
+                            vx: mainTx * mainSpeed,
+                            vy: mainTy * mainSpeed,
+                            vz: mainTz * mainSpeed,
+                            ax: 0, ay: -0.12, az: 0,
+                            tx: mainTx, ty: mainTy, tz: mainTz,
+                            ...colorVars(color, "#FFFFFF", 0.65 + 0.35 * intensity),
+                            fade_in: 0.12,
+                            fade_out: 0.75,
+                        },
+                    },
+                    {
+                        effect: "beam",
+                        particle: "draw_comet",
+                        offset: { x: dir * 0.25, y: yTop - 0.08, z: zBase - 0.06 },
+                        particles: 1,
+                        lifetime: 2.15,
+                        transform: { x: 0, y: 0, z: 0, scale },
+                        variables: {
+                            count: 1,
+                            life: 2.15,
+                            length: 2.6 * scale,
+                            length_end: 3.6 * scale,
+                            width: 0.58 * scale,
+                            vx: splitTx * splitSpeed,
+                            vy: splitTy * splitSpeed,
+                            vz: splitTz * splitSpeed,
+                            ax: 0, ay: -0.26, az: 0,
+                            tx: splitTx, ty: splitTy, tz: splitTz,
+                            ...colorVars(color2, "#FFF4DC", 0.65 + 0.35 * intensity),
+                            fade_in: 0.14,
+                            fade_out: 0.72,
+                        },
+                    },
+                    drawPoints({
+                        count: 10,
+                        life: 1.55,
+                        lifeJitter: 0.18,
+                        brush: resolvedBrush,
+                        color: "#FFF4DC",
+                        color2: color,
+                        opacity: 0.76 + 0.24 * intensity,
+                        scale,
+                        offset: [0, yTop, zBase],
+                        size: 0.13 + 0.04 * intensity,
+                        sizeEnd: 0.032,
+                        sizeJitter: 0.26,
+                        spinJitter: 90,
+                        spinRate: 130 * dir,
+                        phaseSpread: 360,
+                        radius: 0.08,
+                        radiusEnd: (1.35 + 0.35 * intensity) * m.spread,
+                        curve: 0.52,
+                        radialJitter: 0.20,
+                        depthRatio: 0.85,
+                        twinkle: 0.88,
+                        fadeIn: 0.05,
+                        fadeOut: 0.52,
+                    }),
+                    drawPoints({
+                        count: 9,
+                        life: 2.1,
+                        lifeJitter: 0.22,
+                        brush: resolvedBrush,
+                        color,
+                        color2: color2,
+                        opacity: 0.52 + 0.42 * intensity,
+                        scale,
+                        offset: [0, yTop - 0.12, zBase - 0.08],
+                        size: 0.072 + 0.025 * intensity,
+                        sizeEnd: 0.022,
+                        sizeJitter: 0.34,
+                        spread: [0.65, 0.28, 0.28],
+                        velocity: [splitTx * splitSpeed * 0.62, splitTy * splitSpeed * 0.62, splitTz * splitSpeed * 0.62],
+                        accel: [0, -0.32, 0],
+                        flutter: 0.14,
+                        twinkle: 0.85,
+                        fadeIn: 0.08,
+                        fadeOut: 0.60,
+                    }),
+                ],
+            };
+        },
+    },
+
+    musubi_braid: {
+        label: "绯红组纽",
+        category: "curve",
+        instant: false,
+        interval: 10,
+        priority: 3,
+        defaultBrush: "mote",
+        emit({ color, color2, intensity, scale, brush, zone, motion, music, phase = 0 }) {
+            const m = motionFactors(motion);
+            const ascending = motion === "reverse";
+            const yBase = zoneBaseY(zone, ascending ? 0.85 : 1.18, 0.35);
+            const resolvedBrush = resolveBrush(brush, 0);
+            const baseAngle = (phase * 28) % 360;
+            const r = (2.15 + 0.32 * music.sustain) * m.spread;
+            // Two intertwined braided strands of fine glowing beads — zero rigid tube seams
+            return {
+                priority: 3,
+                emitters: ([0, 1] as const).map((strand) => drawPoints({
+                    count: 7,
+                    life: ascending ? 2.6 : 1.75,
+                    lifeJitter: 0.14,
+                    brush: resolvedBrush,
+                    color: strand === 0 ? color : color2,
+                    color2: strand === 0 ? color2 : color,
+                    opacity: 0.38 + 0.52 * intensity,
+                    scale,
+                    offset: [0, yBase + (strand === 0 ? 0.08 : -0.08), 0],
+                    size: 0.058 + 0.022 * intensity,
+                    sizeEnd: ascending ? 0.024 : 0.036,
+                    sizeJitter: 0.18,
+                    phase: baseAngle + strand * 180,
+                    phaseSpread: 42,
+                    omega: (ascending ? 36 : 58) * m.speed * (strand === 0 ? 1 : 1),
+                    radius: r,
+                    radiusEnd: ascending ? r * 0.68 : r * (1.04 + 0.06 * music.activity),
+                    curve: 0.85,
+                    radialJitter: 0.05,
+                    depthRatio: 0.88,
+                    tilt: (strand === 0 ? 0.38 : -0.38) * (0.8 + 0.35 * music.pitch),
+                    rise: ascending ? 1.85 : 0.08 * (strand === 0 ? 1 : -1),
+                    flutter: 0.07 * m.energy,
+                    twinkle: 0.42,
+                    fadeIn: 0.18,
+                    fadeOut: 0.45,
+                })),
+            };
+        },
+    },
+
+    twilight_mist: {
+        label: "黄昏云海",
+        category: "atmosphere",
+        instant: false,
+        interval: 26,
+        priority: 2,
+        defaultBrush: "mote",
+        emit({ color, color2, intensity, scale, zone, motion, music, phase = 0 }) {
+            const m = motionFactors(motion);
+            const yBase = zoneBaseY(zone, 1.85, 0.65);
+            const driftX = (0.16 + 0.08 * music.activity) * m.speed * m.dir;
+            const emitters: VfxEmitter[] = [];
+            for (let i = 0; i < 3; i++) {
+                const seed = Math.abs(Math.sin((phase + 2) * 17.13 + i * 43.7) * 19381.4) % 1;
+                const xPos = (i - 1) * 2.55 * m.spread + (seed - 0.5) * 0.9;
+                const yPos = yBase + (i === 1 ? 0.45 : -0.15) + (seed - 0.5) * 0.45;
+                const zPos = 2.85 + (i % 2) * 0.75 + seed * 0.55;
+                const baseSize = (1.15 + 0.45 * intensity + 0.20 * seed) * scale;
+                emitters.push({
+                    effect: "curtain",
+                    particle: "draw_cloud",
+                    offset: { x: xPos, y: yPos, z: zPos },
+                    particles: 2,
+                    lifetime: 3.8,
+                    transform: { x: 0, y: 0, z: 0, scale },
+                    variables: {
+                        count: 2,
+                        life: 3.8,
+                        life_jitter: 0.16,
+                        size: baseSize,
+                        size_end: baseSize * 1.24,
+                        size_jitter: 0.22,
+                        spin: (seed - 0.5) * 16,
+                        spin_jitter: 10,
+                        spin_rate: (i % 2 === 0 ? 1.8 : -1.8) * m.speed,
+                        spread_x: 0.75,
+                        spread_y: 0.28,
+                        spread_z: 0.35,
+                        vx: driftX,
+                        vy: 0.03 * m.speed,
+                        vz: 0,
+                        ...colorVars(i === 1 ? color2 : color, i === 1 ? color : color2, 0.16 + 0.24 * intensity),
+                        fade_in: 0.95,
+                        fade_out: 1.25,
+                    },
+                });
+            }
+            return { priority: 2, emitters };
+        },
+    },
+
+    starfall_impact: {
+        label: "星落湖面",
+        category: "stage",
+        instant: false,
+        interval: 14,
+        priority: 4,
+        defaultBrush: "star",
+        emit({ color, color2, intensity, scale, brush, zone, motion, phase = 0 }) {
+            const m = motionFactors(motion);
+            const yFloor = zone === "mid" ? 0.25 : 0.08;
+            const resolvedBrush = resolveBrush(brush, 1);
+            const seed = Math.abs(Math.sin((phase + 5) * 23.17) * 41293.7) % 1;
+            const side = phase % 2 === 0 ? -1 : 1;
+            // Land around the piano perimeter (left / right / far tail), never on the pianist
+            const landX = side * (1.85 + seed * 1.35) * m.spread;
+            const landZ = -0.25 + seed * 2.45;
+            const dropH = 3.45;
+            const dx = side * 0.85;
+            const dy = -dropH;
+            const dz = -0.35;
+            const len = Math.hypot(dx, dy, dz) || 1;
+            const fallLife = 0.58;
+            const speed = len / fallLife;
+            const impactColor = phase % 2 === 0 ? color : color2;
+            const splashColor = phase % 2 === 0 ? color2 : color;
+            return {
+                priority: 4,
+                emitters: [
+                    // Steep plunging star fragment diving straight into the lake surface
+                    {
+                        effect: "beam",
+                        particle: "draw_comet",
+                        offset: { x: landX - dx, y: yFloor + dropH, z: landZ - dz },
+                        particles: 1,
+                        lifetime: fallLife,
+                        transform: { x: 0, y: 0, z: 0, scale },
+                        variables: {
+                            count: 1,
+                            life: fallLife,
+                            length: 1.45 * scale,
+                            length_end: 0.95 * scale,
+                            width: 0.24 * scale,
+                            vx: (dx / len) * speed,
+                            vy: (dy / len) * speed,
+                            vz: (dz / len) * speed,
+                            ax: 0, ay: -0.4, az: 0,
+                            tx: dx / len, ty: dy / len, tz: dz / len,
+                            ...colorVars(impactColor, "#FFFFFF", 0.65 + 0.35 * intensity),
+                            fade_in: 0.06,
+                            fade_out: 0.16,
+                        },
+                    },
+                    // Luminous ground lake ripple expanding outward from the impact site
+                    drawGroundRing({
+                        life: 1.35,
+                        color: impactColor,
+                        color2: splashColor,
+                        opacity: 0.42 + 0.48 * intensity,
+                        scale,
+                        offset: [landX, yFloor, landZ],
+                        radiusStart: 0.16,
+                        radiusEnd: (1.35 + 0.45 * intensity) * m.spread,
+                        curve: 0.62,
+                        spinRate: side * 24,
+                        style: 0,
+                        fadeIn: 0.14,
+                        fadeOut: 0.58,
+                    }),
+                    // Upward starlight splash leaping out of the lake ripple
+                    drawPoints({
+                        count: 8,
+                        life: 1.25,
+                        lifeJitter: 0.20,
+                        brush: resolvedBrush,
+                        color: splashColor,
+                        color2: "#FFF4DC",
+                        opacity: 0.55 + 0.42 * intensity,
+                        scale,
+                        offset: [landX, yFloor + 0.12, landZ],
+                        size: 0.078 + 0.025 * intensity,
+                        sizeEnd: 0.024,
+                        sizeJitter: 0.32,
+                        spinJitter: 75,
+                        spinRate: side * 110,
+                        phaseSpread: 360,
+                        radius: 0.06,
+                        radiusEnd: 0.72 * m.spread,
+                        curve: 0.68,
+                        velocity: [0, (1.65 + 0.45 * intensity) * m.speed, 0],
+                        accel: [0, -2.55, 0],
+                        flutter: 0.08,
+                        twinkle: 0.85,
+                        fadeIn: 0.10,
+                        fadeOut: 0.48,
+                    }),
+                ],
+            };
+        },
+    },
 };
 
 export interface StageThemeLayer {

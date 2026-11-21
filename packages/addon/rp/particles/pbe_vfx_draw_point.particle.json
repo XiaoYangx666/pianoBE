@@ -50,8 +50,8 @@
           "texture_width": 1024,
           "texture_height": 1024,
           "uv": [
-            "math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 7)) * 128",
-            768
+            "(math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 8))) < 8 ? (math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 8))) * 128 : ((math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 8))) - 8) * 128 + 256",
+            "(math.floor(math.clamp((variable.vfx_brush ?? 0), 0, 8))) < 8 ? 768 : 640"
           ],
           "uv_size": [
             128,

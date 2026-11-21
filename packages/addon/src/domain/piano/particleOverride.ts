@@ -78,6 +78,7 @@ const BRUSH_TO_KEY_STYLE: Readonly<Record<PerformanceBrush, KeyParticleStyleId>>
     star: "stardust",
     shard: "prism_shards",
     snow: "snow",
+    blossom: "sakura_drift",
 };
 
 const ALIAS_MAP: Readonly<Record<string, { brush?: PerformanceBrush; motion?: PerformanceMotion }>> = {

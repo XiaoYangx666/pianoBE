@@ -34,6 +34,9 @@ const tiles = {
     brush_shard: [640, 768, 128, 128],
     brush_spark: [768, 768, 128, 128],
     brush_ring: [896, 768, 128, 128],
+    brush_blossom: [256, 640, 128, 128],
+    cloud_puff: [512, 0, 256, 256],
+    comet_body: [512, 256, 512, 128],
     stroke_silk: [0, 896, 256, 96],
     stroke_laser: [256, 896, 256, 96],
     stroke_comet: [512, 896, 256, 96],
@@ -292,6 +295,79 @@ paint(tiles.brush_ring, 0.64, (x, y) => {
     const outer = gaussian(r - 0.72, 0.042);
     const inner = 0.48 * gaussian(r - 0.54, 0.055);
     return [0.78 + 0.22 * outer, shimmer * (outer + inner) * smooth((0.92 - r) / 0.14)];
+});
+paint(tiles.brush_blossom, 0.56, (x, y) => {
+    // Delicate 5-petal white wildflower (Anohana / forget-me-not silhouette)
+    const r = Math.hypot(x, y);
+    const a = Math.atan2(y, x);
+    const sector = (Math.PI * 2) / 5;
+    const folded = Math.abs((((a + Math.PI) % sector) + sector) % sector - sector / 2);
+    const px = r * Math.cos(folded);
+    const py = r * Math.sin(folded);
+    // Soft rounded petal with a tiny tip dimple and fine central vein
+    const petalDist = Math.hypot((px - 0.42) / 0.36, py / 0.25);
+    const dimple = px > 0.66 ? 0.14 * gaussian(py, 0.09) * smooth((px - 0.66) / 0.14) : 0;
+    const petal = smooth((0.96 - (petalDist + dimple)) / 0.24);
+    const vein = 0.22 * gaussian(py, 0.042) * smooth((px - 0.12) / 0.16) * smooth((0.72 - px) / 0.18);
+    const rim = 0.18 * gaussian(petalDist - 0.82, 0.09) * smooth((px - 0.14) / 0.16);
+    const stamen = gaussian(r, 0.13);
+    const aura = 0.18 * gaussian(r, 0.48) * smooth((0.94 - r) / 0.22);
+    const alpha = clamp(petal * 0.86 + vein + rim + stamen * 0.92 + aura) * smooth((0.95 - r) / 0.16);
+    // Pure white petals with a subtle warm-ivory stamen glow
+    const red = 0.94 + 0.06 * stamen;
+    const green = 0.93 + 0.05 * stamen;
+    const blue = 0.96 - 0.14 * stamen + 0.04 * petal;
+    return [[red, green, blue], alpha];
+});
+paint(tiles.cloud_puff, 0.34, (x, y) => {
+    // Painterly Makoto Shinkai twilight cloud puff: multi-lobe soft cumulus with sunlit upper rim
+    const lobes = [
+        [0.0, 0.05, 0.44, 0.30, 0.72],
+        [-0.32, 0.14, 0.32, 0.24, 0.54],
+        [0.34, 0.12, 0.34, 0.25, 0.56],
+        [-0.14, -0.14, 0.30, 0.22, 0.52],
+        [0.20, -0.12, 0.28, 0.21, 0.48],
+    ];
+    let density = 0;
+    for (const [cx, cy, rx, ry, w] of lobes) {
+        const d = Math.hypot((x - cx) / rx, (y - cy) / ry);
+        density += w * gaussian(d, 0.72);
+    }
+    const edgeFade = smooth((0.96 - Math.hypot(x, y)) / 0.32);
+    const alpha = clamp(density * 0.62) * edgeFade;
+    // Softly brighter upper-lit twilight rim
+    const rim = smooth((0.35 - y) / 0.85);
+    const light = 0.76 + 0.24 * rim;
+    return [[light, light * (0.94 + 0.06 * rim), light * (0.92 + 0.08 * rim)], alpha];
+});
+paint(tiles.comet_body, 0.90, (x, y) => {
+    // Makoto Shinkai / Your Name style meteor & comet:
+    // blazing white-hot pinpoint head at x=+0.80, delicate star-glint, long feathery chromatic tail tapering to mist
+    const hx = x - 0.80;
+    const hr = Math.hypot(hx * 3.1, y);
+    const nucleus = gaussian(hr, 0.11);
+    const innerGlow = 0.55 * gaussian(hr, 0.28);
+    // Crisp 4-point Shinkai lens glint at the head
+    const glint = 0.82 * gaussian(hx * 3.1, 0.045) * gaussian(y, 0.54)
+        + 0.48 * gaussian(y, 0.048) * gaussian(hx * 3.1, 0.36);
+    // Tail progress: 0 at far mist tip (-0.96), 1 at nucleus (+0.80)
+    const u = clamp((x + 0.96) / 1.76);
+    const inTail = smooth((0.84 - x) / 0.06) * smooth((x + 0.98) / 0.34);
+    // Razor-thin near head, gently fanning into feathery atmospheric plasma mist
+    const widthProfile = 0.055 + 0.28 * (1 - u) ** 0.85;
+    const spine = gaussian(y, widthProfile * 0.34) * (0.20 + 0.80 * u ** 1.15);
+    const upperWisp = 0.42 * gaussian(y - widthProfile * 0.58, widthProfile * 0.26) * (0.35 + 0.65 * u) * (1 - 0.35 * u);
+    const lowerWisp = 0.42 * gaussian(y + widthProfile * 0.58, widthProfile * 0.26) * (0.35 + 0.65 * u) * (1 - 0.35 * u);
+    const mistHalo = 0.28 * gaussian(y, widthProfile * 1.25) * smooth((0.92 - Math.abs(y)) / 0.26) * (0.25 + 0.75 * u ** 0.7);
+    const tail = inTail * (spine + upperWisp + lowerWisp + mistHalo) * (0.10 + 0.90 * u ** 0.85);
+    const alpha = clamp(nucleus + innerGlow + glint + tail) * smooth((0.96 - Math.abs(y)) / 0.14);
+    // Subtle Shinkai iridescence: white-hot core -> bright cyan spine -> faintly rose/violet outer mist
+    const hot = clamp(nucleus + 0.75 * glint + 0.55 * spine * inTail);
+    const outer = clamp((upperWisp + lowerWisp + mistHalo) * inTail * (1 - hot));
+    const red = clamp(0.76 + 0.24 * hot + 0.16 * outer);
+    const green = clamp(0.88 + 0.12 * hot - 0.08 * outer);
+    const blue = clamp(0.96 + 0.04 * hot);
+    return [[red, green, blue], alpha];
 });
 
 // 4 strokes (128x48 at y=320) for generic draw_stroke primitives
@@ -655,6 +731,7 @@ const ptZ = `(${param("spread_z", 0)} * (2 * ${random(4)} - 1) + (${ptRadius}) *
 const ptSize = scaled(`math.lerp(${param("size", 0.08)}, ${param("size_end", 0.08)}, ${drawAge}) * (1 + ${param("size_jitter", 0.25)} * (2 * ${random(4)} - 1))`);
 const ptTwinkle = `((1 - ${param("twinkle", 0)}) + ${param("twinkle", 0)} * (0.45 + 0.55 * math.sin(260 * ${age} + 360 * ${random(4)})))`;
 
+const ptBrush = `math.floor(math.clamp(${param("brush", 0)}, 0, 8))`;
 particle("draw_point", {
     "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
     "minecraft:emitter_lifetime_once": { active_time: 0.05 },
@@ -676,7 +753,10 @@ particle("draw_point", {
         uv: {
             texture_width: width,
             texture_height: height,
-            uv: [`math.floor(math.clamp(${param("brush", 0)}, 0, 7)) * ${brushCell}`, tiles.brush_mote[1]],
+            uv: [
+                `(${ptBrush}) < 8 ? (${ptBrush}) * ${brushCell} : ((${ptBrush}) - 8) * ${brushCell} + ${tiles.brush_blossom[0]}`,
+                `(${ptBrush}) < 8 ? ${tiles.brush_mote[1]} : ${tiles.brush_blossom[1]}`,
+            ],
             uv_size: [brushCell, brushCell],
         },
     },
@@ -734,6 +814,60 @@ particle("draw_plane", {
         facing_camera_mode: "emitter_transform_xz",
         size: [planeR, planeR],
         uv: alternateUv(tiles.ripple, tiles.brush_ring, "style"),
+    },
+    "minecraft:particle_appearance_tinting": drawTint,
+});
+
+const cloudSize = scaled(`math.lerp(${param("size", 0.9)}, ${param("size_end", 1.35)}, ${drawAge}) * (1 + ${param("size_jitter", 0.2)} * (2 * ${random(4)} - 1))`);
+particle("draw_cloud", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
+    "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_initial_spin": {
+        rotation: `${param("spin", 0)} + ${param("spin_jitter", 14)} * (2 * ${random(2)} - 1)`,
+        rotation_rate: param("spin_rate", 0),
+    },
+    "minecraft:particle_motion_parametric": {
+        relative_position: position(
+            `${param("spread_x", 0)} * (2 * ${random(1)} - 1) + ${param("vx", 0)} * ${age}`,
+            `${param("spread_y", 0)} * (2 * ${random(2)} - 1) + ${param("vy", 0)} * ${age}`,
+            `(${param("spread_z", 0)} * (2 * ${random(3)} - 1) + ${param("vz", 0)} * ${age}) * ${stageDepth}`,
+        ),
+    },
+    "minecraft:particle_lifetime_expression": {
+        max_lifetime: `math.max(0.2, ${param("life", 3.2)} * (1 + ${param("life_jitter", 0.18)} * (2 * ${random(1)} - 1)))`,
+    },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "rotate_xyz",
+        size: [cloudSize, `(${cloudSize}) * 0.62`],
+        uv: uv(tiles.cloud_puff),
+    },
+    "minecraft:particle_appearance_tinting": drawTint,
+});
+
+const cometLen = scaled(`math.lerp(${param("length", 2.8)}, ${param("length_end", 3.4)}, ${drawAge})`);
+particle("draw_comet", {
+    "minecraft:emitter_rate_instant": { num_particles: param("count", 1) },
+    "minecraft:emitter_lifetime_once": { active_time: 0.05 },
+    "minecraft:emitter_local_space": localSpace,
+    "minecraft:emitter_shape_point": point,
+    "minecraft:particle_motion_parametric": {
+        relative_position: position(
+            `${param("vx", 0)} * ${age} + 0.5 * ${param("ax", 0)} * ${age} * ${age}`,
+            `${param("vy", 0)} * ${age} + 0.5 * ${param("ay", 0)} * ${age} * ${age}`,
+            `(${param("vz", 0)} * ${age} + 0.5 * ${param("az", 0)} * ${age} * ${age}) * ${stageDepth}`,
+        ),
+    },
+    "minecraft:particle_lifetime_expression": { max_lifetime: `math.max(0.2, ${param("life", 2.2)})` },
+    "minecraft:particle_appearance_billboard": {
+        facing_camera_mode: "direction_x",
+        size: [`0.5 * (${cometLen})`, scaled(`0.5 * ${param("width", 0.55)}`)],
+        direction: {
+            mode: "custom",
+            custom_direction: rotate(param("tx", 1), param("ty", 0), `${param("tz", 0)} * ${stageDepth}`),
+        },
+        uv: uv(tiles.comet_body),
     },
     "minecraft:particle_appearance_tinting": drawTint,
 });

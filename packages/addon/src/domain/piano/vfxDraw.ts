@@ -10,7 +10,7 @@ import { vfxStageFrame } from "./vfxStage";
 
 export type Point3 = readonly [number, number, number];
 export type Segment3 = { point: Point3; tangent: Point3; spacing: number; u: number };
-export type BrushIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type BrushIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type StrokeBrushIndex = 0 | 1 | 2 | 3;
 
 export const BRUSH_INDEX: Readonly<Record<Exclude<PerformanceBrush, "default">, BrushIndex>> = {
@@ -22,6 +22,7 @@ export const BRUSH_INDEX: Readonly<Record<Exclude<PerformanceBrush, "default">, 
     shard: 5,
     spark: 6,
     ring: 7,
+    blossom: 8,
 };
 
 export const ZONE_Y_OFFSET: Readonly<Record<PerformanceZone, number>> = {
@@ -49,6 +50,7 @@ export function resolveStrokeBrush(brush: PerformanceBrush | undefined, fallback
         case "mote":
         case "star":
         case "snow":
+        case "blossom":
             return 0; // stroke_silk
         default:
             return fallback;

@@ -1,0 +1,1004 @@
+{
+  "song": "c8159589",
+  "title": "secret base · 夏末花火",
+  "sections": [
+    {
+      "at": 0,
+      "label": "第一幕 · 暮色初启",
+      "note": "2.200s 低音琶音入场。远景铺开低亮暮色天际霞光，夏末微风卷起稀疏小白花，琴键泛起暖象牙星火微光。"
+    },
+    {
+      "at": 17.075,
+      "label": "第二幕 · 夏日回声",
+      "note": "高八度风铃旋律进入。天际霞光收淡，轻柔穿场丝带与淡粉银白音符随高音浮起。"
+    },
+    {
+      "at": 31.725,
+      "label": "第三幕 · 秘密基地",
+      "note": "主歌叙事展开，黄昏渐沉入蓝调时刻。低位流萤初现，小白花随风横掠，琴键星座在长音间连起星点回忆。"
+    },
+    {
+      "at": 60.9,
+      "label": "第四幕 · 暮色初涌",
+      "note": "60.9s 扫地转场进入预副歌，75.575s 首次副歌以夏夜深靛天际、满庭流萤与暖金丝带托举，刻意克制不放烟花；86s 起长淡出清场。"
+    },
+    {
+      "at": 96.6,
+      "label": "第五幕 · 八音盒之夜",
+      "note": "纯高音区清澈独奏。舞台大面积留白，仅留月白星尘、冰白雪晶键光与少量流萤；112s 渐入倾斜星环蓄势。"
+    },
+    {
+      "at": 126.875,
+      "label": "第六幕 · 仲夏初绽",
+      "note": "第二次副歌开启，星环退场，双翼流光与花瓣雨展开；141.325s 与 146.8s 首次呈现「龙势升空 → 单朵花火」错拍绽放。"
+    },
+    {
+      "at": 165.025,
+      "label": "第七幕 · 翻涌与追忆",
+      "note": "C 段主动切换空间语言：撤掉丝带与烟花，以暮紫琥珀双螺旋星轨与双侧柔光幕呼应十年之约；193.5s 起彻底清场。"
+    },
+    {
+      "at": 198.7,
+      "label": "第八幕 · 十年后的八月",
+      "note": "全曲最催泪的纯高音留白独白，舞台几乎全空，仅留微弱星尘与几缕纯白无名花；214s 流萤聚拢蓄势，226.8s 龙势火箭冲天直指终极副歌。"
+    },
+    {
+      "at": 228.6,
+      "label": "第九幕 · 花火与告别",
+      "note": "228.6s–255s 终极副歌四发龙势错色花火与暖金扇束释放；256s 后退回暮光余温与落花流萤；286.425s 终章八音盒中纯白无名花缓缓向上升散，随 309.525s 末音余韵合拢于晨光。"
+    }
+  ],
+  "cues": [
+    {
+      "at": 2.2,
+      "method": "horizon_glow",
+      "color": "#FFBA7A",
+      "color2": "#FFF4DC",
+      "motion": "gentle",
+      "level": 36,
+      "scale": 100,
+      "fade": 2.6
+    },
+    {
+      "at": 2.2,
+      "method": "dandelion_drift",
+      "color": "#FFF4DC",
+      "color2": "#F7FAFF",
+      "brush": "blossom",
+      "motion": "gentle",
+      "level": 26,
+      "scale": 95,
+      "fade": 2.8
+    },
+    {
+      "at": 2.2,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#FFF4DC",
+      "color2": "#FFBA7A",
+      "level": 78,
+      "scale": 100,
+      "fade": 0
+    },
+    {
+      "at": 17.075,
+      "method": "horizon_glow",
+      "color": "#F4A6B8",
+      "color2": "#9CE6FF",
+      "motion": "gentle",
+      "level": 18,
+      "scale": 98,
+      "fade": 2.4
+    },
+    {
+      "at": 17.075,
+      "method": "silk_streams",
+      "color": "#F4A6B8",
+      "color2": "#9CE6FF",
+      "motion": "gentle",
+      "level": 36,
+      "scale": 96,
+      "fade": 2.4
+    },
+    {
+      "at": 17.075,
+      "method": "key_notes",
+      "color": "#FFF4DC",
+      "color2": "#F4A6B8",
+      "brush": "note",
+      "motion": "gentle",
+      "level": 56,
+      "scale": 96,
+      "fade": 1.8
+    },
+    {
+      "at": 17.075,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#F4A6B8",
+      "color2": "#9CE6FF",
+      "level": 82,
+      "scale": 100,
+      "fade": 2.0
+    },
+    {
+      "at": 30.8,
+      "method": "silk_streams",
+      "color": "#F4A6B8",
+      "level": 0,
+      "scale": 95,
+      "fade": 2.2
+    },
+    {
+      "at": 30.8,
+      "method": "key_notes",
+      "color": "#FFF4DC",
+      "brush": "note",
+      "level": 0,
+      "scale": 95,
+      "fade": 1.8
+    },
+    {
+      "at": 31.725,
+      "method": "horizon_glow",
+      "color": "#FFBA7A",
+      "color2": "#6D89CC",
+      "motion": "gentle",
+      "level": 30,
+      "scale": 102,
+      "fade": 3.0
+    },
+    {
+      "at": 31.725,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "color2": "#FFBA7A",
+      "brush": "blossom",
+      "level": 40,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 31.725,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "color2": "#FFF4DC",
+      "zone": "low",
+      "motion": "gentle",
+      "level": 36,
+      "scale": 96,
+      "fade": 2.6
+    },
+    {
+      "at": 31.725,
+      "method": "key_constellation",
+      "color": "#FFF4DC",
+      "color2": "#9CE6FF",
+      "brush": "star",
+      "motion": "gentle",
+      "level": 54,
+      "scale": 96,
+      "fade": 2.0
+    },
+    {
+      "at": 31.725,
+      "method": "key_style",
+      "style": "blue_tears",
+      "color": "#FFF4DC",
+      "color2": "#9CE6FF",
+      "level": 84,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 59.8,
+      "method": "key_constellation",
+      "color": "#9CE6FF",
+      "brush": "star",
+      "level": 0,
+      "scale": 96,
+      "fade": 1.4
+    },
+    {
+      "at": 59.8,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "brush": "blossom",
+      "level": 0,
+      "scale": 96,
+      "fade": 2.2
+    },
+    {
+      "at": 60.9,
+      "method": "floor_sweep",
+      "color": "#FFBA7A",
+      "color2": "#FFE29A",
+      "level": 64,
+      "scale": 100
+    },
+    {
+      "at": 60.9,
+      "method": "wing_ribbons",
+      "color": "#FFBA7A",
+      "color2": "#F4A6B8",
+      "motion": "gentle",
+      "level": 54,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 60.9,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "color2": "#FFE29A",
+      "zone": "low",
+      "level": 50,
+      "scale": 100,
+      "fade": 2.2
+    },
+    {
+      "at": 75.575,
+      "method": "horizon_glow",
+      "color": "#5876BA",
+      "color2": "#8EB8FF",
+      "level": 44,
+      "scale": 106,
+      "fade": 2.2
+    },
+    {
+      "at": 75.575,
+      "method": "wing_ribbons",
+      "color": "#FFE29A",
+      "color2": "#F4A6B8",
+      "level": 72,
+      "scale": 106,
+      "fade": 1.8
+    },
+    {
+      "at": 75.575,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "color2": "#FFE29A",
+      "zone": "stage",
+      "level": 66,
+      "scale": 104,
+      "fade": 1.8
+    },
+    {
+      "at": 75.575,
+      "method": "key_style",
+      "style": "blue_tears",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "level": 90,
+      "scale": 100,
+      "fade": 1.8
+    },
+    {
+      "at": 86.2,
+      "method": "wing_ribbons",
+      "color": "#8EB8FF",
+      "color2": "#D6EAFF",
+      "motion": "gentle",
+      "level": 0,
+      "scale": 96,
+      "fade": 3.4
+    },
+    {
+      "at": 89.5,
+      "method": "horizon_glow",
+      "color": "#5876BA",
+      "level": 0,
+      "scale": 98,
+      "fade": 3.6
+    },
+    {
+      "at": 90.0,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "zone": "low",
+      "motion": "gentle",
+      "level": 28,
+      "scale": 94,
+      "fade": 3.5
+    },
+    {
+      "at": 96.6,
+      "method": "starfield",
+      "color": "#D6EAFF",
+      "color2": "#9CE6FF",
+      "motion": "gentle",
+      "level": 38,
+      "scale": 100,
+      "fade": 2.8
+    },
+    {
+      "at": 96.6,
+      "method": "key_notes",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "brush": "snow",
+      "motion": "gentle",
+      "level": 62,
+      "scale": 96,
+      "fade": 2.0
+    },
+    {
+      "at": 96.6,
+      "method": "key_style",
+      "style": "snow",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "level": 84,
+      "scale": 100,
+      "fade": 2.2
+    },
+    {
+      "at": 112.0,
+      "method": "orbit_halo",
+      "color": "#9CE6FF",
+      "color2": "#D8F28A",
+      "brush": "star",
+      "motion": "gentle",
+      "level": 34,
+      "scale": 98,
+      "fade": 3.2
+    },
+    {
+      "at": 119.5,
+      "method": "orbit_halo",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "brush": "star",
+      "level": 62,
+      "scale": 106,
+      "fade": 3.5
+    },
+    {
+      "at": 119.5,
+      "method": "starfield",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "level": 48,
+      "scale": 104,
+      "fade": 3.5
+    },
+    {
+      "at": 125.6,
+      "method": "orbit_halo",
+      "color": "#FFE29A",
+      "brush": "star",
+      "level": 0,
+      "scale": 104,
+      "fade": 1.2
+    },
+    {
+      "at": 125.6,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "zone": "low",
+      "level": 0,
+      "scale": 96,
+      "fade": 1.2
+    },
+    {
+      "at": 126.875,
+      "method": "shockwave",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "level": 70,
+      "scale": 104
+    },
+    {
+      "at": 126.875,
+      "method": "wing_ribbons",
+      "color": "#FFE29A",
+      "color2": "#FFB7D5",
+      "level": 76,
+      "scale": 108,
+      "fade": 1.6
+    },
+    {
+      "at": 126.875,
+      "method": "petal_fall",
+      "color": "#FFB7D5",
+      "color2": "#FFF4DC",
+      "brush": "petal",
+      "zone": "high",
+      "level": 62,
+      "scale": 104,
+      "fade": 2.0
+    },
+    {
+      "at": 126.875,
+      "method": "key_style",
+      "style": "sakura_drift",
+      "color": "#FFB7D5",
+      "color2": "#FFE29A",
+      "level": 92,
+      "scale": 100,
+      "fade": 1.6
+    },
+    {
+      "at": 140.15,
+      "method": "hanabi_launch",
+      "color": "#FFE29A",
+      "color2": "#FFBA7A",
+      "brush": "spark",
+      "motion": "normal",
+      "level": 72,
+      "scale": 102
+    },
+    {
+      "at": 141.325,
+      "method": "firework_bloom",
+      "color": "#FFE29A",
+      "color2": "#FFB7D5",
+      "brush": "spark",
+      "zone": "high",
+      "level": 74,
+      "scale": 104
+    },
+    {
+      "at": 145.65,
+      "method": "hanabi_launch",
+      "color": "#78C8FF",
+      "color2": "#FFF4DC",
+      "brush": "spark",
+      "motion": "reverse",
+      "level": 74,
+      "scale": 104
+    },
+    {
+      "at": 146.8,
+      "method": "firework_bloom",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "brush": "spark",
+      "zone": "high",
+      "level": 76,
+      "scale": 106
+    },
+    {
+      "at": 146.8,
+      "method": "key_fountain",
+      "color": "#FFE29A",
+      "color2": "#FFB7D5",
+      "brush": "spark",
+      "level": 52,
+      "scale": 100,
+      "fade": 1.2
+    },
+    {
+      "at": 154.5,
+      "method": "key_fountain",
+      "color": "#FFE29A",
+      "brush": "spark",
+      "level": 0,
+      "scale": 98,
+      "fade": 2.0
+    },
+    {
+      "at": 155.5,
+      "method": "petal_fall",
+      "color": "#FFB7D5",
+      "brush": "petal",
+      "zone": "high",
+      "level": 0,
+      "scale": 98,
+      "fade": 3.0
+    },
+    {
+      "at": 156.0,
+      "method": "wing_ribbons",
+      "color": "#FFE29A",
+      "level": 0,
+      "scale": 98,
+      "fade": 3.2
+    },
+    {
+      "at": 156.5,
+      "method": "key_notes",
+      "color": "#FFF4DC",
+      "brush": "snow",
+      "level": 0,
+      "scale": 96,
+      "fade": 2.5
+    },
+    {
+      "at": 165.025,
+      "method": "double_helix",
+      "color": "#B896FF",
+      "color2": "#FFB870",
+      "brush": "star",
+      "level": 58,
+      "scale": 104,
+      "fade": 2.4
+    },
+    {
+      "at": 165.025,
+      "method": "wing_curtain",
+      "color": "#9E82E8",
+      "color2": "#FFB870",
+      "level": 48,
+      "scale": 102,
+      "fade": 2.6
+    },
+    {
+      "at": 165.025,
+      "method": "key_style",
+      "style": "magic_trail",
+      "color": "#FFB870",
+      "color2": "#B896FF",
+      "level": 90,
+      "scale": 100,
+      "fade": 2.0
+    },
+    {
+      "at": 180.0,
+      "method": "double_helix",
+      "color": "#FFB870",
+      "color2": "#B896FF",
+      "brush": "star",
+      "level": 68,
+      "scale": 110,
+      "fade": 2.2
+    },
+    {
+      "at": 180.0,
+      "method": "wing_curtain",
+      "color": "#FFB870",
+      "color2": "#9E82E8",
+      "level": 58,
+      "scale": 106,
+      "fade": 2.2
+    },
+    {
+      "at": 193.5,
+      "method": "double_helix",
+      "color": "#B896FF",
+      "brush": "star",
+      "level": 0,
+      "scale": 98,
+      "fade": 3.2
+    },
+    {
+      "at": 193.5,
+      "method": "wing_curtain",
+      "color": "#9E82E8",
+      "level": 0,
+      "scale": 96,
+      "fade": 3.2
+    },
+    {
+      "at": 195.0,
+      "method": "starfield",
+      "color": "#6D89CC",
+      "color2": "#D6EAFF",
+      "motion": "gentle",
+      "level": 24,
+      "scale": 96,
+      "fade": 3.0
+    },
+    {
+      "at": 198.7,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "brush": "blossom",
+      "motion": "gentle",
+      "level": 28,
+      "scale": 96,
+      "fade": 2.8
+    },
+    {
+      "at": 198.7,
+      "method": "key_notes",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "brush": "mote",
+      "motion": "gentle",
+      "level": 48,
+      "scale": 92,
+      "fade": 2.4
+    },
+    {
+      "at": 198.7,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "level": 76,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 214.0,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "color2": "#FFE29A",
+      "zone": "low",
+      "level": 38,
+      "scale": 100,
+      "fade": 3.0
+    },
+    {
+      "at": 214.0,
+      "method": "horizon_glow",
+      "color": "#FFBA7A",
+      "color2": "#FFE29A",
+      "level": 34,
+      "scale": 102,
+      "fade": 3.2
+    },
+    {
+      "at": 221.5,
+      "method": "firefly_rise",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "zone": "stage",
+      "level": 74,
+      "scale": 108,
+      "fade": 4.2
+    },
+    {
+      "at": 221.5,
+      "method": "horizon_glow",
+      "color": "#FFE29A",
+      "color2": "#FF857A",
+      "level": 56,
+      "scale": 108,
+      "fade": 4.2
+    },
+    {
+      "at": 221.5,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "level": 92,
+      "scale": 100,
+      "fade": 3.6
+    },
+    {
+      "at": 226.8,
+      "method": "hanabi_launch",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "brush": "spark",
+      "motion": "intense",
+      "level": 84,
+      "scale": 108
+    },
+    {
+      "at": 227.4,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "brush": "blossom",
+      "level": 0,
+      "scale": 98,
+      "fade": 1.2
+    },
+    {
+      "at": 227.4,
+      "method": "firefly_rise",
+      "color": "#FFE29A",
+      "zone": "stage",
+      "level": 0,
+      "scale": 104,
+      "fade": 1.2
+    },
+    {
+      "at": 228.6,
+      "method": "shockwave",
+      "color": "#FFE29A",
+      "color2": "#FF857A",
+      "level": 82,
+      "scale": 108
+    },
+    {
+      "at": 228.6,
+      "method": "firework_bloom",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "brush": "spark",
+      "zone": "high",
+      "level": 82,
+      "scale": 108
+    },
+    {
+      "at": 228.6,
+      "method": "wing_ribbons",
+      "color": "#FFE29A",
+      "color2": "#FF857A",
+      "level": 84,
+      "scale": 110,
+      "fade": 1.2
+    },
+    {
+      "at": 228.6,
+      "method": "starfield",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "level": 44,
+      "scale": 106,
+      "fade": 1.4
+    },
+    {
+      "at": 228.6,
+      "method": "key_style",
+      "style": "prism_shards",
+      "color": "#FFE29A",
+      "color2": "#9CE6FF",
+      "level": 96,
+      "scale": 100,
+      "fade": 1.2
+    },
+    {
+      "at": 241.9,
+      "method": "hanabi_launch",
+      "color": "#FF857A",
+      "color2": "#FFE29A",
+      "brush": "spark",
+      "motion": "normal",
+      "level": 86,
+      "scale": 108
+    },
+    {
+      "at": 243.05,
+      "method": "firework_bloom",
+      "color": "#FF857A",
+      "color2": "#FFE29A",
+      "brush": "spark",
+      "zone": "high",
+      "level": 90,
+      "scale": 112
+    },
+    {
+      "at": 243.05,
+      "method": "crown_fan",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "level": 76,
+      "scale": 112,
+      "fade": 1.0
+    },
+    {
+      "at": 243.05,
+      "method": "horizon_glow",
+      "color": "#FFE29A",
+      "color2": "#FF857A",
+      "level": 0,
+      "scale": 104,
+      "fade": 1.4
+    },
+    {
+      "at": 247.375,
+      "method": "hanabi_launch",
+      "color": "#78C8FF",
+      "color2": "#FFF4DC",
+      "brush": "spark",
+      "motion": "reverse",
+      "level": 86,
+      "scale": 108
+    },
+    {
+      "at": 248.525,
+      "method": "firework_bloom",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "brush": "spark",
+      "zone": "high",
+      "level": 92,
+      "scale": 114
+    },
+    {
+      "at": 249.25,
+      "method": "hanabi_launch",
+      "color": "#FFE29A",
+      "color2": "#FFB7D5",
+      "brush": "spark",
+      "motion": "intense",
+      "level": 90,
+      "scale": 112
+    },
+    {
+      "at": 250.375,
+      "method": "firework_bloom",
+      "color": "#FFE29A",
+      "color2": "#FFB7D5",
+      "brush": "spark",
+      "zone": "high",
+      "level": 94,
+      "scale": 116
+    },
+    {
+      "at": 250.375,
+      "method": "shockwave",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "level": 78,
+      "scale": 110
+    },
+    {
+      "at": 256.25,
+      "method": "crown_fan",
+      "color": "#FFE29A",
+      "level": 0,
+      "scale": 102,
+      "fade": 3.2
+    },
+    {
+      "at": 256.25,
+      "method": "wing_ribbons",
+      "color": "#FFBA7A",
+      "color2": "#F4A6B8",
+      "motion": "gentle",
+      "level": 46,
+      "scale": 100,
+      "fade": 3.4
+    },
+    {
+      "at": 256.25,
+      "method": "horizon_glow",
+      "color": "#FFBA7A",
+      "color2": "#FFF4DC",
+      "motion": "gentle",
+      "level": 40,
+      "scale": 102,
+      "fade": 3.6
+    },
+    {
+      "at": 265.0,
+      "method": "wing_ribbons",
+      "color": "#F4A6B8",
+      "motion": "gentle",
+      "level": 0,
+      "scale": 96,
+      "fade": 3.5
+    },
+    {
+      "at": 265.0,
+      "method": "starfield",
+      "color": "#D6EAFF",
+      "motion": "gentle",
+      "level": 0,
+      "scale": 96,
+      "fade": 4.0
+    },
+    {
+      "at": 265.0,
+      "method": "petal_fall",
+      "color": "#F7FAFF",
+      "color2": "#FFB7D5",
+      "brush": "blossom",
+      "zone": "high",
+      "motion": "gentle",
+      "level": 44,
+      "scale": 98,
+      "fade": 3.2
+    },
+    {
+      "at": 265.0,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "color2": "#FFF4DC",
+      "zone": "low",
+      "motion": "gentle",
+      "level": 40,
+      "scale": 96,
+      "fade": 3.2
+    },
+    {
+      "at": 265.0,
+      "method": "key_style",
+      "style": "sakura_drift",
+      "color": "#F7FAFF",
+      "color2": "#FFE29A",
+      "level": 82,
+      "scale": 100,
+      "fade": 3.0
+    },
+    {
+      "at": 284.5,
+      "method": "petal_fall",
+      "color": "#F7FAFF",
+      "brush": "blossom",
+      "zone": "high",
+      "level": 0,
+      "scale": 94,
+      "fade": 2.4
+    },
+    {
+      "at": 284.5,
+      "method": "firefly_rise",
+      "color": "#D8F28A",
+      "zone": "low",
+      "level": 0,
+      "scale": 94,
+      "fade": 2.4
+    },
+    {
+      "at": 284.5,
+      "method": "key_notes",
+      "color": "#F7FAFF",
+      "brush": "mote",
+      "level": 0,
+      "scale": 92,
+      "fade": 2.2
+    },
+    {
+      "at": 286.425,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "brush": "blossom",
+      "zone": "stage",
+      "motion": "reverse",
+      "level": 44,
+      "scale": 100,
+      "fade": 3.2
+    },
+    {
+      "at": 286.425,
+      "method": "horizon_glow",
+      "color": "#FFF4DC",
+      "color2": "#9CE6FF",
+      "motion": "gentle",
+      "level": 30,
+      "scale": 100,
+      "fade": 3.2
+    },
+    {
+      "at": 286.425,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "level": 76,
+      "scale": 100,
+      "fade": 2.8
+    },
+    {
+      "at": 309.525,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "color2": "#9CE6FF",
+      "brush": "blossom",
+      "zone": "stage",
+      "motion": "reverse",
+      "level": 20,
+      "scale": 96,
+      "fade": 3.0
+    },
+    {
+      "at": 309.525,
+      "method": "horizon_glow",
+      "color": "#FFF4DC",
+      "motion": "gentle",
+      "level": 0,
+      "scale": 96,
+      "fade": 5.5
+    },
+    {
+      "at": 312.8,
+      "method": "dandelion_drift",
+      "color": "#F7FAFF",
+      "brush": "blossom",
+      "zone": "stage",
+      "motion": "reverse",
+      "level": 0,
+      "scale": 92,
+      "fade": 3.2
+    },
+    {
+      "at": 312.8,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#F7FAFF",
+      "level": 0,
+      "scale": 100,
+      "fade": 3.2
+    }
+  ]
+}

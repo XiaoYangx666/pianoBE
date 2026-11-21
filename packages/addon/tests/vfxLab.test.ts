@@ -186,12 +186,15 @@ test("generic draw primitives reference the 1024x1024 atlas, valid brush UVs and
                 expect(896 + 96).toBeLessThanOrEqual(height);
             }
         } else if (name === "draw_point") {
-            expect(uv.uv[1]).toBe(768);
             expect(uv.uv_size).toEqual([128, 128]);
+            expect(String(uv.uv[1])).toContain("768");
+            expect(String(uv.uv[1])).toContain("640");
             for (let b = 0; b <= 7; b++) {
                 expect(b * 128 + 128).toBeLessThanOrEqual(width);
                 expect(768 + 128).toBeLessThanOrEqual(height);
             }
+            expect(256 + 128).toBeLessThanOrEqual(width);
+            expect(640 + 128).toBeLessThanOrEqual(height);
         } else {
             expect(billboard.facing_camera_mode).toBe("emitter_transform_xz");
             for (const val of [uv.uv_size[0], uv.uv_size[1]]) {

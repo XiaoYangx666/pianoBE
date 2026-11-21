@@ -50,6 +50,36 @@ test("e1563b03 performance places finite variables", () => {
     expect([...new Set(failures)].slice(0, 30)).toEqual([]);
 });
 
+test("c8159589 secret base performance places finite variables", () => {
+    const source = JSON.parse(readFileSync(new URL("../../../midis/performances/c8159589.json", import.meta.url), "utf8"));
+    const instant = new Set(["floor_sweep", "shockwave", "prism_rewind", "firework_bloom", "hanabi_launch"]);
+    const cues = source.cues.map((cue: any) => {
+        const base = {
+            tick: Math.round(cue.at * 40),
+            method: cue.method,
+            slot: cue.slot,
+            color: resolvePerformanceColor(cue.color),
+            color2: cue.color2 ? resolvePerformanceColor(cue.color2) : undefined,
+            brush: cue.brush,
+            zone: cue.zone,
+            motion: cue.motion,
+            level: cue.level,
+            scale: cue.scale,
+        };
+        return instant.has(cue.method) ? { ...base, op: "flash" as const }
+            : { ...base, op: "set" as const, fade: Math.round((cue.fade ?? 1.5) * 40) };
+    });
+    const player = new VfxPerformancePlayer(cues, 317);
+    const music = { ...quietFeatures, velocity: 0.55, activity: 0.6, density: 0.55, sustain: 0.5, surge: 0.6, chord: 0.6, onset: 0.55 };
+    const failures: string[] = [];
+    for (let t = 0; t <= 317; t += 0.2) {
+        const notes = [{ midi: 66, velocity: 0.8, duration: 0.8, tick: Math.round(t * 20) }];
+        const batches = player.update(t, music, true, notes, false);
+        for (const batch of batches) for (const emitter of batch.emitters) check(`c8159589 ${emitter.effect}/${emitter.particle ?? ""}`, emitter, t, failures);
+    }
+    expect([...new Set(failures)].slice(0, 30)).toEqual([]);
+});
+
 test("all painters place finite variables", () => {
     const music = { ...quietFeatures, velocity: 0.5, activity: 0.55, density: 0.5, sustain: 0.4, surge: 0.45, chord: 0.5, onset: 0.5 };
     const failures: string[] = [];

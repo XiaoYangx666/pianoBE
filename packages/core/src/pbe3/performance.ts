@@ -27,6 +27,14 @@ export const PERFORMANCE_METHODS = {
     prism_rewind: 23,
     firework_bloom: 24,
     key_style: 25,
+    hanabi_launch: 26,
+    dandelion_drift: 27,
+    horizon_glow: 28,
+    meteor_shower: 29,
+    comet_split: 30,
+    musubi_braid: 31,
+    twilight_mist: 32,
+    starfall_impact: 33,
 } as const;
 export type PerformanceMethod = keyof typeof PERFORMANCE_METHODS;
 
@@ -40,6 +48,7 @@ export const PERFORMANCE_BRUSHES = {
     shard: 6,
     spark: 7,
     ring: 8,
+    blossom: 9,
 } as const;
 export type PerformanceBrush = keyof typeof PERFORMANCE_BRUSHES;
 
@@ -116,6 +125,8 @@ const INSTANT_METHODS: ReadonlySet<PerformanceMethod> = new Set([
     "shockwave",
     "prism_rewind",
     "firework_bloom",
+    "hanabi_launch",
+    "comet_split",
 ]);
 
 export function isInstantPerformanceMethod(method: PerformanceMethod): boolean {

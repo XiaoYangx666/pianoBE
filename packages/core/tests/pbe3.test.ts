@@ -81,15 +81,23 @@ describe("PBE3 performance section", () => {
         expect(isInstantPerformanceMethod("shockwave")).toBe(true);
         expect(isInstantPerformanceMethod("prism_rewind")).toBe(true);
         expect(isInstantPerformanceMethod("firework_bloom")).toBe(true);
+        expect(isInstantPerformanceMethod("hanabi_launch")).toBe(true);
+        expect(isInstantPerformanceMethod("comet_split")).toBe(true);
         expect(isInstantPerformanceMethod("wing_ribbons")).toBe(false);
         expect(isInstantPerformanceMethod("key_style")).toBe(false);
+        expect(isInstantPerformanceMethod("dandelion_drift")).toBe(false);
+        expect(isInstantPerformanceMethod("horizon_glow")).toBe(false);
+        expect(isInstantPerformanceMethod("meteor_shower")).toBe(false);
+        expect(isInstantPerformanceMethod("musubi_braid")).toBe(false);
+        expect(isInstantPerformanceMethod("twilight_mist")).toBe(false);
+        expect(isInstantPerformanceMethod("starfall_impact")).toBe(false);
 
         const methods = Object.keys(PERFORMANCE_METHODS) as PerformanceMethod[];
         const brushes = Object.keys(PERFORMANCE_BRUSHES) as PerformanceBrush[];
         const zones = Object.keys(PERFORMANCE_ZONES) as PerformanceZone[];
         const motions = Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[];
         const palettes = Object.keys(PERFORMANCE_PALETTES) as PerformancePalette[];
-        expect(methods).toHaveLength(25);
+        expect(methods).toHaveLength(33);
 
         const allCues: PerformanceCue[] = methods.map((method, index) => {
             const brush = brushes[index % brushes.length];

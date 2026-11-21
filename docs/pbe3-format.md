@@ -191,7 +191,7 @@ PBE2 编解码已完全移除。仓库中不再保留 PBE2 代码、测试样本
    - bit 5 (`0x20`)：`hasStyle`（是否存在样式修饰字节）
    - bits 3–4 (`0x18`)：保留，必须为 `0`
    - bits 0–2 (`0x07`)：`slot`（0–7，同一绘制方法允许并行占用的独立通道槽位）
-3. `u8` 内置绘制方法 `methodId`（1–255；当前已注册 25 种，对应 `PERFORMANCE_METHODS`，含 `25: key_style` 弹奏粒子替换通道）
+3. `u8` 内置绘制方法 `methodId`（1–255；当前已注册 33 种，对应 `PERFORMANCE_METHODS`，含 `25: key_style` 弹奏粒子替换通道）
 4. `u8` 强度（0–100%；对 `key_style` 而言，`level = 0` 表示解除覆盖恢复默认弹奏粒子，`level > 0` 表示启用覆盖并以 `color` / `color2` 作为 88 键渐变配色）
 5. `u8` 缩放（50–170%）
 6. `u8` 主色索引（指向颜色表；打包工具支持 `PERFORMANCE_PALETTES` 色板名或 `#RRGGBB`，编码时按首次出现顺序去重）
@@ -201,4 +201,4 @@ PBE2 编解码已完全移除。仓库中不再保留 PBE2 代码、测试样本
 
 相同时间的提示按源文件顺序处理。提示和渐变终点均位于曲目时长内。
 
-内置绘制方法由 `PERFORMANCE_METHODS`（25 种：`starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain`、`wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave`、`light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch`、`key_notes`、`key_fountain`、`key_constellation`、`floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom`、`key_style`）定义，笔刷由 `PERFORMANCE_BRUSHES`、空间高度由 `PERFORMANCE_ZONES`、运动修饰由 `PERFORMANCE_MOTIONS` 定义。解码器遇到未知 `methodId` 时会完整跳过该条提示而不报错，遇到未知 `brushId` 时降级为 `default`，仍正常播放音符。单曲存储上限仍为 2 MiB。
+内置绘制方法由 `PERFORMANCE_METHODS`（33 种：`starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain`、`wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave`、`light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch`、`key_notes`、`key_fountain`、`key_constellation`、`floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom`、`key_style`、`hanabi_launch`、`dandelion_drift`、`horizon_glow`、`meteor_shower`、`comet_split`、`musubi_braid`、`twilight_mist`、`starfall_impact`）定义，笔刷由 `PERFORMANCE_BRUSHES`、空间高度由 `PERFORMANCE_ZONES`、运动修饰由 `PERFORMANCE_MOTIONS` 定义。解码器遇到未知 `methodId` 时会完整跳过该条提示而不报错，遇到未知 `brushId` 时降级为 `default`，仍正常播放音符。单曲存储上限仍为 2 MiB。

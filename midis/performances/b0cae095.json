@@ -1,0 +1,729 @@
+{
+  "song": "b0cae095",
+  "title": "火花 · 迪亚玛特之夜",
+  "sections": [
+    {
+      "at": 0,
+      "label": "第一幕 · 宇宙微光",
+      "note": "1.675s 晶莹分解和弦引入。极简深空星尘与冰白音符；25s 绯红组纽红绳首次绕琴轻舞。"
+    },
+    {
+      "at": 60.35,
+      "label": "第二幕 · 暮色初临",
+      "note": "悬停呼吸后进入主歌 1。新海诚式黄昏云海在后景缓缓铺开，琴键星座连起冰蓝与绯红（全段刻意隐藏流星）。"
+    },
+    {
+      "at": 92.725,
+      "label": "第三幕 · 命运交织",
+      "note": "副歌 1 展开。绯红与冰蓝双股组纽加速交织环绕，黄昏云海染上夕阳暮紫与珊瑚粉。"
+    },
+    {
+      "at": 150.25,
+      "label": "第四幕 · 黄昏之时",
+      "note": "かたわれ時（黄昏之时）。后景盛放浓郁的珊瑚红与落日琥珀云海，金粉微光随夏末晚风缓漂。"
+    },
+    {
+      "at": 206.5,
+      "label": "第五幕 · 穿越黄昏",
+      "note": "副歌 2 双通道绯红与冰蓝组纽如时空交错般高速盘旋，直至 258.675s 戛然而止。"
+    },
+    {
+      "at": 258.675,
+      "label": "第六幕 · 真空静默",
+      "note": "长达 6.65 秒的绝对黑暗与静默，全场光影瞬间归零，屏息等待迪亚玛特。"
+    },
+    {
+      "at": 265.325,
+      "label": "第七幕 · 孤星迪亚玛特",
+      "note": "极高音星点落下。278s 与 305s 一颗孤独而巨大的迪亚玛特彗星无声滑过深空，318.9s 心跳低音蓄势冲顶。"
+    },
+    {
+      "at": 325.55,
+      "label": "第八幕 · 彗星分裂 · 初降流星雨",
+      "note": "5:25.55 最高音冲顶瞬间，迪亚玛特彗星在天顶一分为二！5:26.52 全曲首次释放璀璨划空流星雨，无任何遮挡弧线，纯净震撼。"
+    },
+    {
+      "at": 358.7,
+      "label": "第九幕 · 星落系守湖 · 晨光红线",
+      "note": "5:58.70 二次彗星分裂，终极惊喜「星落湖面」登场——流星碎片坠落琴周激起发光湖面涟漪与星光水花，与双向流星雨共振；6:18.82 巨响后喧嚣骤静，一缕绯红组纽缓缓升入晨曦云海。"
+    }
+  ],
+  "cues": [
+    {
+      "at": 1.675,
+      "method": "starfield",
+      "color": "#5E88FF",
+      "color2": "#D6EAFF",
+      "motion": "gentle",
+      "level": 30,
+      "scale": 100,
+      "fade": 2.6
+    },
+    {
+      "at": 1.675,
+      "method": "key_notes",
+      "color": "#D6EAFF",
+      "color2": "#68E4FF",
+      "brush": "note",
+      "motion": "gentle",
+      "level": 50,
+      "scale": 96,
+      "fade": 2.2
+    },
+    {
+      "at": 1.675,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#D6EAFF",
+      "color2": "#68E4FF",
+      "level": 80,
+      "scale": 100,
+      "fade": 0
+    },
+    {
+      "at": 25.0,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "color2": "#FF94B2",
+      "brush": "mote",
+      "motion": "gentle",
+      "level": 38,
+      "scale": 96,
+      "fade": 3.0
+    },
+    {
+      "at": 58.2,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "brush": "mote",
+      "level": 0,
+      "scale": 94,
+      "fade": 2.0
+    },
+    {
+      "at": 58.2,
+      "method": "key_notes",
+      "color": "#D6EAFF",
+      "brush": "note",
+      "level": 0,
+      "scale": 94,
+      "fade": 2.0
+    },
+    {
+      "at": 60.35,
+      "method": "twilight_mist",
+      "color": "#5E72C8",
+      "color2": "#9E7BFF",
+      "motion": "gentle",
+      "level": 44,
+      "scale": 102,
+      "fade": 3.2
+    },
+    {
+      "at": 60.35,
+      "method": "key_constellation",
+      "color": "#68E4FF",
+      "color2": "#FF7A9E",
+      "brush": "star",
+      "motion": "gentle",
+      "level": 52,
+      "scale": 98,
+      "fade": 2.4
+    },
+    {
+      "at": 60.35,
+      "method": "key_style",
+      "style": "blue_tears",
+      "color": "#68E4FF",
+      "color2": "#FF94B2",
+      "level": 84,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 91.5,
+      "method": "key_constellation",
+      "color": "#68E4FF",
+      "brush": "star",
+      "level": 0,
+      "scale": 96,
+      "fade": 1.2
+    },
+    {
+      "at": 92.725,
+      "method": "floor_sweep",
+      "color": "#FF5E7E",
+      "color2": "#68E4FF",
+      "level": 66,
+      "scale": 102
+    },
+    {
+      "at": 92.725,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "color2": "#68E4FF",
+      "brush": "mote",
+      "level": 74,
+      "scale": 104,
+      "fade": 1.8
+    },
+    {
+      "at": 92.725,
+      "method": "twilight_mist",
+      "color": "#9E7BFF",
+      "color2": "#FF7A9E",
+      "level": 58,
+      "scale": 106,
+      "fade": 2.2
+    },
+    {
+      "at": 92.725,
+      "method": "key_style",
+      "style": "magic_trail",
+      "color": "#68E4FF",
+      "color2": "#FF5E7E",
+      "level": 90,
+      "scale": 100,
+      "fade": 1.8
+    },
+    {
+      "at": 122.0,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "color2": "#FFE29A",
+      "brush": "star",
+      "motion": "intense",
+      "level": 82,
+      "scale": 108,
+      "fade": 2.4
+    },
+    {
+      "at": 146.5,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF7A9E",
+      "brush": "mote",
+      "level": 0,
+      "scale": 98,
+      "fade": 3.0
+    },
+    {
+      "at": 149.775,
+      "method": "starfield",
+      "color": "#9E7BFF",
+      "color2": "#FFB870",
+      "motion": "gentle",
+      "level": 24,
+      "scale": 98,
+      "fade": 2.4
+    },
+    {
+      "at": 150.25,
+      "method": "twilight_mist",
+      "color": "#FF6E8A",
+      "color2": "#FFAD66",
+      "motion": "gentle",
+      "level": 72,
+      "scale": 110,
+      "fade": 2.8
+    },
+    {
+      "at": 150.25,
+      "method": "dandelion_drift",
+      "color": "#FFE29A",
+      "color2": "#FF94B2",
+      "brush": "mote",
+      "motion": "gentle",
+      "level": 36,
+      "scale": 96,
+      "fade": 2.8
+    },
+    {
+      "at": 150.25,
+      "method": "key_notes",
+      "color": "#FFAD66",
+      "color2": "#FF6E8A",
+      "brush": "note",
+      "motion": "gentle",
+      "level": 56,
+      "scale": 98,
+      "fade": 2.2
+    },
+    {
+      "at": 150.25,
+      "method": "key_style",
+      "style": "sakura_drift",
+      "color": "#FF6E8A",
+      "color2": "#FFAD66",
+      "level": 86,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 185.0,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "color2": "#FFAD66",
+      "brush": "mote",
+      "level": 52,
+      "scale": 102,
+      "fade": 3.0
+    },
+    {
+      "at": 204.5,
+      "method": "dandelion_drift",
+      "color": "#FFE29A",
+      "brush": "mote",
+      "level": 0,
+      "scale": 96,
+      "fade": 1.8
+    },
+    {
+      "at": 204.5,
+      "method": "key_notes",
+      "color": "#FFAD66",
+      "brush": "note",
+      "level": 0,
+      "scale": 96,
+      "fade": 1.8
+    },
+    {
+      "at": 206.5,
+      "method": "shockwave",
+      "color": "#FF6E8A",
+      "color2": "#68E4FF",
+      "level": 72,
+      "scale": 106
+    },
+    {
+      "at": 206.5,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "brush": "star",
+      "motion": "intense",
+      "level": 82,
+      "scale": 108,
+      "fade": 1.6
+    },
+    {
+      "at": 206.5,
+      "method": "musubi_braid",
+      "slot": 1,
+      "color": "#FF5E7E",
+      "color2": "#FF94B2",
+      "brush": "mote",
+      "zone": "mid",
+      "level": 64,
+      "scale": 104,
+      "fade": 1.8
+    },
+    {
+      "at": 206.5,
+      "method": "twilight_mist",
+      "color": "#7E68D8",
+      "color2": "#FF6E8A",
+      "level": 62,
+      "scale": 108,
+      "fade": 1.8
+    },
+    {
+      "at": 206.5,
+      "method": "key_style",
+      "style": "magic_trail",
+      "color": "#68E4FF",
+      "color2": "#FF5E7E",
+      "level": 92,
+      "scale": 100,
+      "fade": 1.6
+    },
+    {
+      "at": 258.675,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#68E4FF",
+      "brush": "star",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.8
+    },
+    {
+      "at": 258.675,
+      "method": "musubi_braid",
+      "slot": 1,
+      "color": "#FF5E7E",
+      "brush": "mote",
+      "zone": "mid",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.8
+    },
+    {
+      "at": 258.675,
+      "method": "twilight_mist",
+      "color": "#5E72C8",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.9
+    },
+    {
+      "at": 258.675,
+      "method": "starfield",
+      "color": "#5E88FF",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.9
+    },
+    {
+      "at": 258.675,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#D6EAFF",
+      "level": 0,
+      "scale": 100,
+      "fade": 0.8
+    },
+    {
+      "at": 265.325,
+      "method": "starfield",
+      "color": "#5E88FF",
+      "color2": "#D6EAFF",
+      "motion": "gentle",
+      "level": 24,
+      "scale": 98,
+      "fade": 3.0
+    },
+    {
+      "at": 265.325,
+      "method": "key_notes",
+      "color": "#F7FAFF",
+      "color2": "#68E4FF",
+      "brush": "snow",
+      "motion": "gentle",
+      "level": 46,
+      "scale": 94,
+      "fade": 2.6
+    },
+    {
+      "at": 265.325,
+      "method": "key_style",
+      "style": "snow",
+      "color": "#F7FAFF",
+      "color2": "#68E4FF",
+      "level": 80,
+      "scale": 100,
+      "fade": 2.4
+    },
+    {
+      "at": 278.0,
+      "method": "comet_split",
+      "color": "#68E4FF",
+      "color2": "#D6EAFF",
+      "brush": "star",
+      "zone": "high",
+      "motion": "gentle",
+      "level": 76,
+      "scale": 110
+    },
+    {
+      "at": 305.0,
+      "method": "comet_split",
+      "color": "#68E4FF",
+      "color2": "#FF94B2",
+      "brush": "star",
+      "zone": "high",
+      "motion": "gentle",
+      "level": 86,
+      "scale": 116
+    },
+    {
+      "at": 318.925,
+      "method": "twilight_mist",
+      "color": "#4E68C8",
+      "color2": "#9E7BFF",
+      "level": 46,
+      "scale": 108,
+      "fade": 3.4
+    },
+    {
+      "at": 318.925,
+      "method": "starfield",
+      "color": "#68E4FF",
+      "color2": "#FFF4DC",
+      "level": 52,
+      "scale": 110,
+      "fade": 3.2
+    },
+    {
+      "at": 318.925,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "level": 94,
+      "scale": 100,
+      "fade": 2.6
+    },
+    {
+      "at": 324.2,
+      "method": "key_notes",
+      "color": "#FFF4DC",
+      "brush": "snow",
+      "level": 0,
+      "scale": 96,
+      "fade": 1.1
+    },
+    {
+      "at": 325.55,
+      "method": "comet_split",
+      "color": "#68E4FF",
+      "color2": "#FF6E8A",
+      "brush": "star",
+      "zone": "high",
+      "motion": "normal",
+      "level": 96,
+      "scale": 122
+    },
+    {
+      "at": 326.525,
+      "method": "shockwave",
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "level": 86,
+      "scale": 112
+    },
+    {
+      "at": 326.525,
+      "method": "meteor_shower",
+      "slot": 0,
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "brush": "star",
+      "zone": "high",
+      "motion": "normal",
+      "level": 86,
+      "scale": 112,
+      "fade": 0.9
+    },
+    {
+      "at": 326.525,
+      "method": "twilight_mist",
+      "color": "#7E68D8",
+      "color2": "#FF6E8A",
+      "level": 56,
+      "scale": 112,
+      "fade": 1.4
+    },
+    {
+      "at": 326.525,
+      "method": "key_style",
+      "style": "prism_shards",
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "level": 98,
+      "scale": 100,
+      "fade": 1.0
+    },
+    {
+      "at": 341.0,
+      "method": "meteor_shower",
+      "slot": 0,
+      "color": "#68E4FF",
+      "color2": "#FF6E8A",
+      "brush": "star",
+      "zone": "high",
+      "motion": "intense",
+      "level": 92,
+      "scale": 116,
+      "fade": 1.4
+    },
+    {
+      "at": 341.0,
+      "method": "comet_split",
+      "color": "#78C8FF",
+      "color2": "#FFE29A",
+      "brush": "star",
+      "zone": "high",
+      "motion": "reverse",
+      "level": 88,
+      "scale": 114
+    },
+    {
+      "at": 358.7,
+      "method": "comet_split",
+      "color": "#68E4FF",
+      "color2": "#FF6E8A",
+      "brush": "star",
+      "zone": "high",
+      "motion": "intense",
+      "level": 100,
+      "scale": 126
+    },
+    {
+      "at": 358.7,
+      "method": "shockwave",
+      "color": "#FFE29A",
+      "color2": "#68E4FF",
+      "level": 90,
+      "scale": 114
+    },
+    {
+      "at": 358.7,
+      "method": "starfall_impact",
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "brush": "star",
+      "level": 90,
+      "scale": 110,
+      "fade": 1.0
+    },
+    {
+      "at": 358.7,
+      "method": "meteor_shower",
+      "slot": 1,
+      "color": "#FF6E8A",
+      "color2": "#FFF4DC",
+      "brush": "star",
+      "zone": "high",
+      "motion": "reverse",
+      "level": 80,
+      "scale": 110,
+      "fade": 1.2
+    },
+    {
+      "at": 358.7,
+      "method": "starfield",
+      "color": "#68E4FF",
+      "color2": "#FFE29A",
+      "level": 28,
+      "scale": 104,
+      "fade": 1.2
+    },
+    {
+      "at": 358.7,
+      "method": "key_style",
+      "style": "magic_trail",
+      "color": "#FFE29A",
+      "color2": "#68E4FF",
+      "level": 100,
+      "scale": 100,
+      "fade": 1.0
+    },
+    {
+      "at": 378.825,
+      "method": "shockwave",
+      "color": "#FFE29A",
+      "color2": "#FFF4DC",
+      "level": 84,
+      "scale": 114
+    },
+    {
+      "at": 378.825,
+      "method": "starfall_impact",
+      "color": "#FFE29A",
+      "brush": "star",
+      "level": 0,
+      "scale": 100,
+      "fade": 1.6
+    },
+    {
+      "at": 378.825,
+      "method": "meteor_shower",
+      "slot": 0,
+      "color": "#D6EAFF",
+      "brush": "star",
+      "zone": "high",
+      "level": 0,
+      "scale": 100,
+      "fade": 1.8
+    },
+    {
+      "at": 378.825,
+      "method": "meteor_shower",
+      "slot": 1,
+      "color": "#FF94B2",
+      "brush": "star",
+      "zone": "high",
+      "motion": "reverse",
+      "level": 0,
+      "scale": 100,
+      "fade": 1.6
+    },
+    {
+      "at": 379.5,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "color2": "#FFE29A",
+      "brush": "mote",
+      "motion": "reverse",
+      "level": 64,
+      "scale": 100,
+      "fade": 1.2
+    },
+    {
+      "at": 379.5,
+      "method": "twilight_mist",
+      "color": "#FF94B2",
+      "color2": "#FFE29A",
+      "motion": "gentle",
+      "level": 48,
+      "scale": 104,
+      "fade": 1.8
+    },
+    {
+      "at": 379.5,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#FF94B2",
+      "color2": "#FFE29A",
+      "level": 78,
+      "scale": 100,
+      "fade": 1.4
+    },
+    {
+      "at": 381.4,
+      "method": "musubi_braid",
+      "slot": 0,
+      "color": "#FF5E7E",
+      "brush": "mote",
+      "motion": "reverse",
+      "level": 0,
+      "scale": 96,
+      "fade": 2.8
+    },
+    {
+      "at": 381.4,
+      "method": "twilight_mist",
+      "color": "#FFE29A",
+      "motion": "gentle",
+      "level": 0,
+      "scale": 100,
+      "fade": 2.9
+    },
+    {
+      "at": 381.4,
+      "method": "starfield",
+      "color": "#D6EAFF",
+      "motion": "gentle",
+      "level": 0,
+      "scale": 96,
+      "fade": 2.9
+    },
+    {
+      "at": 381.4,
+      "method": "key_style",
+      "style": "stardust",
+      "color": "#FFE29A",
+      "level": 0,
+      "scale": 100,
+      "fade": 2.9
+    }
+  ]
+}

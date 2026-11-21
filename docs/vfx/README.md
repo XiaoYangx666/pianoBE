@@ -26,26 +26,29 @@ npm run build
 
 在 `/vfx-lab` 的音乐片段里选「Secret · 时门」，按播放从头观看，或用乐段按钮定位。基岩版用钢琴的常规曲库搜索「周杰伦 - Secret」并播放，曲目会自动启动演出。对准钢琴运行 `/scriptevent pbe:vfx status` 可查看发射和预算。
 
-[编排源文件](../../midis/performances/e1563b03.json)中的 `sections` 是段落与观察目标，`cues` 按秒填写，最小步长为 0.025 秒。`method` 指定 25 种内置粒子绘制方法之一（见下文，含 `key_style` 弹奏粒子样式通道），可选 `slot`（`0..7` 允许同方法多通道并行叠加）、主色 `color`、渐变副色 `color2`、笔刷 `brush`（`default`/`mote`/`star`/`petal`/`snow`/`note`/`shard`/`spark`/`ring`）、高度区域 `zone`（`stage`/`low`/`mid`/`high`）与运动修饰 `motion`（`normal`/`reverse`/`intense`/`gentle`）。`level` 是强度百分比，`scale` 是缩放百分比。持续提示用 `fade` 填入渐变秒数，瞬时绘制方法或显式 `"op": "flash"` 触发一次性爆发。
+[编排源文件](../../midis/performances/e1563b03.json)中的 `sections` 是段落与观察目标，`cues` 按秒填写，最小步长为 0.025 秒。`method` 指定 33 种内置粒子绘制方法之一（见下文，含 `key_style` 弹奏粒子样式通道），可选 `slot`（`0..7` 允许同方法多通道并行叠加）、主色 `color`、渐变副色 `color2`、笔刷 `brush`（`default`/`mote`/`star`/`petal`/`snow`/`note`/`shard`/`spark`/`ring`/`blossom`）、高度区域 `zone`（`stage`/`low`/`mid`/`high`）与运动修饰 `motion`（`normal`/`reverse`/`intense`/`gentle`）。`level` 是强度百分比，`scale` 是缩放百分比。持续提示用 `fade` 填入渐变秒数，瞬时绘制方法或显式 `"op": "flash"` 触发一次性爆发。
 
-示例曲目《Secret · 时门》在各幕同步编排了舞台特效与 `key_style` 弹奏粒子过渡（从星火、蓝眼泪、魔法流光、雪晶到棱光晶片并在尾声释放恢复默认）。
+已内置定制编排曲目：
+- `e1563b03`（[《Secret · 时门》](../../midis/performances/e1563b03.json)）：周杰伦 - Secret
+- `c8159589`（[《secret base · 夏末花火》](../../midis/performances/c8159589.json)）：Animenz secret base（未闻花名主题曲，9 幕）
+- `b0cae095`（[《火花 · 迪亚玛特之夜》](../../midis/performances/b0cae095.json)）：Animenz - 火花（你的名字。主题曲，9 幕）
 
 ```powershell
 npm run build:core
 npm run export:performance
 ```
 
-导出改写 `midis/library/e1563b03.pbe3` 及曲库字节数，有本地内嵌模块时同时更新 `midis/js`。后续曲目可在 `midis/performances/<曲库 ID>.json` 中自由组合 25 种内置绘制方法，并用 `npm run export:performance -- <曲库 ID>` 导出。
+导出改写 `midis/library/<曲库 ID>.pbe3` 及曲库字节数，有本地内嵌模块时同时更新 `midis/js`。后续曲目可在 `midis/performances/<曲库 ID>.json` 中自由组合 33 种内置绘制方法，并用 `npm run export:performance -- <曲库 ID>` 导出。
 
-### 25 种内置绘制方法
+### 33 种内置绘制方法
 
 | 分类 | 绘制方法（`method`） | 表现与特性 |
 | --- | --- | --- |
-| 氛围（`atmosphere`） | `starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain` | Bokeh 星尘雾海、双侧飘落花瓣/雪花、地面升腾流萤、极光天幕、双翼光幕 |
-| 曲线（`curve`） | `wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave` | 双翼 Catmull-Rom 丝带、双螺旋星轨、倾斜行星环、穿场丝带、律动音浪环、旋涡漏斗、3D 利萨如织光 |
-| 舞台（`stage`） | `light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch` | 霓虹灯柱阵、圣光扇束冠冕、门架光框、旋转六芒星辰法阵、时空光拱门 |
+| 氛围（`atmosphere`） | `starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain`、`dandelion_drift`、`meteor_shower`、`twilight_mist` | Bokeh 星尘雾海、双侧飘落花瓣/雪花、地面升腾流萤、极光天幕、双翼光幕、夏风白絮/晨光升散（`blossom`）、新海诚式羽状划空流星雨（`draw_comet`）、黄昏云海（`draw_cloud`） |
+| 曲线（`curve`） | `wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave`、`musubi_braid` | 双翼 Catmull-Rom 丝带、双螺旋星轨、倾斜行星环、穿场丝带、律动音浪环、旋涡漏斗、3D 利萨如织光、双股交织绯红组纽 |
+| 舞台（`stage`） | `light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch`、`horizon_glow`、`starfall_impact` | 霓虹灯柱阵、圣光扇束冠冕、门架光框、旋转六芒星辰法阵、时空光拱门、暮色天际光幕、星落湖面（俯冲流星 + 湖面涟漪 + 星光水花） |
 | 琴键（`keys`） | `key_notes`、`key_fountain`、`key_constellation`、`key_style` | 实时琴键飞音符、琴键重力音泉喷涌、活跃音符星座连线；`key_style` 用于在演出中动态替换/渐变弹奏粒子样式与配色（`style` 别名或 `brush`/`motion`，`level: 0` 恢复默认） |
-| 瞬时（`accent`） | `floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom` | 地面彗星扫光弧、双环扩散冲击波、棱晶回卷（`reverse` 为向外裂变）、高空重力烟花盛放 |
+| 瞬时（`accent`） | `floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom`、`hanabi_launch`、`comet_split` | 地面彗星扫光弧、双环扩散冲击波、棱晶回卷（`reverse` 为向外裂变）、高空重力烟花盛放、龙势火箭升空、迪亚玛特彗星滑行与天顶裂变（`draw_comet`） |
 
 ### 验收记录
 

@@ -66,13 +66,13 @@ test("seeking into an in-flight transition reconstructs intensity, scale, dual R
     expect(player.update(8, quietFeatures)).toEqual([]);
 });
 
-test("all 25 built-in performance methods emit valid finite parameters and declared particle variables", () => {
+test("all 33 built-in performance methods emit valid finite parameters and declared particle variables", () => {
     const methods = Object.keys(PERFORMANCE_METHODS) as PerformanceMethod[];
-    const brushes: PerformanceBrush[] = ["default", "mote", "star", "petal", "snow", "note", "shard", "spark", "ring"];
+    const brushes: PerformanceBrush[] = ["default", "mote", "star", "petal", "snow", "note", "shard", "spark", "ring", "blossom"];
     const zones = Object.keys(PERFORMANCE_ZONES) as PerformanceZone[];
     const motions = Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[];
-    expect(methods).toHaveLength(25);
-    expect(Object.keys(VFX_PAINTERS)).toHaveLength(25);
+    expect(methods).toHaveLength(33);
+    expect(Object.keys(VFX_PAINTERS)).toHaveLength(33);
 
     const recentNotes = [
         { midi: 36, velocity: 0.78, duration: 1.2, tick: 10 },
@@ -291,6 +291,167 @@ test("four staggered Secret performances complete within dispatch and particle b
         expect(piano.planes).toBeGreaterThan(10);
         expect(piano.shards).toBeGreaterThanOrEqual(24);
         expect(piano.fountains).toBeGreaterThanOrEqual(2);
+        expect(piano.budget.dropped).toBe(0);
+        expect(piano.budget.reserved).toBe(0);
+    }
+});
+
+test("Animenz secret base performance completes within dispatch and particle budgets with zero drops", () => {
+    const data = readFileSync(new URL("../../../midis/library/c8159589.pbe3", import.meta.url));
+    const { duration, performance } = readSongHeader(data);
+    expect(performance).toBeDefined();
+    expect(performance!.length).toBeGreaterThanOrEqual(90);
+
+    const notes = new Map<number, ReturnType<typeof songToNoteEvents>>();
+    for (const note of songToNoteEvents(data)) {
+        const tick = Math.round(note.time * 20);
+        const list = notes.get(tick) ?? [];
+        list.push(note);
+        notes.set(tick, list);
+    }
+
+    const seconds = duration / TIME_SCALE;
+    const pianos = [0, 7, 19, 31].map((start, index) => ({
+        start,
+        music: new VfxMusic(),
+        player: new VfxPerformancePlayer(performance!, seconds, index % 2 === 0 ? grandDefinition : pianoDefinition),
+        budget: new VfxBudget(),
+        strokes: 0,
+        points: 0,
+    }));
+
+    let peakReserved = 0;
+    let peakCalls = 0;
+    for (let tick = 0; tick < seconds * 20 + 200; tick++) {
+        let totalCalls = 0;
+        for (const piano of pianos) {
+            const elapsed = tick - piano.start;
+            piano.budget.expire(tick);
+            if (elapsed < 0) continue;
+            for (const note of notes.get(elapsed) ?? []) {
+                piano.music.note({
+                    midi: note.midi,
+                    duration: note.duration,
+                    tick,
+                    velocity: Math.round(note.velocity * 127),
+                    source: "midi",
+                    hasVelocity: true,
+                    songTime: note.time,
+                });
+            }
+            const features = elapsed % 4 === 0 ? piano.music.sample(tick) : quietFeatures;
+            piano.budget.enqueue(piano.player.update(elapsed / 20, features, true, piano.music.recent()));
+            let count = 0;
+            piano.budget.dispatch(tick, emitter => {
+                count++;
+                const name = emitter.particle ?? emitter.effect;
+                if (name === "draw_stroke") piano.strokes++;
+                if (name === "draw_point") piano.points++;
+            });
+            expect(count).toBeLessThanOrEqual(VFX_EMITTERS_PER_TICK);
+            totalCalls += count;
+            peakReserved = Math.max(peakReserved, piano.budget.reserved);
+        }
+        peakCalls = Math.max(peakCalls, totalCalls);
+    }
+
+    expect(peakCalls).toBeLessThanOrEqual(VFX_MAX_PIANOS * VFX_EMITTERS_PER_TICK);
+    expect(peakReserved).toBeLessThanOrEqual(VFX_PARTICLES_PER_PIANO);
+    for (const piano of pianos) {
+        expect(piano.player.keyParticleOverride(5)?.style).toBe("stardust");
+        expect(piano.player.keyParticleOverride(40)?.style).toBe("blue_tears");
+        expect(piano.player.keyParticleOverride(102)?.style).toBe("snow");
+        expect(piano.player.keyParticleOverride(132)?.style).toBe("sakura_drift");
+        expect(piano.player.keyParticleOverride(172)?.style).toBe("magic_trail");
+        expect(piano.player.keyParticleOverride(205)?.style).toBe("stardust");
+        expect(piano.player.keyParticleOverride(236)?.style).toBe("prism_shards");
+        expect(piano.player.keyParticleOverride(295)?.style).toBe("stardust");
+        expect(piano.player.keyParticleOverride(316.5)).toBeUndefined();
+        expect(piano.strokes).toBeGreaterThan(800);
+        expect(piano.points).toBeGreaterThan(400);
+        expect(piano.budget.dropped).toBe(0);
+        expect(piano.budget.reserved).toBe(0);
+    }
+});
+
+test("Animenz Sparkle performance completes within dispatch and particle budgets with zero drops", () => {
+    const data = readFileSync(new URL("../../../midis/library/b0cae095.pbe3", import.meta.url));
+    const { duration, performance } = readSongHeader(data);
+    expect(performance).toBeDefined();
+    expect(performance!.length).toBeGreaterThanOrEqual(60);
+
+    const notes = new Map<number, ReturnType<typeof songToNoteEvents>>();
+    for (const note of songToNoteEvents(data)) {
+        const tick = Math.round(note.time * 20);
+        const list = notes.get(tick) ?? [];
+        list.push(note);
+        notes.set(tick, list);
+    }
+
+    const seconds = duration / TIME_SCALE;
+    const pianos = [0, 7, 19, 31].map((start, index) => ({
+        start,
+        music: new VfxMusic(),
+        player: new VfxPerformancePlayer(performance!, seconds, index % 2 === 0 ? grandDefinition : pianoDefinition),
+        budget: new VfxBudget(),
+        strokes: 0,
+        points: 0,
+        clouds: 0,
+        comets: 0,
+    }));
+
+    let peakReserved = 0;
+    let peakCalls = 0;
+    for (let tick = 0; tick < seconds * 20 + 200; tick++) {
+        let totalCalls = 0;
+        for (const piano of pianos) {
+            const elapsed = tick - piano.start;
+            piano.budget.expire(tick);
+            if (elapsed < 0) continue;
+            for (const note of notes.get(elapsed) ?? []) {
+                piano.music.note({
+                    midi: note.midi,
+                    duration: note.duration,
+                    tick,
+                    velocity: Math.round(note.velocity * 127),
+                    source: "midi",
+                    hasVelocity: true,
+                    songTime: note.time,
+                });
+            }
+            const features = elapsed % 4 === 0 ? piano.music.sample(tick) : quietFeatures;
+            piano.budget.enqueue(piano.player.update(elapsed / 20, features, true, piano.music.recent()));
+            let count = 0;
+            piano.budget.dispatch(tick, emitter => {
+                count++;
+                const name = emitter.particle ?? emitter.effect;
+                if (name === "draw_stroke") piano.strokes++;
+                if (name === "draw_point") piano.points++;
+                if (name === "draw_cloud") piano.clouds++;
+                if (name === "draw_comet") piano.comets++;
+            });
+            expect(count).toBeLessThanOrEqual(VFX_EMITTERS_PER_TICK);
+            totalCalls += count;
+            peakReserved = Math.max(peakReserved, piano.budget.reserved);
+        }
+        peakCalls = Math.max(peakCalls, totalCalls);
+    }
+
+    expect(peakCalls).toBeLessThanOrEqual(VFX_MAX_PIANOS * VFX_EMITTERS_PER_TICK);
+    expect(peakReserved).toBeLessThanOrEqual(VFX_PARTICLES_PER_PIANO);
+    for (const piano of pianos) {
+        expect(piano.player.keyParticleOverride(5)?.style).toBe("stardust");
+        expect(piano.player.keyParticleOverride(70)?.style).toBe("blue_tears");
+        expect(piano.player.keyParticleOverride(105)?.style).toBe("magic_trail");
+        expect(piano.player.keyParticleOverride(160)?.style).toBe("sakura_drift");
+        expect(piano.player.keyParticleOverride(262)).toBeUndefined();
+        expect(piano.player.keyParticleOverride(272)?.style).toBe("snow");
+        expect(piano.player.keyParticleOverride(332)?.style).toBe("prism_shards");
+        expect(piano.player.keyParticleOverride(366)?.style).toBe("magic_trail");
+        expect(piano.player.keyParticleOverride(384.4)).toBeUndefined();
+        expect(piano.clouds).toBeGreaterThan(200);
+        expect(piano.comets).toBeGreaterThan(150);
+        expect(piano.points).toBeGreaterThan(600);
         expect(piano.budget.dropped).toBe(0);
         expect(piano.budget.reserved).toBe(0);
     }
