@@ -4,12 +4,13 @@ import Wintersky from "wintersky";
 import type { Config, Emitter } from "wintersky";
 import type Molang from "molangjs";
 import atlasUrl from "@piano/vfx/assets/textures/particle/vfx_lab.png";
+import pianoFxUrl from "@piano/vfx/assets/textures/particle/piano_fx.png";
 import type { VfxParticle } from "@piano/vfx";
 
 type Expression = number | string;
 interface Definition {
     particle_effect: {
-        description: { identifier: string };
+        description: { identifier: string; basic_render_parameters: { texture: string } };
         components: {
             "minecraft:particle_initial_speed"?: [Expression, Expression, Expression] | Expression;
         };
@@ -38,9 +39,16 @@ export const particleStep = 1 / stepRate;
 
 export async function loadParticles() {
     const loader = new TextureLoader();
-    const texture = await loader.loadAsync(atlasUrl);
-    texture.magFilter = LinearFilter;
-    texture.minFilter = LinearFilter;
+    const [texture, pianoFxTexture] = await Promise.all([
+        loader.loadAsync(atlasUrl),
+        loader.loadAsync(pianoFxUrl),
+    ]);
+    for (const loaded of [texture, pianoFxTexture]) {
+        loaded.magFilter = LinearFilter;
+        loaded.minFilter = LinearFilter;
+    }
+    const textureFor = (doc: Definition) =>
+        doc.particle_effect.description.basic_render_parameters.texture.includes("piano_fx") ? pianoFxTexture : texture;
     const scene = new Wintersky.Scene();
     scene.global_options.tick_rate = stepRate;
     scene.global_options.ground_collision = false;
@@ -59,7 +67,7 @@ export async function loadParticles() {
                 `((${expr}) * (${expr}))`).join(" + ")})`;
         }
         const particle = identifier.slice("pbe:vfx_".length) as VfxParticle;
-        config.texture = texture;
+        config.texture = textureFor(doc);
         // The built-in steady scheduler rounds 1/rate to whole ticks. Integrate the authored rate here.
         if (config.emitter_rate_mode === "steady") {
             rates.set(particle, config.emitter_rate_rate);
@@ -140,6 +148,6 @@ export async function loadParticles() {
         },
         face(camera: Camera) { scene.updateFacingRotation(camera); },
         reset,
-        dispose() { reset(); texture.dispose(); },
+        dispose() { reset(); texture.dispose(); pianoFxTexture.dispose(); },
     };
 }

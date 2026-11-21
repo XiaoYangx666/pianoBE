@@ -38,13 +38,13 @@ export function buildParticleDocuments(manifest) {
     const point = { offset: [0, 0, 0] };
 
     const docs = [];
-    function particle(name, components, material = "particles_add") {
+    function particle(name, components, material = "particles_add", textureOverride = texture) {
         const document = {
             format_version: "1.10.0",
             particle_effect: {
                 description: {
                     identifier: `pbe:vfx_${name}`,
-                    basic_render_parameters: { material, texture },
+                    basic_render_parameters: { material, texture: textureOverride },
                 },
                 components,
             },
@@ -408,6 +408,46 @@ export function buildParticleDocuments(manifest) {
         },
     });
 
+    // Original "magic trail": dedicated additive comet sprite with a long fading
+    // tail, exactly as authored before the shared-atlas refactor.
+    const trailProgress = saturate(`${age} / math.max(0.01, variable.particle_lifetime)`);
+    particle("magic_trail", {
+        "minecraft:emitter_rate_instant": { num_particles: 1 },
+        "minecraft:emitter_lifetime_once": { active_time: 0.68 },
+        "minecraft:emitter_shape_point": {
+            direction: [0, 1, 0],
+        },
+        "minecraft:particle_lifetime_expression": {
+            max_lifetime: 0.62,
+        },
+        "minecraft:particle_appearance_billboard": {
+            facing_camera_mode: "rotate_y",
+            size: [
+                `0.08 * (1 - 0.45 * ${trailProgress})`,
+                `0.015 + 0.16 * math.sin(140 * ${trailProgress})`,
+            ],
+            uv: {
+                texture_width: 256,
+                texture_height: 128,
+                uv: [128, 0],
+                uv_size: [64, 64],
+            },
+        },
+        "minecraft:particle_appearance_tinting": {
+            color: [
+                param("red", 0.39),
+                param("green", 0.86),
+                param("blue", 0.95),
+                `math.pow(1 - ${trailProgress}, 0.68)`,
+            ],
+        },
+        "minecraft:particle_initial_speed": 1.35,
+        "minecraft:particle_motion_dynamic": {
+            linear_acceleration: [0, 0.16, 0],
+            linear_drag_coefficient: 1.05,
+        },
+    }, "particles_add", "textures/particle/piano_fx");
+
     // Normal-blended drifting petal / snow with an always-facing billboard.
     const driftProgress = saturate(`${age} / math.max(0.01, variable.particle_lifetime)`);
     const driftWidth = scaled(`math.lerp(${param("size", 0.058)}, ${param("size_end", 0.042)}, ${driftProgress}) * (1 + ${param("size_jitter", 0.3)} * (2 * ${random(4)} - 1))`);
@@ -451,6 +491,54 @@ export function buildParticleDocuments(manifest) {
             ],
         },
     }, "particles_blend");
+
+    // Original "blue tears" bubble: dedicated additive blob sprite with stochastic
+    // launch speed and drag. The whole timeline is stretched by `tearStretch` so the
+    // first half of the path takes longer without making the end faster: velocity,
+    // acceleration and drag scale together, leaving the trajectory and total
+    // distance exactly the same.
+    const tearStretch = 1.2;
+    const tearVelocity = (value) => (value / tearStretch).toFixed(4);
+    const tearProgress = saturate(`${age} / math.max(0.01, variable.particle_lifetime)`);
+    const tearSize = `(0.024 + 0.052 * ${random(2)}) * (1 - 0.42 * ${tearProgress})`;
+    particle("key_blue_tears", {
+        "minecraft:emitter_rate_instant": { num_particles: 5 },
+        "minecraft:emitter_lifetime_once": { active_time: 0.72 },
+        "minecraft:emitter_shape_point": {
+            direction: ["math.random(-0.10, 0.10)", 1, "math.random(-0.10, 0.10)"],
+        },
+        "minecraft:particle_initial_spin": {
+            rotation: "math.random(0, 180)",
+            rotation_rate: `math.random(${tearVelocity(-36)}, ${tearVelocity(36)})`,
+        },
+        "minecraft:particle_lifetime_expression": {
+            max_lifetime: `math.random(${(0.35 * tearStretch).toFixed(3)}, ${(0.67 * tearStretch).toFixed(3)})`,
+        },
+        "minecraft:particle_appearance_billboard": {
+            facing_camera_mode: "lookat_xyz",
+            size: [tearSize, tearSize],
+            uv: {
+                texture_width: 256,
+                texture_height: 128,
+                uv: [0, 64],
+                uv_size: [64, 64],
+            },
+        },
+        "minecraft:particle_appearance_tinting": {
+            color: [
+                param("red", 0.39),
+                param("green", 0.86),
+                param("blue", 0.95),
+                `math.pow(1 - (${tearProgress}), 0.85) * (0.6 + 0.4 * ${random(3)})`,
+            ],
+        },
+        "minecraft:particle_initial_speed": `math.random(${tearVelocity(0.9)}, ${tearVelocity(2.2)})`,
+        "minecraft:particle_motion_dynamic": {
+            linear_acceleration: [0, 0.34 / (tearStretch * tearStretch), 0],
+            linear_drag_coefficient: 0.95 / tearStretch,
+            rotation_drag_coefficient: 1.1 / tearStretch,
+        },
+    }, "particles_add", "textures/particle/piano_fx");
 
     const maxStrokeBrush = strokeBrushes.length - 1;
     const strokeLen = scaled(`math.lerp(${param("length", 0.3)}, ${param("length_end", 0.3)}, ${drawAge})`);

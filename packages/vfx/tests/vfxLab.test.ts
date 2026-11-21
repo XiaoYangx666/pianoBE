@@ -31,6 +31,8 @@ const ALL_VFX_PARTICLES: readonly VfxParticle[] = [
     "draw_comet",
     "key_stream",
     "key_drift",
+    "key_blue_tears",
+    "magic_trail",
     "dust",
     "shock",
 ];
@@ -41,6 +43,14 @@ test("single vfx_lab atlas and MER textures match declared dimensions without se
     expect(existsSync(new URL("textures/particle/secret_cinema.texture_set.json", resource))).toBe(false);
     expect(existsSync(new URL("particles/pbe_vfx_cinema_dust.particle.json", resource))).toBe(false);
     expect(existsSync(new URL("particles/pbe_vfx_cinema_shock.particle.json", resource))).toBe(false);
+    expect(existsSync(new URL("textures/particle/piano_fx.png", resource))).toBe(true);
+    const pianoFxMer = readFileSync(new URL("textures/particle/piano_fx_mer.png", resource));
+    expect([pianoFxMer.readUInt32BE(16), pianoFxMer.readUInt32BE(20)]).toEqual([256, 128]);
+    const pianoFxSet = JSON.parse(readFileSync(new URL("textures/particle/piano_fx.texture_set.json", resource), "utf8"));
+    expect(pianoFxSet["minecraft:texture_set"]).toEqual({
+        color: "piano_fx",
+        metalness_emissive_roughness: "piano_fx_mer",
+    });
 
     const atlas = readFileSync(new URL("textures/particle/vfx_lab.png", resource));
     expect(atlas.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
@@ -62,16 +72,21 @@ test("single vfx_lab atlas and MER textures match declared dimensions without se
     expect(green(0, 48)).toBe(0);
 });
 
-test("all 19 pbe_vfx particle definitions use vfx_lab 1024x1024 atlas and clean Molang variables", () => {
+test("all 21 pbe_vfx particle definitions use declared textures and clean Molang variables", () => {
     const resource = new URL("../assets/", import.meta.url);
     for (const particle of ALL_VFX_PARTICLES) {
         const source = readFileSync(new URL(`particles/pbe_vfx_${particle}.particle.json`, resource), "utf8");
         const doc = JSON.parse(source).particle_effect;
+        const pianoFx = particle === "key_blue_tears" || particle === "magic_trail";
         expect(doc.description.identifier).toBe(`pbe:vfx_${particle}`);
-        expect(doc.description.basic_render_parameters.texture).toBe(VFX_ATLAS.texture);
+        expect(doc.description.basic_render_parameters.texture).toBe(
+            pianoFx ? "textures/particle/piano_fx" : VFX_ATLAS.texture,
+        );
         const billboard = doc.components["minecraft:particle_appearance_billboard"];
         const uv = billboard.uv;
-        expect([uv.texture_width, uv.texture_height]).toEqual([VFX_ATLAS.width, VFX_ATLAS.height]);
+        expect([uv.texture_width, uv.texture_height]).toEqual(
+            pianoFx ? [256, 128] : [VFX_ATLAS.width, VFX_ATLAS.height],
+        );
 
         if (particle === "beam" || particle === "shaft" || particle === "draw_stroke" || particle === "draw_comet") {
             expect(billboard.direction.mode).toBe("custom");
@@ -102,6 +117,10 @@ test("all 19 pbe_vfx particle definitions use vfx_lab 1024x1024 atlas and clean 
         if (particle === "draw_plane") {
             expect(billboard.facing_camera_mode).toBe("emitter_transform_xz");
         }
+        const dynamic = doc.components["minecraft:particle_motion_dynamic"];
+        if (dynamic?.linear_acceleration) expect(dynamic.linear_acceleration).toHaveLength(3);
+        const parametric = doc.components["minecraft:particle_motion_parametric"];
+        if (parametric?.relative_position) expect(parametric.relative_position).toHaveLength(3);
         for (const match of source.matchAll(/variable\.(?!vfx_)(\w+)/g)) {
             expect(/^(particle_age|particle_lifetime|particle_random_[1-4])$/.test(match[1])).toBe(true);
         }

@@ -28,7 +28,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
         const resolved = resolveKeyParticle(21, baseSettings, right);
         expect(resolved.overridden).toBe(false);
         expect(resolved.style).toBe("magic_trail");
-        expect(resolved.emitters[0].particle).toBe("key_stream");
+        expect(resolved.emitters[0].particle).toBe("magic_trail");
         expect(resolved.emitters[0].variables.brush).toBe(POINT_BRUSH_INDEX.spark);
         expect(resolved.glimmer).toBe(true);
         expect(resolved.colors).toEqual(PIANO_PARTICLE_PALETTES[0].colors);
@@ -57,7 +57,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
             });
             expect(resolved.overridden).toBe(true);
             expect(resolved.style).toBe(option.style);
-            expect(resolved.emitters[0].particle).toBe(particles[definition.render]);
+            expect(resolved.emitters[0].particle).toBe(definition.particle ?? particles[definition.render]);
             expect(resolved.emitters[0].variables.brush).toBe(POINT_BRUSH_INDEX[definition.brush]);
             expect(resolved.color.red).toBeCloseTo(43 / 87, 2);
         }

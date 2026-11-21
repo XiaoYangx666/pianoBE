@@ -33,6 +33,8 @@ export type VfxParticle =
     | "draw_comet"
     | "key_stream"
     | "key_drift"
+    | "key_blue_tears"
+    | "magic_trail"
     | "dust"
     | "shock";
 

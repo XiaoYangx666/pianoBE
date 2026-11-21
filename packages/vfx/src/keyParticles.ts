@@ -81,6 +81,8 @@ interface RenderStyle {
     /** Stable numeric value persisted in piano settings; undefined for cue-only styles. */
     value?: number;
     render: "point" | "stream" | "drift";
+    /** Optional dedicated particle document overriding the render primitive. */
+    particle?: VfxParticle;
     brush: PointBrushId;
     alpha: number;
     color: KeyParticleColor;
@@ -110,19 +112,21 @@ export const KEY_PARTICLE_STYLES = {
         label: "魔法流光",
         value: 3,
         render: "stream",
+        particle: "magic_trail",
         brush: "spark",
         alpha: 0.92,
         color: { mode: "free" },
         draw: {
-            count: 1, life: 0.62, size: 0.075, sizeEnd: 0.04, sizeJitter: 0.18, aspect: 2.4, drag: 1.05,
-            velocity: [0, 1.35, 0], accel: [0, 0.16, 0], flutter: 0.02,
-            fadeIn: 0.04, fadeOut: 0.34,
+            count: 1, life: 0.62, size: 0.09, sizeEnd: 0.045,
+            velocity: [0, 1.35, 0], accel: [0, 0.16, 0],
+            twinkle: 0.18, fadeIn: 0.04, fadeOut: 0.34,
         },
     },
     blue_tears: {
         label: "蓝眼泪 · 发光气泡",
         value: 4,
         render: "point",
+        particle: "key_blue_tears",
         brush: "mote",
         alpha: 0.9,
         color: { mode: "limited", palettes: BLUE_TEAR_PALETTES },
@@ -483,7 +487,7 @@ export function resolveKeyParticle(
 
     if (!("special" in definition)) {
         emitters.push({
-            particle: RENDER_PARTICLE[definition.render],
+            particle: "particle" in definition ? definition.particle : RENDER_PARTICLE[definition.render],
             variables: styleVariables(
                 definition,
                 pitchHex,

@@ -33,6 +33,7 @@ my_style: {
     label: "我的键上粒子",
     value: 8,              // 出现在钢琴设置中；不写则仅作为 key_style 变体
     render: "point",       // point = draw_point；stream = key_stream；drift = key_drift
+    particle: "key_blue_tears", // 可选：覆盖渲染原语，使用专用粒子文档
     brush: "star",         // vfxAtlas 点画笔
     alpha: 0.9,
     color: { mode: "free" }, // free / limited / fixed；fixed 使用 colors
@@ -41,8 +42,9 @@ my_style: {
 ```
 
 - `render: "point"` 使用共享 `pbe:vfx_draw_point`；`aspect` 可做非等比尺寸，`colorRandom` 可让每个粒子在双色间随机。
-- `render: "stream"` 使用加法混合、竖向拉伸和 `rotate_y` Billboard 的 `pbe:vfx_key_stream`（魔法流光）。
+- `render: "stream"` 默认使用加法混合、竖向拉伸和 `rotate_y` Billboard 的 `pbe:vfx_key_stream`；魔法流光通过 `particle: "magic_trail"` 使用原始拖尾粒子 `pbe:vfx_magic_trail`。
 - `render: "drift"` 使用普通透明混合、`lookat_xyz` Billboard 与自然飘落运动的 `pbe:vfx_key_drift`（樱吹雪、雪晶）。
+- `particle` 可覆盖上述默认原语；魔法流光使用 `pbe:vfx_magic_trail` 的原始长拖尾，蓝眼泪使用 `pbe:vfx_key_blue_tears`，两者都以 `textures/particle/piano_fx` 的原始贴图恢复旧版观感。
 - 配色策略集中在样式定义里：`free` 使用四套全局预设；`limited` 自带专属调色板；`fixed` 由样式提供自然色，玩家设置直接隐藏配色项。演出编排中的显式 `colors` 仍是创作者覆盖，对任何样式都优先生效。
 
 标签、设置下拉、`key_style` 变体、颜色选项和变量校验都会自动派生，不需要再改粒子文档或 UI 样式名判断。运行 `npm run test:vfx` 会按实际 `render` 对应的粒子文档验证变量。
