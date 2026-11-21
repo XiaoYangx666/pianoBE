@@ -1,10 +1,10 @@
 import {
-    catmullRom, motionFactors, sampleLissajous, sampleWingPair, zoneBaseY, ZONE_Y_OFFSET,
+    catmullRom, motionFactors, sampleLissajous, sampleWingPair, zoneBaseY, ZONE_Y_OFFSET, type Point3,
 } from "../geometry";
 import { mix } from "../music";
 import { resolveSchemaParams } from "../parameters";
 import {
-    drawBeam, drawPoints, drawStrokeSegments, drawWave, resolvePointBrush, resolveStrokeBrush,
+    drawBeam, drawComet, drawPoints, drawStrokeSegments, drawWave, resolvePointBrush, resolveStrokeBrush,
 } from "../primitives";
 import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
 
@@ -59,6 +59,13 @@ const MUSUBI_BRAID_PARAMS = {
     radius: { label: "编织半径", default: 2.15, min: 0.6, max: 3.6, step: 0.1 },
     tilt: { label: "交错倾角", default: 0.38, min: 0.0, max: 1.0, step: 0.05 },
     angularSpeed: { label: "回旋速度", default: 58, min: -180, max: 180, step: 5 },
+} as const satisfies VfxParameterSchema;
+
+const TIME_WARP_PARAMS = {
+    radius: { label: "裂隙半径", default: 2.55, min: 1.2, max: 4.0, step: 0.1 },
+    speed: { label: "倒流速度", default: 1.35, min: 0.3, max: 3.0, step: 0.1 },
+    warp: { label: "时空畸变", default: 0.6, min: 0.0, max: 1.0, step: 0.05 },
+    streakLength: { label: "光丝长度", default: 1.65, min: 0.6, max: 3.4, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
 export const CURVE_EFFECTS = {
@@ -540,6 +547,116 @@ export const CURVE_EFFECTS = {
                     fadeOut: 0.45,
                 })),
             };
+        },
+    } satisfies VfxEffectDefinition,
+
+    time_warp: {
+        id: "time_warp",
+        label: "时空穿越裂隙",
+        category: "curve",
+        trigger: "continuous",
+        interval: 14,
+        priority: 4,
+        defaultBrush: "shard",
+        defaultStroke: "comet",
+        parameters: TIME_WARP_PARAMS,
+        emit({ params, music, phase }) {
+            const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(TIME_WARP_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const yCenter = zoneBaseY(zone, 1.35, 0.35);
+            const r = (c.radius + 0.20 * music.sustain) * m.spread;
+            const strokeBrush = resolveStrokeBrush(brush, "comet");
+            const pointBrush = resolvePointBrush(brush, "shard");
+            const emitters = [];
+
+            for (const [idx, angleOffset] of ([0, 180] as const).entries()) {
+                const baseDeg = phase * 3.0 * m.dir + angleOffset;
+                const arcR = r * (idx === 0 ? 1.0 : 1.12);
+                const tiltAmp = (idx === 0 ? 1 : -1) * (0.30 + 0.38 * c.warp);
+                const points: Point3[] = Array.from({ length: 8 }, (_, step) => {
+                    const rad = ((baseDeg + (step / 7) * 95) * Math.PI) / 180;
+                    return [
+                        arcR * Math.cos(rad),
+                        yCenter + tiltAmp * Math.sin(rad),
+                        arcR * 0.88 * Math.sin(rad),
+                    ];
+                });
+                emitters.push(...drawStrokeSegments(points, {
+                    count: 5,
+                    life: 0.92,
+                    brush: strokeBrush,
+                    color: idx === 0 ? color : color2,
+                    color2: idx === 0 ? color2 : color,
+                    opacity: 0.38 + 0.54 * intensity,
+                    width: 0.085 + 0.045 * c.warp,
+                    scale,
+                    travel: -0.35 * c.speed * m.speed * m.dir,
+                    fadeIn: 0.12,
+                    fadeOut: 0.32,
+                }));
+            }
+
+            const streakCount = c.warp >= 0.45 ? 4 : 2;
+            for (let i = 0; i < streakCount; i++) {
+                const side = i % 2 === 0 ? -1 : 1;
+                const tier = Math.floor(i / 2);
+                const seed = Math.abs(Math.sin((phase + 7) * 19.31 + i * 53.7) * 29413.1) % 1;
+                const xPos = side * (r * (0.86 + 0.20 * tier) + (seed - 0.5) * 0.35);
+                const yPos = yCenter + (tier === 0 ? -0.35 : 0.72) + (seed - 0.5) * 0.35;
+                const zStart = m.dir > 0 ? 2.45 + 0.35 * seed : -1.05 - 0.35 * seed;
+                const velSpeed = (2.15 + 1.35 * c.speed + 0.45 * music.activity) * m.speed;
+                const len = c.streakLength * (0.72 + 0.48 * c.warp + 0.20 * intensity) * scale;
+                const dirY = 0.06 * c.warp;
+                const dirZ = -m.dir;
+                const dirMag = Math.hypot(dirY, dirZ) || 1;
+                emitters.push(drawComet({
+                    offset: [xPos, yPos, zStart],
+                    life: 0.76,
+                    length: len * 0.68,
+                    lengthEnd: len,
+                    width: (0.14 + 0.05 * c.warp) * scale,
+                    direction: [0, dirY / dirMag, dirZ / dirMag],
+                    velocity: [0, (dirY / dirMag) * velSpeed, (dirZ / dirMag) * velSpeed],
+                    color: i % 2 === 0 ? color : color2,
+                    color2: "#FFF4DC",
+                    opacity: 0.44 + 0.52 * intensity,
+                    scale,
+                    fadeIn: 0.08,
+                    fadeOut: 0.34,
+                }));
+            }
+
+            emitters.push(drawPoints({
+                count: 8,
+                life: 1.15,
+                lifeJitter: 0.14,
+                brush: pointBrush,
+                color: color2,
+                color2: color,
+                opacity: 0.42 + 0.52 * intensity,
+                scale,
+                offset: [0, Math.max(0.25, yCenter - 0.15), 0],
+                size: 0.072 + 0.024 * intensity,
+                sizeEnd: 0.032,
+                aspect: 1.65,
+                spinJitter: 45,
+                spinRate: -110 * c.speed * m.dir,
+                phase: phase * 4,
+                phaseSpread: 360,
+                omega: -145 * c.speed * m.speed * m.dir,
+                radius: r * 0.96,
+                radiusEnd: r * Math.max(0.55, 0.96 - 0.28 * c.warp),
+                radialJitter: 0.14,
+                depthRatio: 0.88,
+                tilt: 0.35 + 0.42 * c.warp,
+                rise: (0.42 + 1.05 * c.warp) * m.dir,
+                twinkle: 0.72,
+                fadeIn: 0.14,
+                fadeOut: 0.38,
+            }));
+
+            return { priority: 4, emitters };
         },
     } satisfies VfxEffectDefinition,
 };

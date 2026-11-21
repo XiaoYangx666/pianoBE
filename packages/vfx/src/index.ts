@@ -12,4 +12,5 @@ export * from "./primitives";
 export * from "./effects";
 export * from "./themes";
 export * from "./programs";
+export * from "./performanceSource";
 export * from "./engine";

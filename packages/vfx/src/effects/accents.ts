@@ -1,4 +1,4 @@
-import { colorVars } from "../color";
+import { blendHex, colorVars } from "../color";
 import { catmullRom, motionFactors, zoneBaseY, ZONE_Y_OFFSET, type Point3 } from "../geometry";
 import { mix } from "../music";
 import { resolveSchemaParams } from "../parameters";
@@ -42,6 +42,15 @@ const COMET_SPLIT_PARAMS = {
     length: { label: "彗尾长度", default: 3.1, min: 1.2, max: 5.5, step: 0.1 },
     speed: { label: "掠空速度", default: 1.65, min: 0.6, max: 3.2, step: 0.1 },
     split: { type: "boolean", label: "双生分裂", default: true },
+} as const satisfies VfxParameterSchema;
+
+const HANABI_SHELL_PARAMS = {
+    shellStyle: { type: "enum", label: "花火品种", options: ["chrysanthemum", "willow", "peony"] as const, default: "chrysanthemum" },
+    flatness: { label: "侧面扁平度", default: 0.0, min: 0.0, max: 1.0, step: 0.05 },
+    tilt: { label: "切面倾角", default: 0, min: -75, max: 75, step: 5 },
+    xOffset: { label: "横向方位", default: 0, min: -2.6, max: 2.6, step: 0.1 },
+    height: { label: "绽放高度", default: 3.15, min: 1.6, max: 4.8, step: 0.1 },
+    burstRadius: { label: "绽放半径", default: 1.75, min: 0.8, max: 3.2, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
 export const ACCENT_EFFECTS = {
@@ -581,6 +590,134 @@ export const ACCENT_EFFECTS = {
                     fadeOut: 0.60,
                 }),
             );
+            return { priority: 8, emitters };
+        },
+    } satisfies VfxEffectDefinition,
+
+    hanabi_shell: {
+        id: "hanabi_shell",
+        label: "日式大玉花火",
+        category: "accent",
+        trigger: "instant",
+        interval: 0,
+        priority: 8,
+        defaultBrush: "spark",
+        defaultStroke: "comet",
+        parameters: HANABI_SHELL_PARAMS,
+        yields: { tag: "ribbon", ticks: 10 },
+        emit({ params, phase }) {
+            const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(HANABI_SHELL_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const cx = c.xOffset * m.spread;
+            const cy = Math.max(1.1, c.height + ZONE_Y_OFFSET[zone] * 0.7);
+            const cz = 2.15;
+            const isWillow = c.shellStyle === "willow";
+            const isPeony = c.shellStyle === "peony";
+            const rayCount = isPeony ? 8 : 12;
+            const streakLife = isPeony ? 0.95 : isWillow ? 1.85 : 1.25;
+            const gravity = isPeony ? -1.05 : isWillow ? -2.35 : -1.45;
+            const streakWidth = isPeony ? 0.065 : isWillow ? 0.075 : 0.085;
+            const lenStart = isPeony ? 0.38 : isWillow ? 0.55 : 0.48;
+            const lenEnd = isPeony ? 0.62 : isWillow ? 1.05 : 0.82;
+            const burstSpeed = c.burstRadius * (isWillow ? 0.95 : 1.15) * m.speed;
+            const tiltRad = (c.tilt * Math.PI) / 180;
+            const cosTilt = Math.cos(tiltRad);
+            const sinTilt = Math.sin(tiltRad);
+            const strokeBrush = resolveStrokeBrush(brush, "comet");
+
+            const emitters: VfxEmitter[] = [
+                drawPoints({
+                    count: 1,
+                    life: 0.32,
+                    lifeJitter: 0,
+                    brush: "star",
+                    color: "#FFFFFF",
+                    color2: color,
+                    opacity: Math.min(1, 0.72 + 0.28 * intensity),
+                    scale,
+                    offset: [cx, cy, cz],
+                    size: 0.22 + 0.08 * intensity,
+                    sizeEnd: 0.04,
+                    sizeJitter: 0,
+                    fadeIn: 0.02,
+                    fadeOut: 0.24,
+                }),
+            ];
+
+            for (let i = 0; i < rayCount; i++) {
+                const a = (((i / rayCount) * 360 + phase * 7) * Math.PI) / 180;
+                const el = (i % 2 === 0 ? 1 : -1) * (0.24 + 0.44 * (((i * 7) % 5) / 4)) * (1 - c.flatness);
+                const cosEl = Math.cos(el);
+                const dx0 = Math.cos(a) * cosEl;
+                const dy = Math.sin(a) * cosEl;
+                const dz0 = Math.sin(el);
+                const dx = dx0 * cosTilt + dz0 * sinTilt;
+                const dz = -dx0 * sinTilt + dz0 * cosTilt;
+                const rayColor = blendHex(color, color2, (i % 3) / 2);
+                emitters.push({
+                    particle: "draw_stroke",
+                    group: "beam",
+                    offset: { x: cx, y: cy, z: cz },
+                    particles: 1,
+                    lifetime: streakLife,
+                    transform: { scale },
+                    variables: {
+                        count: 1,
+                        life: streakLife,
+                        brush: strokeBrush,
+                        length: lenStart,
+                        length_end: lenEnd,
+                        width: streakWidth,
+                        vx: dx * burstSpeed,
+                        vy: dy * burstSpeed,
+                        vz: dz * burstSpeed,
+                        ax: 0,
+                        ay: gravity * m.energy,
+                        az: 0,
+                        tx: dx,
+                        ty: dy,
+                        tz: dz,
+                        ...colorVars(rayColor, color2, 0.52 + 0.46 * intensity),
+                        fade_in: 0.04,
+                        fade_out: isWillow ? 0.65 : 0.42,
+                    },
+                });
+            }
+
+            const emberBrush = isWillow ? "spark" : isPeony ? "star" : resolvePointBrush(brush, "spark");
+            emitters.push(drawPoints({
+                count: isWillow ? 16 : isPeony ? 18 : 14,
+                life: isWillow ? 2.35 : isPeony ? 1.45 : 1.55,
+                lifeJitter: 0.20,
+                brush: emberBrush,
+                color,
+                color2,
+                opacity: 0.56 + 0.42 * intensity,
+                scale,
+                offset: [cx, cy, cz],
+                size: (isWillow ? 0.088 : 0.098) + 0.025 * intensity,
+                sizeEnd: 0.026,
+                sizeJitter: 0.25,
+                spinJitter: 90,
+                spinRate: 95 * m.dir,
+                phase: phase * 5,
+                phaseSpread: 360,
+                omega: 18 * m.dir,
+                radius: 0.10,
+                radiusEnd: c.burstRadius * (isWillow ? 1.15 : 1.02) * m.spread,
+                curve: 0.54,
+                radialJitter: 0.18,
+                depthRatio: Math.max(0.18, 0.92 * (1 - 0.72 * c.flatness)),
+                tilt: c.burstRadius * (0.48 + 0.28 * c.flatness) * Math.cos(tiltRad * 0.5),
+                velocity: [0, (isWillow ? 0.35 : 0.52) * m.speed, 0],
+                accel: [0, (isWillow ? -1.65 : -1.95) * m.energy, 0],
+                flutter: isWillow ? 0.14 : 0.08,
+                twinkle: 0.78,
+                fadeIn: 0.06,
+                fadeOut: isWillow ? 0.95 : 0.55,
+            }));
+
             return { priority: 8, emitters };
         },
     } satisfies VfxEffectDefinition,

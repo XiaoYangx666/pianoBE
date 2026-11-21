@@ -1,0 +1,1047 @@
+{
+  "song": "ff9c1534",
+  "title": "打上花火 · 海边防波堤的夏夜",
+  "sections": [
+    {
+      "at": 0,
+      "label": "序幕 · 夏夜海岸",
+      "note": "2.825 秒八音盒质感轻柔起音，远景暮色海平线与低位藏青微光海波浮现，稀疏夜星点亮。"
+    },
+    {
+      "at": 21,
+      "label": "第一幕 · 防波堤漫步",
+      "note": "DAOKO 轻柔女声主歌，海面波光染上极淡樱粉倒影，琴键化作清浅星尘。"
+    },
+    {
+      "at": 38.525,
+      "label": "第二幕 · 仰望夜空",
+      "note": "铺陈蓄势段，海波渐亮并延展宽幅；59.4 秒悬停瞬间射出第一道升空花火引信。"
+    },
+    {
+      "at": 60.175,
+      "label": "第三幕 · 初绽（正圆菊花）",
+      "note": "副歌炸响：正圆菊花与牡丹大玉在夜空左右接力绽放，海面同步映出粉金碎波。"
+    },
+    {
+      "at": 80.35,
+      "label": "第四幕 · 少年心事",
+      "note": "夜空回归深邃开阔留白，海风微漾，琴键切为清透海蓝气泡（蓝眼泪）。"
+    },
+    {
+      "at": 114,
+      "label": "第五幕 · 祭典升温",
+      "note": "波光加速跃动推升情绪，135.2 秒双发升空引信齐射入云。"
+    },
+    {
+      "at": 136,
+      "label": "第六幕 · 从侧面看？（扁平花火）",
+      "note": "从正圆双玉切入高扁平度大倾角切面花火——仿佛绕到烟花侧面，窥见“如果”的平行时空。"
+    },
+    {
+      "at": 155,
+      "label": "第七幕 · 玻璃弹珠（もしも）",
+      "note": "花火暂歇，后景浮起倾斜旋动的琉璃星环象征抛向空中的玻璃弹珠，172 秒触发棱晶折射。"
+    },
+    {
+      "at": 177.9,
+      "label": "第八幕 · 灯塔与渚",
+      "note": "全曲最安静的海风清唱段：清空繁杂灯阵，仅余唯一一道冷月灯塔斜光与轻柔海波。"
+    },
+    {
+      "at": 204,
+      "label": "第九幕 · 盛夏终章花火",
+      "note": "灯塔退场，多轮升空火束接连引爆牡丹、菊花与垂柳金雨，整片海面彻底被烟火照亮。"
+    },
+    {
+      "at": 250,
+      "label": "第十幕 · 漫天锦冠垂柳",
+      "note": "Animenz 炫技巅峰段：261.5–265 秒三连发超大半径垂柳金雨大玉伴随重拍冲击与圣光扇束盛放。"
+    },
+    {
+      "at": 268,
+      "label": "尾声 · 夏夜余烬",
+      "note": "花火落尽，暖金微星化作缓缓沉入海面的余烬，海波重归藏青并渐暗熄灭于 285.8 秒。"
+    }
+  ],
+  "cues": [
+    {
+      "at": 0.5,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#28468C",
+      "color2": "#8DB8FF",
+      "level": 28,
+      "scale": 100,
+      "fade": 2.2
+    },
+    {
+      "at": 0.5,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#28468C",
+      "color2": "#8DB8FF",
+      "level": 34,
+      "scale": 100,
+      "fade": 2.0,
+      "params": { "width": 2.6, "depth": 1.6, "shimmer": 0.25, "tideSpeed": 0.22 }
+    },
+    {
+      "at": 1.2,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "star",
+      "color": "#8DB8FF",
+      "color2": "#DCEBFF",
+      "level": 26,
+      "scale": 100,
+      "fade": 2.0,
+      "params": { "radius": 2.5, "speed": 0.5, "particleSize": 0.048, "driftY": -0.02 }
+    },
+    {
+      "at": 2.825,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "glimmer",
+      "color": "#DCEBFF",
+      "color2": "#8DB8FF",
+      "level": 72,
+      "scale": 100,
+      "fade": 0
+    },
+    {
+      "at": 21.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#2E5299",
+      "color2": "#F5A9C8",
+      "level": 44,
+      "scale": 100,
+      "fade": 2.5,
+      "params": { "width": 2.9, "depth": 1.75, "shimmer": 0.35, "tideSpeed": 0.28 }
+    },
+    {
+      "at": 21.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "stardust",
+      "color": "#DCEBFF",
+      "color2": "#F5A9C8",
+      "level": 68,
+      "scale": 100,
+      "fade": 1.8
+    },
+    {
+      "at": 38.525,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#4668C4",
+      "color2": "#FFC875",
+      "level": 44,
+      "scale": 104,
+      "fade": 2.8
+    },
+    {
+      "at": 38.525,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#4668C4",
+      "color2": "#FFC875",
+      "level": 56,
+      "scale": 104,
+      "fade": 2.8,
+      "params": { "width": 3.3, "depth": 1.9, "shimmer": 0.52, "tideSpeed": 0.36 }
+    },
+    {
+      "at": 38.525,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "star",
+      "color": "#9EC4FF",
+      "color2": "#FFD89A",
+      "level": 36,
+      "scale": 104,
+      "fade": 2.5,
+      "params": { "radius": 2.6, "speed": 0.65, "particleSize": 0.054, "driftY": 0.04 }
+    },
+    {
+      "at": 59.4,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "intense",
+      "color": "#FFE08A",
+      "color2": "#FF8FB8",
+      "level": 84,
+      "scale": 105,
+      "params": { "apexHeight": 3.3, "spread": 0.3, "trailWidth": 0.095 }
+    },
+    {
+      "at": 60.175,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 88,
+      "scale": 108,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.0, "tilt": 0, "xOffset": 0.0, "height": 3.35, "burstRadius": 1.95 }
+    },
+    {
+      "at": 60.175,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 78,
+      "scale": 108,
+      "fade": 0.8,
+      "params": { "width": 3.6, "depth": 2.1, "shimmer": 0.78, "tideSpeed": 0.45 }
+    },
+    {
+      "at": 60.175,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "magic_trail",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 92,
+      "scale": 100,
+      "fade": 0.6
+    },
+    {
+      "at": 63.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#FFE08A",
+      "color2": "#FFF4DC",
+      "level": 82,
+      "scale": 104,
+      "params": { "apexHeight": 3.1, "spread": 1.25, "trailWidth": 0.09 }
+    },
+    {
+      "at": 64.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFE08A",
+      "color2": "#FF8FB8",
+      "level": 86,
+      "scale": 106,
+      "params": { "shellStyle": "peony", "flatness": 0.05, "tilt": 0, "xOffset": -1.7, "height": 3.25, "burstRadius": 1.75 }
+    },
+    {
+      "at": 67.45,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "reverse",
+      "color": "#FF8FB8",
+      "color2": "#8EE0FF",
+      "level": 84,
+      "scale": 106,
+      "params": { "apexHeight": 3.35, "spread": 1.25, "trailWidth": 0.09 }
+    },
+    {
+      "at": 68.2,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FF8FB8",
+      "color2": "#8EE0FF",
+      "level": 90,
+      "scale": 108,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.0, "tilt": 0, "xOffset": 1.7, "height": 3.45, "burstRadius": 1.95 }
+    },
+    {
+      "at": 71.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#FFE08A",
+      "color2": "#FFF4DC",
+      "level": 86,
+      "scale": 108,
+      "params": { "apexHeight": 3.55, "spread": 1.0, "trailWidth": 0.095 }
+    },
+    {
+      "at": 72.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFE08A",
+      "color2": "#FFF6DE",
+      "level": 92,
+      "scale": 110,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.0, "tilt": 0, "xOffset": -1.3, "height": 3.6, "burstRadius": 2.1 }
+    },
+    {
+      "at": 74.75,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "reverse",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 84,
+      "scale": 106,
+      "params": { "apexHeight": 3.2, "spread": 1.15, "trailWidth": 0.09 }
+    },
+    {
+      "at": 75.5,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 88,
+      "scale": 108,
+      "params": { "shellStyle": "peony", "flatness": 0.1, "tilt": 15, "xOffset": 1.5, "height": 3.3, "burstRadius": 1.85 }
+    },
+    {
+      "at": 78.6,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#3B5EA8",
+      "color2": "#8DB8FF",
+      "level": 44,
+      "scale": 100,
+      "fade": 1.6,
+      "params": { "width": 3.0, "depth": 1.8, "shimmer": 0.35, "tideSpeed": 0.3 }
+    },
+    {
+      "at": 80.35,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#244A82",
+      "color2": "#7CD4FF",
+      "level": 32,
+      "scale": 100,
+      "fade": 2.0
+    },
+    {
+      "at": 80.35,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#2E68A6",
+      "color2": "#7CD4FF",
+      "level": 48,
+      "scale": 100,
+      "fade": 2.0,
+      "params": { "width": 3.0, "depth": 1.8, "shimmer": 0.32, "tideSpeed": 0.28 }
+    },
+    {
+      "at": 80.35,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#7CD4FF",
+      "color2": "#DCEBFF",
+      "level": 34,
+      "scale": 100,
+      "fade": 2.0,
+      "params": { "radius": 2.4, "speed": 0.55, "particleSize": 0.05, "driftY": -0.02 }
+    },
+    {
+      "at": 80.35,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "blue_tears",
+      "color": "#2E68A6",
+      "color2": "#7CD4FF",
+      "level": 80,
+      "scale": 100,
+      "fade": 1.5
+    },
+    {
+      "at": 114.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#6C8CFF",
+      "color2": "#FF7EA8",
+      "level": 64,
+      "scale": 104,
+      "fade": 2.5,
+      "params": { "width": 3.4, "depth": 2.0, "shimmer": 0.62, "tideSpeed": 0.55 }
+    },
+    {
+      "at": 114.0,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#5568C9",
+      "color2": "#FF7EA8",
+      "level": 46,
+      "scale": 104,
+      "fade": 2.5
+    },
+    {
+      "at": 114.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "stardust",
+      "color": "#6C8CFF",
+      "color2": "#FF7EA8",
+      "level": 82,
+      "scale": 102,
+      "fade": 1.6
+    },
+    {
+      "at": 135.2,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#6BE3FF",
+      "color2": "#FFF4DC",
+      "level": 88,
+      "scale": 108,
+      "params": { "apexHeight": 3.35, "spread": 1.15, "trailWidth": 0.095 }
+    },
+    {
+      "at": 135.2,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "reverse",
+      "color": "#FF7EA8",
+      "color2": "#FFD978",
+      "level": 88,
+      "scale": 108,
+      "params": { "apexHeight": 3.35, "spread": 1.15, "trailWidth": 0.095 }
+    },
+    {
+      "at": 136.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#6BE3FF",
+      "color2": "#FF7EA8",
+      "level": 92,
+      "scale": 110,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.0, "tilt": 0, "xOffset": -1.5, "height": 3.4, "burstRadius": 1.85 }
+    },
+    {
+      "at": 136.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FF7EA8",
+      "color2": "#FFD978",
+      "level": 92,
+      "scale": 110,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.0, "tilt": 0, "xOffset": 1.5, "height": 3.4, "burstRadius": 1.85 }
+    },
+    {
+      "at": 136.0,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#4A7EC7",
+      "color2": "#FF7EA8",
+      "level": 44,
+      "scale": 102,
+      "fade": 1.2,
+      "params": { "length": 1.25, "width": 0.2, "spread": 1.05 }
+    },
+    {
+      "at": 136.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#6BE3FF",
+      "color2": "#FF7EA8",
+      "level": 84,
+      "scale": 110,
+      "fade": 0.8,
+      "params": { "width": 3.8, "depth": 2.2, "shimmer": 0.85, "tideSpeed": 0.58 }
+    },
+    {
+      "at": 136.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "magic_trail",
+      "color": "#6BE3FF",
+      "color2": "#FF7EA8",
+      "level": 96,
+      "scale": 100,
+      "fade": 0.6
+    },
+    {
+      "at": 139.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#6BE3FF",
+      "color2": "#FFD978",
+      "level": 86,
+      "scale": 106,
+      "params": { "apexHeight": 3.25, "spread": 1.0, "trailWidth": 0.09 }
+    },
+    {
+      "at": 140.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#6BE3FF",
+      "color2": "#FFD978",
+      "level": 92,
+      "scale": 110,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.82, "tilt": 45, "xOffset": -1.3, "height": 3.35, "burstRadius": 2.0 }
+    },
+    {
+      "at": 144.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "reverse",
+      "color": "#FF7EA8",
+      "color2": "#FFF4DC",
+      "level": 88,
+      "scale": 108,
+      "params": { "apexHeight": 3.45, "spread": 1.05, "trailWidth": 0.095 }
+    },
+    {
+      "at": 145.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FF7EA8",
+      "color2": "#FFF4DC",
+      "level": 94,
+      "scale": 112,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.88, "tilt": -52, "xOffset": 1.3, "height": 3.5, "burstRadius": 2.1 }
+    },
+    {
+      "at": 149.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "intense",
+      "color": "#FFD978",
+      "color2": "#6BE3FF",
+      "level": 90,
+      "scale": 110,
+      "params": { "apexHeight": 3.65, "spread": 0.35, "trailWidth": 0.1 }
+    },
+    {
+      "at": 150.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFD978",
+      "color2": "#6BE3FF",
+      "level": 95,
+      "scale": 112,
+      "params": { "shellStyle": "peony", "flatness": 0.9, "tilt": 58, "xOffset": 0.0, "height": 3.65, "burstRadius": 2.15 }
+    },
+    {
+      "at": 152.5,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#6BE3FF",
+      "color2": "#FF7EA8",
+      "level": 88,
+      "scale": 108,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.78, "tilt": -42, "xOffset": 0.9, "height": 3.25, "burstRadius": 1.9 }
+    },
+    {
+      "at": 155.0,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#75E6FF",
+      "level": 0,
+      "scale": 100,
+      "fade": 1.5
+    },
+    {
+      "at": 155.0,
+      "op": "set",
+      "effect": "orbit_halo",
+      "brush": "star",
+      "color": "#75E6FF",
+      "color2": "#C9A4FF",
+      "level": 58,
+      "scale": 104,
+      "fade": 2.2,
+      "params": { "radius": 2.3, "angularSpeed": 62, "tilt": 0.65, "particleSize": 0.068 }
+    },
+    {
+      "at": 155.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#4576BD",
+      "color2": "#C9A4FF",
+      "level": 58,
+      "scale": 102,
+      "fade": 2.0,
+      "params": { "width": 3.2, "depth": 1.9, "shimmer": 0.56, "tideSpeed": 0.34 }
+    },
+    {
+      "at": 155.0,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "shard",
+      "color": "#75E6FF",
+      "color2": "#C9A4FF",
+      "level": 44,
+      "scale": 104,
+      "fade": 2.0,
+      "params": { "radius": 2.5, "speed": 0.75, "particleSize": 0.056, "driftY": 0.14 }
+    },
+    {
+      "at": 155.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "prism_shards",
+      "color": "#75E6FF",
+      "color2": "#C9A4FF",
+      "level": 88,
+      "scale": 100,
+      "fade": 1.4
+    },
+    {
+      "at": 172.0,
+      "op": "flash",
+      "effect": "prism_rewind",
+      "brush": "shard",
+      "color": "#75E6FF",
+      "color2": "#C9A4FF",
+      "level": 78,
+      "scale": 106,
+      "params": { "radius": 2.55, "speed": 1.1 }
+    },
+    {
+      "at": 177.225,
+      "op": "set",
+      "effect": "orbit_halo",
+      "color": "#8DB8FF",
+      "level": 0,
+      "scale": 98,
+      "fade": 0.65
+    },
+    {
+      "at": 177.225,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#243F7A",
+      "color2": "#8DB8FF",
+      "level": 24,
+      "scale": 98,
+      "fade": 1.2
+    },
+    {
+      "at": 177.9,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#8DB8FF",
+      "color2": "#D6EAFF",
+      "level": 36,
+      "scale": 100,
+      "fade": 1.5,
+      "params": { "beams": "single", "angle": 40, "spread": 2.2, "length": 2.7, "width": 0.68 }
+    },
+    {
+      "at": 177.9,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#243F7A",
+      "color2": "#8DB8FF",
+      "level": 36,
+      "scale": 98,
+      "fade": 1.5,
+      "params": { "width": 2.7, "depth": 1.6, "shimmer": 0.22, "tideSpeed": 0.2 }
+    },
+    {
+      "at": 177.9,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#8DB8FF",
+      "color2": "#D6EAFF",
+      "level": 24,
+      "scale": 98,
+      "fade": 1.5,
+      "params": { "radius": 2.2, "speed": 0.4, "particleSize": 0.046, "driftY": -0.03 }
+    },
+    {
+      "at": 177.9,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "glimmer",
+      "color": "#D6EAFF",
+      "color2": "#8DB8FF",
+      "level": 70,
+      "scale": 100,
+      "fade": 0.6
+    },
+    {
+      "at": 204.0,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#FFE08A",
+      "level": 0,
+      "scale": 98,
+      "fade": 0.8
+    },
+    {
+      "at": 204.0,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#5568C9",
+      "color2": "#FF8FB8",
+      "level": 50,
+      "scale": 108,
+      "fade": 2.2
+    },
+    {
+      "at": 204.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#7ADFFF",
+      "color2": "#FF8FB8",
+      "level": 72,
+      "scale": 108,
+      "fade": 2.0,
+      "params": { "width": 3.7, "depth": 2.1, "shimmer": 0.68, "tideSpeed": 0.48 }
+    },
+    {
+      "at": 204.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "stardust",
+      "color": "#FFE08A",
+      "color2": "#FF8FB8",
+      "level": 86,
+      "scale": 104,
+      "fade": 1.2
+    },
+    {
+      "at": 205.0,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "intense",
+      "color": "#7ADFFF",
+      "color2": "#FFE08A",
+      "level": 84,
+      "scale": 106,
+      "params": { "apexHeight": 3.15, "spread": 0.4, "trailWidth": 0.09 }
+    },
+    {
+      "at": 205.8,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#7ADFFF",
+      "color2": "#FFE08A",
+      "level": 86,
+      "scale": 106,
+      "params": { "shellStyle": "peony", "flatness": 0.0, "tilt": 0, "xOffset": 0.0, "height": 3.2, "burstRadius": 1.8 }
+    },
+    {
+      "at": 224.2,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 90,
+      "scale": 110,
+      "params": { "apexHeight": 3.55, "spread": 1.2, "trailWidth": 0.1 }
+    },
+    {
+      "at": 225.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FF8FB8",
+      "color2": "#FFE08A",
+      "level": 94,
+      "scale": 112,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.0, "tilt": 0, "xOffset": -1.4, "height": 3.6, "burstRadius": 2.2 }
+    },
+    {
+      "at": 225.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#FFE08A",
+      "color2": "#FF8FB8",
+      "level": 88,
+      "scale": 112,
+      "fade": 1.2,
+      "params": { "width": 4.0, "depth": 2.3, "shimmer": 0.88, "tideSpeed": 0.56 }
+    },
+    {
+      "at": 225.0,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "star",
+      "color": "#FFE08A",
+      "color2": "#FF8FB8",
+      "level": 58,
+      "scale": 110,
+      "fade": 1.5,
+      "params": { "radius": 2.9, "speed": 0.95, "particleSize": 0.062, "driftY": 0.08 }
+    },
+    {
+      "at": 225.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "magic_trail",
+      "motion": "intense",
+      "color": "#FFE08A",
+      "color2": "#FF8FB8",
+      "level": 98,
+      "scale": 100,
+      "fade": 0.8
+    },
+    {
+      "at": 229.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "reverse",
+      "color": "#FFE08A",
+      "color2": "#FFF6DE",
+      "level": 92,
+      "scale": 110,
+      "params": { "apexHeight": 3.7, "spread": 1.2, "trailWidth": 0.1 }
+    },
+    {
+      "at": 230.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFE08A",
+      "color2": "#FFF6DE",
+      "level": 95,
+      "scale": 114,
+      "params": { "shellStyle": "willow", "flatness": 0.0, "tilt": 0, "xOffset": 1.5, "height": 3.75, "burstRadius": 2.35 }
+    },
+    {
+      "at": 235.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#7ADFFF",
+      "color2": "#FF8FB8",
+      "level": 90,
+      "scale": 110,
+      "params": { "apexHeight": 3.45, "spread": 1.0, "trailWidth": 0.095 }
+    },
+    {
+      "at": 236.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#7ADFFF",
+      "color2": "#FF8FB8",
+      "level": 94,
+      "scale": 112,
+      "params": { "shellStyle": "chrysanthemum", "flatness": 0.55, "tilt": 35, "xOffset": -1.1, "height": 3.5, "burstRadius": 2.15 }
+    },
+    {
+      "at": 243.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "intense",
+      "color": "#FFE08A",
+      "color2": "#FF9B54",
+      "level": 92,
+      "scale": 112,
+      "params": { "apexHeight": 3.8, "spread": 0.3, "trailWidth": 0.105 }
+    },
+    {
+      "at": 244.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFE08A",
+      "color2": "#FF9B54",
+      "level": 96,
+      "scale": 114,
+      "params": { "shellStyle": "willow", "flatness": 0.0, "tilt": 0, "xOffset": 0.0, "height": 3.85, "burstRadius": 2.45 }
+    },
+    {
+      "at": 250.0,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#FFB85C",
+      "color2": "#FFF6DE",
+      "motion": "intense",
+      "level": 68,
+      "scale": 110,
+      "fade": 2.2,
+      "params": { "length": 1.65, "width": 0.24, "spread": 1.18 }
+    },
+    {
+      "at": 250.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#FFB85C",
+      "color2": "#FFF6DE",
+      "level": 92,
+      "scale": 114,
+      "fade": 2.0,
+      "params": { "width": 4.2, "depth": 2.4, "shimmer": 0.96, "tideSpeed": 0.65 }
+    },
+    {
+      "at": 250.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "magic_trail",
+      "motion": "intense",
+      "color": "#FFB85C",
+      "color2": "#FFF6DE",
+      "level": 100,
+      "scale": 100,
+      "fade": 1.0
+    },
+    {
+      "at": 260.75,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "normal",
+      "color": "#FFF6DE",
+      "color2": "#FFB85C",
+      "level": 95,
+      "scale": 114,
+      "params": { "apexHeight": 3.55, "spread": 1.45, "trailWidth": 0.11 }
+    },
+    {
+      "at": 261.5,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFF6DE",
+      "color2": "#FFB85C",
+      "level": 96,
+      "scale": 114,
+      "params": { "shellStyle": "willow", "flatness": 0.0, "tilt": 0, "xOffset": -1.8, "height": 3.55, "burstRadius": 2.55 }
+    },
+    {
+      "at": 262.45,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "reverse",
+      "color": "#FFF6DE",
+      "color2": "#FFB85C",
+      "level": 95,
+      "scale": 114,
+      "params": { "apexHeight": 3.65, "spread": 1.45, "trailWidth": 0.11 }
+    },
+    {
+      "at": 263.2,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFF6DE",
+      "color2": "#FFB85C",
+      "level": 98,
+      "scale": 116,
+      "params": { "shellStyle": "willow", "flatness": 0.0, "tilt": 0, "xOffset": 1.8, "height": 3.65, "burstRadius": 2.65 }
+    },
+    {
+      "at": 264.0,
+      "op": "flash",
+      "effect": "shockwave",
+      "color": "#FFF6DE",
+      "color2": "#FFB85C",
+      "level": 84,
+      "scale": 110,
+      "params": { "radius": 3.5, "spikeLength": 2.3, "dualRing": false }
+    },
+    {
+      "at": 264.25,
+      "op": "flash",
+      "effect": "hanabi_launch",
+      "motion": "intense",
+      "color": "#FFF6DE",
+      "color2": "#FFE08A",
+      "level": 100,
+      "scale": 116,
+      "params": { "apexHeight": 4.0, "spread": 0.25, "trailWidth": 0.12 }
+    },
+    {
+      "at": 265.0,
+      "op": "flash",
+      "effect": "hanabi_shell",
+      "color": "#FFF6DE",
+      "color2": "#FFB85C",
+      "level": 100,
+      "scale": 118,
+      "params": { "shellStyle": "willow", "flatness": 0.0, "tilt": 0, "xOffset": 0.0, "height": 4.0, "burstRadius": 2.9 }
+    },
+    {
+      "at": 268.0,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#E8C284",
+      "level": 0,
+      "scale": 100,
+      "fade": 2.5
+    },
+    {
+      "at": 268.0,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#233B6E",
+      "color2": "#8DB8FF",
+      "level": 18,
+      "scale": 98,
+      "fade": 3.5
+    },
+    {
+      "at": 268.0,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "spark",
+      "color": "#E8C284",
+      "color2": "#FFF6DE",
+      "level": 36,
+      "scale": 102,
+      "fade": 2.5,
+      "params": { "radius": 2.7, "speed": 0.55, "particleSize": 0.052, "driftY": -0.14 }
+    },
+    {
+      "at": 268.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#233B6E",
+      "color2": "#8DB8FF",
+      "level": 40,
+      "scale": 98,
+      "fade": 3.5,
+      "params": { "width": 2.8, "depth": 1.6, "shimmer": 0.22, "tideSpeed": 0.2 }
+    },
+    {
+      "at": 268.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "glimmer",
+      "color": "#E8C284",
+      "color2": "#8DB8FF",
+      "level": 68,
+      "scale": 100,
+      "fade": 1.5
+    },
+    {
+      "at": 281.0,
+      "op": "set",
+      "effect": "horizon_glow",
+      "color": "#233B6E",
+      "level": 0,
+      "scale": 96,
+      "fade": 4.8
+    },
+    {
+      "at": 281.0,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "spark",
+      "color": "#E8C284",
+      "level": 0,
+      "scale": 96,
+      "fade": 4.8
+    },
+    {
+      "at": 281.0,
+      "op": "set",
+      "effect": "sea_reflection",
+      "color": "#233B6E",
+      "level": 0,
+      "scale": 96,
+      "fade": 4.8
+    },
+    {
+      "at": 281.0,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "glimmer",
+      "color": "#E8C284",
+      "level": 0,
+      "scale": 100,
+      "fade": 4.8
+    }
+  ]
+}

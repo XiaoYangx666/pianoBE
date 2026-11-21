@@ -1,12 +1,11 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { resolvePerformanceColor } from "@piano/core";
 import {
+    compilePerformanceSource,
     createPerformanceProgram,
     createThemeProgram,
     placeVfxEmitter,
     quietFeatures,
-    validateEffectCustomParams,
     VFX_EFFECT_IDS,
     VFX_EFFECTS,
     VFX_PARTICLES_PER_PIANO,
@@ -30,42 +29,19 @@ function check(label: string, emitter: VfxEmitter, seconds: number, out: string[
     }
 }
 
-function parseJsonPerformanceCues(source: any) {
-    return source.cues.map((cue: any) => {
-        const def = VFX_EFFECTS[cue.effect as keyof typeof VFX_EFFECTS];
-        const params = validateEffectCustomParams(cue.effect, cue.params);
-        const base = {
-            tick: Math.round(cue.at * 40),
-            effect: cue.effect as string,
-            slot: cue.slot,
-            color: resolvePerformanceColor(cue.color),
-            color2: cue.color2 ? resolvePerformanceColor(cue.color2) : undefined,
-            brush: cue.brush,
-            variant: cue.variant,
-            zone: cue.zone,
-            motion: cue.motion,
-            ...(params ? { params } : {}),
-            level: cue.level,
-            scale: cue.scale,
-        };
-        return cue.op === "flash" || def?.trigger === "instant"
-            ? { ...base, op: "flash" as const }
-            : { ...base, op: "set" as const, fade: Math.round((cue.fade ?? 1.5) * 40) };
-    });
-}
-
 test("all performance JSON cues place finite variables through unified VfxEngine", () => {
     const songs = [
         ["e1563b03", 87, 0.1],
         ["c8159589", 317, 0.2],
         ["b0cae095", 385, 0.25],
+        ["ff9c1534", 287, 0.25],
     ] as const;
     const music = { ...quietFeatures, velocity: 0.55, activity: 0.6, density: 0.55, sustain: 0.5, surge: 0.6, chord: 0.6, onset: 0.55 };
     const failures: string[] = [];
 
     for (const [id, duration, step] of songs) {
         const source = JSON.parse(readFileSync(new URL(`../../../midis/performances/${id}.json`, import.meta.url), "utf8"));
-        const engine = new VfxEngine(createPerformanceProgram(parseJsonPerformanceCues(source), duration));
+        const engine = new VfxEngine(createPerformanceProgram(compilePerformanceSource(source, id), duration));
         for (let t = 0; t <= duration; t += step) {
             const notes = [{ midi: 66, velocity: 0.8, duration: 0.8, tick: Math.round(t * 20) }];
             const batches = engine.update(t, Math.round(t * 20), music, notes);
@@ -77,7 +53,7 @@ test("all performance JSON cues place finite variables through unified VfxEngine
     expect([...new Set(failures)].slice(0, 30)).toEqual([]);
 });
 
-test("all 33 effects place finite variables across solo and music modes", () => {
+test("all registered effects place finite variables across solo and music modes", () => {
     const music = { ...quietFeatures, velocity: 0.5, activity: 0.55, density: 0.5, sustain: 0.4, surge: 0.45, chord: 0.5, onset: 0.5 };
     const failures: string[] = [];
     for (const id of VFX_EFFECT_IDS) {

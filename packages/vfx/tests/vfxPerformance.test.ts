@@ -14,6 +14,7 @@ import {
     type PerformanceZone,
 } from "@piano/core";
 import {
+    compilePerformanceSource,
     createPerformanceProgram,
     createSingleEffectProgram,
     createThemeProgram,
@@ -97,8 +98,8 @@ test("seeking into an in-flight transition reconstructs intensity, scale, dual R
     expect(engine.update(8, 160, quietFeatures)).toEqual([]);
 });
 
-test("all 33 registered effects emit valid finite parameters and declared particle variables", () => {
-    expect(VFX_EFFECT_IDS).toHaveLength(33);
+test("all registered effects emit valid finite parameters and declared particle variables", () => {
+    expect(VFX_EFFECT_IDS.length).toBeGreaterThanOrEqual(33);
     const zones = Object.keys(PERFORMANCE_ZONES) as PerformanceZone[];
     const motions = Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[];
     const allBrushes = [...POINT_BRUSH_IDS, ...STROKE_BRUSH_IDS];
@@ -310,21 +311,23 @@ function simulateSongPerformance(fileName: string, starts: readonly number[]) {
 test("four staggered Secret performances complete within dispatch and particle budgets with zero drops", () => {
     const { performance, pianos, peakReserved } = simulateSongPerformance("e1563b03.pbe3", [0, 13, 26, 39]);
     expect(performance.length).toBeGreaterThanOrEqual(60);
-    expect(peakReserved).toBeGreaterThan(100);
+    expect(peakReserved).toBeGreaterThan(80);
     for (const piano of pianos) {
-        expect(piano.engine.keyParticleOverride(3)?.style).toBe("stardust");
-        expect(piano.engine.keyParticleOverride(28)?.style).toBe("blue_tears");
-        expect(piano.engine.keyParticleOverride(45)?.style).toBe("magic_trail");
-        expect(piano.engine.keyParticleOverride(56)?.style).toBe("snow");
+        expect(piano.engine.keyParticleOverride(3)?.style).toBe("glimmer");
+        expect(piano.engine.keyParticleOverride(18)?.style).toBe("stardust");
+        expect(piano.engine.keyParticleOverride(45)?.style).toBe("prism_shards");
+        expect(piano.engine.keyParticleOverride(56)?.style).toBe("stardust");
         expect(piano.engine.keyParticleOverride(66)?.style).toBe("prism_shards");
         expect(piano.engine.keyParticleOverride(74)?.style).toBe("magic_trail");
-        expect(piano.engine.keyParticleOverride(85)).toBeUndefined();
+        expect(piano.engine.keyParticleOverride(82)?.style).toBe("glimmer");
+        expect(piano.engine.keyParticleOverride(85.95)).toBeUndefined();
         expect(piano.counts.get("shock") ?? 0).toBeGreaterThanOrEqual(2);
+        expect(piano.counts.get("shaft") ?? 0).toBeGreaterThan(80);
         expect(piano.counts.get("draw_stroke") ?? 0).toBeGreaterThan(400);
+        expect(piano.counts.get("draw_comet") ?? 0).toBeGreaterThan(40);
         expect(piano.counts.get("draw_point") ?? 0).toBeGreaterThan(200);
         expect(piano.counts.get("draw_plane") ?? 0).toBeGreaterThan(10);
         expect(piano.counts.get("shard") ?? 0).toBeGreaterThanOrEqual(24);
-        expect(piano.counts.get("fountain") ?? 0).toBeGreaterThanOrEqual(2);
     }
 });
 
@@ -362,6 +365,25 @@ test("Animenz Sparkle performance completes within dispatch and particle budgets
         expect(piano.counts.get("draw_cloud") ?? 0).toBeGreaterThan(200);
         expect(piano.counts.get("draw_comet") ?? 0).toBeGreaterThan(150);
         expect(piano.counts.get("draw_point") ?? 0).toBeGreaterThan(600);
+    }
+});
+
+test("Animenz Uchiage Hanabi performance completes within dispatch and particle budgets with zero drops", () => {
+    const { performance, pianos } = simulateSongPerformance("ff9c1534.pbe3", [0, 7, 19, 31]);
+    expect(performance.length).toBeGreaterThanOrEqual(80);
+    for (const piano of pianos) {
+        expect(piano.engine.keyParticleOverride(5)?.style).toBe("glimmer");
+        expect(piano.engine.keyParticleOverride(26)?.style).toBe("stardust");
+        expect(piano.engine.keyParticleOverride(64)?.style).toBe("magic_trail");
+        expect(piano.engine.keyParticleOverride(90)?.style).toBe("blue_tears");
+        expect(piano.engine.keyParticleOverride(160)?.style).toBe("prism_shards");
+        expect(piano.engine.keyParticleOverride(182)?.style).toBe("glimmer");
+        expect(piano.engine.keyParticleOverride(262)?.style).toBe("magic_trail");
+        expect(piano.engine.keyParticleOverride(272)?.style).toBe("glimmer");
+        expect(piano.engine.keyParticleOverride(285.9)).toBeUndefined();
+        expect(piano.counts.get("draw_stroke") ?? 0).toBeGreaterThan(1200);
+        expect(piano.counts.get("draw_point") ?? 0).toBeGreaterThan(400);
+        expect(piano.counts.get("shard") ?? 0).toBeGreaterThanOrEqual(6);
     }
 });
 
@@ -529,4 +551,156 @@ test("custom parameter validation rejects invalid names/bounds while runtime res
     const cometEmitters = singleEngine.update(0, 0, quietFeatures)[0].emitters;
     expect(cometEmitters.filter(e => e.particle === "draw_comet")).toHaveLength(1);
     expect(cometEmitters.find(e => e.particle === "draw_comet")!.variables.length).toBeCloseTo(4.5, 4);
+});
+
+test("time_dial reverses pointer integration, window_beams switches group size, time_warp scales warp streaks, and starfield respects driftY", () => {
+    const dialEngine = new VfxEngine(createPerformanceProgram([
+        { tick: 0, effect: "time_dial", color: "#E6B87A", level: 80, scale: 100, op: "set", fade: 0, params: { pointerSpeed: 30, tilt: 0 } },
+        { tick: 40, effect: "time_dial", color: "#5E9EFF", level: 80, scale: 100, op: "set", fade: 0, params: { pointerSpeed: -120, tilt: 45 } },
+    ], 4));
+    const fwd1 = dialEngine.update(0, 0, quietFeatures)[0].emitters;
+    const fwd2 = dialEngine.update(0.8, 16, quietFeatures)[0].emitters;
+    const fwdHand1 = fwd1.filter(e => e.particle === "draw_stroke").at(-2)!;
+    const fwdHand2 = fwd2.filter(e => e.particle === "draw_stroke").at(-2)!;
+    // Clockwise forward (pointerSpeed > 0): 12 o'clock (tx=0, tz=1) rotates toward +x (tx > 0)
+    expect(fwdHand1.variables.tx).toBeCloseTo(0, 4);
+    expect(fwdHand2.variables.tx).toBeGreaterThan(0.1);
+    // Low tilt has ground ring and no rewind ghost hand
+    expect(fwd1.some(e => e.particle === "draw_plane")).toBe(true);
+    expect(fwd1.filter(e => e.particle === "draw_stroke")).toHaveLength(10);
+
+    const rev1 = dialEngine.update(1.6, 32, quietFeatures)[0].emitters;
+    const rev2 = dialEngine.update(2.4, 48, quietFeatures)[0].emitters;
+    const revHand1 = rev1.filter(e => e.particle === "draw_stroke").at(-3)!;
+    const revHand2 = rev2.filter(e => e.particle === "draw_stroke").at(-3)!;
+    // Reverse (pointerSpeed < 0) at high tilt (45°): counter-clockwise toward -x, omits ground ring, adds ghost hand
+    expect(revHand2.variables.tx).toBeLessThan(revHand1.variables.tx);
+    expect(rev1.some(e => e.particle === "draw_plane")).toBe(false);
+    expect(rev1.filter(e => e.particle === "draw_stroke")).toHaveLength(11);
+
+    for (const [beams, expectedCount] of [["single", 1], ["pair", 2], ["quad", 4]] as const) {
+        const wb = new VfxEngine(createSingleEffectProgram({
+            effect: "window_beams",
+            color: "#E6B87A",
+            level: 70,
+            params: { beams, angle: 35, length: 2.8 },
+        }));
+        const emitters = wb.update(0, 0, quietFeatures)[0].emitters;
+        expect(emitters.filter(e => e.particle === "shaft")).toHaveLength(expectedCount);
+    }
+
+    const warpLow = new VfxEngine(createSingleEffectProgram({
+        effect: "time_warp",
+        color: "#6CC4FF",
+        level: 80,
+        params: { warp: 0.2, streakLength: 1.5 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+    const warpHigh = new VfxEngine(createSingleEffectProgram({
+        effect: "time_warp",
+        color: "#FFF3D1",
+        level: 90,
+        params: { warp: 0.9, streakLength: 2.6 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+    expect(warpLow.filter(e => e.particle === "draw_comet")).toHaveLength(2);
+    expect(warpHigh.filter(e => e.particle === "draw_comet")).toHaveLength(4);
+
+    const sinkDust = new VfxEngine(createSingleEffectProgram({
+        effect: "starfield",
+        color: "#E6B87A",
+        level: 50,
+        params: { driftY: -0.1, speed: 1.0 },
+    })).update(0, 0, quietFeatures)[0].emitters[0];
+    expect(sinkDust.particle).toBe("draw_point");
+    expect(sinkDust.variables.vy).toBeCloseTo(-0.1, 4);
+});
+
+test("hanabi_shell renders shellStyle variants and flattens side-view depth, and sea_reflection responds to shimmer", () => {
+    const roundShell = new VfxEngine(createSingleEffectProgram({
+        effect: "hanabi_shell",
+        color: "#FF8FB8",
+        color2: "#FFE08A",
+        level: 90,
+        params: { shellStyle: "chrysanthemum", flatness: 0, tilt: 0, burstRadius: 2.0 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+    const flatShell = new VfxEngine(createSingleEffectProgram({
+        effect: "hanabi_shell",
+        color: "#6BE3FF",
+        color2: "#FFD978",
+        level: 90,
+        params: { shellStyle: "willow", flatness: 0.9, tilt: 50, burstRadius: 2.4 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+    const peonyShell = new VfxEngine(createSingleEffectProgram({
+        effect: "hanabi_shell",
+        color: "#FFE08A",
+        level: 85,
+        params: { shellStyle: "peony", flatness: 0, tilt: 0 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+
+    expect(roundShell.filter(e => e.particle === "draw_stroke")).toHaveLength(12);
+    expect(peonyShell.filter(e => e.particle === "draw_stroke")).toHaveLength(8);
+    expect(roundShell.at(-1)!.variables.depth_ratio).toBeCloseTo(0.92, 3);
+    expect(flatShell.at(-1)!.variables.depth_ratio).toBeLessThan(0.35);
+    expect(flatShell.at(-1)!.variables.life).toBeGreaterThan(roundShell.at(-1)!.variables.life);
+
+    const calmSea = new VfxEngine(createSingleEffectProgram({
+        effect: "sea_reflection",
+        color: "#28468C",
+        color2: "#8DB8FF",
+        level: 60,
+        params: { shimmer: 0.2, width: 2.8 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+    const brightSea = new VfxEngine(createSingleEffectProgram({
+        effect: "sea_reflection",
+        color: "#FFE08A",
+        color2: "#FF8FB8",
+        level: 85,
+        params: { shimmer: 0.95, width: 4.0 },
+    })).update(0, 0, quietFeatures)[0].emitters;
+    expect(calmSea.filter(e => e.particle === "draw_stroke")).toHaveLength(6);
+    expect(brightSea.at(-1)!.variables.twinkle).toBeGreaterThan(calmSea.at(-1)!.variables.twinkle);
+});
+
+test("compilePerformanceSource merges sections[].cues, sorts out-of-order cues, expands blackout except, and validates params", () => {
+    const cues = compilePerformanceSource({
+        song: "demo",
+        sections: [
+            {
+                at: 0,
+                label: "Intro",
+                cues: [
+                    { at: 2.0, op: "set", effect: "window_beams", color: "#E6B87A", level: 60, fade: 1.0, params: { beams: "pair" } },
+                    { at: 1.0, op: "set", effect: "starfield", color: "#8EB8FF", level: 40, fade: 0.5 },
+                ],
+            },
+            {
+                at: 5.0,
+                label: "Blackout",
+                cues: [
+                    { at: 5.0, op: "blackout", fade: 0.75, except: ["starfield"] },
+                    { at: 6.0, op: "blackout", fade: 0.5 },
+                ],
+            },
+        ],
+        cues: [
+            { at: 2.0, op: "set", effect: "key_style", variant: "stardust", color: "#FFF4DC", level: 80, fade: 0 },
+        ],
+    }, "demo");
+
+    // Sorted by tick: starfield (40), key_style (80, from top-level cues), window_beams (80, from section), blackout@5s, blackout@6s
+    expect(cues.map(c => `${c.tick}:${c.effect}:${c.level}`)).toEqual([
+        "40:starfield:40",
+        "80:key_style:80",
+        "80:window_beams:60",
+        "200:key_style:0",
+        "200:window_beams:0",
+        "240:starfield:0",
+    ]);
+    expect(cues[3]).toMatchObject({ op: "set", fade: 30, variant: "stardust" });
+    expect(cues[4]).toMatchObject({ op: "set", fade: 30, color: "#E6B87A" });
+    expect(cues[5]).toMatchObject({ op: "set", fade: 20, color: "#8EB8FF" });
+
+    expect(() => compilePerformanceSource({
+        song: "demo",
+        cues: [{ at: 0, op: "set", effect: "window_beams", color: "gold", level: 50, fade: 1.0, params: { angle: 999 } }],
+    }, "demo")).toThrow(/0 到 65/);
 });

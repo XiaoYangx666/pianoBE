@@ -21,9 +21,13 @@ import {
     VFX_THEMES,
 } from "../src";
 
-test("effect registry keeps all 33 effects valid, uniquely keyed and backed by the single atlas", () => {
-    expect(VFX_EFFECT_IDS).toHaveLength(33);
+test("effect registry keeps all registered effects valid, uniquely keyed, covering every category and backed by the single atlas", () => {
+    expect(VFX_EFFECT_IDS.length).toBeGreaterThanOrEqual(33);
     expect(new Set(VFX_EFFECT_IDS).size).toBe(VFX_EFFECT_IDS.length);
+    const categories = new Set(VFX_EFFECT_IDS.map(id => VFX_EFFECTS[id].category));
+    for (const required of ["atmosphere", "curve", "stage", "keys", "accent", "control"] as const) {
+        expect(categories.has(required)).toBe(true);
+    }
 
     for (const id of VFX_EFFECT_IDS) {
         const effect = VFX_EFFECTS[id];

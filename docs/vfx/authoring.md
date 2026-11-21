@@ -60,7 +60,9 @@ my_style: {
 
 制作定制曲目演出不需要新增专用播放器、修改运行时或改动 Core：
 
-1. 在 `midis/performances/<songId>.json` 编写提示序列（`op`: `"set"` 或 `"flash"`，`effect`: 任意已注册特效名，可选 `slot`、`brush`、`variant`、`zone`、`motion`、`params`、`fade`；其中数值型 `params` 在同一 `(effect, slot)` 通道上会随 `set` + `fade` 平滑渐变，未重复写出的参数沿用当前通道状态）：
+1. 在 `midis/performances/<songId>.json` 编写提示序列（`op`: `"set"`、`"flash"` 或 `"blackout"`，`effect`: 任意已注册特效名，可选 `slot`、`brush`、`variant`、`zone`、`motion`、`params`、`fade`；其中数值型 `params` 在同一 `(effect, slot)` 通道上会随 `set` + `fade` 平滑渐变，未重复写出的参数沿用当前通道状态）：
+   - 提示既可写在顶层 `cues`，也可直接内嵌在各 `sections[i].cues` 中；编译器 `compilePerformanceSource` 会自动合并并按 `at` 时间稳定排序，无需手动维护全局顺序。
+   - 使用 `{ "at": 80.75, "op": "blackout", "fade": 0.7, "except": ["starfield"] }` 可一键将当前所有激活通道淡出至 `level: 0`（并保留上一次的颜色/变体设置），免去逐通道重复清场。
    ```json
    {
      "at": 32,

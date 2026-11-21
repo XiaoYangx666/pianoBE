@@ -1,626 +1,808 @@
 {
   "song": "e1563b03",
-  "title": "Secret · 时门",
+  "title": "Secret · 旧琴房与倒转的二十年",
   "sections": [
     {
       "at": 0,
-      "label": "前奏 · 旧琴",
-      "note": "1.625 秒低 E 起音。外围浮起冷月 Bokeh 星尘，琴键上空升起银辉流萤音符 ♪。"
+      "label": "序幕 · 暗场",
+      "note": "琴房暗场留白，0.8 秒起微弱暖尘缓缓浮现。"
     },
     {
-      "at": 6.1,
-      "label": "主题 · 回声",
-      "note": "高音旋律进入。地面星环扫光展开主题，双翼流光彗星沿琴身两侧优雅盘旋，上方双螺旋星芒开始回旋。"
+      "at": 1.625,
+      "label": "第一幕 · 旧琴房",
+      "note": "E 小调巴赫对位起音，两道午后暖金高窗斜光切入琴房，琴键仅留克制微光。"
     },
     {
-      "at": 24.175,
-      "label": "发展 · 第一重时间",
-      "note": "跑动加密、低音加深。极光天幕与落樱花瓣在后景展开，32 秒时空光拱门起势，42 秒随高音走句染为琥珀暖金并亮起圣光扇束冠冕与琴键星座连线。"
+      "at": 13.125,
+      "label": "第二幕 · 古谱的秘密",
+      "note": "主题复现，极简时空表盘在地面低位顺时针缓缓启动，古谱魔力初醒。"
     },
     {
-      "at": 54.1,
-      "label": "回落 · 悬停",
-      "note": "高音跑动停顿，舞台收束为低暗冷月蓝星尘与微弱流萤，留白蓄势。"
+      "at": 24.4,
+      "label": "第三幕 · 琴声与悬停",
+      "note": "古典音阶流动，单侧丝光轻掠呼应右手走句；31.2 秒表盘减速悬停蓄势。"
     },
     {
-      "at": 64.075,
-      "label": "再现 · 时门开启",
-      "note": "主题再现。星辰法阵、时空光拱与双翼流光重燃；66.65s 与 71.075s 两次冰蓝琉璃棱晶时空回卷，仿佛时间倒流。"
+      "at": 33.325,
+      "label": "第四幕 · 逆转启动",
+      "note": "B7 全和弦与低音脉冲开启，地面扫光点亮，四束冷暖交叉追光切入，表盘开始倒转。"
     },
     {
-      "at": 72.025,
-      "label": "高潮 · 穿越",
-      "note": "72.05s 与 74.20s 双波密集高潮：地面冲击波扩散、全开圣光冠冕、耀金棱晶向外裂变与高空烟花盛放。"
+      "at": 41.775,
+      "label": "第五幕 · 第一重穿越",
+      "note": "表盘抬起加速倒转，时空裂隙光流与两翼丝光展开，浮尘反重力升腾，46 秒高音触发棱晶回卷。"
     },
     {
-      "at": 79.9,
-      "label": "尾奏 · 合拢",
-      "note": "最后一次银白碎晶轻柔回卷合拢，各通道依次淡出，星尘伴随踏板尾音收束于 86.1 秒。"
+      "at": 52.575,
+      "label": "第六幕 · 空间压缩",
+      "note": "琴房坍塌前的紧绷压迫：追光灯位向内收窄，表盘半径收缩、深钴蓝背光随低音持续呼吸。"
+    },
+    {
+      "at": 63.825,
+      "label": "第七幕 · 加速破壁",
+      "note": "第二重高音冲刺，表盘与追光骤然外扩，时空裂隙畸变加剧，69 秒再度高音回卷。"
+    },
+    {
+      "at": 71.35,
+      "label": "第八幕 · 急促的琴键",
+      "note": "终极狂想高潮：单环重拍冲击、圣光扇束全开、表盘高速倒转、时空裂隙与彗星撕裂穿过舞台，77 秒归于炽白金穿透之光。"
+    },
+    {
+      "at": 80.725,
+      "label": "间歇 · Blackout",
+      "note": "终极和弦落下伴随轻柔回卷，全部舞台灯阵于 0.7 秒内骤收熄灭。"
+    },
+    {
+      "at": 81.675,
+      "label": "尾声 · 1979 的晨光",
+      "note": "0.95 秒静默后孤音 E7 响起，舞台仅余唯一一道暖金斜窗晨光与缓降微尘，渐暗收束于 86.1 秒。"
     }
   ],
   "cues": [
     {
-      "at": 1.625,
+      "at": 0.8,
+      "op": "set",
       "effect": "starfield",
-      "color": "moon",
-      "color2": "silver",
-      "motion": "gentle",
-      "level": 52,
+      "variant": "points",
+      "brush": "mote",
+      "color": "#E6B87A",
+      "color2": "#FFF1D6",
+      "level": 20,
       "scale": 100,
-      "fade": 2.2
+      "fade": 0.8,
+      "params": { "radius": 2.1, "speed": 0.45, "particleSize": 0.05, "driftY": -0.04 }
     },
     {
       "at": 1.625,
-      "effect": "key_notes",
-      "color": "silver",
-      "color2": "ice",
-      "brush": "note",
-      "level": 64,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#E6B87A",
+      "color2": "#FFF1D6",
+      "level": 42,
       "scale": 100,
-      "fade": 1.8
+      "fade": 2.2,
+      "params": { "beams": "pair", "angle": 42, "spread": 2.5, "length": 2.5, "width": 0.68 }
     },
     {
       "at": 1.625,
+      "op": "set",
       "effect": "key_style",
-      "variant": "stardust",
-      "color": "silver",
-      "color2": "ice",
-      "level": 85,
+      "variant": "glimmer",
+      "color": "#E6B87A",
+      "color2": "#FFF1D6",
+      "level": 75,
       "scale": 100,
       "fade": 0
     },
     {
-      "at": 6.1,
-      "effect": "wing_ribbons",
-      "color": "ice",
-      "color2": "silver",
-      "level": 54,
-      "scale": 98,
-      "fade": 2.2
-    },
-    {
-      "at": 6.45,
-      "effect": "floor_sweep",
-      "color": "silver",
-      "color2": "ice",
-      "level": 62,
-      "scale": 98
-    },
-    {
-      "at": 6.5,
-      "effect": "double_helix",
-      "color": "aurora",
-      "color2": "ice",
+      "at": 13.125,
+      "op": "set",
+      "effect": "time_dial",
       "brush": "star",
-      "zone": "high",
-      "level": 46,
+      "color": "#E6B87A",
+      "color2": "#C7D8F0",
+      "level": 30,
       "scale": 100,
-      "fade": 2.8
+      "fade": 2.6,
+      "params": { "radius": 2.25, "pointerSpeed": 18, "tilt": 0, "lineWidth": 0.075 }
     },
     {
-      "at": 13.9,
-      "effect": "starfield",
-      "color": "moon",
-      "color2": "aurora",
-      "motion": "gentle",
-      "level": 60,
-      "scale": 108,
-      "fade": 3.6
+      "at": 13.125,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#E6B87A",
+      "color2": "#FFF1D6",
+      "level": 52,
+      "scale": 100,
+      "fade": 3.0,
+      "params": { "beams": "pair", "angle": 36, "spread": 2.4, "length": 2.7, "width": 0.7 }
     },
     {
-      "at": 18.1,
-      "effect": "wing_ribbons",
-      "color": "ice",
-      "color2": "aurora",
-      "level": 42,
-      "scale": 96,
-      "fade": 3
-    },
-    {
-      "at": 24.175,
-      "effect": "aurora_veil",
-      "color": "aurora",
-      "color2": "ice",
-      "level": 56,
-      "scale": 104,
-      "fade": 3.2
-    },
-    {
-      "at": 24.175,
-      "effect": "wing_ribbons",
-      "color": "aurora",
-      "color2": "ice",
-      "level": 64,
-      "scale": 104,
-      "fade": 2.4
-    },
-    {
-      "at": 24.175,
-      "effect": "key_notes",
-      "color": "ice",
-      "color2": "silver",
-      "brush": "note",
-      "level": 74,
-      "scale": 104,
-      "fade": 2.2
-    },
-    {
-      "at": 24.175,
+      "at": 13.125,
+      "op": "set",
       "effect": "key_style",
-      "variant": "blue_tears",
-      "color": "aurora",
-      "color2": "ice",
-      "level": 90,
-      "scale": 100,
-      "fade": 2.2
-    },
-    {
-      "at": 32.4,
-      "effect": "portal_arch",
-      "color": "aurora",
-      "color2": "ice",
+      "variant": "stardust",
+      "color": "#E6B87A",
+      "color2": "#DCEBFF",
       "level": 58,
-      "scale": 104,
-      "fade": 2.8
-    },
-    {
-      "at": 32.4,
-      "effect": "double_helix",
-      "color": "aurora",
-      "color2": "cyan",
-      "brush": "star",
-      "zone": "high",
-      "level": 34,
-      "scale": 104,
-      "fade": 3
-    },
-    {
-      "at": 40,
-      "effect": "double_helix",
-      "color": "aurora",
-      "brush": "star",
-      "zone": "high",
-      "level": 0,
-      "scale": 98,
-      "fade": 2
-    },
-    {
-      "at": 41.2,
-      "effect": "key_notes",
-      "color": "ice",
-      "brush": "note",
-      "level": 0,
       "scale": 100,
-      "fade": 0.8
+      "fade": 2.0
     },
     {
-      "at": 42.025,
-      "effect": "wing_ribbons",
-      "color": "amber",
-      "color2": "gold",
-      "level": 80,
-      "scale": 110,
-      "fade": 1.6
-    },
-    {
-      "at": 42.025,
-      "effect": "crown_fan",
-      "color": "amber",
-      "color2": "gold",
-      "level": 62,
-      "scale": 108,
-      "fade": 1.8
-    },
-    {
-      "at": 42.025,
-      "effect": "key_constellation",
-      "color": "amber",
-      "color2": "gold",
-      "brush": "star",
-      "level": 84,
-      "scale": 108,
-      "fade": 1.5
-    },
-    {
-      "at": 42.025,
-      "effect": "key_style",
-      "variant": "magic_trail",
-      "color": "amber",
-      "color2": "gold",
-      "level": 95,
-      "scale": 100,
-      "fade": 1.6
-    },
-    {
-      "at": 48.5,
-      "effect": "aurora_veil",
-      "color": "aurora",
-      "level": 0,
-      "scale": 96,
-      "fade": 3.5
-    },
-    {
-      "at": 49,
-      "effect": "crown_fan",
-      "color": "amber",
-      "color2": "moon",
-      "level": 24,
-      "scale": 96,
-      "fade": 3.2
-    },
-    {
-      "at": 49,
-      "effect": "portal_arch",
-      "color": "aurora",
-      "color2": "moon",
-      "level": 26,
-      "scale": 96,
-      "fade": 3.5
-    },
-    {
-      "at": 53.6,
-      "effect": "key_constellation",
-      "color": "silver",
-      "brush": "star",
-      "level": 0,
-      "scale": 96,
-      "fade": 1.2
-    },
-    {
-      "at": 53.95,
-      "effect": "wing_ribbons",
-      "color": "ice",
-      "level": 0,
-      "scale": 92,
-      "fade": 2
-    },
-    {
-      "at": 54.1,
-      "effect": "starfield",
-      "color": "moon",
-      "color2": "silver",
-      "motion": "gentle",
-      "level": 46,
-      "scale": 102,
-      "fade": 3.2
-    },
-    {
-      "at": 54.1,
-      "effect": "crown_fan",
-      "color": "moon",
-      "level": 0,
-      "scale": 92,
-      "fade": 1.8
-    },
-    {
-      "at": 54.1,
-      "effect": "portal_arch",
-      "color": "moon",
-      "level": 0,
-      "scale": 92,
-      "fade": 1.8
-    },
-    {
-      "at": 54.1,
-      "effect": "key_notes",
-      "color": "silver",
-      "color2": "moon",
-      "brush": "note",
+      "at": 24.4,
+      "op": "set",
+      "effect": "silk_streams",
+      "variant": "right",
+      "color": "#EBA95E",
+      "color2": "#A8CEFF",
       "level": 48,
       "scale": 98,
-      "fade": 2
+      "fade": 1.8,
+      "params": { "width": 0.17, "length": 1.35, "bend": 0.65, "speed": 0.72 }
     },
     {
-      "at": 54.1,
-      "effect": "key_style",
-      "variant": "snow",
-      "color": "silver",
-      "color2": "moon",
-      "level": 75,
-      "scale": 100,
-      "fade": 2
-    },
-    {
-      "at": 64.075,
-      "effect": "magic_circle",
-      "color": "ice",
-      "color2": "amber",
-      "brush": "star",
-      "zone": "low",
-      "level": 64,
-      "scale": 105,
-      "fade": 2.2
-    },
-    {
-      "at": 64.075,
-      "effect": "portal_arch",
-      "color": "ice",
-      "color2": "amber",
-      "level": 66,
-      "scale": 106,
-      "fade": 2.4
-    },
-    {
-      "at": 64.075,
-      "effect": "wing_ribbons",
-      "color": "amber",
-      "color2": "gold",
-      "level": 72,
-      "scale": 108,
-      "fade": 2.4
-    },
-    {
-      "at": 64.075,
-      "effect": "key_notes",
-      "color": "amber",
-      "color2": "gold",
-      "brush": "note",
-      "level": 84,
-      "scale": 110,
-      "fade": 2.2
-    },
-    {
-      "at": 64.075,
-      "effect": "key_style",
-      "variant": "prism_shards",
-      "color": "ice",
-      "color2": "amber",
-      "level": 95,
-      "scale": 100,
-      "fade": 1.8
-    },
-    {
-      "at": 66.65,
-      "effect": "prism_rewind",
-      "color": "ice",
-      "color2": "silver",
-      "brush": "shard",
-      "level": 62,
-      "scale": 96
-    },
-    {
-      "at": 70.05,
+      "at": 24.4,
+      "op": "set",
       "effect": "starfield",
-      "color": "amber",
-      "color2": "gold",
-      "level": 66,
-      "scale": 116,
-      "fade": 2
-    },
-    {
-      "at": 71.075,
-      "effect": "prism_rewind",
-      "color": "ice",
-      "color2": "cyan",
-      "brush": "shard",
-      "level": 82,
-      "scale": 108
-    },
-    {
-      "at": 71.45,
-      "effect": "portal_arch",
-      "color": "amber",
-      "level": 0,
+      "variant": "points",
+      "brush": "mote",
+      "color": "#EBA95E",
+      "color2": "#A8CEFF",
+      "level": 30,
       "scale": 100,
-      "fade": 0.6
+      "fade": 2.4,
+      "params": { "radius": 2.3, "speed": 0.6, "particleSize": 0.055, "driftY": 0.02 }
     },
     {
-      "at": 71.45,
-      "effect": "magic_circle",
-      "color": "amber",
+      "at": 31.2,
+      "op": "set",
+      "effect": "time_dial",
       "brush": "star",
-      "zone": "low",
-      "level": 0,
+      "color": "#A8CEFF",
+      "color2": "#EBA95E",
+      "level": 42,
       "scale": 100,
-      "fade": 0.6
+      "fade": 1.65,
+      "params": { "radius": 2.35, "pointerSpeed": 0, "tilt": 0, "lineWidth": 0.08 }
     },
     {
-      "at": 72.025,
-      "effect": "starfield",
-      "color": "amber",
-      "color2": "gold",
-      "motion": "intense",
-      "level": 76,
-      "scale": 116,
-      "fade": 0.35
-    },
-    {
-      "at": 72.025,
-      "effect": "crown_fan",
-      "color": "gold",
-      "color2": "amber",
-      "motion": "intense",
-      "level": 88,
-      "scale": 116,
+      "at": 32.6,
+      "op": "set",
+      "effect": "silk_streams",
+      "variant": "right",
+      "color": "#A8CEFF",
+      "level": 0,
+      "scale": 96,
       "fade": 0.65
     },
     {
-      "at": 72.025,
-      "effect": "wing_ribbons",
-      "color": "gold",
-      "color2": "amber",
-      "motion": "intense",
-      "level": 84,
-      "scale": 114,
-      "fade": 0.9
-    },
-    {
-      "at": 72.025,
-      "effect": "key_style",
-      "variant": "magic_trail",
-      "color": "gold",
-      "color2": "ivory",
-      "motion": "intense",
-      "level": 100,
-      "scale": 100,
-      "fade": 0.4
-    },
-    {
-      "at": 72.05,
-      "effect": "shockwave",
-      "color": "gold",
-      "color2": "amber",
-      "level": 82,
-      "scale": 106
-    },
-    {
-      "at": 72.35,
-      "effect": "prism_rewind",
-      "color": "gold",
-      "color2": "amber",
-      "brush": "shard",
-      "motion": "reverse",
-      "level": 80,
-      "scale": 108
-    },
-    {
-      "at": 72.8,
-      "effect": "firework_bloom",
-      "color": "gold",
-      "color2": "rose",
-      "brush": "spark",
-      "level": 74,
-      "scale": 106
-    },
-    {
-      "at": 74.175,
-      "effect": "starfield",
-      "color": "gold",
-      "color2": "ivory",
-      "motion": "intense",
-      "level": 84,
-      "scale": 120,
-      "fade": 0.35
-    },
-    {
-      "at": 74.175,
-      "effect": "crown_fan",
-      "color": "gold",
-      "color2": "ivory",
-      "motion": "intense",
-      "level": 96,
-      "scale": 120,
-      "fade": 0.55
-    },
-    {
-      "at": 74.175,
-      "effect": "wing_ribbons",
-      "color": "gold",
-      "color2": "rose",
-      "motion": "intense",
-      "level": 92,
-      "scale": 116,
-      "fade": 0.85
-    },
-    {
-      "at": 74.2,
-      "effect": "shockwave",
-      "color": "gold",
-      "color2": "ivory",
-      "level": 96,
-      "scale": 112
-    },
-    {
-      "at": 74.55,
-      "effect": "prism_rewind",
-      "color": "gold",
-      "color2": "ivory",
-      "brush": "shard",
-      "motion": "reverse",
-      "level": 92,
-      "scale": 114
-    },
-    {
-      "at": 74.95,
-      "effect": "firework_bloom",
-      "color": "gold",
-      "color2": "rose",
-      "brush": "spark",
-      "level": 92,
-      "scale": 114
-    },
-    {
-      "at": 78,
-      "effect": "wing_ribbons",
-      "color": "silver",
-      "color2": "moon",
-      "motion": "gentle",
-      "level": 36,
+      "at": 32.6,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#EBA95E",
+      "color2": "#A8CEFF",
+      "level": 24,
       "scale": 98,
+      "fade": 0.65,
+      "params": { "beams": "pair", "angle": 30, "spread": 2.25, "length": 2.2 }
+    },
+    {
+      "at": 33.325,
+      "op": "flash",
+      "effect": "floor_sweep",
+      "color": "#5E9EFF",
+      "color2": "#F0B96B",
+      "level": 72,
+      "scale": 102,
+      "params": { "extent": 2.3, "width": 0.16, "speed": 0.28 }
+    },
+    {
+      "at": 33.325,
+      "op": "set",
+      "effect": "time_dial",
+      "brush": "star",
+      "color": "#5E9EFF",
+      "color2": "#F0B96B",
+      "level": 62,
+      "scale": 100,
+      "fade": 1.4,
+      "params": { "radius": 2.5, "pointerSpeed": -54, "tilt": 12, "lineWidth": 0.085 }
+    },
+    {
+      "at": 33.325,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#F0B96B",
+      "color2": "#5E9EFF",
+      "level": 64,
+      "scale": 102,
+      "fade": 1.6,
+      "params": { "beams": "quad", "angle": 26, "spread": 2.2, "length": 2.6, "width": 0.56 }
+    },
+    {
+      "at": 33.325,
+      "op": "set",
+      "effect": "light_pillars",
+      "variant": "backline",
+      "color": "#4A7EC7",
+      "color2": "#8EB8FF",
+      "level": 44,
+      "scale": 100,
+      "fade": 1.8,
+      "params": { "length": 1.35, "width": 0.2, "spread": 1.05 }
+    },
+    {
+      "at": 33.325,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "stardust",
+      "color": "#5E9EFF",
+      "color2": "#F0B96B",
+      "level": 78,
+      "scale": 100,
       "fade": 1.2
     },
     {
-      "at": 78.5,
-      "effect": "crown_fan",
-      "color": "silver",
+      "at": 41.775,
+      "op": "set",
+      "effect": "time_dial",
+      "brush": "star",
+      "color": "#6CC4FF",
+      "color2": "#FFD98A",
+      "level": 76,
+      "scale": 104,
+      "fade": 1.8,
+      "params": { "radius": 2.65, "pointerSpeed": -108, "tilt": 34, "lineWidth": 0.09 }
+    },
+    {
+      "at": 41.775,
+      "op": "set",
+      "effect": "time_warp",
+      "brush": "shard",
+      "color": "#6CC4FF",
+      "color2": "#FFD98A",
+      "level": 64,
+      "scale": 102,
+      "fade": 1.8,
+      "params": { "radius": 2.6, "speed": 1.15, "warp": 0.48, "streakLength": 1.65 }
+    },
+    {
+      "at": 41.775,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#8EE0FF",
+      "color2": "#FFD98A",
+      "level": 50,
+      "scale": 105,
+      "fade": 2.0,
+      "params": { "radius": 2.6, "speed": 0.9, "particleSize": 0.06, "driftY": 0.28 }
+    },
+    {
+      "at": 41.775,
+      "op": "set",
+      "effect": "wing_ribbons",
+      "color": "#6CC4FF",
+      "color2": "#FFD98A",
+      "level": 52,
+      "scale": 102,
+      "fade": 1.8,
+      "params": { "radius": 1.55, "height": 1.05, "spread": 0.74, "width": 0.105 }
+    },
+    {
+      "at": 41.775,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "prism_shards",
+      "color": "#6CC4FF",
+      "color2": "#FFD98A",
+      "level": 86,
+      "scale": 100,
+      "fade": 1.5
+    },
+    {
+      "at": 46.0,
+      "op": "flash",
+      "effect": "prism_rewind",
+      "brush": "shard",
+      "color": "#8EE0FF",
+      "color2": "#FFD98A",
+      "level": 76,
+      "scale": 104,
+      "params": { "radius": 2.6, "speed": 1.15 }
+    },
+    {
+      "at": 52.575,
+      "op": "set",
+      "effect": "wing_ribbons",
+      "color": "#3B62B8",
       "level": 0,
-      "scale": 95,
+      "scale": 96,
       "fade": 1.6
     },
     {
-      "at": 79.55,
-      "effect": "wing_ribbons",
-      "color": "silver",
+      "at": 52.575,
+      "op": "set",
+      "effect": "time_warp",
+      "color": "#3B62B8",
       "level": 0,
-      "scale": 90,
-      "fade": 1.45
+      "scale": 96,
+      "fade": 1.6
     },
     {
-      "at": 79.9,
+      "at": 52.575,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#3B62B8",
+      "color2": "#B86B35",
+      "level": 46,
+      "scale": 96,
+      "fade": 2.2,
+      "params": { "beams": "quad", "angle": 16, "spread": 1.55, "length": 1.85, "width": 0.48 }
+    },
+    {
+      "at": 52.575,
+      "op": "set",
+      "effect": "time_dial",
+      "brush": "star",
+      "color": "#3B62B8",
+      "color2": "#C98548",
+      "level": 52,
+      "scale": 96,
+      "fade": 2.0,
+      "params": { "radius": 2.05, "pointerSpeed": -66, "tilt": 18, "lineWidth": 0.08 }
+    },
+    {
+      "at": 52.575,
+      "op": "set",
+      "effect": "light_pillars",
+      "variant": "backline",
+      "color": "#3B62B8",
+      "color2": "#5E9EFF",
+      "level": 38,
+      "scale": 96,
+      "fade": 2.0,
+      "params": { "length": 1.1, "width": 0.18, "spread": 0.8 }
+    },
+    {
+      "at": 52.575,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#5E9EFF",
+      "color2": "#C98548",
+      "level": 34,
+      "scale": 98,
+      "fade": 2.0,
+      "params": { "radius": 2.1, "speed": 0.65, "particleSize": 0.052, "driftY": 0.08 }
+    },
+    {
+      "at": 52.575,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "stardust",
+      "color": "#5E9EFF",
+      "color2": "#C98548",
+      "level": 62,
+      "scale": 98,
+      "fade": 1.5
+    },
+    {
+      "at": 63.825,
+      "op": "set",
+      "effect": "time_dial",
+      "brush": "star",
+      "color": "#8EE0FF",
+      "color2": "#FFC864",
+      "level": 84,
+      "scale": 106,
+      "fade": 2.0,
+      "params": { "radius": 2.85, "pointerSpeed": -162, "tilt": 48, "lineWidth": 0.095 }
+    },
+    {
+      "at": 63.825,
+      "op": "set",
+      "effect": "time_warp",
+      "brush": "shard",
+      "color": "#8EE0FF",
+      "color2": "#FFC864",
+      "level": 78,
+      "scale": 106,
+      "fade": 1.8,
+      "params": { "radius": 2.75, "speed": 1.85, "warp": 0.75, "streakLength": 2.2 }
+    },
+    {
+      "at": 63.825,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#8EE0FF",
+      "color2": "#FFC864",
+      "level": 72,
+      "scale": 105,
+      "fade": 2.0,
+      "params": { "beams": "quad", "angle": 32, "spread": 2.9, "length": 2.9, "width": 0.65 }
+    },
+    {
+      "at": 63.825,
+      "op": "set",
+      "effect": "light_pillars",
+      "variant": "backline",
+      "color": "#6CC4FF",
+      "color2": "#FFC864",
+      "level": 62,
+      "scale": 104,
+      "fade": 2.0,
+      "params": { "length": 1.85, "width": 0.22, "spread": 1.25 }
+    },
+    {
+      "at": 63.825,
+      "op": "set",
+      "effect": "wave_ribbon",
+      "variant": "points",
+      "brush": "star",
+      "color": "#8EE0FF",
+      "color2": "#FFC864",
+      "level": 52,
+      "scale": 104,
+      "fade": 2.0,
+      "params": { "amplitude": 0.28, "radius": 1.15, "speed": 1.3 }
+    },
+    {
+      "at": 63.825,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "prism_shards",
+      "color": "#8EE0FF",
+      "color2": "#FFC864",
+      "level": 95,
+      "scale": 100,
+      "fade": 1.5
+    },
+    {
+      "at": 69.0,
+      "op": "flash",
       "effect": "prism_rewind",
-      "color": "silver",
-      "color2": "moon",
+      "brush": "shard",
+      "color": "#8EE0FF",
+      "color2": "#FFF3D1",
+      "level": 86,
+      "scale": 108,
+      "params": { "radius": 2.85, "speed": 1.4 }
+    },
+    {
+      "at": 69.0,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#8EE0FF",
+      "color2": "#FFF3D1",
+      "level": 62,
+      "scale": 110,
+      "fade": 1.2,
+      "params": { "radius": 2.85, "speed": 1.25, "particleSize": 0.064, "driftY": 0.42 }
+    },
+    {
+      "at": 71.0,
+      "op": "set",
+      "effect": "wave_ribbon",
+      "variant": "points",
+      "brush": "star",
+      "color": "#8EE0FF",
+      "level": 0,
+      "scale": 104,
+      "fade": 0.35
+    },
+    {
+      "at": 71.35,
+      "op": "flash",
+      "effect": "shockwave",
+      "color": "#FFF3D1",
+      "color2": "#8EE0FF",
+      "level": 88,
+      "scale": 106,
+      "params": { "radius": 3.4, "spikeLength": 2.4, "dualRing": false }
+    },
+    {
+      "at": 71.35,
+      "op": "flash",
+      "effect": "prism_rewind",
+      "brush": "shard",
+      "motion": "reverse",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "level": 86,
+      "scale": 108,
+      "params": { "radius": 3.0, "speed": 1.5 }
+    },
+    {
+      "at": 71.35,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#FFB347",
+      "color2": "#FFF3D1",
+      "motion": "intense",
+      "level": 86,
+      "scale": 110,
+      "fade": 0.6,
+      "params": { "length": 1.85, "width": 0.24, "spread": 1.2 }
+    },
+    {
+      "at": 71.35,
+      "op": "set",
+      "effect": "time_dial",
+      "brush": "star",
+      "color": "#FFF3D1",
+      "color2": "#8EE0FF",
+      "level": 92,
+      "scale": 110,
+      "fade": 0.6,
+      "params": { "radius": 3.05, "pointerSpeed": -240, "tilt": 62, "lineWidth": 0.11 }
+    },
+    {
+      "at": 71.35,
+      "op": "set",
+      "effect": "time_warp",
+      "brush": "shard",
+      "motion": "intense",
+      "color": "#FFF3D1",
+      "color2": "#8EE0FF",
+      "level": 92,
+      "scale": 110,
+      "fade": 0.6,
+      "params": { "radius": 2.95, "speed": 2.55, "warp": 1.0, "streakLength": 2.85 }
+    },
+    {
+      "at": 71.35,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "level": 72,
+      "scale": 112,
+      "fade": 0.5,
+      "params": { "radius": 3.1, "speed": 1.5, "particleSize": 0.068, "driftY": 0.55 }
+    },
+    {
+      "at": 71.35,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "magic_trail",
+      "motion": "intense",
+      "color": "#FFB347",
+      "color2": "#FFF3D1",
+      "level": 100,
+      "scale": 100,
+      "fade": 0.35
+    },
+    {
+      "at": 74.2,
+      "op": "flash",
+      "effect": "shockwave",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "level": 94,
+      "scale": 112,
+      "params": { "radius": 3.7, "spikeLength": 2.8, "dualRing": false }
+    },
+    {
+      "at": 74.2,
+      "op": "flash",
+      "effect": "comet_split",
+      "brush": "star",
+      "color": "#FFF3D1",
+      "color2": "#8EE0FF",
+      "level": 82,
+      "scale": 108,
+      "params": { "length": 3.6, "speed": 2.1, "split": true }
+    },
+    {
+      "at": 77.0,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "level": 88,
+      "scale": 110,
+      "fade": 1.2,
+      "params": { "beams": "quad", "angle": 36, "spread": 3.1, "length": 3.2, "width": 0.72 }
+    },
+    {
+      "at": 77.0,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "motion": "intense",
+      "level": 94,
+      "scale": 112,
+      "fade": 1.2,
+      "params": { "length": 2.05, "width": 0.26, "spread": 1.28 }
+    },
+    {
+      "at": 77.0,
+      "op": "set",
+      "effect": "time_dial",
+      "brush": "star",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "level": 96,
+      "scale": 112,
+      "fade": 1.2,
+      "params": { "radius": 3.15, "pointerSpeed": -270, "tilt": 65, "lineWidth": 0.115 }
+    },
+    {
+      "at": 77.0,
+      "op": "set",
+      "effect": "time_warp",
+      "brush": "shard",
+      "motion": "intense",
+      "color": "#FFF3D1",
+      "color2": "#FFB347",
+      "level": 96,
+      "scale": 112,
+      "fade": 1.2,
+      "params": { "radius": 3.05, "speed": 2.8, "warp": 1.0, "streakLength": 3.1 }
+    },
+    {
+      "at": 77.0,
+      "op": "set",
+      "effect": "light_pillars",
+      "variant": "backline",
+      "color": "#FFE29A",
+      "color2": "#FFF3D1",
+      "level": 74,
+      "scale": 108,
+      "fade": 1.0,
+      "params": { "length": 2.0, "width": 0.24, "spread": 1.3 }
+    },
+    {
+      "at": 80.725,
+      "op": "flash",
+      "effect": "prism_rewind",
       "brush": "shard",
       "motion": "gentle",
-      "level": 54,
-      "scale": 92
+      "color": "#FFF3D1",
+      "color2": "#E6B87A",
+      "level": 48,
+      "scale": 96,
+      "params": { "radius": 2.2, "speed": 0.75 }
     },
     {
-      "at": 79.9,
-      "effect": "key_notes",
-      "color": "silver",
-      "brush": "note",
+      "at": 80.75,
+      "op": "set",
+      "effect": "crown_fan",
+      "color": "#FFF3D1",
       "level": 0,
-      "scale": 92,
-      "fade": 1.8
+      "scale": 96,
+      "fade": 0.7
     },
     {
-      "at": 79.9,
+      "at": 80.75,
+      "op": "set",
+      "effect": "time_warp",
+      "color": "#FFF3D1",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.7
+    },
+    {
+      "at": 80.75,
+      "op": "set",
+      "effect": "time_dial",
+      "color": "#FFF3D1",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.7
+    },
+    {
+      "at": 80.75,
+      "op": "set",
+      "effect": "light_pillars",
+      "variant": "backline",
+      "color": "#FFF3D1",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.7
+    },
+    {
+      "at": 80.75,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#FFF3D1",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.7
+    },
+    {
+      "at": 80.75,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#FFF3D1",
+      "level": 0,
+      "scale": 96,
+      "fade": 0.7
+    },
+    {
+      "at": 80.75,
+      "op": "set",
       "effect": "key_style",
-      "variant": "stardust",
-      "color": "silver",
-      "color2": "moon",
+      "variant": "magic_trail",
+      "color": "#FFF3D1",
+      "level": 0,
+      "scale": 100,
+      "fade": 0.7
+    },
+    {
+      "at": 81.675,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#F2D29B",
+      "color2": "#FFF8EB",
+      "level": 36,
+      "scale": 100,
+      "fade": 0.45,
+      "params": { "beams": "single", "angle": 38, "spread": 2.1, "length": 2.6, "width": 0.75 }
+    },
+    {
+      "at": 81.675,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#F2D29B",
+      "color2": "#FFF8EB",
+      "level": 28,
+      "scale": 100,
+      "fade": 0.8,
+      "params": { "radius": 2.1, "speed": 0.35, "particleSize": 0.05, "driftY": -0.04 }
+    },
+    {
+      "at": 81.675,
+      "op": "set",
+      "effect": "key_style",
+      "variant": "glimmer",
+      "color": "#FFF8EB",
+      "color2": "#F2D29B",
       "level": 65,
       "scale": 100,
-      "fade": 1.8
+      "fade": 0.2
     },
     {
-      "at": 81.35,
-      "effect": "starfield",
-      "color": "moon",
-      "color2": "silver",
-      "motion": "gentle",
-      "level": 24,
-      "scale": 102,
-      "fade": 1.6
-    },
-    {
-      "at": 82.45,
-      "effect": "starfield",
-      "color": "moon",
-      "motion": "gentle",
+      "at": 83.8,
+      "op": "set",
+      "effect": "window_beams",
+      "color": "#F2D29B",
       "level": 0,
-      "scale": 94,
-      "fade": 1.65
+      "scale": 96,
+      "fade": 2.1
     },
     {
-      "at": 82.45,
+      "at": 83.8,
+      "op": "set",
+      "effect": "starfield",
+      "variant": "points",
+      "brush": "mote",
+      "color": "#F2D29B",
+      "level": 0,
+      "scale": 96,
+      "fade": 2.1
+    },
+    {
+      "at": 83.8,
+      "op": "set",
       "effect": "key_style",
-      "variant": "stardust",
-      "color": "moon",
+      "variant": "glimmer",
+      "color": "#FFF8EB",
       "level": 0,
       "scale": 100,
-      "fade": 1.65
+      "fade": 2.1
     }
   ]
 }

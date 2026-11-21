@@ -10,6 +10,7 @@ const STARFIELD_PARAMS = {
     radius: { label: "覆盖半径", default: 2.25, min: 0.8, max: 4.2, step: 0.1 },
     speed: { label: "漂浮速度", default: 1.0, min: 0.2, max: 2.5, step: 0.1 },
     particleSize: { label: "星尘大小", default: 0.055, min: 0.02, max: 0.15, step: 0.005 },
+    driftY: { label: "垂直漂浮", default: 0.07, min: -0.6, max: 0.8, step: 0.05 },
 } as const satisfies VfxParameterSchema;
 
 const PETAL_FALL_PARAMS = {
@@ -79,6 +80,7 @@ export const ATMOSPHERE_EFFECTS = {
                 variant !== "cinema" && (
                     (brush !== undefined && brush !== "mote" && brush !== "default")
                     || zone !== "stage"
+                    || Math.abs(c.driftY - STARFIELD_PARAMS.driftY.default) > 1e-4
                 )
             );
             if (!usePoints) {
@@ -115,7 +117,7 @@ export const ATMOSPHERE_EFFECTS = {
                     sizeEnd: (c.particleSize / 0.055) * 0.04,
                     sizeJitter: 0.45,
                     spread: [2.8 * radiusScale * m.spread, 0.95, 2.2 * radiusScale * m.spread],
-                    velocity: [0, 0.07 * c.speed * m.dir * m.speed, 0],
+                    velocity: [0, c.driftY * c.speed * m.dir * m.speed, 0],
                     flutter: 0.14 * m.energy,
                     twinkle: 0.65,
                     fadeIn: 0.35,

@@ -1,21 +1,24 @@
+import { colorVars, hexToUnitRgb } from "../color";
 import {
-    catmullRom, motionFactors, sampleArch, sampleStarPolygon, zoneBaseY, ZONE_Y_OFFSET,
+    catmullRom, motionFactors, sampleArch, sampleStarPolygon, zoneBaseY, ZONE_Y_OFFSET, type Point3,
 } from "../geometry";
 import { resolveSchemaParams } from "../parameters";
 import {
     drawComet, drawGroundRing, drawPoints, drawPolygonFrame, drawShaft, drawStrokeSegments,
     resolvePointBrush, resolveStrokeBrush,
 } from "../primitives";
-import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
+import type { VfxEffectDefinition, VfxEmitter, VfxParameterSchema } from "../types";
 
 const LIGHT_PILLARS_PARAMS = {
     length: { label: "光束长度", default: 1.28, min: 0.5, max: 2.4, step: 0.1 },
     width: { label: "光束宽度", default: 0.21, min: 0.08, max: 0.5, step: 0.01 },
+    spread: { label: "横向展开", default: 1.0, min: 0.5, max: 1.6, step: 0.05 },
 } as const satisfies VfxParameterSchema;
 
 const CROWN_FAN_PARAMS = {
     length: { label: "光束长度", default: 1.10, min: 0.5, max: 2.4, step: 0.1 },
     width: { label: "光束宽度", default: 0.22, min: 0.08, max: 0.5, step: 0.01 },
+    spread: { label: "横向展开", default: 1.0, min: 0.5, max: 1.6, step: 0.05 },
 } as const satisfies VfxParameterSchema;
 
 const STAGE_TRUSS_PARAMS = {
@@ -34,6 +37,66 @@ const PORTAL_ARCH_PARAMS = {
     height: { label: "拱门高度", default: 2.35, min: 1.0, max: 4.5, step: 0.1 },
     lineWidth: { label: "光弧宽度", default: 0.155, min: 0.06, max: 0.35, step: 0.01 },
 } as const satisfies VfxParameterSchema;
+
+const WINDOW_BEAMS_PARAMS = {
+    angle: { label: "照射倾角", default: 34, min: 0, max: 65, step: 2 },
+    spread: { label: "灯位跨度", default: 2.35, min: 1.0, max: 3.8, step: 0.1 },
+    length: { label: "光束长度", default: 2.4, min: 0.8, max: 4.2, step: 0.1 },
+    width: { label: "光束宽度", default: 0.62, min: 0.18, max: 1.4, step: 0.02 },
+    beams: { type: "enum", label: "光束编组", options: ["single", "pair", "quad"] as const, default: "pair" },
+} as const satisfies VfxParameterSchema;
+
+const TIME_DIAL_PARAMS = {
+    radius: { label: "表盘半径", default: 2.35, min: 1.0, max: 3.8, step: 0.1 },
+    pointerSpeed: { label: "指针转速", default: 24, min: -300, max: 300, step: 6 },
+    tilt: { label: "表盘倾角", default: 0, min: 0, max: 75, step: 5 },
+    lineWidth: { label: "指针线宽", default: 0.085, min: 0.04, max: 0.2, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const SEA_REFLECTION_PARAMS = {
+    width: { label: "海面宽幅", default: 3.1, min: 1.4, max: 4.8, step: 0.1 },
+    depth: { label: "纵深跨度", default: 1.9, min: 0.8, max: 3.2, step: 0.1 },
+    shimmer: { label: "波光活跃", default: 0.45, min: 0.1, max: 1.0, step: 0.05 },
+    tideSpeed: { label: "海浪推进", default: 0.35, min: 0.05, max: 1.2, step: 0.05 },
+} as const satisfies VfxParameterSchema;
+
+function buildWindowShaft(
+    x: number,
+    y: number,
+    z: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    color: string,
+    opacity: number,
+    length: number,
+    previousLength: number,
+    width: number,
+    scale: number,
+): VfxEmitter {
+    const mag = Math.hypot(dx, dy, dz) || 1;
+    const life = 1.6;
+    return {
+        particle: "shaft",
+        group: "shaft",
+        offset: { x, y, z },
+        particles: 1,
+        lifetime: life,
+        transform: { z: 0, scale },
+        variables: {
+            ...hexToUnitRgb(color),
+            opacity,
+            life,
+            length,
+            previous_length: previousLength,
+            width,
+            shaft_style: 1,
+            dir_x: dx / mag,
+            dir_y: dy / mag,
+            dir_z: dz / mag,
+        },
+    };
+}
 
 export const STAGE_EFFECTS = {
     light_pillars: {
@@ -76,7 +139,7 @@ export const STAGE_EFFECTS = {
                         length,
                         previousLength,
                         width: (variant === "backline" ? 0.26 : variant === "neon_rear" ? 0.18 : 0.21) * widthScale,
-                        range: 1.05 * m.spread,
+                        range: 1.05 * c.spread * m.spread,
                         yOffset,
                         zOffset: variant === "backline" ? 0.1 : 0,
                         scale,
@@ -96,7 +159,7 @@ export const STAGE_EFFECTS = {
                         length,
                         previousLength: prev,
                         width: c.width,
-                        range: 1.05 * m.spread,
+                        range: 1.05 * c.spread * m.spread,
                         yOffset,
                         scale,
                     }),
@@ -107,7 +170,7 @@ export const STAGE_EFFECTS = {
                         length: Math.min(2.4, length * 1.12),
                         previousLength: prev * 1.12,
                         width: 0.18 * widthScale,
-                        range: 1.08 * m.spread,
+                        range: 1.08 * c.spread * m.spread,
                         yOffset,
                         scale,
                     }),
@@ -142,7 +205,7 @@ export const STAGE_EFFECTS = {
                     length,
                     previousLength,
                     width: c.width,
-                    range: 1.05 * m.spread,
+                    range: 1.05 * c.spread * m.spread,
                     yOffset: ZONE_Y_OFFSET[zone] * 0.7,
                     scale,
                 }),
@@ -481,6 +544,317 @@ export const STAGE_EFFECTS = {
                     }),
                 ],
             };
+        },
+    } satisfies VfxEffectDefinition,
+
+    window_beams: {
+        id: "window_beams",
+        label: "琴房斜射光束",
+        category: "stage",
+        trigger: "continuous",
+        interval: 20,
+        priority: 4,
+        defaultBrush: "mote",
+        parameters: WINDOW_BEAMS_PARAMS,
+        createState: () => ({ previousLength: undefined as number | undefined }),
+        emit({ params, music, state }) {
+            const { color, color2, intensity, scale, zone, motion } = params;
+            const c = resolveSchemaParams(WINDOW_BEAMS_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const rad = (c.angle * Math.PI) / 180;
+            const yOffset = ZONE_Y_OFFSET[zone] * 0.6;
+            const length = Math.min(4.5, (c.length + 0.45 * music.sustain + 0.20 * music.activity) * m.energy);
+            const prevLength = state?.previousLength ?? length;
+            if (state) state.previousLength = length;
+
+            if (c.beams === "single") {
+                return {
+                    priority: 4,
+                    emitters: [
+                        buildWindowShaft(
+                            -c.spread * 0.78 * m.spread,
+                            3.65 + yOffset,
+                            1.15,
+                            Math.sin(rad),
+                            -Math.cos(rad),
+                            -0.18,
+                            color,
+                            intensity * 0.92,
+                            length,
+                            prevLength,
+                            c.width,
+                            scale,
+                        ),
+                    ],
+                };
+            }
+
+            const emitters: VfxEmitter[] = ([-1, 1] as const).map((side) =>
+                buildWindowShaft(
+                    side * c.spread * m.spread,
+                    3.65 + yOffset,
+                    1.35,
+                    -side * Math.sin(rad),
+                    -Math.cos(rad),
+                    -0.18,
+                    side === -1 ? color : color2,
+                    intensity,
+                    length,
+                    prevLength,
+                    c.width,
+                    scale,
+                ),
+            );
+
+            if (c.beams === "quad") {
+                const innerRad = Math.min(Math.PI * 0.44, rad * 1.12);
+                for (const side of [-1, 1] as const) {
+                    emitters.push(
+                        buildWindowShaft(
+                            side * (c.spread + 0.55) * m.spread,
+                            3.45 + yOffset,
+                            0.55,
+                            -side * Math.sin(innerRad),
+                            -Math.cos(innerRad),
+                            -0.14,
+                            side === -1 ? color2 : color,
+                            intensity * 0.78,
+                            Math.min(4.5, length * 0.92),
+                            prevLength * 0.92,
+                            c.width * 0.88,
+                            scale,
+                        ),
+                    );
+                }
+            }
+
+            return { priority: 4, emitters };
+        },
+    } satisfies VfxEffectDefinition<{ previousLength?: number }>,
+
+    time_dial: {
+        id: "time_dial",
+        label: "极简时空表盘",
+        category: "stage",
+        trigger: "continuous",
+        interval: 16,
+        priority: 4,
+        defaultBrush: "star",
+        defaultStroke: "laser",
+        parameters: TIME_DIAL_PARAMS,
+        createState: () => ({ angle: 0 }),
+        emit({ params, music, state }) {
+            const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(TIME_DIAL_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const r = (c.radius + 0.15 * music.sustain) * m.spread;
+            const tiltRad = (c.tilt * Math.PI) / 180;
+            const cosTilt = Math.cos(tiltRad);
+            const sinTilt = Math.sin(tiltRad);
+            const yFloor = zone === "mid" ? 0.45 : zone === "high" ? 1.25 : 0.10;
+            const centerY = yFloor + r * sinTilt;
+            const centerZ = sinTilt * 1.15;
+            const center: Point3 = [0, centerY, centerZ];
+            const effectiveSpeed = c.pointerSpeed * m.dir * m.speed;
+            const angle = state ? state.angle : 0;
+            if (state) state.angle = (state.angle - effectiveSpeed * (16 / 20)) % 360;
+
+            const dialPoint = (deg: number, len: number): Point3 => {
+                const a = (deg * Math.PI) / 180;
+                const sy = Math.sin(a);
+                return [
+                    Math.cos(a) * len,
+                    centerY + sy * sinTilt * len,
+                    centerZ + sy * cosTilt * 0.9 * len,
+                ];
+            };
+
+            const strokeBrush = resolveStrokeBrush(brush, "laser");
+            const pointBrush = resolvePointBrush(brush, "star");
+            const ringVerts = Array.from({ length: 8 }, (_, i) => dialPoint(i * 45, r));
+            const minuteDeg = 90 + angle;
+            const hourDeg = 90 + angle / 6;
+
+            const emitters: VfxEmitter[] = [
+                ...drawPolygonFrame(ringVerts, {
+                    life: 1.05,
+                    brush: strokeBrush,
+                    color,
+                    color2,
+                    opacity: (0.24 + 0.38 * intensity) * 0.72,
+                    width: c.lineWidth * 0.58,
+                    scale,
+                    fadeIn: 0.18,
+                    fadeOut: 0.36,
+                }),
+                drawPoints({
+                    count: 12,
+                    life: 1.15,
+                    lifeJitter: 0.05,
+                    brush: pointBrush,
+                    color: color2,
+                    color2: color,
+                    opacity: 0.32 + 0.50 * intensity,
+                    scale,
+                    offset: center,
+                    size: 0.068 + 0.02 * intensity,
+                    sizeEnd: 0.05,
+                    phase: 0,
+                    phaseSpread: 360,
+                    omega: 0,
+                    radius: r,
+                    radiusEnd: r,
+                    depthRatio: cosTilt * 0.9,
+                    tilt: sinTilt * r,
+                    twinkle: 0.45,
+                    fadeIn: 0.16,
+                    fadeOut: 0.34,
+                }),
+                ...drawPolygonFrame([center, dialPoint(minuteDeg, r * 0.88)], {
+                    closed: false,
+                    life: 1.05,
+                    brush: strokeBrush,
+                    color,
+                    color2,
+                    opacity: 0.46 + 0.50 * intensity,
+                    width: c.lineWidth,
+                    scale,
+                    fadeIn: 0.12,
+                    fadeOut: 0.30,
+                }),
+                ...drawPolygonFrame([center, dialPoint(hourDeg, r * 0.54)], {
+                    closed: false,
+                    life: 1.05,
+                    brush: strokeBrush,
+                    color: color2,
+                    color2: color,
+                    opacity: 0.40 + 0.46 * intensity,
+                    width: c.lineWidth * 1.15,
+                    scale,
+                    fadeIn: 0.12,
+                    fadeOut: 0.30,
+                }),
+            ];
+
+            if (c.tilt <= 20) {
+                const ringFade = 1 - c.tilt / 20;
+                emitters.push(drawGroundRing({
+                    life: 1.15,
+                    color,
+                    color2,
+                    opacity: (0.28 + 0.42 * intensity) * ringFade,
+                    scale,
+                    offset: [0, yFloor, 0],
+                    radiusStart: r,
+                    radiusEnd: r * 1.02,
+                    curve: 1,
+                    spin: angle,
+                    spinRate: -effectiveSpeed * 0.22,
+                    style: 1,
+                    fadeIn: 0.18,
+                    fadeOut: 0.38,
+                }));
+            }
+
+            if (Math.abs(effectiveSpeed) >= 60) {
+                const ghostDeg = minuteDeg + Math.sign(effectiveSpeed) * 20;
+                emitters.push(...drawPolygonFrame([center, dialPoint(ghostDeg, r * 0.84)], {
+                    closed: false,
+                    life: 0.95,
+                    brush: strokeBrush,
+                    color: color2,
+                    color2: color,
+                    opacity: (0.46 + 0.50 * intensity) * 0.42,
+                    width: c.lineWidth * 0.72,
+                    scale,
+                    fadeIn: 0.08,
+                    fadeOut: 0.32,
+                }));
+            }
+
+            return { priority: 4, emitters };
+        },
+    } satisfies VfxEffectDefinition<{ angle: number }>,
+
+    sea_reflection: {
+        id: "sea_reflection",
+        label: "夏夜海面波光",
+        category: "stage",
+        trigger: "continuous",
+        interval: 18,
+        priority: 2,
+        defaultBrush: "mote",
+        defaultStroke: "silk",
+        parameters: SEA_REFLECTION_PARAMS,
+        emit({ params, phase }) {
+            const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(SEA_REFLECTION_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const y = zone === "mid" ? 0.36 : zone === "high" ? 1.1 : 0.07;
+            const strokeBrush = resolveStrokeBrush(brush, "silk");
+            const pointBrush = resolvePointBrush(brush, "mote");
+            const emitters: VfxEmitter[] = [];
+
+            for (let i = 0; i < 6; i++) {
+                const seed = Math.abs(Math.sin((phase + 3) * 14.71 + i * 37.9) * 31943.2) % 1;
+                const lane = (i % 3) - 1;
+                const tier = Math.floor(i / 3);
+                const xPos = (lane * 0.42 + (seed - 0.5) * 0.34) * c.width * m.spread;
+                const zPos = 0.22 + (tier * 0.48 + seed * 0.35) * c.depth;
+                const len = (0.55 + 0.60 * seed) * (0.85 + 0.25 * c.shimmer);
+                const streakColor = i % 2 === 0 ? color : color2;
+                const streakNext = i % 2 === 0 ? color2 : color;
+                emitters.push({
+                    particle: "draw_stroke",
+                    group: "beam",
+                    offset: { x: xPos, y, z: zPos },
+                    particles: 1,
+                    lifetime: 1.45,
+                    transform: { scale },
+                    variables: {
+                        count: 1,
+                        life: 1.45,
+                        brush: strokeBrush,
+                        length: len,
+                        length_end: len * 1.18,
+                        width: 0.065 + 0.045 * c.shimmer,
+                        vx: 0,
+                        vy: 0,
+                        vz: -c.tideSpeed * 0.35 * m.speed * m.dir,
+                        ax: 0,
+                        ay: 0,
+                        az: 0,
+                        tx: 1,
+                        ty: 0,
+                        tz: 0,
+                        ...colorVars(streakColor, streakNext, (0.24 + 0.48 * intensity) * (0.55 + 0.55 * c.shimmer)),
+                        fade_in: 0.28,
+                        fade_out: 0.55,
+                    },
+                });
+            }
+
+            emitters.push(drawPoints({
+                count: 10,
+                life: 1.55,
+                lifeJitter: 0.22,
+                brush: pointBrush,
+                color: color2,
+                color2: color,
+                opacity: (0.26 + 0.50 * intensity) * (0.50 + 0.55 * c.shimmer),
+                scale,
+                offset: [0, y + 0.03, c.depth * 0.45],
+                size: 0.055 + 0.03 * c.shimmer,
+                sizeEnd: 0.028,
+                sizeJitter: 0.36,
+                spread: [c.width * 0.9 * m.spread, 0.04, c.depth * 0.65],
+                velocity: [0, 0, -c.tideSpeed * 0.25 * m.speed * m.dir],
+                twinkle: Math.min(1, 0.45 + 0.50 * c.shimmer),
+                fadeIn: 0.25,
+                fadeOut: 0.52,
+            }));
+
+            return { priority: 2, emitters };
         },
     } satisfies VfxEffectDefinition,
 };

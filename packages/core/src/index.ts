@@ -26,6 +26,15 @@ export {
     type PerformanceParams,
     type PerformanceZone,
 } from "./pbe3/performance.js";
+export {
+    compilePerformanceSource,
+    type CompilePerformanceSourceOptions,
+    type PerformanceSourceBlackoutCue,
+    type PerformanceSourceCue,
+    type PerformanceSourceDocument,
+    type PerformanceSourceEffectCue,
+    type PerformanceSourceSection,
+} from "./pbe3/performanceSource.js";
 export * from "./songCodec.js";
 export * from "./importCode.js";
 export * from "./binary/base64url.js";
