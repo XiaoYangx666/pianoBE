@@ -37,3 +37,7 @@ packages/addon/rp/textures/entity/piano_score/*.png
 build/loudness-ab/
 build/audio-lab/
 tools/audio_lab_source/
+
+# VFX particle documents and textures are generated into packages/vfx/assets and synced into the RP
+packages/addon/rp/particles/
+packages/addon/rp/textures/particle/

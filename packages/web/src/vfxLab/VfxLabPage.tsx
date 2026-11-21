@@ -1,72 +1,104 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, ChevronDown, CircleHelp, Eye, EyeOff, FileUp, Maximize2, Pause, Play, Repeat2, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import {
-    createSecretScore, PERFORMANCE_BRUSHES, PERFORMANCE_METHODS, PERFORMANCE_MOTIONS, PERFORMANCE_ZONES,
-    readSongHeader, songToNoteEvents, TIME_SCALE,
-    type PerformanceBrush, type PerformanceCue, type PerformanceMethod, type PerformanceMotion, type PerformanceZone,
+    PERFORMANCE_MOTIONS,
+    PERFORMANCE_ZONES,
+    readSongHeader,
+    resolvePerformanceColor,
+    songToNoteEvents,
+    TIME_SCALE,
+    type PerformanceCue,
+    type PerformanceMotion,
+    type PerformanceZone,
 } from "@piano/core";
 import secretUrl from "../../../../midis/library/e1563b03.pbe3?url";
 import secret from "../../../../midis/performances/e1563b03.json";
-import { VFX_COLORS, VFX_EFFECTS, VFX_LIMITS, type NumericParameter, type VfxEffect, type VfxOptions } from "../../../addon/src/domain/piano/vfxLab";
-import { VFX_PARTICLES_PER_PIANO } from "../../../addon/src/domain/piano/vfxBudget";
-import type { VfxLayout } from "../../../addon/src/domain/piano/vfxLighting";
-import { quietFeatures, simulatedVfxNotes, type MusicFeatures } from "../../../addon/src/domain/piano/vfxMusic";
-import { isVfxStageTheme, VFX_PAINTERS, VFX_STAGE_THEMES, type VfxStageThemeName } from "../../../addon/src/domain/piano/vfxPainters";
-import { validateVfxPreset, VFX_PRESETS, type VfxPreset } from "../../../addon/src/domain/piano/vfxPreset";
+import {
+    deriveAccentHex,
+    getVfxEffect,
+    isVfxTheme,
+    KEY_PARTICLE_STYLE_LABELS,
+    POINT_BRUSHES,
+    quietFeatures,
+    simulatedVfxNotes,
+    STROKE_BRUSHES,
+    validateVfxTheme,
+    VFX_EFFECT_IDS,
+    VFX_EFFECTS,
+    VFX_PARTICLES_PER_PIANO,
+    VFX_THEME_ORDER,
+    VFX_THEMES,
+    type MusicFeatures,
+    type SingleEffectConfig,
+    type VfxTheme,
+    type VfxThemeId,
+    type VfxThemeLayer,
+} from "@piano/vfx";
 import { MidiPlayer, parseMidi, type NoteEvent } from "../midiPlayer";
-import { createStage, type Direction, type PainterConfig, type PreviewStats, type Stage, type Track, type View } from "./stage";
+import { createStage, type Direction, type PreviewStats, type Stage, type StageMode, type Track, type View } from "./stage";
 import type { PianoModel } from "./models";
 import { MusicStrip } from "./MusicStrip";
 import "./vfxLab.css";
 
-const names: Record<string, [string, string]> = {
-    galaxy: ["Galaxy", "梦幻星河"],
-    neon: ["Neon", "霓虹音乐会"],
-    stage: ["Stage", "高能舞台"],
-    sakura: ["Sakura", "落樱星庭"],
-    starlight: ["Starlight", "星空法阵"],
-    cathedral: ["Cathedral", "圣光时空"],
-    carnival: ["Carnival", "璀璨烟花夜"],
+const themeEnglishNames: Record<VfxThemeId, string> = {
+    galaxy: "Galaxy",
+    neon: "Neon",
+    stage: "Stage",
+    sakura: "Sakura",
+    starlight: "Starlight",
+    cathedral: "Cathedral",
+    carnival: "Carnival",
 };
-const brushNames: Record<PerformanceBrush, string> = {
-    default: "默认笔刷", mote: "柔光球", star: "星芒", petal: "樱花瓣",
-    snow: "雪花晶", note: "八分音符", shard: "玻璃棱晶", spark: "烟花火花", ring: "双缘圆环",
-};
+
 const zoneNames: Record<PerformanceZone, string> = {
-    stage: "舞台基准", low: "低空贴地", mid: "中空环绕", high: "高空天顶",
+    stage: "舞台基准",
+    low: "低空贴地",
+    mid: "中空环绕",
+    high: "高空天顶",
 };
+
 const motionNames: Record<PerformanceMotion, string> = {
-    normal: "标准", reverse: "反向", intense: "强力", gentle: "轻柔",
+    normal: "标准",
+    reverse: "反向",
+    intense: "强力",
+    gentle: "轻柔",
 };
-const effectNames: Record<VfxEffect, string> = {
-    field: "星尘", orbit: "环绕星芒", beam: "流光", wave: "波带", ripple: "地面波纹", fountain: "火花", curtain: "光幕",
-    shaft: "定向光束", shard: "时间碎片",
-};
+
+const triggerNames = {
+    continuous: "持续周期",
+    note: "音符触发",
+    instant: "瞬时脉冲",
+    control: "状态控制",
+} as const;
+
 const featureNames: Record<keyof MusicFeatures, string> = {
-    density: "密度", velocity: "力度", dynamics: "力度变化", activity: "活动度", pitch: "音高", low: "低音",
-    middle: "中音", high: "高音", sustain: "延音", surge: "舞台蓄势", chord: "和弦", onset: "起奏",
+    density: "密度",
+    velocity: "力度",
+    dynamics: "力度变化",
+    activity: "活动度",
+    pitch: "音高",
+    low: "低音",
+    middle: "中音",
+    high: "高音",
+    sustain: "延音",
+    surge: "舞台蓄势",
+    chord: "和弦",
+    onset: "起奏",
 };
-const layoutNames: Record<VfxLayout, string> = {
-    rails: "侧翼灯阵", backline: "后景灯柱", fan: "外展扇形", truss: "门架灯带", aurora: "星云帷幕", wings: "纵深光幕",
-    "neon-sides": "霓虹侧翼灯柱", "neon-rear": "霓虹后排灯柱",
-};
-const parameterNames: Partial<Record<NumericParameter, string>> = {
-    x: "横向 X", y: "垂直 Y", z: "纵深 Z", rotation: "旋转", scale: "缩放", range: "范围",
-    intensity: "亮度", opacity: "透明度", density: "数量", size: "粒径", speed: "速度", height: "高度",
-    heading: "方向", bend: "曲率", lanes: "光轨数", segments: "分段", length: "长度", width: "宽度",
-    amplitude: "波幅", period: "周期", wavelength: "波长", phase: "相位", flow: "聚拢／散开",
-};
-const basicOptions: NumericParameter[] = ["intensity", "scale", "x", "y", "z", "rotation"];
+
 const fixturePoints = [[0, "休止"], [3.75, "弱奏"], [5.5, "长音"], [6.6, "和弦"], [8.7, "高潮"], [11.4, "回落"]] as const;
 const fixtureModes = { phrase: "标准乐句", note: "长音", chord: "和弦", dense: "密集音符" } as const;
 type Fixture = keyof typeof fixtureModes;
-type Layer = VfxPreset["layers"][number];
 type LabSong = { title: string; notes: NoteEvent[]; duration: number; performance?: readonly PerformanceCue[]; sample?: boolean };
 
 function readPbe(bytes: Uint8Array): LabSong {
     const header = readSongHeader(bytes);
-    return { title: header.name, notes: songToNoteEvents(bytes), duration: header.duration / TIME_SCALE,
-        performance: header.performance };
+    return {
+        title: header.name,
+        notes: songToNoteEvents(bytes),
+        duration: header.duration / TIME_SCALE,
+        performance: header.performance,
+    };
 }
 
 async function loadSecret(): Promise<LabSong> {
@@ -81,14 +113,25 @@ function makeFixture(mode: Fixture): NoteEvent[] {
     }))).flat();
 }
 
-function toTrack(events: readonly NoteEvent[], duration: number, source: "midi" | "simulation",
-    performance?: readonly PerformanceCue[]): Track {
+function toTrack(
+    events: readonly NoteEvent[],
+    duration: number,
+    source: "midi" | "simulation",
+    performance?: readonly PerformanceCue[],
+): Track {
     const notes = new Map<number, NonNullable<ReturnType<Track["notes"]["get"]>>[number][]>();
     for (const note of events) {
         const tick = source === "midi" ? Math.floor(note.time * 20 + 0.500001) : Math.ceil(note.time * 20 - 1e-7);
         const bucket = notes.get(tick) ?? [];
-        bucket.push({ midi: note.midi, duration: note.duration, velocity: Math.round(note.velocity * 127),
-            hasVelocity: true, source, tick, songTime: note.time });
+        bucket.push({
+            midi: note.midi,
+            duration: note.duration,
+            velocity: Math.round(note.velocity * 127),
+            hasVelocity: true,
+            source,
+            tick,
+            songTime: note.time,
+        });
         notes.set(tick, bucket);
     }
     return { notes, duration, performance };
@@ -101,138 +144,259 @@ function saveFile(url: string, name: string) {
     link.click();
 }
 
-function exportPreset(preset: VfxPreset) {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(preset, null, 2)], { type: "application/json" }));
-    saveFile(url, "pianobe-vfx-preset.json");
+function exportThemeJson(theme: VfxTheme, name: string) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(theme, null, 2)], { type: "application/json" }));
+    saveFile(url, `pianobe-vfx-${name}.json`);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function seconds(time: number) { return time.toFixed(2) + " s"; }
+function seconds(time: number) {
+    return `${time.toFixed(2)} s`;
+}
 
-function ParameterInput({ label, value, bounds, disabled, whole, set }: {
-    label: string;
-    value?: number;
-    bounds: readonly [number, number];
-    disabled?: boolean;
-    whole?: boolean;
-    set: (value: number | undefined) => void;
-}) {
-    const [draft, setDraft] = useState(value?.toString() ?? "");
-    const [focused, setFocused] = useState(false);
-    const [min, max] = bounds;
-    function read(text: string) {
-        const parsed = text.trim() ? Number(text) : NaN;
-        return Number.isFinite(parsed) ? whole ? Math.round(parsed) : parsed : undefined;
+function defaultBrushLabel(effectId: string): string {
+    const def = getVfxEffect(effectId);
+    if (!def) return "无";
+    const point = def.defaultBrush ? POINT_BRUSHES.find(item => item.id === def.defaultBrush)?.label : undefined;
+    const stroke = def.defaultStroke ? STROKE_BRUSHES.find(item => item.id === def.defaultStroke)?.label : undefined;
+    if (point && stroke) return `${point} / ${stroke}`;
+    return point ?? stroke ?? "无";
+}
+
+function variantLabel(effectId: string, variant: string): string {
+    if (effectId === "key_style" && variant in KEY_PARTICLE_STYLE_LABELS) {
+        return KEY_PARTICLE_STYLE_LABELS[variant as keyof typeof KEY_PARTICLE_STYLE_LABELS];
     }
-    return <input aria-label={label} type="text" inputMode={whole ? "numeric" : "decimal"} disabled={disabled}
-        placeholder={disabled ? "已映射" : "默认"} value={focused ? draft : value ?? ""}
-        onFocus={() => { setDraft(value?.toString() ?? ""); setFocused(true); }}
+    return variant;
+}
+
+function NumberField({ label, value, min, max, step = 1, disabled, set }: {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    step?: number;
+    disabled?: boolean;
+    set: (value: number) => void;
+}) {
+    const [focused, setFocused] = useState(false);
+    const [draft, setDraft] = useState("");
+    function parse(text: string): number | undefined {
+        const number = Number(text.trim());
+        return text.trim() && Number.isFinite(number) ? number : undefined;
+    }
+    return <input
+        aria-label={label}
+        type="text"
+        inputMode={step < 1 ? "decimal" : "numeric"}
+        disabled={disabled}
+        value={focused ? draft : String(value)}
+        onFocus={() => { setDraft(String(value)); setFocused(true); }}
         onChange={event => {
             const text = event.target.value;
-            const parsed = read(text);
             setDraft(text);
+            const parsed = parse(text);
             if (parsed !== undefined && parsed >= min && parsed <= max) set(parsed);
         }}
         onBlur={() => {
-            const parsed = read(draft);
+            const parsed = parse(draft);
             if (parsed !== undefined) set(Math.min(max, Math.max(min, parsed)));
-            else if (!draft.trim()) set(undefined);
             setFocused(false);
         }}
-        onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} />;
+        onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }}
+    />;
 }
 
-function LayerEditor({ layer, update, remove }: { layer: Layer; update: (next: Layer) => void; remove?: () => void }) {
-    const parameters = [...basicOptions, ...VFX_EFFECTS[layer.effect].options];
-    const tint = `${layer.effect}Color` as const;
-    const layouts = VFX_EFFECTS[layer.effect].layouts;
-    const options = layer.options ?? {};
-    function setOption(key: keyof VfxOptions, value: string | number | undefined) {
-        const next = { ...options };
-        if (value === undefined) delete next[key];
-        else Object.assign(next, { [key]: value });
-        update({ ...layer, options: next });
-    }
+function BrushSelect({ label, effectId, value, onChange }: {
+    label: string;
+    effectId: string;
+    value?: string;
+    onChange: (next?: string) => void;
+}) {
+    const def = getVfxEffect(effectId);
+    if (!def?.defaultBrush && !def?.defaultStroke) return null;
+    return (
+        <label>{label}
+            <select aria-label={label} value={value ?? ""} onChange={event => onChange(event.target.value || undefined)}>
+                <option value="">默认 ({defaultBrushLabel(effectId)})</option>
+                {def.defaultBrush && (
+                    <optgroup label="点状纹理">
+                        {POINT_BRUSHES.map(brush => (
+                            <option key={brush.id} value={brush.id}>{brush.label} ({brush.id})</option>
+                        ))}
+                    </optgroup>
+                )}
+                {def.defaultStroke && (
+                    <optgroup label="线条笔刷">
+                        {STROKE_BRUSHES.map(brush => (
+                            <option key={brush.id} value={brush.id}>{brush.label} ({brush.id})</option>
+                        ))}
+                    </optgroup>
+                )}
+            </select>
+        </label>
+    );
+}
+
+function ThemeLayerEditor({ layer, update, remove }: {
+    layer: VfxThemeLayer;
+    update: (next: VfxThemeLayer) => void;
+    remove?: () => void;
+}) {
+    const def = getVfxEffect(layer.effect);
+    const primaryHex = resolvePerformanceColor(layer.color);
+    const accentHex = layer.color2 ? resolvePerformanceColor(layer.color2) : deriveAccentHex(primaryHex);
+    const levelMapped = typeof layer.level !== "number";
+
     return (
         <div className="vfx-editor">
-            <div className="vfx-row">
-                <label>颜色 <input aria-label="颜色" type="color" value={options[tint] ?? VFX_COLORS[layer.effect]}
-                    onChange={event => setOption(tint, event.target.value)} /></label>
-                <label>模式 <select value={layer.mode ?? ""} onChange={event =>
-                    update({ ...layer, mode: (event.target.value || undefined) as Layer["mode"] })}>
-                    <option value="">默认</option><option value="autonomous">自主</option>
-                    <option value="continuous">持续</option><option value="trigger">触发</option>
-                </select></label>
-                {(layer.mode ?? VFX_EFFECTS[layer.effect].mode) === "trigger" &&
-                    <label>触发 <select value={layer.gate ?? "onset"} onChange={event =>
-                        update({ ...layer, gate: event.target.value as Layer["gate"] })}>
-                        <option value="onset">起奏</option><option value="chord">和弦</option>
-                    </select></label>}
-                {layouts && <label>布局 <select value={layer.layout ?? ""} onChange={event =>
-                    update({ ...layer, layout: (event.target.value || undefined) as VfxLayout | undefined })}>
-                    <option value="">默认</option>
-                    {layouts.map(key => <option key={key} value={key}>{layoutNames[key]}</option>)}
-                </select></label>}
-                {layer.effect === "beam" && <label>纹理 <select value={layer.profile ?? ""} onChange={event =>
-                    update({ ...layer, profile: event.target.value ? "silk" : undefined })}>
-                    <option value="">细光</option><option value="silk">丝带</option>
-                </select></label>}
-            </div>
-            <div className="vfx-parameters">
-                {parameters.map(parameter => {
-                    const mapped = layer.mode !== "autonomous" && layer.map?.some(mapping => mapping.parameter === parameter);
-                    return <label key={parameter}>{parameterNames[parameter] ?? parameter}
-                        <ParameterInput label={parameterNames[parameter] ?? parameter} bounds={VFX_LIMITS[parameter]}
-                            value={options[parameter]} disabled={mapped} whole={parameter === "lanes" || parameter === "segments"}
-                            set={value => setOption(parameter, value)} />
-                    </label>;
-                })}
-            </div>
-            <div className="vfx-mappings">
-                <strong>音乐映射</strong>
-                {(layer.map ?? []).map((mapping, index) => {
-                    function change(patch: Partial<typeof mapping>) {
-                        update({ ...layer, map: layer.map?.map((item, i) => i === index ? { ...item, ...patch } : item) });
-                    }
-                    return <div key={mapping.parameter} className="vfx-map">
-                        <select aria-label="音乐特征" value={mapping.input} onChange={event =>
-                            change({ input: event.target.value as keyof MusicFeatures })}>
-                            {Object.keys(quietFeatures).map(key =>
-                                <option key={key} value={key}>{featureNames[key as keyof MusicFeatures]}</option>)}
+            <div className="vfx-painter-grid">
+                <label>特效
+                    <select aria-label="图层特效" value={layer.effect} onChange={event => {
+                        const effect = event.target.value;
+                        const nextDef = getVfxEffect(effect);
+                        update({
+                            ...layer,
+                            effect,
+                            brush: undefined,
+                            variant: nextDef?.variants?.[0],
+                            gate: nextDef?.trigger === "instant"
+                                ? (layer.gate ?? { input: "chord", threshold: 0.5, cooldown: 32 })
+                                : undefined,
+                        });
+                    }}>
+                        {VFX_EFFECT_IDS.map(id => (
+                            <option key={id} value={id}>{VFX_EFFECTS[id].label} ({id})</option>
+                        ))}
+                    </select>
+                </label>
+                {def?.variants?.length ? (
+                    <label>变体
+                        <select aria-label="图层变体" value={layer.variant ?? ""} onChange={event =>
+                            update({ ...layer, variant: event.target.value || undefined })}>
+                            <option value="">默认</option>
+                            {def.variants.map(item => (
+                                <option key={item} value={item}>{variantLabel(layer.effect, item)}</option>
+                            ))}
                         </select>
-                        <span>{parameterNames[mapping.parameter]}</span>
-                        {(["from", "to"] as const).map(edge => <ParameterInput key={edge} label={edge === "from" ? "映射起点" : "映射终点"}
-                            bounds={VFX_LIMITS[mapping.parameter]} value={mapping[edge]}
-                            set={value => { if (value !== undefined) change({ [edge]: value }); }} />)}
-                        <button aria-label="移除映射" onClick={() =>
-                            update({ ...layer, map: layer.map?.filter((_, i) => i !== index) })}>×</button>
-                    </div>;
-                })}
-                {(layer.map?.length ?? 0) < 6 && <select aria-label="添加音乐映射" value="" onChange={event => {
-                    const parameter = event.target.value as NumericParameter;
-                    const [min, max] = VFX_LIMITS[parameter];
-                    update({ ...layer, map: [...(layer.map ?? []), { input: "activity", parameter, from: min, to: max }] });
-                }}>
-                    <option value="" disabled>添加参数映射</option>
-                    {parameters.filter(parameter => parameter !== "lanes" && parameter !== "segments" &&
-                        !layer.map?.some(mapping => mapping.parameter === parameter)).map(parameter =>
-                            <option key={parameter} value={parameter}>{parameterNames[parameter] ?? parameter}</option>)}
-                </select>}
-                {remove && <button onClick={remove}>移除图层</button>}
+                    </label>
+                ) : null}
+                <div className="vfx-colors">
+                    <label>主色 <input aria-label="图层主色" type="color" value={primaryHex}
+                        onChange={event => update({ ...layer, color: event.target.value })} /></label>
+                    <label>副色 <input aria-label="图层副色" type="color" value={accentHex}
+                        onChange={event => update({ ...layer, color2: event.target.value })} /></label>
+                </div>
+                <BrushSelect label="画笔" effectId={layer.effect} value={layer.brush}
+                    onChange={brush => update({ ...layer, brush })} />
+                {def?.trigger !== "control" && <>
+                    <label>高度区域
+                        <select aria-label="图层区域" value={layer.zone ?? "stage"} onChange={event =>
+                            update({ ...layer, zone: event.target.value as PerformanceZone })}>
+                            {(Object.keys(PERFORMANCE_ZONES) as PerformanceZone[]).map(zone => (
+                                <option key={zone} value={zone}>{zoneNames[zone]}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label>运动修饰
+                        <select aria-label="图层运动" value={layer.motion ?? "normal"} onChange={event =>
+                            update({ ...layer, motion: event.target.value as PerformanceMotion })}>
+                            {(Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[]).map(motion => (
+                                <option key={motion} value={motion}>{motionNames[motion]}</option>
+                            ))}
+                        </select>
+                    </label>
+                </>}
+                <label>缩放 (%)
+                    <NumberField label="图层缩放" value={layer.scale ?? 100} min={50} max={170}
+                        set={scale => update({ ...layer, scale: Math.round(scale) })} />
+                </label>
+                <label>强度模式
+                    <select aria-label="强度模式" value={levelMapped ? "mapped" : "fixed"} onChange={event => {
+                        if (event.target.value === "mapped") {
+                            update({ ...layer, level: { input: "activity", from: 40, to: 90 } });
+                        } else {
+                            update({ ...layer, level: typeof layer.level === "number" ? layer.level : 85 });
+                        }
+                    }}>
+                        <option value="fixed">固定百分比</option>
+                        <option value="mapped">音乐特征映射</option>
+                    </select>
+                </label>
+                {typeof layer.level === "number" ? (
+                    <label>强度 (%)
+                        <NumberField label="图层强度" value={layer.level} min={0} max={100}
+                            set={level => update({ ...layer, level: Math.round(level) })} />
+                    </label>
+                ) : (
+                    <>
+                        <label>音乐特征
+                            <select aria-label="映射特征" value={layer.level.input} onChange={event => {
+                                if (typeof layer.level === "number") return;
+                                update({ ...layer, level: { ...layer.level, input: event.target.value as keyof MusicFeatures } });
+                            }}>
+                                {(Object.keys(quietFeatures) as (keyof MusicFeatures)[]).map(key => (
+                                    <option key={key} value={key}>{featureNames[key]}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>映射下限 (%)
+                            <NumberField label="映射起点" value={layer.level.from} min={0} max={100}
+                                set={from => typeof layer.level !== "number" && update({ ...layer, level: { ...layer.level, from: Math.round(from) } })} />
+                        </label>
+                        <label>映射上限 (%)
+                            <NumberField label="映射终点" value={layer.level.to} min={0} max={100}
+                                set={to => typeof layer.level !== "number" && update({ ...layer, level: { ...layer.level, to: Math.round(to) } })} />
+                        </label>
+                    </>
+                )}
+                {(def?.trigger === "instant" || layer.gate) && (
+                    <>
+                        <label>门限触发
+                            <select aria-label="门限输入" value={layer.gate?.input ?? "off"} onChange={event => {
+                                const value = event.target.value;
+                                if (value === "off") { update({ ...layer, gate: undefined }); return; }
+                                update({
+                                    ...layer,
+                                    gate: {
+                                        input: value as "chord" | "onset" | "surge",
+                                        threshold: layer.gate?.threshold ?? 0.5,
+                                        cooldown: layer.gate?.cooldown ?? 32,
+                                    },
+                                });
+                            }}>
+                                <option value="off">无门限</option>
+                                <option value="chord">和弦</option>
+                                <option value="onset">起奏</option>
+                                <option value="surge">舞台蓄势</option>
+                            </select>
+                        </label>
+                        {layer.gate && <>
+                            <label>触发阈值
+                                <NumberField label="门限阈值" value={layer.gate.threshold} min={0} max={1} step={0.05}
+                                    set={threshold => layer.gate && update({ ...layer, gate: { ...layer.gate, threshold } })} />
+                            </label>
+                            <label>冷却刻数
+                                <NumberField label="门限冷却" value={layer.gate.cooldown} min={1} max={400}
+                                    set={cooldown => layer.gate && update({ ...layer, gate: { ...layer.gate, cooldown: Math.round(cooldown) } })} />
+                            </label>
+                        </>}
+                    </>
+                )}
+                {remove && <button type="button" onClick={remove}>移除图层</button>}
             </div>
         </div>
     );
 }
 
 export default function VfxLabPage() {
-    const [inspectorMode, setInspectorMode] = useState<"preset" | "painter">("preset");
-    const [presetId, setPresetId] = useState("galaxy");
-    const [preset, setPreset] = useState<VfxPreset>(VFX_PRESETS.galaxy);
-    const [painterConfig, setPainterConfig] = useState<PainterConfig>({
-        method: "magic_circle",
+    const [inspectorMode, setInspectorMode] = useState<"theme" | "effect">("theme");
+    const [themeId, setThemeId] = useState<string>("galaxy");
+    const [theme, setTheme] = useState<VfxTheme>(VFX_THEMES.galaxy);
+    const [singleConfig, setSingleConfig] = useState<SingleEffectConfig>({
+        effect: "magic_circle",
         color: "#68E4FF",
         color2: "#C58CFF",
-        brush: "default",
         zone: "stage",
         motion: "normal",
         level: 85,
@@ -248,7 +412,7 @@ export default function VfxLabPage() {
     const [deck, setDeck] = useState(true);
     const [debug, setDebug] = useState(false);
     const [showKeyParticles, setShowKeyParticles] = useState(true);
-    const methodCount = Object.keys(PERFORMANCE_METHODS).length;
+    const effectCount = VFX_EFFECT_IDS.length;
     const [loop, setLoop] = useState(true);
     const [loopIn, setLoopIn] = useState(0);
     const [loopOut, setLoopOut] = useState(12);
@@ -262,7 +426,7 @@ export default function VfxLabPage() {
     const canvas = useRef<HTMLCanvasElement>(null);
     const stage = useRef<Stage | null>(null);
     const midiInput = useRef<HTMLInputElement>(null);
-    const presetInput = useRef<HTMLInputElement>(null);
+    const themeInput = useRef<HTMLInputElement>(null);
     const position = useRef(0);
     const audio = useMemo(() => new MidiPlayer(), []);
     const playGeneration = useRef(0);
@@ -271,11 +435,15 @@ export default function VfxLabPage() {
     const capture = new URLSearchParams(location.search).has("capture");
     const events = useMemo(() => midi?.notes ?? makeFixture(fixture), [fixture, midi]);
     const track = useMemo(() => toTrack(events, midi?.duration ?? 12, midi ? "midi" : "simulation", midi?.performance), [events, midi]);
-    const visiblePreset = useMemo(() => ({ ...preset, layers: preset.layers.filter((_, index) => !hidden.has(index)) }), [preset, hidden]);
+    const visibleTheme = useMemo<VfxTheme>(() => ({
+        ...theme,
+        layers: theme.layers.filter((_, index) => !hidden.has(index)),
+    }), [theme, hidden]);
+    const activeEffectDef = getVfxEffect(singleConfig.effect);
 
-    function selectPreset(id: string, value = VFX_PRESETS[id] ?? VFX_PRESETS.galaxy) {
-        setPresetId(id);
-        setPreset(value);
+    function selectTheme(id: string, value: VfxTheme = isVfxTheme(id) ? VFX_THEMES[id] : VFX_THEMES.galaxy) {
+        setThemeId(id);
+        setTheme(value);
         setHidden(new Set());
         setOpen(null);
     }
@@ -303,7 +471,7 @@ export default function VfxLabPage() {
                 stage.current = instance;
                 setReady(true);
             }).catch(reason => {
-                if (!cancelled) setError("无法启动 WebGL · " + String(reason));
+                if (!cancelled) setError(`无法启动 WebGL · ${String(reason)}`);
             });
         });
         return () => {
@@ -317,16 +485,11 @@ export default function VfxLabPage() {
 
     useEffect(() => {
         if (!ready) return;
-        const theme: VfxStageThemeName | undefined = inspectorMode === "preset" && isVfxStageTheme(presetId) ? presetId : undefined;
-        stage.current!.configure(
-            visiblePreset,
-            track,
-            model,
-            direction,
-            position.current,
-            inspectorMode === "painter" ? { painter: painterConfig } : theme ? { theme } : undefined,
-        );
-    }, [ready, visiblePreset, track, model, direction, inspectorMode, presetId, painterConfig]);
+        const mode: StageMode = inspectorMode === "effect"
+            ? { kind: "single", config: singleConfig }
+            : { kind: "theme", theme: visibleTheme };
+        stage.current!.configure(mode, track, model, direction, position.current);
+    }, [ready, visibleTheme, track, model, direction, inspectorMode, singleConfig]);
 
     useEffect(() => { stage.current?.setView(view); }, [ready, view]);
     useEffect(() => { stage.current?.setDeck(deck); }, [ready, deck]);
@@ -368,21 +531,27 @@ export default function VfxLabPage() {
         const decodeSong = (base64: string) => readPbe(Uint8Array.from(atob(base64), char => char.charCodeAt(0)));
         const lab = {
             render: async (options: {
-                preset: string | VfxPreset; time: number; view?: View; piano?: PianoModel; direction?: Direction;
-                deck?: boolean; songBase64?: string;
+                preset: string | VfxTheme;
+                time: number;
+                view?: View;
+                piano?: PianoModel;
+                direction?: Direction;
+                deck?: boolean;
+                songBase64?: string;
             }) => {
                 const instance = stage.current!;
                 instance.setView(options.view ?? "stage");
                 instance.setDeck(options.deck ?? true);
                 const custom = options.songBase64 ? decodeSong(options.songBase64) : undefined;
-                const native = options.preset === "secret-native";
-                const song = custom ?? (native || options.preset === "secret" ? await (sample ??= loadSecret()) : undefined);
+                const song = custom ?? (options.preset === "secret" ? await (sample ??= loadSecret()) : undefined);
                 const input = song ? toTrack(song.notes, song.duration, "midi", song.performance) : track;
-                if (native && song) input.nativeSecret = createSecretScore(song.notes, song.duration);
-                const selection = song ? VFX_PRESETS.galaxy :
-                    typeof options.preset === "string" ? VFX_PRESETS[options.preset] : validateVfxPreset(options.preset);
-                if (!selection) throw new Error("未知预设");
-                instance.configure(selection, input, options.piano ?? "grand",
+                const selection = song
+                    ? VFX_THEMES.galaxy
+                    : typeof options.preset === "string"
+                        ? (isVfxTheme(options.preset) ? VFX_THEMES[options.preset] : undefined)
+                        : validateVfxTheme(options.preset);
+                if (!selection) throw new Error(`未知主题: ${String(options.preset)}`);
+                instance.configure({ kind: "theme", theme: selection }, input, options.piano ?? "grand",
                     options.direction ?? "south", options.time);
                 position.current = options.time;
                 return { ...instance.stats(), duration: song?.duration ?? track.duration };
@@ -439,7 +608,7 @@ export default function VfxLabPage() {
             setMidi(song);
             setError("");
         } catch (reason) {
-            if (generation === selectionGeneration.current) setError("读取曲目失败 · " + String(reason));
+            if (generation === selectionGeneration.current) setError(`读取曲目失败 · ${String(reason)}`);
         }
     }
 
@@ -455,18 +624,20 @@ export default function VfxLabPage() {
         });
     }
 
-    function updateLayer(index: number, layer: Layer) {
-        setPreset(previous => ({ ...previous, layers: previous.layers.map((item, i) => i === index ? layer : item) }));
+    function updateLayer(index: number, layer: VfxThemeLayer) {
+        setTheme(previous => ({
+            ...previous,
+            layers: previous.layers.map((item, i) => i === index ? layer : item),
+        }));
     }
 
     if (capture) return <main className="vfx-capture"><canvas ref={canvas} />{error && <p>{error}</p>}</main>;
     return <main className="vfx-lab">
         <header className="vfx-header">
-            <div className="vfx-header-title"><a href="/">PianoBE</a><span>/</span><h1>VFX Lab</h1>
-                <a href="/vfx-lab/replay">回放《Secret》</a></div>
+            <div className="vfx-header-title"><a href="/">PianoBE</a><span>/</span><h1>VFX Lab</h1></div>
             <details className="vfx-help">
                 <summary><CircleHelp size={17} /> 渲染说明</summary>
-                <div>预览读取实际 Bedrock 粒子 JSON 与纹理，复用游戏内音乐分析、锚点和发射预算。
+                <div>预览读取实际 Bedrock 粒子 JSON 与图集纹理，与游戏内共享同一套 VFX 引擎、特效定义、音乐特征采样及粒子预算。
                     排练台、布光和演奏者是 Web 场景布置，可切换平地。
                     Vibrant Visuals 的 MER、混合、世界照明和网络时序以游戏客户端为准。</div>
             </details>
@@ -485,7 +656,7 @@ export default function VfxLabPage() {
                                 </button>)}
                         </div>
                         <button className="vfx-icon" title="保存画面" aria-label="保存画面" disabled={!ready} onClick={() =>
-                            saveFile(canvas.current!.toDataURL(), `pianobe-${presetId}-${time.toFixed(2)}.png`)}><Camera size={17} /></button>
+                            saveFile(canvas.current!.toDataURL(), `pianobe-${themeId}-${time.toFixed(2)}.png`)}><Camera size={17} /></button>
                         <button className="vfx-icon" title="全屏" aria-label="全屏" onClick={event =>
                             void event.currentTarget.closest(".vfx-viewport")?.requestFullscreen()}><Maximize2 size={16} /></button>
                     </div>
@@ -554,164 +725,186 @@ export default function VfxLabPage() {
                         </span>
                     </div>
                 </section>}
-                {midi?.performance && <section>
+                {midi?.performance ? <section>
                     <h2>{midi.title}</h2>
                     <div>曲目编排 · {midi.performance.length} 条提示 · 预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</div>
                     <div className="vfx-channel-list">
                         {(stats?.activeChannels ?? []).map(channel => (
-                            <div className="vfx-channel-item" key={`${channel.method}:${channel.slot}`}>
-                                <span>{channel.label} <small>({channel.method}:{channel.slot})</small></span>
+                            <div className="vfx-channel-item" key={`${channel.effect}:${channel.slot}`}>
+                                <span>{channel.label} <small>({channel.effect}:{channel.slot})</small></span>
                                 <span>{channel.level}%</span>
                             </div>
                         ))}
                         {!stats?.activeChannels?.length && <div className="vfx-layer-stats">当前时刻暂无活跃持续通道</div>}
                     </div>
-                    {Object.entries(stats?.effects ?? {}).map(([effect, fx]) =>
-                        <div key={effect}>{effectNames[effect as VfxEffect]} · {fx.particles} 粒子</div>)}
-                </section>}
-                {!midi?.performance && <>
+                </section> : <>
                     <section>
                         <div className="vfx-mode-tabs">
-                            <button type="button" aria-pressed={inspectorMode === "preset"}
-                                onClick={() => setInspectorMode("preset")}>主题 / 图层</button>
-                            <button type="button" aria-pressed={inspectorMode === "painter"}
-                                onClick={() => setInspectorMode("painter")}>绘制方法 ({methodCount})</button>
+                            <button type="button" aria-pressed={inspectorMode === "theme"}
+                                onClick={() => setInspectorMode("theme")}>主题编排 ({VFX_THEME_ORDER.length})</button>
+                            <button type="button" aria-pressed={inspectorMode === "effect"}
+                                onClick={() => setInspectorMode("effect")}>单特效 ({effectCount})</button>
                         </div>
                     </section>
-                    {inspectorMode === "painter" && <section>
-                        <h2>内置粒子绘制（{methodCount} 种）</h2>
+                    {inspectorMode === "effect" ? <section>
+                        <h2>内置特效（{effectCount} 种）</h2>
                         <div className="vfx-painter-grid">
-                            <label>绘制方法
-                                <select aria-label="绘制方法" value={painterConfig.method} onChange={event =>
-                                    setPainterConfig(prev => ({ ...prev, method: event.target.value as PerformanceMethod }))}>
-                                    {(Object.keys(PERFORMANCE_METHODS) as PerformanceMethod[]).map(method => (
-                                        <option key={method} value={method}>{VFX_PAINTERS[method].label} ({method})</option>
-                                    ))}
-                                </select>
-                            </label>
-                            <div className="vfx-colors">
-                                <label>主色 <input aria-label="主色" type="color" value={painterConfig.color}
-                                    onChange={event => setPainterConfig(prev => ({ ...prev, color: event.target.value }))} /></label>
-                                <label>副色 <input aria-label="副色" type="color" value={painterConfig.color2}
-                                    onChange={event => setPainterConfig(prev => ({ ...prev, color2: event.target.value }))} /></label>
-                            </div>
-                            <label>笔刷
-                                <select aria-label="笔刷" value={painterConfig.brush} onChange={event =>
-                                    setPainterConfig(prev => ({ ...prev, brush: event.target.value as PerformanceBrush }))}>
-                                    {(Object.keys(PERFORMANCE_BRUSHES) as PerformanceBrush[]).map(brush => (
-                                        <option key={brush} value={brush}>{brushNames[brush]}</option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label>高度区域
-                                <select aria-label="高度区域" value={painterConfig.zone} onChange={event =>
-                                    setPainterConfig(prev => ({ ...prev, zone: event.target.value as PerformanceZone }))}>
-                                    {(Object.keys(PERFORMANCE_ZONES) as PerformanceZone[]).map(zone => (
-                                        <option key={zone} value={zone}>{zoneNames[zone]}</option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label>运动修饰
-                                <select aria-label="运动修饰" value={painterConfig.motion} onChange={event =>
-                                    setPainterConfig(prev => ({ ...prev, motion: event.target.value as PerformanceMotion }))}>
-                                    {(Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[]).map(motion => (
-                                        <option key={motion} value={motion}>{motionNames[motion]}</option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label>强度 (%)
-                                <input aria-label="强度" type="number" min={10} max={100} value={painterConfig.level}
-                                    onChange={event => setPainterConfig(prev => ({
+                            <label>特效
+                                <select aria-label="特效" value={singleConfig.effect} onChange={event => {
+                                    const effect = event.target.value;
+                                    const nextDef = getVfxEffect(effect);
+                                    setSingleConfig(prev => ({
                                         ...prev,
-                                        level: Math.max(10, Math.min(100, Math.round(Number(event.target.value) || 85))),
-                                    }))} />
+                                        effect,
+                                        brush: undefined,
+                                        variant: nextDef?.variants?.[0],
+                                    }));
+                                }}>
+                                    {VFX_EFFECT_IDS.map(id => (
+                                        <option key={id} value={id}>{VFX_EFFECTS[id].label} ({id})</option>
+                                    ))}
+                                </select>
+                            </label>
+                            {activeEffectDef?.variants?.length ? (
+                                <label>变体
+                                    <select aria-label="变体" value={singleConfig.variant ?? ""} onChange={event =>
+                                        setSingleConfig(prev => ({ ...prev, variant: event.target.value || undefined }))}>
+                                        <option value="">默认</option>
+                                        {activeEffectDef.variants.map(item => (
+                                            <option key={item} value={item}>{variantLabel(singleConfig.effect, item)}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                            ) : null}
+                            <div className="vfx-colors">
+                                <label>主色 <input aria-label="主色" type="color" value={singleConfig.color}
+                                    onChange={event => setSingleConfig(prev => ({ ...prev, color: event.target.value }))} /></label>
+                                <label>副色 <input aria-label="副色" type="color" value={singleConfig.color2 ?? singleConfig.color}
+                                    onChange={event => setSingleConfig(prev => ({ ...prev, color2: event.target.value }))} /></label>
+                            </div>
+                            <BrushSelect label="画笔" effectId={singleConfig.effect} value={singleConfig.brush}
+                                onChange={brush => setSingleConfig(prev => ({ ...prev, brush }))} />
+                            {activeEffectDef?.trigger !== "control" && <>
+                                <label>高度区域
+                                    <select aria-label="高度区域" value={singleConfig.zone ?? "stage"} onChange={event =>
+                                        setSingleConfig(prev => ({ ...prev, zone: event.target.value as PerformanceZone }))}>
+                                        {(Object.keys(PERFORMANCE_ZONES) as PerformanceZone[]).map(zone => (
+                                            <option key={zone} value={zone}>{zoneNames[zone]}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label>运动修饰
+                                    <select aria-label="运动修饰" value={singleConfig.motion ?? "normal"} onChange={event =>
+                                        setSingleConfig(prev => ({ ...prev, motion: event.target.value as PerformanceMotion }))}>
+                                        {(Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[]).map(motion => (
+                                            <option key={motion} value={motion}>{motionNames[motion]}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </>}
+                            <label>强度 (%)
+                                <NumberField label="强度" value={singleConfig.level ?? 85} min={10} max={100}
+                                    set={level => setSingleConfig(prev => ({ ...prev, level: Math.round(level) }))} />
                             </label>
                             <label>缩放 (%)
-                                <input aria-label="缩放" type="number" min={50} max={170} value={painterConfig.scale}
-                                    onChange={event => setPainterConfig(prev => ({
-                                        ...prev,
-                                        scale: Math.max(50, Math.min(170, Math.round(Number(event.target.value) || 100))),
-                                    }))} />
+                                <NumberField label="缩放" value={singleConfig.scale ?? 100} min={50} max={170}
+                                    set={scale => setSingleConfig(prev => ({ ...prev, scale: Math.round(scale) }))} />
                             </label>
-                            {VFX_PAINTERS[painterConfig.method].instant && <button type="button" onClick={() => {
-                                stage.current?.triggerFlash();
-                                if (!playing) void togglePlay();
-                            }}>触发一次（{VFX_PAINTERS[painterConfig.method].label}）</button>}
+                            {activeEffectDef?.trigger === "instant" && (
+                                <button type="button" onClick={() => {
+                                    stage.current?.triggerFlash();
+                                    if (!playing) void togglePlay();
+                                }}>触发一次（{activeEffectDef.label}）</button>
+                            )}
                         </div>
                         <div className="vfx-layer-stats">
-                            预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO} · 默认笔刷 {brushNames[VFX_PAINTERS[painterConfig.method].defaultBrush]}
+                            预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}
+                            {activeEffectDef ? ` · ${triggerNames[activeEffectDef.trigger]} · 默认画笔 ${defaultBrushLabel(singleConfig.effect)}` : ""}
                         </div>
-                    </section>}
-                    {inspectorMode === "preset" && <><section>
-                        <h2>预设与舞台主题</h2>
-                        <div className="vfx-presets">
-                            {Object.entries(names).map(([key, [name, label]]) => <button key={key} data-preset={key}
-                                aria-pressed={presetId === key} onClick={() => selectPreset(key)}>
-                                <i className={key} /><span>{name}<small>{label}</small></span>
-                            </button>)}
-                        </div>
-                        {!isVfxStageTheme(presetId) && <div className="vfx-row vfx-actions">
-                            <button onClick={() => presetInput.current?.click()}>导入</button>
-                            <button onClick={() => exportPreset(preset)}>导出 JSON</button>
-                            <button aria-label="重置预设" title="重置预设" disabled={!VFX_PRESETS[presetId]}
-                                onClick={() => selectPreset(presetId)}><RotateCcw size={14} /></button>
-                            <input type="file" accept=".json" hidden ref={presetInput} onChange={async event => {
-                                const file = event.target.files?.[0];
-                                event.currentTarget.value = "";
-                                if (!file) return;
-                                try { selectPreset("custom", validateVfxPreset(JSON.parse(await file.text()))); setError(""); }
-                                catch (reason) { setError(String(reason)); }
-                            }} />
-                        </div>}
-                    </section>
-                    {isVfxStageTheme(presetId) && <section>
-                        <div className="vfx-section-title"><h2>{VFX_STAGE_THEMES[presetId].label}图层</h2><span>预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</span></div>
-                        <div className="vfx-channel-list">
-                            {VFX_STAGE_THEMES[presetId].layers.map((layer, index) => (
-                                <div className="vfx-channel-item" key={index}>
-                                    <span>{VFX_PAINTERS[layer.method].label} <small>({layer.method})</small></span>
-                                    <span>{typeof layer.level === "number" ? `${layer.level}%` : `${featureNames[layer.level.input]}`}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </section>}
-                    {!isVfxStageTheme(presetId) && <section>
-                        <div className="vfx-section-title"><h2>图层</h2><span>预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</span></div>
-                        {preset.layers.map((layer, index) => {
-                            const fx = stats?.effects[layer.effect];
-                            return <div className="vfx-layer" key={index}>
-                                <div className="vfx-layer-row">
-                                    <button title={hidden.has(index) ? "显示图层" : "隐藏图层"} aria-pressed={!hidden.has(index)}
-                                        onClick={() => setHidden(previous => {
-                                            const next = new Set(previous);
-                                            if (next.has(index)) next.delete(index);
-                                            else next.add(index);
-                                            return next;
-                                        })}>{hidden.has(index) ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                                    <button className="vfx-layer-name" aria-expanded={open === index}
-                                        onClick={() => setOpen(open === index ? null : index)}>
-                                        {layer.layout ? layoutNames[layer.layout] : effectNames[layer.effect]}
-                                        <small>{layer.effect}</small><ChevronDown size={14} /></button>
-                                </div>
-                                {open === index && <><div className="vfx-layer-stats">
-                                    按效果汇总 · {fx?.particles ?? 0} 粒子 · {fx?.reserved ?? 0} 预留 · {fx?.rate ?? 0} 发射 / 秒
-                                </div><LayerEditor layer={layer} update={item => updateLayer(index, item)}
-                                    remove={preset.layers.length > 1 ? () => {
-                                        setPreset(previous => ({ ...previous, layers: previous.layers.filter((_, i) => i !== index) }));
-                                        setHidden(previous => new Set([...previous].filter(i => i !== index).map(i => i > index ? i - 1 : i)));
-                                        setOpen(null);
-                                    } : undefined} /></>}
-                            </div>;
-                        })}
-                        {preset.layers.length < 6 && <select aria-label="添加图层" value="" onChange={event => {
-                            const effect = event.target.value as VfxEffect;
-                            setOpen(preset.layers.length);
-                            setPreset(previous => ({ ...previous, layers: [...previous.layers, { effect }] }));
-                        }}>
-                            <option value="" disabled>添加图层</option>
-                            {Object.entries(effectNames).map(([effect, name]) => <option key={effect} value={effect}>{name}</option>)}
-                        </select>}
-                    </section>}</>}
+                    </section> : <>
+                        <section>
+                            <h2>舞台主题</h2>
+                            <div className="vfx-presets">
+                                {VFX_THEME_ORDER.map(id => (
+                                    <button key={id} data-preset={id} aria-pressed={themeId === id} onClick={() => selectTheme(id)}>
+                                        <i className={id} />
+                                        <span>{themeEnglishNames[id]}<small>{VFX_THEMES[id].label}</small></span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="vfx-row vfx-actions">
+                                <button onClick={() => themeInput.current?.click()}>导入 JSON</button>
+                                <button onClick={() => exportThemeJson(theme, themeId)}>导出 JSON</button>
+                                <button aria-label="重置主题" title="重置主题" disabled={!isVfxTheme(themeId)}
+                                    onClick={() => selectTheme(themeId)}><RotateCcw size={14} /></button>
+                                <input type="file" accept=".json" hidden ref={themeInput} onChange={async event => {
+                                    const file = event.target.files?.[0];
+                                    event.currentTarget.value = "";
+                                    if (!file) return;
+                                    try { selectTheme("custom", validateVfxTheme(JSON.parse(await file.text()))); setError(""); }
+                                    catch (reason) { setError(String(reason)); }
+                                }} />
+                            </div>
+                        </section>
+                        <section>
+                            <div className="vfx-section-title">
+                                <h2>{theme.label ?? "自定义"}图层</h2>
+                                <span>预留 {stats?.reserved ?? 0}/{VFX_PARTICLES_PER_PIANO}</span>
+                            </div>
+                            {theme.layers.map((layer, index) => {
+                                const def = getVfxEffect(layer.effect);
+                                return <div className="vfx-layer" key={index}>
+                                    <div className="vfx-layer-row">
+                                        <button title={hidden.has(index) ? "显示图层" : "隐藏图层"} aria-pressed={!hidden.has(index)}
+                                            onClick={() => setHidden(previous => {
+                                                const next = new Set(previous);
+                                                if (next.has(index)) next.delete(index);
+                                                else next.add(index);
+                                                return next;
+                                            })}>{hidden.has(index) ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                                        <button className="vfx-layer-name" aria-expanded={open === index}
+                                            onClick={() => setOpen(open === index ? null : index)}>
+                                            {def?.label ?? layer.effect}
+                                            <small>{layer.effect}</small>
+                                            <ChevronDown size={14} />
+                                        </button>
+                                    </div>
+                                    {open === index && <ThemeLayerEditor
+                                        layer={layer}
+                                        update={item => updateLayer(index, item)}
+                                        remove={theme.layers.length > 1 ? () => {
+                                            setTheme(previous => ({ ...previous, layers: previous.layers.filter((_, i) => i !== index) }));
+                                            setHidden(previous => new Set([...previous].filter(i => i !== index).map(i => i > index ? i - 1 : i)));
+                                            setOpen(null);
+                                        } : undefined}
+                                    />}
+                                </div>;
+                            })}
+                            {theme.layers.length < 8 && <select aria-label="添加图层" value="" onChange={event => {
+                                const effect = event.target.value;
+                                const nextDef = getVfxEffect(effect);
+                                setOpen(theme.layers.length);
+                                setTheme(previous => ({
+                                    ...previous,
+                                    layers: [
+                                        ...previous.layers,
+                                        {
+                                            effect,
+                                            color: "#8EC8FF",
+                                            level: { input: "activity", from: 40, to: 90 },
+                                            ...(nextDef?.variants?.length ? { variant: nextDef.variants[0] } : {}),
+                                            ...(nextDef?.trigger === "instant" ? { gate: { input: "chord", threshold: 0.5, cooldown: 32 } } : {}),
+                                        },
+                                    ],
+                                }));
+                            }}>
+                                <option value="" disabled>添加图层</option>
+                                {VFX_EFFECT_IDS.map(id => (
+                                    <option key={id} value={id}>{VFX_EFFECTS[id].label} ({id})</option>
+                                ))}
+                            </select>}
+                        </section>
+                    </>}
                 </>}
                 <section className="vfx-scene-controls">
                     <h2>场景</h2>

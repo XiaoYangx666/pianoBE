@@ -3,7 +3,7 @@ import { hostScope, textPort } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
 import { type Entity, type Player, type SoundInstance, Vector3, system } from "@minecraft/server";
-import { grandDefinition } from "@domain/instrument/definition";
+import { grandDefinition, vfxInstrumentFor } from "@domain/instrument/definition";
 import { inspectInstrument, instrumentCenter, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
@@ -23,7 +23,7 @@ import { CardAccess } from "@platform/storage/cardItem";
 import type { MusicStorage } from "@domain/music/storage";
 import { SoundReleaseQueue } from "@domain/playback/soundRelease";
 import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visualEvent";
-import type { PianoParticleOverride } from "@domain/piano/particleOverride";
+import type { PianoParticleOverride } from "@piano/vfx";
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -353,7 +353,7 @@ export class PianoRuntime {
                 this.right,
                 note.midi,
                 settings,
-                this.hitModel,
+                vfxInstrumentFor(this.location.definition),
                 this.particleOverrideProvider?.(songTime),
             );
         }

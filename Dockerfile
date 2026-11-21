@@ -10,6 +10,7 @@ RUN mkdir -p packages/server/amt
 # 容器内仅 core/server/web（.dockerignore 排除除采样外的 addon 与 generator），装全量依赖
 RUN bun install
 RUN bun run --filter @piano/core build
+RUN bun run --filter @piano/vfx build
 RUN bun run --filter @piano/web build
 
 # ---- 运行阶段 ----

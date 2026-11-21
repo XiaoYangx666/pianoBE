@@ -29,7 +29,7 @@ const presets = values.song ? [values.song] : values.preset ?? ["galaxy", "neon"
 const fixtures = values.time?.map(seconds => [`t-${Number(seconds).toFixed(2)}`, Number(seconds)]) ??
     (values.song ? [["intro", 8], ["verse", 30], ["build", 75], ["chorus", 144], ["interlude", 180],
         ["bridge", 200], ["final", 240], ["outro", 280]] :
-    presets.length === 1 && ["secret", "secret-native"].includes(presets[0])
+    presets.length === 1 && presets[0] === "secret"
         ? [["intro", 5.1], ["develop", 43.2], ["gather", 71.6], ["fracture", 72.8],
             ["climax", 75.05], ["coda", 82.3], ["end", 86.1]] :
         [["quiet", 3.75], ["climax", 8.7], ["release", 11.4]]);
@@ -72,7 +72,7 @@ try {
     for (const preset of presets) {
         const duration = values.song
             ? await page.evaluate(base64 => window.pianoVfxLab.songDuration(base64), songBase64)
-            : ["secret", "secret-native"].includes(preset) ? await page.evaluate(() => window.pianoVfxLab.scoreDuration()) : 12;
+            : preset === "secret" ? await page.evaluate(() => window.pianoVfxLab.scoreDuration()) : 12;
         for (const [label, time] of fixtures) {
             if (time > duration) throw new Error(`Capture time ${time} exceeds ${preset} duration (${duration}s)`);
             const options = { preset, time, view: values.view, piano: values.piano, direction: values.direction, deck: !values.flat };

@@ -1,0 +1,29 @@
+{
+    "name": "@piano/vfx",
+    "version": "0.1.0",
+    "description": "PianoBE cross-platform visual effects: instruments, stage layout, effects and the shared execution engine",
+    "type": "module",
+    "license": "CC-BY-NC-4.0",
+    "private": true,
+    "sideEffects": false,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./assets/*": "./assets/*"
+    },
+    "files": [
+        "dist",
+        "assets"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "@piano/core": "*"
+    }
+}

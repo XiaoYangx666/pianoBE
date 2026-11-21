@@ -1,0 +1,57 @@
+{
+  "width": 1024,
+  "height": 1024,
+  "texture": "textures/particle/vfx_lab",
+  "pointBrushGrid": {
+    "originX": 0,
+    "originY": 640,
+    "cellSize": 128,
+    "cols": 8,
+    "rows": 2
+  },
+  "strokeBrushStrip": {
+    "originX": 0,
+    "originY": 896,
+    "cellWidth": 256,
+    "cellHeight": 96
+  },
+  "pointBrushes": [
+    { "id": "mote", "label": "柔光球", "stroke": "silk" },
+    { "id": "star", "label": "星芒", "stroke": "silk" },
+    { "id": "petal", "label": "樱花瓣", "stroke": "calligraphy" },
+    { "id": "snow", "label": "雪花晶", "stroke": "silk" },
+    { "id": "note", "label": "八分音符", "stroke": "calligraphy" },
+    { "id": "shard", "label": "玻璃棱晶", "stroke": "comet" },
+    { "id": "spark", "label": "烟花火花", "stroke": "comet" },
+    { "id": "ring", "label": "双缘圆环", "stroke": "laser" },
+    { "id": "blossom", "label": "无名白花", "stroke": "silk" }
+  ],
+  "strokeBrushes": [
+    { "id": "silk", "label": "柔边丝光" },
+    { "id": "laser", "label": "锐利激光" },
+    { "id": "comet", "label": "彗星拖尾" },
+    { "id": "calligraphy", "label": "书法双丝" }
+  ],
+  "tiles": {
+    "mote": [0, 0, 32, 32],
+    "glint": [32, 0, 32, 32],
+    "silk": [64, 0, 32, 32],
+    "curtain": [96, 0, 32, 48],
+    "spark": [128, 0, 32, 32],
+    "beam": [0, 48, 256, 48],
+    "shaft": [128, 109, 128, 64],
+    "haze": [128, 225, 128, 30],
+    "flow": [128, 175, 128, 48],
+    "aurora": [256, 0, 256, 112],
+    "drape": [256, 112, 256, 92],
+    "bar": [256, 204, 256, 48],
+    "upright": [164, 2, 48, 44],
+    "shard": [212, 0, 44, 48],
+    "cloud_puff": [512, 0, 256, 256],
+    "comet_body": [512, 256, 512, 128],
+    "ripple": [0, 384, 256, 256],
+    "cinema_cluster": [256, 384, 128, 128],
+    "cinema_flecks": [384, 384, 128, 128],
+    "cinema_dust": [256, 512, 64, 64]
+  }
+}

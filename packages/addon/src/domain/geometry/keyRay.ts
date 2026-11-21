@@ -1,6 +1,6 @@
 import type { Vec3 } from "./offsets";
-import { GRAND_CASE_HITBOXES, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PANEL_BOXES, GRAND_PARTICLE_LINE, SCORE_STAND } from "../../data/grand.generated";
-import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX, PIANO_PARTICLE_LINE, SETTINGS_HITBOX } from "../../data/hitboxes.generated";
+import { GRAND_CASE_HITBOXES, GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_PANEL_BOXES, SCORE_STAND } from "../../data/grand.generated";
+import { CASE_HITBOXES, KEYBOARD_HITBOX, KEY_HITBOXES, KEY_PRESS_DEGREES, MENU_HITBOX, MIDI_MENU_HITBOX, SETTINGS_HITBOX } from "../../data/hitboxes.generated";
 
 type Vec = readonly [number, number, number];
 type Box = readonly [number, number, number, number, number, number];
@@ -12,7 +12,7 @@ const HEAD_TO_EYE_Y = .1;
 const SIN = Math.sin(KEY_PRESS_DEGREES * Math.PI / 180);
 const COS = Math.cos(KEY_PRESS_DEGREES * Math.PI / 180);
 function hitModel(keyboard: Box, keys: readonly KeyBox[], caseBoxes: readonly Box[],
-    buttons: readonly Button[], particleLine: { y: number; z: number }) {
+    buttons: readonly Button[]) {
     const firstColumn = Math.floor(keyboard[0]);
     const lastColumn = Math.floor(keyboard[3]);
     const columns: KeyBox[][] = Array.from({ length: lastColumn - firstColumn + 1 }, () => []);
@@ -28,12 +28,12 @@ function hitModel(keyboard: Box, keys: readonly KeyBox[], caseBoxes: readonly Bo
     // Only the body behind the keyboard opens the panel; the apron under the
     // keys and the cheeks beside them stay inert so playing cannot pop it open.
     const body = new Set(caseBoxes.filter(box => box[2] > keyboard[5]));
-    return { keyboard, caseBoxes, buttons, particleLine, firstColumn, columns, keyCenters, body };
+    return { keyboard, caseBoxes, buttons, firstColumn, columns, keyCenters, body };
 }
 
 export const digitalPianoHitModel = hitModel(KEYBOARD_HITBOX, KEY_HITBOXES, CASE_HITBOXES,
-    [["menu", MENU_HITBOX], ["midi", MIDI_MENU_HITBOX], ["settings", SETTINGS_HITBOX]], PIANO_PARTICLE_LINE);
-export const grandPianoHitModel = hitModel(GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_CASE_HITBOXES, [], GRAND_PARTICLE_LINE);
+    [["menu", MENU_HITBOX], ["midi", MIDI_MENU_HITBOX], ["settings", SETTINGS_HITBOX]]);
+export const grandPianoHitModel = hitModel(GRAND_KEYBOARD_HITBOX, GRAND_KEY_HITBOXES, GRAND_CASE_HITBOXES, []);
 const grandPanelBoxes = new Set<number>(GRAND_PANEL_BOXES);
 const scoreAngle = SCORE_STAND.lean * Math.PI / 180;
 const scoreSin = Math.sin(scoreAngle);
@@ -67,15 +67,6 @@ export function pianoModelOffset(right: Vec3, x: number, y: number, z: number): 
     };
 }
 
-export function pianoParticleOrigin(center: Vec3, right: Vec3, midi: number, onKey = false,
-    model = digitalPianoHitModel): Vec3 | undefined {
-    const key = model.keyCenters.get(midi);
-    if (!key) return;
-    const [x, y, z] = key;
-    const line = onKey ? undefined : model.particleLine;
-    const offset = pianoModelOffset(right, x, line?.y ?? y + .4, line?.z ?? z);
-    return { x: center.x + offset.x, y: center.y + offset.y, z: center.z + offset.z };
-}
 
 function inverseKeyPose(ray: PianoRay, box: KeyBox): PianoRay {
     const py = box[7], pz = box[8];

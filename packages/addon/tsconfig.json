@@ -3,6 +3,7 @@
         "target": "es2023",
         "moduleResolution": "bundler",
         "module": "es2022",
+        "resolveJsonModule": true,
         "skipLibCheck": true,
         "strict": true,
         "noImplicitAny": true,

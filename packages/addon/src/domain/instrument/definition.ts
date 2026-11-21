@@ -28,3 +28,8 @@ export const instrumentBlockTypes = [...definitionsByPart.keys()];
 export function definitionForPart(typeId: string): InstrumentDefinition | undefined {
     return definitionsByPart.get(typeId);
 }
+
+/** Map an addon assembly to the shared VFX instrument profile. */
+export function vfxInstrumentFor(definition?: InstrumentDefinition) {
+    return definition === grandDefinition ? "grand" as const : "upright" as const;
+}

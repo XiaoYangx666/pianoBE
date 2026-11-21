@@ -2,7 +2,9 @@ import { DEFAULT_PIANO_TIMBRE, PIANO_TIMBRES } from "@piano/core";
 import { DEFAULT_SCORE_ID, isValidScoreId } from "@domain/score/score";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
 import { DEFAULT_MANUAL_VELOCITY, isManualVelocity } from "./soundTypes";
-import { PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES } from "./particleOverride";
+import {
+    PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, VFX_THEMES, VFX_THEME_ORDER,
+} from "@piano/vfx";
 
 export { PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES };
 
@@ -17,14 +19,12 @@ export function availablePianoTimbres(enabled: readonly string[]) {
 export const AVAILABLE_PIANO_TIMBRES = availablePianoTimbres(ENABLED_PIANO_TIMBRES);
 
 export const PIANO_STAGE_THEMES = [
-    { value: 0, id: "off", label: "关闭（仅曲目自带编排）" },
-    { value: 1, id: "galaxy", label: "梦幻星河" },
-    { value: 2, id: "neon", label: "霓虹音乐会" },
-    { value: 3, id: "stage", label: "高能舞台" },
-    { value: 4, id: "sakura", label: "落樱星庭" },
-    { value: 5, id: "starlight", label: "星空法阵" },
-    { value: 6, id: "cathedral", label: "圣光时空" },
-    { value: 7, id: "carnival", label: "璀璨烟花夜" },
+    { value: 0, id: "off" as const, label: "关闭（仅曲目自带编排）" },
+    ...VFX_THEME_ORDER.map((id, index) => ({
+        value: index + 1,
+        id,
+        label: VFX_THEMES[id].label ?? id,
+    })),
 ] as const;
 
 export type PianoStageThemeId = typeof PIANO_STAGE_THEMES[number]["id"];
