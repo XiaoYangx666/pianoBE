@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./parameters";
 export * from "./brushes";
 export * from "./color";
 export * from "./music";

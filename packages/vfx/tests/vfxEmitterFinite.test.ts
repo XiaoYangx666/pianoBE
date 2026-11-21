@@ -6,8 +6,10 @@ import {
     createThemeProgram,
     placeVfxEmitter,
     quietFeatures,
+    validateEffectCustomParams,
     VFX_EFFECT_IDS,
     VFX_EFFECTS,
+    VFX_PARTICLES_PER_PIANO,
     VFX_THEME_ORDER,
     VFX_THEMES,
     VfxEngine,
@@ -31,6 +33,7 @@ function check(label: string, emitter: VfxEmitter, seconds: number, out: string[
 function parseJsonPerformanceCues(source: any) {
     return source.cues.map((cue: any) => {
         const def = VFX_EFFECTS[cue.effect as keyof typeof VFX_EFFECTS];
+        const params = validateEffectCustomParams(cue.effect, cue.params);
         const base = {
             tick: Math.round(cue.at * 40),
             effect: cue.effect as string,
@@ -41,6 +44,7 @@ function parseJsonPerformanceCues(source: any) {
             variant: cue.variant,
             zone: cue.zone,
             motion: cue.motion,
+            ...(params ? { params } : {}),
             level: cue.level,
             scale: cue.scale,
         };
@@ -115,6 +119,60 @@ test("all 7 stage themes place finite variables under unified VfxEngine", () => 
             const batches = engine.update(t, tick, music, [{ midi: 60, velocity: 0.8, duration: 0.8, tick }]);
             for (const batch of batches) {
                 for (const emitter of batch.emitters) check(`${name} ${emitter.group}/${emitter.particle}`, emitter, t, failures);
+            }
+        }
+    }
+    expect([...new Set(failures)].slice(0, 30)).toEqual([]);
+});
+
+test("all parameterized effects remain finite and within per-piano particle budget at min/max/alt extremes", () => {
+    const music = { ...quietFeatures, velocity: 0.9, activity: 0.95, density: 0.9, sustain: 0.9, surge: 0.95, chord: 0.8, onset: 1 };
+    const failures: string[] = [];
+    for (const id of VFX_EFFECT_IDS) {
+        const def = VFX_EFFECTS[id];
+        if (!def.parameters || !def.emit) continue;
+        const minParams: Record<string, number | boolean | string> = {};
+        const maxParams: Record<string, number | boolean | string> = {};
+        for (const [key, spec] of Object.entries(def.parameters)) {
+            if (spec.type === "boolean") {
+                minParams[key] = false;
+                maxParams[key] = true;
+            } else if (spec.type === "enum") {
+                minParams[key] = spec.options[0];
+                maxParams[key] = spec.options[spec.options.length - 1];
+            } else {
+                minParams[key] = spec.min;
+                maxParams[key] = spec.max;
+            }
+        }
+        for (const [mode, custom] of [["min", minParams], ["max", maxParams]] as const) {
+            const state = def.createState?.();
+            const batch = def.emit({
+                params: {
+                    color: "#68E4FF",
+                    color2: "#FFE29A",
+                    intensity: 1,
+                    scale: 1.7,
+                    variant: def.variants?.[0],
+                    zone: "stage",
+                    motion: "intense",
+                    custom,
+                },
+                music,
+                recentNotes: [{ midi: 60, velocity: 1, duration: 1, tick: 1 }],
+                lastNoteTick: 0,
+                instrument: "grand",
+                phase: 17,
+                solo: false,
+                state,
+            });
+            const emitters = batch?.emitters ?? [];
+            const particles = emitters.reduce((sum, emitter) => sum + emitter.particles, 0);
+            expect(particles).toBeLessThanOrEqual(VFX_PARTICLES_PER_PIANO);
+            for (const emitter of emitters) {
+                expect(emitter.lifetime).toBeGreaterThan(0);
+                expect(emitter.lifetime).toBeLessThan(7);
+                check(`${id}:${mode}`, emitter, 2.5, failures);
             }
         }
     }

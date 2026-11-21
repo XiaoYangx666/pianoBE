@@ -9,11 +9,14 @@ import {
     TIME_SCALE,
     type PerformanceCue,
     type PerformanceMotion,
+    type PerformanceParams,
+    type PerformanceParamValue,
     type PerformanceZone,
 } from "@piano/core";
 import secretUrl from "../../../../midis/library/e1563b03.pbe3?url";
 import secret from "../../../../midis/performances/e1563b03.json";
 import {
+    defaultEffectCustomParams,
     deriveAccentHex,
     DEFAULT_KEY_PARTICLE_SETTINGS,
     getVfxEffect,
@@ -243,6 +246,76 @@ function BrushSelect({ label, effectId, value, onChange }: {
     );
 }
 
+function EffectParamsEditor({ effectId, params, onChange }: {
+    effectId: string;
+    params?: PerformanceParams;
+    onChange: (next?: PerformanceParams) => void;
+}) {
+    const schema = getVfxEffect(effectId)?.parameters;
+    if (!schema) return null;
+    const defaults = defaultEffectCustomParams(effectId);
+    const updateValue = (key: string, value: PerformanceParamValue) => {
+        const next: Record<string, PerformanceParamValue> = { ...(params ?? {}), [key]: value };
+        if (value === defaults[key]) delete next[key];
+        onChange(Object.keys(next).length ? next : undefined);
+    };
+    return (
+        <>
+            {Object.entries(schema).map(([key, spec]) => {
+                const label = spec.label ?? key;
+                const current = params && Object.hasOwn(params, key) ? params[key] : spec.default;
+                if (spec.type === "boolean") {
+                    const checked = typeof current === "boolean" ? current : spec.default;
+                    return (
+                        <label key={key}>{label}
+                            <select
+                                aria-label={label}
+                                value={checked ? "true" : "false"}
+                                onChange={event => updateValue(key, event.target.value === "true")}
+                            >
+                                <option value="true">开启</option>
+                                <option value="false">关闭</option>
+                            </select>
+                        </label>
+                    );
+                }
+                if (spec.type === "enum") {
+                    const selected = typeof current === "string" && spec.options.includes(current) ? current : spec.default;
+                    return (
+                        <label key={key}>{label}
+                            <select
+                                aria-label={label}
+                                value={selected}
+                                onChange={event => updateValue(key, event.target.value)}
+                            >
+                                {spec.options.map(option => (
+                                    <option key={option} value={option}>{option}</option>
+                                ))}
+                            </select>
+                        </label>
+                    );
+                }
+                const numeric = typeof current === "number" && Number.isFinite(current) ? current : spec.default;
+                return (
+                    <label key={key}>{label} ({spec.min}–{spec.max})
+                        <NumberField
+                            label={label}
+                            value={numeric}
+                            min={spec.min}
+                            max={spec.max}
+                            step={spec.step ?? 0.1}
+                            set={value => updateValue(key, value)}
+                        />
+                    </label>
+                );
+            })}
+            {params && Object.keys(params).length > 0 && (
+                <button type="button" onClick={() => onChange(undefined)}>重置特效参数</button>
+            )}
+        </>
+    );
+}
+
 function ThemeLayerEditor({ layer, update, remove }: {
     layer: VfxThemeLayer;
     update: (next: VfxThemeLayer) => void;
@@ -265,6 +338,7 @@ function ThemeLayerEditor({ layer, update, remove }: {
                             effect,
                             brush: undefined,
                             variant: nextDef?.variants?.[0],
+                            params: undefined,
                             gate: nextDef?.trigger === "instant"
                                 ? (layer.gate ?? { input: "chord", threshold: 0.5, cooldown: 32 })
                                 : undefined,
@@ -388,6 +462,11 @@ function ThemeLayerEditor({ layer, update, remove }: {
                         </>}
                     </>
                 )}
+                <EffectParamsEditor
+                    effectId={layer.effect}
+                    params={layer.params}
+                    onChange={params => update({ ...layer, params })}
+                />
                 {remove && <button type="button" onClick={remove}>移除图层</button>}
             </div>
         </div>
@@ -803,6 +882,7 @@ export default function VfxLabPage() {
                                         effect,
                                         brush: undefined,
                                         variant: nextDef?.variants?.[0],
+                                        params: undefined,
                                     }));
                                 }}>
                                     {VFX_EFFECT_IDS.map(id => (
@@ -855,6 +935,11 @@ export default function VfxLabPage() {
                                 <NumberField label="缩放" value={singleConfig.scale ?? 100} min={50} max={170}
                                     set={scale => setSingleConfig(prev => ({ ...prev, scale: Math.round(scale) }))} />
                             </label>
+                            <EffectParamsEditor
+                                effectId={singleConfig.effect}
+                                params={singleConfig.params}
+                                onChange={params => setSingleConfig(prev => ({ ...prev, params }))}
+                            />
                             {activeEffectDef?.trigger === "instant" && (
                                 <button type="button" onClick={() => {
                                     stage.current?.triggerFlash();

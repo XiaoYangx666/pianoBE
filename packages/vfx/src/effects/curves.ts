@@ -2,10 +2,64 @@ import {
     catmullRom, motionFactors, sampleLissajous, sampleWingPair, zoneBaseY, ZONE_Y_OFFSET,
 } from "../geometry";
 import { mix } from "../music";
+import { resolveSchemaParams } from "../parameters";
 import {
     drawBeam, drawPoints, drawStrokeSegments, drawWave, resolvePointBrush, resolveStrokeBrush,
 } from "../primitives";
-import type { VfxEffectDefinition } from "../types";
+import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
+
+const WING_RIBBONS_PARAMS = {
+    radius: { label: "翼展半径", default: 1.56, min: 0.6, max: 3.2, step: 0.1 },
+    height: { label: "翼展高度", default: 1.0, min: 0.3, max: 2.5, step: 0.1 },
+    spread: { label: "展开张角", default: 0.72, min: 0.3, max: 1.8, step: 0.05 },
+    width: { label: "丝带宽度", default: 0.145, min: 0.05, max: 0.35, step: 0.01 },
+} as const satisfies VfxParameterSchema;
+
+const DOUBLE_HELIX_PARAMS = {
+    radius: { label: "螺旋半径", default: 2.2, min: 0.5, max: 4.0, step: 0.1 },
+    height: { label: "上升高度", default: 1.95, min: 0.5, max: 5.0, step: 0.1 },
+    angularSpeed: { label: "旋转角速度", default: 135, min: -360, max: 360, step: 5 },
+    particleSize: { label: "粒子大小", default: 0.068, min: 0.02, max: 0.16, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const ORBIT_HALO_PARAMS = {
+    radius: { label: "星环半径", default: 2.28, min: 0.8, max: 4.0, step: 0.1 },
+    angularSpeed: { label: "公转角速度", default: 68, min: -240, max: 240, step: 5 },
+    tilt: { label: "倾角", default: 0.52, min: -1.2, max: 1.2, step: 0.05 },
+    particleSize: { label: "粒子大小", default: 0.068, min: 0.02, max: 0.16, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const SILK_STREAMS_PARAMS = {
+    width: { label: "丝带宽度", default: 0.24, min: 0.08, max: 0.5, step: 0.01 },
+    length: { label: "丝带长度", default: 1.3, min: 0.6, max: 2.8, step: 0.1 },
+    bend: { label: "弯曲弧度", default: 0.66, min: -1.5, max: 1.5, step: 0.05 },
+    speed: { label: "掠过速度", default: 0.84, min: 0.3, max: 2.0, step: 0.05 },
+} as const satisfies VfxParameterSchema;
+
+const WAVE_RIBBON_PARAMS = {
+    amplitude: { label: "波峰振幅", default: 0.22, min: 0.05, max: 1.2, step: 0.05 },
+    radius: { label: "音浪半径", default: 1.08, min: 0.5, max: 2.0, step: 0.05 },
+    speed: { label: "律动速度", default: 1.0, min: 0.3, max: 2.5, step: 0.1 },
+} as const satisfies VfxParameterSchema;
+
+const VORTEX_COLUMN_PARAMS = {
+    radius: { label: "底部半径", default: 2.55, min: 0.5, max: 4.0, step: 0.1 },
+    topRadius: { label: "顶部半径", default: 0.95, min: 0.3, max: 4.0, step: 0.1 },
+    height: { label: "旋涡高度", default: 2.1, min: 0.5, max: 4.5, step: 0.1 },
+    angularSpeed: { label: "旋转角速度", default: 210, min: -360, max: 360, step: 10 },
+} as const satisfies VfxParameterSchema;
+
+const LISSAJOUS_WEAVE_PARAMS = {
+    radius: { label: "水平半径", default: 2.35, min: 0.8, max: 3.8, step: 0.1 },
+    height: { label: "垂直幅度", default: 0.68, min: 0.2, max: 2.2, step: 0.05 },
+    width: { label: "笔触宽度", default: 0.13, min: 0.05, max: 0.32, step: 0.01 },
+} as const satisfies VfxParameterSchema;
+
+const MUSUBI_BRAID_PARAMS = {
+    radius: { label: "编织半径", default: 2.15, min: 0.6, max: 3.6, step: 0.1 },
+    tilt: { label: "交错倾角", default: 0.38, min: 0.0, max: 1.0, step: 0.05 },
+    angularSpeed: { label: "回旋速度", default: 58, min: -180, max: 180, step: 5 },
+} as const satisfies VfxParameterSchema;
 
 export const CURVE_EFFECTS = {
     wing_ribbons: {
@@ -17,15 +71,18 @@ export const CURVE_EFFECTS = {
         priority: 4,
         defaultBrush: "mote",
         defaultStroke: "silk",
+        parameters: WING_RIBBONS_PARAMS,
         tags: ["ribbon"],
         nextInterval: (params) => (params.intensity > 0.70 ? 20 : 22),
         emit({ params, music }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(WING_RIBBONS_PARAMS, params.custom);
             const m = motionFactors(motion);
-            const spread = (0.72 + 0.58 * Math.max(music.surge, intensity * 0.85)) * m.spread;
+            const spread = (c.spread + 0.58 * Math.max(music.surge, intensity * 0.85)) * m.spread;
             const radius = (0.88 + 0.30 * (2.25 + 0.90 * intensity) * (0.85 + 0.15 * music.sustain))
-                * Math.max(0.85, Math.min(1.15, scale));
-            const height = 0.42 + 1.18 * intensity + 0.28 * music.pitch;
+                * Math.max(0.85, Math.min(1.15, scale))
+                * (c.radius / 1.56);
+            const height = (0.42 + 1.18 * intensity + 0.28 * music.pitch) * c.height;
             const yShift = ZONE_Y_OFFSET[zone] * 0.65;
             const strokeBrush = resolveStrokeBrush(brush, "silk");
             const makeWing = (side: 1 | -1, cA: string, cB: string, life: number, gain: number) => {
@@ -38,7 +95,7 @@ export const CURVE_EFFECTS = {
                     color: cA,
                     color2: cB,
                     opacity: Math.min(1, intensity * gain),
-                    width: 0.145 + 0.04 * intensity,
+                    width: c.width + 0.04 * intensity,
                     scale,
                     travel: 0.18 * m.speed,
                     fadeIn: 0.14,
@@ -62,14 +119,16 @@ export const CURVE_EFFECTS = {
         interval: 18,
         priority: 3,
         defaultBrush: "star",
+        parameters: DOUBLE_HELIX_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(DOUBLE_HELIX_PARAMS, params.custom);
             const m = motionFactors(motion);
             const baseY = zoneBaseY(zone, m.dir > 0 ? 0.30 : 2.35, 0.20);
             const resolvedBrush = resolvePointBrush(brush, "star");
-            const radius = (2.20 + 0.35 * music.sustain) * m.spread;
-            const rise = (1.95 + 0.65 * music.activity) * m.dir;
-            const omega = (135 + 65 * music.activity) * m.dir * m.speed;
+            const radius = (c.radius + 0.35 * music.sustain) * m.spread;
+            const rise = (c.height + 0.65 * music.activity) * m.dir;
+            const omega = (c.angularSpeed + Math.sign(c.angularSpeed) * 65 * music.activity) * m.dir * m.speed;
             return {
                 priority: 3,
                 emitters: [0, 180].map((offsetDeg, index) => drawPoints({
@@ -82,8 +141,8 @@ export const CURVE_EFFECTS = {
                     opacity: 0.40 + 0.52 * intensity,
                     scale,
                     offset: [0, baseY, 0],
-                    size: 0.068 + 0.025 * intensity,
-                    sizeEnd: 0.042,
+                    size: c.particleSize + 0.025 * intensity,
+                    sizeEnd: (c.particleSize / 0.068) * 0.042,
                     sizeJitter: 0.20,
                     phase: phase * 4 + offsetDeg,
                     phaseSpread: 28,
@@ -108,11 +167,13 @@ export const CURVE_EFFECTS = {
         interval: 24,
         priority: 2,
         defaultBrush: "star",
+        parameters: ORBIT_HALO_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(ORBIT_HALO_PARAMS, params.custom);
             const m = motionFactors(motion);
             const y = zoneBaseY(zone, 1.32, 0.35);
-            const radius = (2.28 + 0.38 * music.sustain) * m.spread;
+            const radius = (c.radius + 0.38 * music.sustain) * m.spread;
             return {
                 priority: 2,
                 emitters: [drawPoints({
@@ -125,18 +186,18 @@ export const CURVE_EFFECTS = {
                     opacity: 0.34 + 0.56 * intensity,
                     scale,
                     offset: [0, y, 0],
-                    size: 0.068 + 0.026 * intensity,
-                    sizeEnd: 0.052,
+                    size: c.particleSize + 0.026 * intensity,
+                    sizeEnd: (c.particleSize / 0.068) * 0.052,
                     sizeJitter: 0.30,
                     spinRate: 45 * m.dir,
                     phase: phase * 3,
                     phaseSpread: 360,
-                    omega: (68 + 42 * music.activity) * m.dir * m.speed,
+                    omega: (c.angularSpeed + Math.sign(c.angularSpeed) * 42 * music.activity) * m.dir * m.speed,
                     radius,
                     radiusEnd: radius * 1.04,
                     radialJitter: 0.16,
                     depthRatio: 0.89,
-                    tilt: 0.52 * m.spread,
+                    tilt: c.tilt * m.spread,
                     twinkle: 0.48,
                     fadeIn: 0.35,
                     fadeOut: 0.60,
@@ -155,11 +216,17 @@ export const CURVE_EFFECTS = {
         defaultBrush: "mote",
         defaultStroke: "silk",
         variants: ["sweep", "right", "left"],
+        parameters: SILK_STREAMS_PARAMS,
         createState: () => ({ previousHeight: undefined as number | undefined }),
         emit({ params, music, state }) {
             const { color, intensity, scale, variant, zone, motion } = params;
+            const c = resolveSchemaParams(SILK_STREAMS_PARAMS, params.custom);
             const m = motionFactors(motion);
             const yZone = ZONE_Y_OFFSET[zone];
+            const widthScale = c.width / 0.24;
+            const lengthScale = c.length / 1.3;
+            const bendScale = c.bend / 0.66;
+            const speedScale = c.speed / 0.84;
             if (variant === "right") {
                 const height = mix(-0.4, 0.62, music.pitch) + yZone;
                 const previousHeight = state.previousHeight ?? height;
@@ -170,13 +237,13 @@ export const CURVE_EFFECTS = {
                         color,
                         opacity: 0.73 * intensity,
                         heading: 82,
-                        bend: 0.64 * m.spread,
+                        bend: 0.64 * bendScale * m.spread,
                         range: 1.18 * m.spread,
-                        width: 0.23,
+                        width: 0.23 * widthScale,
                         lanes: 1,
                         segments: 3,
-                        speed: 0.7 * m.speed,
-                        length: mix(1.72, 2.39, music.sustain),
+                        speed: 0.7 * speedScale * m.speed,
+                        length: mix(1.72, 2.39, music.sustain) * lengthScale,
                         height,
                         previousHeight,
                         silk: true,
@@ -193,13 +260,13 @@ export const CURVE_EFFECTS = {
                         color,
                         opacity: 0.73 * intensity,
                         heading: -102,
-                        bend: 0.86 * m.spread,
+                        bend: 0.86 * bendScale * m.spread,
                         range: 1.28 * m.spread,
-                        width: 0.26,
+                        width: 0.26 * widthScale,
                         lanes: 1,
                         segments: 2,
-                        speed: 0.56 * m.speed,
-                        length: mix(1.52, 2.4, music.sustain),
+                        speed: 0.56 * speedScale * m.speed,
+                        length: mix(1.52, 2.4, music.sustain) * lengthScale,
                         height,
                         previousHeight: height,
                         silk: true,
@@ -216,13 +283,13 @@ export const CURVE_EFFECTS = {
                     color,
                     opacity: 0.73 * intensity,
                     heading: m.dir > 0 ? -99 : 81,
-                    bend: 0.66 * m.spread,
+                    bend: c.bend * m.spread,
                     range: 1.18 * m.spread,
-                    speed: 0.84 * m.speed,
+                    speed: c.speed * m.speed,
                     lanes: 1,
                     segments: 2,
-                    width: 0.24,
-                    length: Math.min(2.4, (1.3 + 1.05 * music.sustain) * m.energy),
+                    width: c.width,
+                    length: Math.min(2.8, (c.length + 1.05 * music.sustain) * m.energy),
                     height,
                     previousHeight,
                     silk: true,
@@ -241,13 +308,16 @@ export const CURVE_EFFECTS = {
         priority: 3,
         defaultBrush: "mote",
         variants: ["ribbon", "points"],
+        parameters: WAVE_RIBBON_PARAMS,
         createState: () => ({ previousAmplitude: undefined as number | undefined }),
         emit({ params, music, phase, state }) {
             const { color, color2, intensity, scale, brush, variant, zone, motion } = params;
+            const c = resolveSchemaParams(WAVE_RIBBON_PARAMS, params.custom);
             const m = motionFactors(motion);
             const useRibbon = variant === "ribbon" || (variant !== "points" && (!brush || brush === "default" || brush === "mote"));
             if (useRibbon) {
-                const amplitude = Math.min(1.1, (0.22 + 0.42 * music.activity) * m.energy);
+                const maxAmp = Math.max(1.1, c.amplitude * 1.4);
+                const amplitude = Math.min(maxAmp, (c.amplitude + 0.42 * music.activity) * m.energy);
                 const previousAmplitude = state.previousAmplitude ?? amplitude;
                 state.previousAmplitude = amplitude;
                 return {
@@ -258,19 +328,20 @@ export const CURVE_EFFECTS = {
                         amplitude,
                         previousAmplitude,
                         height: ZONE_Y_OFFSET[zone] * 0.7,
-                        range: 1.08 * m.spread,
+                        range: c.radius * m.spread,
                         density: 0.78,
                         size: 1.0,
-                        speed: m.speed,
+                        speed: c.speed * m.speed,
                         phase: phase * m.dir,
                         scale,
                     }),
                 };
             }
             const y = zoneBaseY(zone, 1.18, 0.30);
-            const amp = (0.34 + 0.45 * music.activity) * m.energy;
+            const amp = (0.34 + 0.45 * music.activity) * (c.amplitude / 0.22) * m.energy;
             state.previousAmplitude = amp;
             const resolvedBrush = resolvePointBrush(brush, "star");
+            const radiusScale = c.radius / 1.08;
             return {
                 priority: 3,
                 emitters: [0, 180].map((shift, idx) => drawPoints({
@@ -288,9 +359,9 @@ export const CURVE_EFFECTS = {
                     sizeJitter: 0.15,
                     phase: phase * 3 + shift,
                     phaseSpread: 360,
-                    omega: (110 + 50 * music.activity) * m.dir * m.speed,
-                    radius: 2.30 * m.spread,
-                    radiusEnd: (2.30 + 0.14 * idx) * m.spread,
+                    omega: (110 + 50 * music.activity) * m.dir * c.speed * m.speed,
+                    radius: 2.30 * radiusScale * m.spread,
+                    radiusEnd: (2.30 + 0.14 * idx) * radiusScale * m.spread,
                     depthRatio: 0.88,
                     tilt: amp,
                     fadeIn: 0.25,
@@ -308,13 +379,16 @@ export const CURVE_EFFECTS = {
         interval: 16,
         priority: 3,
         defaultBrush: "star",
+        parameters: VORTEX_COLUMN_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(VORTEX_COLUMN_PARAMS, params.custom);
             const m = motionFactors(motion);
             const reverse = motion === "reverse";
             const y = zoneBaseY(zone, reverse ? 2.45 : 0.22, 0.15);
             const resolvedBrush = resolvePointBrush(brush, "star");
-            const omega = (210 + 90 * music.activity) * (reverse ? -1 : 1) * m.speed;
+            const omega = (c.angularSpeed + Math.sign(c.angularSpeed) * 90 * music.activity) * (reverse ? -1 : 1) * m.speed;
+            const secondaryHeight = c.height * (1.85 / 2.1);
             return {
                 priority: 3,
                 emitters: [
@@ -333,11 +407,11 @@ export const CURVE_EFFECTS = {
                         phase: phase * 5,
                         phaseSpread: 360,
                         omega,
-                        radius: (reverse ? 0.95 : 2.55) * m.spread,
-                        radiusEnd: (reverse ? 2.55 : 0.95) * m.spread,
+                        radius: (reverse ? c.topRadius : c.radius) * m.spread,
+                        radiusEnd: (reverse ? c.radius : c.topRadius) * m.spread,
                         curve: 0.85,
                         depthRatio: 0.88,
-                        rise: (reverse ? -2.1 : 2.1) * m.energy,
+                        rise: (reverse ? -c.height : c.height) * m.energy,
                         fadeIn: 0.18,
                         fadeOut: 0.36,
                     }),
@@ -356,11 +430,11 @@ export const CURVE_EFFECTS = {
                         phase: phase * 5 + 90,
                         phaseSpread: 360,
                         omega: omega * 1.15,
-                        radius: (reverse ? 1.35 : 2.95) * m.spread,
-                        radiusEnd: (reverse ? 2.95 : 1.35) * m.spread,
+                        radius: (reverse ? c.topRadius + 0.40 : c.radius + 0.40) * m.spread,
+                        radiusEnd: (reverse ? c.radius + 0.40 : c.topRadius + 0.40) * m.spread,
                         curve: 0.85,
                         depthRatio: 0.88,
-                        rise: (reverse ? -1.85 : 1.85) * m.energy,
+                        rise: (reverse ? -secondaryHeight : secondaryHeight) * m.energy,
                         twinkle: 0.6,
                         fadeIn: 0.18,
                         fadeOut: 0.36,
@@ -379,14 +453,16 @@ export const CURVE_EFFECTS = {
         priority: 3,
         defaultBrush: "mote",
         defaultStroke: "calligraphy",
+        parameters: LISSAJOUS_WEAVE_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(LISSAJOUS_WEAVE_PARAMS, params.custom);
             const m = motionFactors(motion);
             const yCenter = zoneBaseY(zone, 1.55, 0.75);
             const raw = sampleLissajous(
-                (2.35 + 0.35 * music.sustain) * m.spread,
-                (0.68 + 0.35 * music.activity) * m.energy,
-                (1.85 + 0.30 * music.sustain) * m.spread,
+                (c.radius + 0.35 * music.sustain) * m.spread,
+                (c.height + 0.35 * music.activity) * m.energy,
+                ((c.radius / 2.35) * 1.85 + 0.30 * music.sustain) * m.spread,
                 yCenter,
                 2,
                 3,
@@ -404,7 +480,7 @@ export const CURVE_EFFECTS = {
                     color,
                     color2,
                     opacity: 0.36 + 0.54 * intensity,
-                    width: 0.13 + 0.04 * intensity,
+                    width: c.width + 0.04 * intensity,
                     scale,
                     travel: 0.16 * m.speed * m.dir,
                     taperEnds: false,
@@ -423,14 +499,16 @@ export const CURVE_EFFECTS = {
         interval: 10,
         priority: 3,
         defaultBrush: "mote",
+        parameters: MUSUBI_BRAID_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(MUSUBI_BRAID_PARAMS, params.custom);
             const m = motionFactors(motion);
             const ascending = motion === "reverse";
             const yBase = zoneBaseY(zone, ascending ? 0.85 : 1.18, 0.35);
             const resolvedBrush = resolvePointBrush(brush, "mote");
             const baseAngle = (phase * 28) % 360;
-            const r = (2.15 + 0.32 * music.sustain) * m.spread;
+            const r = (c.radius + 0.32 * music.sustain) * m.spread;
             return {
                 priority: 3,
                 emitters: ([0, 1] as const).map((strand) => drawPoints({
@@ -448,13 +526,13 @@ export const CURVE_EFFECTS = {
                     sizeJitter: 0.18,
                     phase: baseAngle + strand * 180,
                     phaseSpread: 42,
-                    omega: (ascending ? 36 : 58) * m.speed,
+                    omega: (ascending ? (c.angularSpeed / 58) * 36 : c.angularSpeed) * m.speed,
                     radius: r,
                     radiusEnd: ascending ? r * 0.68 : r * (1.04 + 0.06 * music.activity),
                     curve: 0.85,
                     radialJitter: 0.05,
                     depthRatio: 0.88,
-                    tilt: (strand === 0 ? 0.38 : -0.38) * (0.8 + 0.35 * music.pitch),
+                    tilt: (strand === 0 ? c.tilt : -c.tilt) * (0.8 + 0.35 * music.pitch),
                     rise: ascending ? 1.85 : 0.08 * (strand === 0 ? 1 : -1),
                     flutter: 0.07 * m.energy,
                     twinkle: 0.42,

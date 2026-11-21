@@ -1,11 +1,39 @@
 import {
     catmullRom, motionFactors, sampleArch, sampleStarPolygon, zoneBaseY, ZONE_Y_OFFSET,
 } from "../geometry";
+import { resolveSchemaParams } from "../parameters";
 import {
     drawComet, drawGroundRing, drawPoints, drawPolygonFrame, drawShaft, drawStrokeSegments,
     resolvePointBrush, resolveStrokeBrush,
 } from "../primitives";
-import type { VfxEffectDefinition } from "../types";
+import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
+
+const LIGHT_PILLARS_PARAMS = {
+    length: { label: "光束长度", default: 1.28, min: 0.5, max: 2.4, step: 0.1 },
+    width: { label: "光束宽度", default: 0.21, min: 0.08, max: 0.5, step: 0.01 },
+} as const satisfies VfxParameterSchema;
+
+const CROWN_FAN_PARAMS = {
+    length: { label: "光束长度", default: 1.10, min: 0.5, max: 2.4, step: 0.1 },
+    width: { label: "光束宽度", default: 0.22, min: 0.08, max: 0.5, step: 0.01 },
+} as const satisfies VfxParameterSchema;
+
+const STAGE_TRUSS_PARAMS = {
+    length: { label: "光束长度", default: 1.20, min: 0.5, max: 2.4, step: 0.1 },
+    width: { label: "光束宽度", default: 0.20, min: 0.08, max: 0.5, step: 0.01 },
+} as const satisfies VfxParameterSchema;
+
+const MAGIC_CIRCLE_PARAMS = {
+    radius: { label: "法阵半径", default: 2.42, min: 1.0, max: 4.2, step: 0.1 },
+    spinSpeed: { label: "旋转速度", default: 28, min: -120, max: 120, step: 2 },
+    lineWidth: { label: "阵纹宽度", default: 0.095, min: 0.04, max: 0.24, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const PORTAL_ARCH_PARAMS = {
+    width: { label: "拱门跨度", default: 2.35, min: 1.0, max: 4.2, step: 0.1 },
+    height: { label: "拱门高度", default: 2.35, min: 1.0, max: 4.5, step: 0.1 },
+    lineWidth: { label: "光弧宽度", default: 0.155, min: 0.06, max: 0.35, step: 0.01 },
+} as const satisfies VfxParameterSchema;
 
 export const STAGE_EFFECTS = {
     light_pillars: {
@@ -17,11 +45,15 @@ export const STAGE_EFFECTS = {
         priority: 4,
         defaultBrush: "mote",
         variants: ["neon", "neon_sides", "neon_rear", "backline", "rails"],
+        parameters: LIGHT_PILLARS_PARAMS,
         createState: () => ({ previousLength: undefined as number | undefined }),
         emit({ params, music, state }) {
             const { color, color2, intensity, scale, variant, zone, motion } = params;
+            const c = resolveSchemaParams(LIGHT_PILLARS_PARAMS, params.custom);
             const m = motionFactors(motion);
             const yOffset = ZONE_Y_OFFSET[zone] * 0.6;
+            const lengthScale = c.length / 1.28;
+            const widthScale = c.width / 0.21;
             if (variant === "backline" || variant === "rails" || variant === "neon_sides" || variant === "neon_rear") {
                 const layout = variant === "neon_sides"
                     ? "neon-sides"
@@ -29,10 +61,10 @@ export const STAGE_EFFECTS = {
                         ? "neon-rear"
                         : variant;
                 const length = variant === "backline"
-                    ? Math.min(2.4, (1.38 + 0.97 * music.surge) * m.energy)
+                    ? Math.min(2.4, (1.38 + 0.97 * music.surge) * lengthScale * m.energy)
                     : variant === "neon_rear"
-                        ? Math.min(2.4, (1.72 + 0.43 * music.density) * m.energy)
-                        : Math.min(2.4, (1.42 + 0.54 * music.sustain) * m.energy);
+                        ? Math.min(2.4, (1.72 + 0.43 * music.density) * lengthScale * m.energy)
+                        : Math.min(2.4, (1.42 + 0.54 * music.sustain) * lengthScale * m.energy);
                 const previousLength = state.previousLength ?? length;
                 state.previousLength = length;
                 return {
@@ -43,7 +75,7 @@ export const STAGE_EFFECTS = {
                         opacity: intensity,
                         length,
                         previousLength,
-                        width: variant === "backline" ? 0.26 : variant === "neon_rear" ? 0.18 : 0.21,
+                        width: (variant === "backline" ? 0.26 : variant === "neon_rear" ? 0.18 : 0.21) * widthScale,
                         range: 1.05 * m.spread,
                         yOffset,
                         zOffset: variant === "backline" ? 0.1 : 0,
@@ -51,7 +83,7 @@ export const STAGE_EFFECTS = {
                     }),
                 };
             }
-            const length = Math.min(2.4, (1.28 + 0.85 * music.sustain + 0.30 * music.activity) * m.energy);
+            const length = Math.min(2.4, (c.length + 0.85 * music.sustain + 0.30 * music.activity) * m.energy);
             const prev = state.previousLength ?? length;
             state.previousLength = length;
             return {
@@ -63,7 +95,7 @@ export const STAGE_EFFECTS = {
                         opacity: intensity,
                         length,
                         previousLength: prev,
-                        width: 0.21,
+                        width: c.width,
                         range: 1.05 * m.spread,
                         yOffset,
                         scale,
@@ -74,7 +106,7 @@ export const STAGE_EFFECTS = {
                         opacity: intensity * 0.82,
                         length: Math.min(2.4, length * 1.12),
                         previousLength: prev * 1.12,
-                        width: 0.18,
+                        width: 0.18 * widthScale,
                         range: 1.08 * m.spread,
                         yOffset,
                         scale,
@@ -92,11 +124,13 @@ export const STAGE_EFFECTS = {
         interval: 20,
         priority: 5,
         defaultBrush: "mote",
+        parameters: CROWN_FAN_PARAMS,
         createState: () => ({ previousLength: undefined as number | undefined }),
         emit({ params, music, state }) {
             const { color, intensity, scale, zone, motion } = params;
+            const c = resolveSchemaParams(CROWN_FAN_PARAMS, params.custom);
             const m = motionFactors(motion);
-            const length = Math.min(2.4, (1.10 + 1.15 * music.sustain + 0.24 * music.surge) * m.energy);
+            const length = Math.min(2.4, (c.length + 1.15 * music.sustain + 0.24 * music.surge) * m.energy);
             const previousLength = state.previousLength ?? length;
             state.previousLength = length;
             return {
@@ -107,7 +141,7 @@ export const STAGE_EFFECTS = {
                     opacity: intensity,
                     length,
                     previousLength,
-                    width: 0.22,
+                    width: c.width,
                     range: 1.05 * m.spread,
                     yOffset: ZONE_Y_OFFSET[zone] * 0.7,
                     scale,
@@ -124,11 +158,13 @@ export const STAGE_EFFECTS = {
         interval: 20,
         priority: 4,
         defaultBrush: "mote",
+        parameters: STAGE_TRUSS_PARAMS,
         createState: () => ({ previousLength: undefined as number | undefined }),
         emit({ params, music, state }) {
             const { color, intensity, scale, zone, motion } = params;
+            const c = resolveSchemaParams(STAGE_TRUSS_PARAMS, params.custom);
             const m = motionFactors(motion);
-            const length = Math.min(2.4, (1.20 + 0.90 * music.density + 0.30 * music.activity) * m.energy);
+            const length = Math.min(2.4, (c.length + 0.90 * music.density + 0.30 * music.activity) * m.energy);
             const previousLength = state.previousLength ?? length;
             state.previousLength = length;
             return {
@@ -139,7 +175,7 @@ export const STAGE_EFFECTS = {
                     opacity: intensity,
                     length,
                     previousLength,
-                    width: 0.20,
+                    width: c.width,
                     range: 1.02 * m.spread,
                     yOffset: ZONE_Y_OFFSET[zone] * 0.5,
                     scale,
@@ -157,12 +193,14 @@ export const STAGE_EFFECTS = {
         priority: 4,
         defaultBrush: "star",
         defaultStroke: "laser",
+        parameters: MAGIC_CIRCLE_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(MAGIC_CIRCLE_PARAMS, params.custom);
             const m = motionFactors(motion);
             const y = zone === "mid" ? 0.45 : zone === "high" ? 1.25 : 0.08;
-            const radius = (2.42 + 0.28 * music.sustain) * m.spread;
-            const rot = phase * 3.5 * m.dir;
+            const radius = (c.radius + 0.28 * music.sustain) * m.spread;
+            const rot = phase * 3.5 * (c.spinSpeed / 28) * m.dir;
             const triA = sampleStarPolygon(radius * 0.95, 3, y, rot, 0.88);
             const triB = sampleStarPolygon(radius * 0.95, 3, y, rot + 60, 0.88);
             const strokeBrush = resolveStrokeBrush(brush, "laser");
@@ -180,7 +218,7 @@ export const STAGE_EFFECTS = {
                         radiusEnd: radius * (1.03 + 0.04 * music.activity),
                         curve: 1,
                         spin: rot,
-                        spinRate: 28 * m.dir * m.speed,
+                        spinRate: c.spinSpeed * m.dir * m.speed,
                         style: 1,
                         fadeIn: 0.22,
                         fadeOut: 0.45,
@@ -191,7 +229,7 @@ export const STAGE_EFFECTS = {
                         color,
                         color2,
                         opacity: 0.32 + 0.52 * intensity,
-                        width: 0.095,
+                        width: c.lineWidth,
                         scale,
                         fadeIn: 0.20,
                         fadeOut: 0.40,
@@ -202,7 +240,7 @@ export const STAGE_EFFECTS = {
                         color: color2,
                         color2: color,
                         opacity: 0.28 + 0.46 * intensity,
-                        width: 0.085,
+                        width: (c.lineWidth / 0.095) * 0.085,
                         scale,
                         fadeIn: 0.20,
                         fadeOut: 0.40,
@@ -221,7 +259,7 @@ export const STAGE_EFFECTS = {
                         sizeEnd: 0.07,
                         phase: rot,
                         phaseSpread: 360,
-                        omega: 28 * m.dir * m.speed,
+                        omega: c.spinSpeed * m.dir * m.speed,
                         radius: radius * 0.96,
                         radiusEnd: radius * 0.96,
                         depthRatio: 0.88,
@@ -243,12 +281,14 @@ export const STAGE_EFFECTS = {
         priority: 4,
         defaultBrush: "mote",
         defaultStroke: "laser",
+        parameters: PORTAL_ARCH_PARAMS,
         emit({ params, music }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(PORTAL_ARCH_PARAMS, params.custom);
             const m = motionFactors(motion);
             const yBase = zoneBaseY(zone, 0.25, 0.12);
-            const archWidth = (2.35 + 0.40 * music.sustain) * m.spread;
-            const archHeight = (2.35 + 0.45 * intensity) * m.energy;
+            const archWidth = (c.width + 0.40 * music.sustain) * m.spread;
+            const archHeight = (c.height + 0.45 * intensity) * m.energy;
             const archPoints = sampleArch(archWidth, archHeight, 1.55, yBase, 24);
             return {
                 priority: 4,
@@ -260,7 +300,7 @@ export const STAGE_EFFECTS = {
                         color,
                         color2,
                         opacity: 0.38 + 0.54 * intensity,
-                        width: 0.155 + 0.04 * intensity,
+                        width: c.lineWidth + 0.04 * intensity,
                         scale,
                         travel: 0.10 * m.dir * m.speed,
                         fadeIn: 0.18,

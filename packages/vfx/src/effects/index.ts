@@ -1,3 +1,9 @@
+import type { PerformanceParams, PerformanceParamValue } from "@piano/core";
+import {
+    defaultSchemaParams,
+    resolveSchemaParams,
+    validateSchemaParams,
+} from "../parameters";
 import type { VfxCategory, VfxEffectDefinition } from "../types";
 import { ACCENT_EFFECTS } from "./accents";
 import { ATMOSPHERE_EFFECTS } from "./atmosphere";
@@ -28,4 +34,26 @@ export function getVfxEffect(id: string): VfxEffectDefinition | undefined {
 export function listVfxEffects(category?: VfxCategory): VfxEffectDefinition[] {
     const all = Object.values(VFX_EFFECTS);
     return category ? all.filter(effect => effect.category === category) : all;
+}
+
+export function defaultEffectCustomParams(effectId: string): Record<string, PerformanceParamValue> {
+    return defaultSchemaParams(getVfxEffect(effectId)?.parameters);
+}
+
+export function resolveEffectCustomParams(
+    effectOrDef: string | VfxEffectDefinition | undefined,
+    raw?: PerformanceParams,
+): Record<string, PerformanceParamValue> {
+    const def = typeof effectOrDef === "string" ? getVfxEffect(effectOrDef) : effectOrDef;
+    if (!def?.parameters) return {};
+    return resolveSchemaParams(def.parameters, raw);
+}
+
+export function validateEffectCustomParams(
+    effectId: string,
+    raw: unknown,
+): Record<string, PerformanceParamValue> | undefined {
+    const def = getVfxEffect(effectId);
+    if (!def) throw new Error(`未知特效 ${effectId}`);
+    return validateSchemaParams(effectId, def.parameters, raw);
 }

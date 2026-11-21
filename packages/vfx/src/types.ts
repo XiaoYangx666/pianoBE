@@ -1,4 +1,6 @@
-import type { PerformanceMotion, PerformanceZone } from "@piano/core";
+import type {
+    PerformanceMotion, PerformanceParams, PerformanceParamValue, PerformanceZone,
+} from "@piano/core";
 import type { PointBrushId, StrokeBrushId } from "./brushes";
 import type { VfxInstrument } from "./instrument";
 import type { MusicFeatures, VfxKeyNote } from "./music";
@@ -70,6 +72,41 @@ export interface PianoParticleOverride {
     scale?: number;
 }
 
+export interface VfxNumberParamSpec {
+    type?: "number";
+    label?: string;
+    default: number;
+    min: number;
+    max: number;
+    step?: number;
+}
+
+export interface VfxBooleanParamSpec {
+    type: "boolean";
+    label?: string;
+    default: boolean;
+}
+
+export interface VfxEnumParamSpec<TOption extends string = string> {
+    type: "enum";
+    label?: string;
+    options: readonly TOption[];
+    default: TOption;
+}
+
+export type VfxParamSpec = VfxNumberParamSpec | VfxBooleanParamSpec | VfxEnumParamSpec;
+export type VfxParameterSchema = Readonly<Record<string, VfxParamSpec>>;
+
+export type ResolvedVfxCustomParams<TSchema extends VfxParameterSchema = VfxParameterSchema> = {
+    readonly [K in keyof TSchema]: TSchema[K] extends VfxBooleanParamSpec
+        ? boolean
+        : TSchema[K] extends VfxEnumParamSpec<infer O>
+            ? O
+            : TSchema[K] extends VfxNumberParamSpec
+                ? number
+                : PerformanceParamValue;
+};
+
 export interface VfxEffectParams {
     color: string;
     color2: string;
@@ -79,6 +116,8 @@ export interface VfxEffectParams {
     variant?: string;
     zone: PerformanceZone;
     motion: PerformanceMotion;
+    /** 经特效参数定义解析、填充默认值并钳制范围后的专属参数 */
+    custom?: PerformanceParams;
 }
 
 export interface VfxEmitContext<TState = unknown> {
@@ -102,6 +141,7 @@ export interface VfxEffectDefinition<TState = any> {
     defaultBrush?: PointBrushId;
     defaultStroke?: StrokeBrushId;
     variants?: readonly string[];
+    parameters?: VfxParameterSchema;
     tags?: readonly string[];
     yields?: { tag: string; ticks: number };
     createState?: () => TState;

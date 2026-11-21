@@ -6,7 +6,7 @@ import {
 import { pianoWorld } from "@app/PianoWorld";
 import {
     KEY_PARTICLE_STYLE_LABELS, VFX_EFFECTS, VFX_THEMES, deriveAccentHex, getVfxEffect,
-    isValidBrush, isVfxTheme, listVfxEffects, parseVfxInput, validateVfxTheme,
+    isValidBrush, isVfxTheme, listVfxEffects, parseVfxInput, validateEffectCustomParams, validateVfxTheme,
     type SingleEffectConfig, type VfxCategory,
 } from "@piano/vfx";
 import { inspectInstrument, resolveInstrument } from "@platform/assembly";
@@ -64,8 +64,9 @@ function parseDrawOptions(effect: string, raw: string): SingleEffectConfig {
     if (!Number.isFinite(scale) || scale < 50 || scale > 170) throw new Error("scale 需要在 50 到 170 之间");
     const seconds = parsed.seconds !== undefined ? Number(parsed.seconds) : 12;
     if (!Number.isFinite(seconds) || seconds < 2 || seconds > 180) throw new Error("seconds 需要在 2 到 180 之间");
+    const params = validateEffectCustomParams(effect, parsed.params);
 
-    return { effect, color, color2, brush, variant, zone, motion, level, scale, seconds };
+    return { effect, color, color2, brush, variant, zone, motion, ...(params ? { params } : {}), level, scale, seconds };
 }
 
 export function registerVfxCommands() {
@@ -92,7 +93,9 @@ export function registerVfxCommands() {
                 for (const def of entries) {
                     const brushText = def.defaultBrush ? ` · 画笔 ${def.defaultBrush}` : "";
                     const variantText = def.variants?.length ? ` · 变体 ${def.variants.join("/")}` : "";
-                    say(`${def.category} / ${def.id} (${def.label}) · ${def.trigger}${brushText}${variantText}`);
+                    const paramNames = def.parameters ? Object.keys(def.parameters) : [];
+                    const paramText = paramNames.length ? ` · 参数 ${paramNames.join("/")}` : "";
+                    say(`${def.category} / ${def.id} (${def.label}) · ${def.trigger}${brushText}${variantText}${paramText}`);
                 }
                 if (!category) {
                     say(`内置主题 ${Object.keys(VFX_THEMES).join(", ")} · 自定义 ${[...loadVfxThemes().keys()].join(", ") || "无"}`);

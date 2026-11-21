@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { PERFORMANCE_MOTIONS, PERFORMANCE_ZONES } from "@piano/core";
+import {
+    isValidPerformanceParamKey,
+    isValidPerformanceSymbol,
+    PERFORMANCE_MOTIONS,
+    PERFORMANCE_ZONES,
+} from "@piano/core";
 import {
     isPointBrush,
     isStrokeBrush,
@@ -34,6 +39,33 @@ test("effect registry keeps all 33 effects valid, uniquely keyed and backed by t
             expect(typeof effect.resolveKeyParticle).toBe("function");
         } else {
             expect(typeof effect.emit).toBe("function");
+        }
+        if (effect.parameters) {
+            const entries = Object.entries(effect.parameters);
+            expect(entries.length).toBeGreaterThan(0);
+            expect(entries.length).toBeLessThanOrEqual(16);
+            for (const [paramKey, spec] of entries) {
+                expect(isValidPerformanceParamKey(paramKey)).toBe(true);
+                if (spec.type === "boolean") {
+                    expect(typeof spec.default).toBe("boolean");
+                } else if (spec.type === "enum") {
+                    expect(spec.options.length).toBeGreaterThan(0);
+                    for (const option of spec.options) {
+                        expect(isValidPerformanceSymbol(option)).toBe(true);
+                    }
+                    expect(spec.options).toContain(spec.default);
+                } else {
+                    expect(Number.isFinite(spec.min)).toBe(true);
+                    expect(Number.isFinite(spec.max)).toBe(true);
+                    expect(Number.isFinite(spec.default)).toBe(true);
+                    expect(spec.min).toBeLessThan(spec.max);
+                    expect(spec.default).toBeGreaterThanOrEqual(spec.min);
+                    expect(spec.default).toBeLessThanOrEqual(spec.max);
+                    if (spec.step !== undefined) {
+                        expect(Number.isFinite(spec.step) && spec.step > 0).toBe(true);
+                    }
+                }
+            }
         }
     }
 });

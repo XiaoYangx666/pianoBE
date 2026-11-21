@@ -1,23 +1,30 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+    attachSongPerformance,
+    encodeSong,
     PERFORMANCE_MOTIONS,
     PERFORMANCE_PALETTES,
     PERFORMANCE_ZONES,
     readSongHeader,
     songToNoteEvents,
     TIME_SCALE,
+    type PerformanceCue,
     type PerformanceMotion,
     type PerformanceZone,
 } from "@piano/core";
 import {
     createPerformanceProgram,
+    createSingleEffectProgram,
     createThemeProgram,
     POINT_BRUSH_IDS,
     POINT_BRUSH_INDEX,
     quietFeatures,
+    resolveEffectCustomParams,
     simulatedVfxNotes,
     STROKE_BRUSH_IDS,
+    validateEffectCustomParams,
+    validateVfxTheme,
     VFX_EFFECT_IDS,
     VFX_EFFECTS,
     VFX_EMITTERS_PER_TICK,
@@ -356,4 +363,170 @@ test("Animenz Sparkle performance completes within dispatch and particle budgets
         expect(piano.counts.get("draw_comet") ?? 0).toBeGreaterThan(150);
         expect(piano.counts.get("draw_point") ?? 0).toBeGreaterThan(600);
     }
+});
+
+test("custom numeric params interpolate smoothly via set+fade, inherit active channel values, and roundtrip through PBE3", () => {
+    const cues: PerformanceCue[] = [
+        {
+            tick: 0,
+            effect: "double_helix",
+            color: PERFORMANCE_PALETTES.aurora,
+            level: 100,
+            scale: 100,
+            op: "set",
+            fade: 0,
+            params: { radius: 1.2, height: 1.0, angularSpeed: 90, particleSize: 0.04 },
+        },
+        {
+            tick: 80, // t = 2s
+            effect: "double_helix",
+            color: PERFORMANCE_PALETTES.gold,
+            level: 100,
+            scale: 100,
+            op: "set",
+            fade: 160, // fades 2s -> 6s; t = 4s is exact midpoint (smoothstep 0.5)
+            params: { radius: 3.6, angularSpeed: 270 },
+        },
+        {
+            tick: 240, // t = 6s fade out over 2s
+            effect: "double_helix",
+            color: PERFORMANCE_PALETTES.gold,
+            level: 0,
+            scale: 100,
+            op: "set",
+            fade: 80,
+        },
+        {
+            tick: 360, // t = 9s restart from silence with only height overridden
+            effect: "double_helix",
+            color: PERFORMANCE_PALETTES.ice,
+            level: 80,
+            scale: 100,
+            op: "set",
+            fade: 0,
+            params: { height: 4.0 },
+        },
+    ];
+
+    const rawSong = encodeSong({
+        id: "paramtest",
+        name: "参数测试",
+        duration: 480,
+        tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 100, 100] }],
+    });
+    const packed = attachSongPerformance(rawSong, cues);
+    const decodedCues = readSongHeader(packed).performance!;
+    expect(decodedCues).toEqual(cues);
+
+    const engine = new VfxEngine(createPerformanceProgram(decodedCues, 12));
+    const first = engine.update(0.5, 10, quietFeatures)[0].emitters[0];
+    expect(first.variables.radius).toBeCloseTo(1.2, 4);
+    expect(first.variables.rise).toBeCloseTo(1.0, 4);
+    expect(first.variables.omega).toBeCloseTo(90, 4);
+    expect(first.variables.size).toBeCloseTo(0.04 + 0.025, 4);
+
+    // Seek to midpoint t = 4.0s: radius & angularSpeed interpolate to midpoint, height & particleSize inherit from active channel
+    engine.seek(4.0, true);
+    const mid = engine.update(4.0, 80, quietFeatures)[0].emitters[0];
+    expect(mid.variables.radius).toBeCloseTo(2.4, 4);
+    expect(mid.variables.omega).toBeCloseTo(180, 4);
+    expect(mid.variables.rise).toBeCloseTo(1.0, 4);
+    expect(mid.variables.size).toBeCloseTo(0.04 + 0.025, 4);
+
+    // At t = 7.0s (midway through level: 0 fade-out), radius remains 3.6 rather than snapping back to default
+    engine.seek(7.0, true);
+    const fadingOut = engine.update(7.0, 140, quietFeatures)[0].emitters[0];
+    expect(fadingOut.variables.radius).toBeCloseTo(3.6, 4);
+
+    // At t = 9.0s (restart from silence), unspecified params reset to defaults while height = 4.0
+    engine.seek(9.0, true);
+    const restarted = engine.update(9.0, 180, quietFeatures)[0].emitters[0];
+    expect(restarted.variables.radius).toBeCloseTo(2.2, 4);
+    expect(restarted.variables.rise).toBeCloseTo(4.0, 4);
+    expect(restarted.variables.omega).toBeCloseTo(135, 4);
+});
+
+test("boolean and enum custom params switch immediately at cue time and control emitted geometry", () => {
+    const engine = new VfxEngine(createPerformanceProgram([
+        {
+            tick: 40,
+            effect: "firework_bloom",
+            color: PERFORMANCE_PALETTES.gold,
+            level: 90,
+            scale: 100,
+            op: "flash",
+            params: { burstRadius: 2.8, burstShape: "ring", fountain: false, particleSize: 0.12 },
+        },
+        {
+            tick: 80,
+            effect: "shockwave",
+            color: PERFORMANCE_PALETTES.ice,
+            level: 90,
+            scale: 100,
+            op: "flash",
+            params: { radius: 4.0, dualRing: false },
+        },
+    ], 5));
+
+    const fw = engine.update(1.0, 20, quietFeatures).flatMap(b => b.emitters);
+    expect(fw.some(e => e.particle === "fountain")).toBe(false);
+    const fwPoints = fw.filter(e => e.particle === "draw_point");
+    expect(fwPoints).toHaveLength(3);
+    expect(fwPoints[0].variables.depth_ratio).toBeCloseTo(0.32, 4);
+    expect(fwPoints[0].variables.radius_end).toBeCloseTo(2.8 + 0.35 * 0.9, 4);
+    expect(fwPoints[0].variables.size).toBeCloseTo(0.12 + 0.025 * 0.9, 4);
+
+    const sw = engine.update(2.0, 40, quietFeatures).flatMap(b => b.emitters);
+    const planes = sw.filter(e => e.particle === "draw_plane");
+    expect(planes).toHaveLength(1);
+    expect(planes[0].variables.radius_end).toBeCloseTo(4.0 + 0.65 * 0.9, 4);
+});
+
+test("custom parameter validation rejects invalid names/bounds while runtime resolution clamps safely and works in themes/single mode", () => {
+    expect(validateEffectCustomParams("double_helix", { radius: 2.8, angularSpeed: -180 })).toEqual({
+        radius: 2.8,
+        angularSpeed: -180,
+    });
+    expect(validateEffectCustomParams("double_helix", {})).toBeUndefined();
+    expect(() => validateEffectCustomParams("double_helix", { unknownParam: 1 })).toThrow(/不支持参数/);
+    expect(() => validateEffectCustomParams("double_helix", { radius: 99 })).toThrow(/0.5 到 4/);
+    expect(() => validateEffectCustomParams("firework_bloom", { burstShape: "cube" })).toThrow(/sphere \/ ring/);
+    expect(() => validateEffectCustomParams("firework_bloom", { fountain: "yes" })).toThrow(/布尔值/);
+
+    expect(resolveEffectCustomParams("double_helix", { radius: 99, angularSpeed: -999, unknown: 1 })).toEqual({
+        radius: 4.0,
+        height: 1.95,
+        angularSpeed: -360,
+        particleSize: 0.068,
+    });
+
+    const theme = validateVfxTheme({
+        seconds: 10,
+        layers: [
+            {
+                effect: "double_helix",
+                color: "aurora",
+                level: 80,
+                params: { radius: 3.2, height: 3.4 },
+            },
+        ],
+    });
+    const themeEngine = new VfxEngine(createThemeProgram(theme, { seconds: 10 }));
+    const themeEmitter = themeEngine.update(0, 0, quietFeatures)[0].emitters[0];
+    expect(themeEmitter.variables.radius).toBeCloseTo(3.2, 4);
+    expect(themeEmitter.variables.rise).toBeCloseTo(3.4, 4);
+
+    expect(() => validateVfxTheme({
+        layers: [{ effect: "double_helix", color: "aurora", level: 80, params: { radius: 0.1 } }],
+    })).toThrow();
+
+    const singleEngine = new VfxEngine(createSingleEffectProgram({
+        effect: "comet_split",
+        color: "#68E4FF",
+        level: 90,
+        params: { length: 4.5, split: false },
+    }));
+    const cometEmitters = singleEngine.update(0, 0, quietFeatures)[0].emitters;
+    expect(cometEmitters.filter(e => e.particle === "draw_comet")).toHaveLength(1);
+    expect(cometEmitters.find(e => e.particle === "draw_comet")!.variables.length).toBeCloseTo(4.5, 4);
 });

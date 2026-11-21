@@ -1,5 +1,5 @@
 import { TIME_SCALE } from "@piano/core";
-import { getVfxEffect } from "./effects";
+import { getVfxEffect, resolveEffectCustomParams } from "./effects";
 import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
 import type { VfxProgram } from "./programs";
 import type { VfxInstrument } from "./instrument";
@@ -155,6 +155,11 @@ export class VfxEngine {
         return Boolean(def.tags?.some(tag => gameTick < (this.yieldUntilByTag.get(tag) ?? -Infinity)));
     }
 
+    private resolvedParams(def: VfxEffectDefinition, params: VfxEffectParams): VfxEffectParams {
+        if (!def.parameters) return params;
+        return { ...params, custom: resolveEffectCustomParams(def, params.custom) };
+    }
+
     private emitChannel(
         def: VfxEffectDefinition,
         params: VfxEffectParams,
@@ -167,7 +172,7 @@ export class VfxEngine {
     ): VfxBatch | null {
         if (!def.emit) return null;
         return def.emit({
-            params,
+            params: this.resolvedParams(def, params),
             music,
             recentNotes,
             lastNoteTick,

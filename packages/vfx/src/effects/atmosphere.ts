@@ -1,10 +1,46 @@
-import { blendHex, hexToUnitRgb } from "../color";
 import { motionFactors, zoneBaseY, ZONE_Y_OFFSET } from "../geometry";
 import { mix } from "../music";
+import { resolveSchemaParams } from "../parameters";
 import {
     drawCloud, drawComet, drawCurtain, drawDust, drawField, drawFountain, drawPoints, resolvePointBrush,
 } from "../primitives";
-import type { VfxEffectDefinition } from "../types";
+import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
+
+const STARFIELD_PARAMS = {
+    radius: { label: "覆盖半径", default: 2.25, min: 0.8, max: 4.2, step: 0.1 },
+    speed: { label: "漂浮速度", default: 1.0, min: 0.2, max: 2.5, step: 0.1 },
+    particleSize: { label: "星尘大小", default: 0.055, min: 0.02, max: 0.15, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const PETAL_FALL_PARAMS = {
+    spread: { label: "飘落范围", default: 1.95, min: 0.8, max: 3.6, step: 0.1 },
+    fallSpeed: { label: "飘落速度", default: 0.48, min: 0.15, max: 1.5, step: 0.05 },
+    particleSize: { label: "花瓣大小", default: 0.085, min: 0.03, max: 0.18, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const FIREFLY_RISE_PARAMS = {
+    spread: { label: "流萤范围", default: 2.45, min: 0.8, max: 4.0, step: 0.1 },
+    riseSpeed: { label: "升腾速度", default: 0.36, min: 0.1, max: 1.5, step: 0.05 },
+    particleSize: { label: "流萤大小", default: 0.062, min: 0.02, max: 0.15, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
+const AURORA_VEIL_PARAMS = {
+    length: { label: "光幕高度", default: 0.9, min: 0.4, max: 2.4, step: 0.1 },
+    width: { label: "光幕宽度", default: 0.26, min: 0.1, max: 0.6, step: 0.02 },
+    speed: { label: "流转速度", default: 0.58, min: 0.2, max: 1.8, step: 0.05 },
+} as const satisfies VfxParameterSchema;
+
+const WING_CURTAIN_PARAMS = {
+    length: { label: "光幕高度", default: 0.78, min: 0.4, max: 2.4, step: 0.1 },
+    width: { label: "光幕宽度", default: 0.25, min: 0.1, max: 0.6, step: 0.02 },
+    speed: { label: "流转速度", default: 0.60, min: 0.2, max: 1.8, step: 0.05 },
+} as const satisfies VfxParameterSchema;
+
+const METEOR_SHOWER_PARAMS = {
+    count: { label: "齐射颗数", default: 2, min: 1, max: 3, step: 1 },
+    length: { label: "流星尾长", default: 1.85, min: 0.8, max: 3.6, step: 0.1 },
+    speed: { label: "划落速度", default: 2.65, min: 1.0, max: 5.0, step: 0.1 },
+} as const satisfies VfxParameterSchema;
 
 export const ATMOSPHERE_EFFECTS = {
     starfield: {
@@ -16,9 +52,12 @@ export const ATMOSPHERE_EFFECTS = {
         priority: 1,
         defaultBrush: "mote",
         variants: ["cinema", "volume", "points"],
+        parameters: STARFIELD_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, variant, zone, motion } = params;
+            const c = resolveSchemaParams(STARFIELD_PARAMS, params.custom);
             const m = motionFactors(motion);
+            const radiusScale = c.radius / 2.25;
             if (variant === "volume") {
                 return {
                     priority: 1,
@@ -27,10 +66,10 @@ export const ATMOSPHERE_EFFECTS = {
                         opacity: 0.68 * intensity,
                         rate: 10,
                         seconds: 1.7,
-                        range: 1.26 * m.spread,
-                        size: 0.72,
+                        range: 1.26 * radiusScale * m.spread,
+                        size: 0.72 * (c.particleSize / 0.055),
                         density: 0.86,
-                        speed: (0.62 + 0.28 * music.sustain) * m.speed,
+                        speed: (0.62 + 0.28 * music.sustain) * c.speed * m.speed,
                         height: ZONE_Y_OFFSET[zone],
                         scale,
                     })],
@@ -50,9 +89,9 @@ export const ATMOSPHERE_EFFECTS = {
                         opacity: 0.22 + intensity * 0.48,
                         count: 22,
                         life: 1.65,
-                        phase: phase * 22 * m.dir,
+                        phase: phase * 22 * c.speed * m.dir,
                         release: (0.25 + 0.85 * music.surge) * m.energy,
-                        radius: (2.25 + 0.55 * music.sustain) * Math.min(1.08, Math.max(0.85, scale)) * m.spread,
+                        radius: (c.radius + 0.55 * music.sustain) * Math.min(1.08, Math.max(0.85, scale)) * m.spread,
                         coherence: 0.25 + 0.70 * intensity,
                         bright: intensity,
                         scale,
@@ -72,11 +111,11 @@ export const ATMOSPHERE_EFFECTS = {
                     opacity: 0.26 + 0.54 * intensity,
                     scale,
                     offset: [0, y, 0],
-                    size: 0.055 + 0.03 * intensity,
-                    sizeEnd: 0.04,
+                    size: c.particleSize + 0.03 * intensity,
+                    sizeEnd: (c.particleSize / 0.055) * 0.04,
                     sizeJitter: 0.45,
-                    spread: [2.8 * m.spread, 0.95, 2.2 * m.spread],
-                    velocity: [0, 0.07 * m.dir * m.speed, 0],
+                    spread: [2.8 * radiusScale * m.spread, 0.95, 2.2 * radiusScale * m.spread],
+                    velocity: [0, 0.07 * c.speed * m.dir * m.speed, 0],
                     flutter: 0.14 * m.energy,
                     twinkle: 0.65,
                     fadeIn: 0.35,
@@ -94,11 +133,14 @@ export const ATMOSPHERE_EFFECTS = {
         interval: 16,
         priority: 2,
         defaultBrush: "petal",
+        parameters: PETAL_FALL_PARAMS,
         emit({ params, music }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(PETAL_FALL_PARAMS, params.custom);
             const m = motionFactors(motion);
             const y = zoneBaseY(zone, 2.75, 1.2);
-            const fallSpeed = (-0.48 - 0.24 * music.activity) * m.speed * m.dir;
+            const fallSpeed = (-c.fallSpeed - 0.24 * music.activity) * m.speed * m.dir;
+            const spreadScale = c.spread / 1.95;
             const resolvedBrush = resolvePointBrush(brush, "petal");
             return {
                 priority: 2,
@@ -111,14 +153,14 @@ export const ATMOSPHERE_EFFECTS = {
                     color2,
                     opacity: 0.34 + 0.52 * intensity,
                     scale,
-                    offset: [side * 1.95 * m.spread, y, 0.25],
-                    size: 0.085 + 0.03 * intensity,
-                    sizeEnd: 0.06,
+                    offset: [side * c.spread * m.spread, y, 0.25],
+                    size: c.particleSize + 0.03 * intensity,
+                    sizeEnd: (c.particleSize / 0.085) * 0.06,
                     sizeJitter: 0.28,
                     spin: side * 25,
                     spinJitter: 45,
                     spinRate: side * 85 * m.dir * m.speed,
-                    spread: [1.35 * m.spread, 0.45, 1.95 * m.spread],
+                    spread: [1.35 * spreadScale * m.spread, 0.45, c.spread * m.spread],
                     velocity: [side * 0.14 * m.energy, fallSpeed, 0.06],
                     flutter: 0.24 * m.energy,
                     fadeIn: 0.25,
@@ -137,9 +179,12 @@ export const ATMOSPHERE_EFFECTS = {
         priority: 2,
         defaultBrush: "mote",
         variants: ["fireflies", "fountain"],
+        parameters: FIREFLY_RISE_PARAMS,
         emit({ params, music }) {
             const { color, color2, intensity, scale, brush, variant, zone, motion } = params;
+            const c = resolveSchemaParams(FIREFLY_RISE_PARAMS, params.custom);
             const m = motionFactors(motion);
+            const spreadScale = c.spread / 2.45;
             if (variant === "fountain") {
                 const count = Math.round(8 * mix(0.4, 0.92, music.surge));
                 return {
@@ -148,9 +193,9 @@ export const ATMOSPHERE_EFFECTS = {
                         color,
                         opacity: 0.63 * intensity,
                         count,
-                        speed: mix(0.64, 1.22, music.surge) * m.speed,
-                        size: 0.8,
-                        range: 1.18 * m.spread,
+                        speed: mix(0.64, 1.22, music.surge) * (c.riseSpeed / 0.36) * m.speed,
+                        size: 0.8 * (c.particleSize / 0.062),
+                        range: 1.18 * spreadScale * m.spread,
                         yOffset: ZONE_Y_OFFSET[zone],
                         zOffset: 2.61,
                         scale,
@@ -158,7 +203,7 @@ export const ATMOSPHERE_EFFECTS = {
                 };
             }
             const y = zoneBaseY(zone, 0.35, 0.12);
-            const riseVel = (0.36 + 0.34 * music.activity) * m.speed * m.dir;
+            const riseVel = (c.riseSpeed + 0.34 * music.activity) * m.speed * m.dir;
             return {
                 priority: 2,
                 emitters: [drawPoints({
@@ -171,10 +216,10 @@ export const ATMOSPHERE_EFFECTS = {
                     opacity: 0.35 + 0.55 * intensity,
                     scale,
                     offset: [0, y, 0],
-                    size: 0.062 + 0.025 * intensity,
-                    sizeEnd: 0.032,
+                    size: c.particleSize + 0.025 * intensity,
+                    sizeEnd: (c.particleSize / 0.062) * 0.032,
                     sizeJitter: 0.35,
-                    spread: [2.45 * m.spread, 0.35, 1.75 * m.spread],
+                    spread: [c.spread * m.spread, 0.35, 1.75 * spreadScale * m.spread],
                     velocity: [0, riseVel, 0],
                     accel: [0, 0.08 * m.dir, 0],
                     flutter: 0.20 * m.energy,
@@ -194,11 +239,13 @@ export const ATMOSPHERE_EFFECTS = {
         interval: 24,
         priority: 3,
         defaultBrush: "mote",
+        parameters: AURORA_VEIL_PARAMS,
         createState: () => ({ previousLength: undefined as number | undefined }),
         emit({ params, music, state }) {
             const { color, intensity, scale, zone, motion } = params;
+            const c = resolveSchemaParams(AURORA_VEIL_PARAMS, params.custom);
             const m = motionFactors(motion);
-            const length = Math.min(2.4, (0.90 + 0.95 * music.sustain + 0.32 * music.surge) * m.energy);
+            const length = Math.min(2.4, (c.length + 0.95 * music.sustain + 0.32 * music.surge) * m.energy);
             const previousLength = state.previousLength ?? length;
             state.previousLength = length;
             return {
@@ -209,8 +256,8 @@ export const ATMOSPHERE_EFFECTS = {
                     opacity: intensity,
                     length,
                     previousLength,
-                    width: 0.26,
-                    speed: (0.58 + 0.24 * music.activity) * m.speed,
+                    width: c.width,
+                    speed: (c.speed + 0.24 * music.activity) * m.speed,
                     range: 1.17 * m.spread,
                     yOffset: ZONE_Y_OFFSET[zone],
                     zOffset: 0.55,
@@ -228,11 +275,13 @@ export const ATMOSPHERE_EFFECTS = {
         interval: 18,
         priority: 3,
         defaultBrush: "mote",
+        parameters: WING_CURTAIN_PARAMS,
         createState: () => ({ previousLength: undefined as number | undefined }),
         emit({ params, music, state }) {
             const { color, intensity, scale, zone, motion } = params;
+            const c = resolveSchemaParams(WING_CURTAIN_PARAMS, params.custom);
             const m = motionFactors(motion);
-            const length = Math.min(2.4, (0.78 + 1.08 * music.sustain + 0.38 * music.surge) * m.energy);
+            const length = Math.min(2.4, (c.length + 1.08 * music.sustain + 0.38 * music.surge) * m.energy);
             const previousLength = state.previousLength ?? length;
             state.previousLength = length;
             return {
@@ -243,8 +292,8 @@ export const ATMOSPHERE_EFFECTS = {
                     opacity: intensity,
                     length,
                     previousLength,
-                    width: 0.25,
-                    speed: (0.60 + 0.22 * music.activity) * m.speed,
+                    width: c.width,
+                    speed: (c.speed + 0.22 * music.activity) * m.speed,
                     range: 1.16 * m.spread,
                     yOffset: -0.14 + ZONE_Y_OFFSET[zone],
                     zOffset: 0.52,
@@ -313,11 +362,14 @@ export const ATMOSPHERE_EFFECTS = {
         interval: 12,
         priority: 3,
         defaultBrush: "star",
+        parameters: METEOR_SHOWER_PARAMS,
         emit({ params, music, phase }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
+            const c = resolveSchemaParams(METEOR_SHOWER_PARAMS, params.custom);
             const m = motionFactors(motion);
             const yBase = zoneBaseY(zone, 3.25, 1.95);
-            const count = motion === "intense" ? 3 : motion === "gentle" ? 1 : 2;
+            const countDelta = motion === "intense" ? 1 : motion === "gentle" ? -1 : 0;
+            const count = Math.max(1, Math.min(3, Math.round(c.count) + countDelta));
             const resolvedBrush = resolvePointBrush(brush, "star");
             const dirX = m.dir;
             const tx = dirX * 0.86;
@@ -330,9 +382,9 @@ export const ATMOSPHERE_EFFECTS = {
                 const startX = -dirX * (0.6 + seed * 2.9) * m.spread + (seed2 - 0.5) * 1.4;
                 const startY = yBase + (seed2 - 0.20) * 1.45;
                 const startZ = 1.05 + seed * 2.35;
-                const speed = (2.65 + 0.95 * seed2 + 0.45 * music.activity) * m.speed;
+                const speed = (c.speed + 0.95 * seed2 + 0.45 * music.activity) * m.speed;
                 const life = 0.95 + 0.35 * seed;
-                const len = (1.85 + 0.95 * seed2 + 0.55 * intensity) * scale;
+                const len = (c.length + 0.95 * seed2 + 0.55 * intensity) * scale;
                 const width = (0.30 + 0.14 * seed + 0.08 * intensity) * scale;
                 const streakColor = i % 2 === 0 ? color : color2;
                 const tailColor = i % 2 === 0 ? color2 : color;

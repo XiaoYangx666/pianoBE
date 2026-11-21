@@ -6,11 +6,12 @@
 
 1. 在 `packages/vfx/src/effects/` 对应分类模块（`atmosphere.ts`、`curves.ts`、`stage.ts`、`keys.ts` 或 `accents.ts`）添加定义：
    - 填写 `id`、`label`、`category`、`trigger`（`continuous` / `note` / `instant` / `control`）、`interval`、`priority`。
+   - 如需对外开放可调几何/运动/形态控制，声明 `parameters`（支持数值 `min`/`max`/`default`/`step`、布尔 `type: "boolean"` 与枚举 `type: "enum", options`），并在 `emit({ params })` 中通过 `resolveSchemaParams(SCHEMA, params.custom)` 读取（数值参数自动在 `set` + `fade` 上平滑渐变，布尔/枚举在提示时刻切换，并继续保留音乐响应叠加）。
    - 需要跨帧平滑衔接（如前一帧长度/高度）或切换状态时声明 `createState: () => ({ ... })`，避免在播放器中维护全局字段。
    - 如需动态调整间隔或与其他特效互相让步，可选声明 `nextInterval`、`tags` 与 `yields: { tag, ticks }`。
    - 在 `emit(context)` 中调用 `primitives.ts` 提供的 `drawPoints`、`drawStrokeSegments`、`drawGroundRing` 等原语返回 `{ priority, emitters }`。
-2. 所有已并入 `effects/index.ts` 的特效会自动出现在 Web VFX Lab「单特效」、主题图层选择器以及 `.pbe3` 符号表调度中；无需修改 `@piano/core` 或任何开关表。
-3. 运行 `npm run test:vfx`，`packages/vfx/tests/vfxRegistry.test.ts` 与 `vfxPerformance.test.ts` 会自动验证新特效的变量完备性、有限性与生命周期上限。
+2. 所有已并入 `effects/index.ts` 的特效及其 `parameters` 会自动出现在 Web VFX Lab「单特效」、主题图层选择器、`/pbe:vfx list` 与 `.pbe3` 参数编解码中；无需修改 `@piano/core` 或任何开关表。
+3. 运行 `npm run test:vfx`，`packages/vfx/tests/vfxRegistry.test.ts` 与 `vfxPerformance.test.ts` 会自动验证新特效的变量完备性、参数范围声明、有限性与生命周期上限。
 
 ## 2. 新增画笔或粒子贴图资源
 
@@ -49,7 +50,7 @@ my_style: {
 ## 4. 新增或编辑舞台主题
 
 1. 在 `packages/vfx/src/themes.ts` 中的 `VFX_THEME_ORDER` 与 `VFX_THEMES` 添加条目（或在 Web VFX Lab 的「主题编排」面板实时调整并点击「导出 JSON」）。
-2. 每个图层按需配置：`effect`、`slot`（同特效多轨槽位）、`color`、`color2`、`brush`、`variant`、`zone`、`motion`、`level`（固定数值或 `{ input, from, to }` 音乐特征映射）、`scale` 与瞬时特效门限 `gate`。
+2. 每个图层按需配置：`effect`、`slot`（同特效多轨槽位）、`color`、`color2`、`brush`、`variant`、`zone`、`motion`、`params`（该特效声明的专属参数）、`level`（固定数值或 `{ input, from, to }` 音乐特征映射）、`scale` 与瞬时特效门限 `gate`。
 3. 需同步到游戏内菜单选项时，在 `packages/addon/src/domain/piano/settings.ts` 登记主题 ID 与显示标题。
 4. 运行 `npm run test:vfx` 确认 4 架钢琴错峰演奏 0 丢弃、单架峰值 ≤ 275 粒子。
 
@@ -57,18 +58,22 @@ my_style: {
 
 制作定制曲目演出不需要新增专用播放器、修改运行时或改动 Core：
 
-1. 在 `midis/performances/<songId>.json` 编写提示序列（`op`: `"set"` 或 `"flash"`，`effect`: 任意已注册特效名，可选 `slot`、`brush`、`variant`、`zone`、`motion`、`fade`）：
+1. 在 `midis/performances/<songId>.json` 编写提示序列（`op`: `"set"` 或 `"flash"`，`effect`: 任意已注册特效名，可选 `slot`、`brush`、`variant`、`zone`、`motion`、`params`、`fade`；其中数值型 `params` 在同一 `(effect, slot)` 通道上会随 `set` + `fade` 平滑渐变，未重复写出的参数沿用当前通道状态）：
    ```json
    {
-     "at": 12.5,
+     "at": 32,
      "op": "set",
-     "effect": "key_style",
-     "variant": "snow",
-     "color": "ice",
-     "color2": "silver",
+     "effect": "double_helix",
+     "color": "aurora",
      "level": 85,
      "scale": 100,
-     "fade": 1.2
+     "fade": 2,
+     "params": {
+       "radius": 2.8,
+       "height": 3.5,
+       "angularSpeed": 180,
+       "particleSize": 0.06
+     }
    }
    ```
 2. 执行导出命令将其打包进 `midis/library/<songId>.pbe3`（带曲目内部符号表与颜色表）：

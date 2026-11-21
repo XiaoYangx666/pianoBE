@@ -1,9 +1,9 @@
 import {
     PERFORMANCE_MOTIONS, PERFORMANCE_ZONES, isValidPerformanceSymbol, resolvePerformanceColor,
-    type PerformanceMotion, type PerformanceZone,
+    type PerformanceMotion, type PerformanceParams, type PerformanceZone,
 } from "@piano/core";
 import { isValidBrush } from "./brushes";
-import { VFX_EFFECTS } from "./effects";
+import { validateEffectCustomParams, VFX_EFFECTS } from "./effects";
 import { validateKeyParticleOverride } from "./keyParticles";
 import { quietFeatures, type MusicFeatures } from "./music";
 import type { PianoParticleOverride } from "./types";
@@ -29,6 +29,8 @@ export interface VfxThemeLayer {
     variant?: string;
     zone?: PerformanceZone;
     motion?: PerformanceMotion;
+    /** 特效专属参数 */
+    params?: PerformanceParams;
     /** 强度百分比（0–100）或由音乐特征映射 */
     level: number | VfxThemeLevelMapping;
     /** 缩放百分比（50–170） */
@@ -379,6 +381,8 @@ export function validateVfxTheme(value: unknown): VfxTheme {
             };
         }
 
+        const params = validateEffectCustomParams(layer.effect, layer.params);
+
         return {
             effect: layer.effect,
             ...(slot !== undefined ? { slot } : {}),
@@ -388,6 +392,7 @@ export function validateVfxTheme(value: unknown): VfxTheme {
             ...(variant !== undefined ? { variant } : {}),
             ...(zone !== undefined ? { zone } : {}),
             ...(motion !== undefined ? { motion } : {}),
+            ...(params !== undefined ? { params } : {}),
             level,
             ...(scale !== undefined ? { scale } : {}),
             ...(gate !== undefined ? { gate } : {}),

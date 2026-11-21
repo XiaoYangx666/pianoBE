@@ -1,12 +1,14 @@
 import {
     parsePerformanceRgb, resolvePerformanceColor, TIME_SCALE,
-    type PerformanceCue, type PerformanceMotion, type PerformanceZone,
+    type PerformanceCue, type PerformanceMotion, type PerformanceParams, type PerformanceParamValue,
+    type PerformanceZone,
 } from "@piano/core";
 import { deriveAccentHex, rgbToHex } from "./color";
-import { getVfxEffect } from "./effects";
+import { getVfxEffect, resolveEffectCustomParams } from "./effects";
 import { clampUnit, mix, type MusicFeatures } from "./music";
+import { interpolateSchemaParams } from "./parameters";
 import type { VfxTheme } from "./themes";
-import type { PianoParticleOverride, VfxEffectParams } from "./types";
+import type { PianoParticleOverride, VfxEffectParams, VfxParameterSchema } from "./types";
 
 export interface ProgramChannelSample {
     params: VfxEffectParams;
@@ -47,6 +49,8 @@ interface ChannelState {
     variant?: string;
     zone: PerformanceZone;
     motion: PerformanceMotion;
+    schema?: VfxParameterSchema;
+    custom: Record<string, PerformanceParamValue>;
 }
 
 interface Transition {
@@ -63,6 +67,7 @@ const DEFAULT_CHANNEL_STATE: ChannelState = {
     r2: 255, g2: 255, b2: 255,
     zone: "stage",
     motion: "normal",
+    custom: {},
 };
 
 function sampleTransitions(transitions: readonly Transition[], tick40: number): ChannelState {
@@ -72,6 +77,7 @@ function sampleTransitions(transitions: readonly Transition[], tick40: number): 
     if (!transition) return DEFAULT_CHANNEL_STATE;
     const progress = transition.fade40 ? clampUnit((tick40 - transition.tick40) / transition.fade40) : 1;
     const smooth = progress * progress * (3 - 2 * progress);
+    const schema = transition.to.schema;
     return {
         intensity: mix(transition.from.intensity, transition.to.intensity, smooth),
         scale: mix(transition.from.scale, transition.to.scale, smooth),
@@ -85,6 +91,10 @@ function sampleTransitions(transitions: readonly Transition[], tick40: number): 
         variant: transition.to.variant,
         zone: transition.to.zone,
         motion: transition.to.motion,
+        schema,
+        custom: schema
+            ? interpolateSchemaParams(schema, transition.from.custom, transition.to.custom, smooth)
+            : {},
     };
 }
 
@@ -98,6 +108,7 @@ function toEffectParams(state: ChannelState): VfxEffectParams {
         variant: state.variant,
         zone: state.zone,
         motion: state.motion,
+        ...(state.schema ? { custom: state.custom } : {}),
     };
 }
 
@@ -124,6 +135,7 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
                     variant: cue.variant,
                     zone: cue.zone ?? "stage",
                     motion: cue.motion ?? "normal",
+                    ...(def.parameters ? { custom: resolveEffectCustomParams(def, cue.params) } : {}),
                 },
             });
             continue;
@@ -148,6 +160,11 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
         }
         const [r, g, b] = parsePerformanceRgb(cue.color);
         const [r2, g2, b2] = parsePerformanceRgb(cue.color2 ?? deriveAccentHex(cue.color));
+        const prev = sampleTransitions(transitions, cue.tick);
+        const isActive = transitions.length > 0 && prev.intensity > 0.001;
+        const custom = def.parameters
+            ? resolveEffectCustomParams(def, isActive ? { ...prev.custom, ...cue.params } : cue.params)
+            : {};
         const target: ChannelState = {
             intensity: cue.level / 100,
             scale: cue.scale / 100,
@@ -156,9 +173,10 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
             variant: cue.variant,
             zone: cue.zone ?? "stage",
             motion: cue.motion ?? "normal",
+            schema: def.parameters,
+            custom,
         };
-        const prev = sampleTransitions(transitions, cue.tick);
-        const from: ChannelState = !transitions.length || prev.intensity <= 0.001
+        const from: ChannelState = !isActive
             ? { ...target, intensity: 0 }
             : prev;
         const to: ChannelState = cue.level === 0
@@ -169,6 +187,10 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
                 variant: cue.variant ?? prev.variant,
                 zone: cue.zone ?? prev.zone,
                 motion: cue.motion ?? prev.motion,
+                schema: def.parameters,
+                custom: def.parameters
+                    ? resolveEffectCustomParams(def, { ...prev.custom, ...cue.params })
+                    : {},
             }
             : target;
         transitions.push({ tick40: cue.tick, fade40: cue.op === "set" ? cue.fade : 0, from, to });
@@ -193,6 +215,8 @@ export function createThemeProgram(theme: VfxTheme, overrides: ThemeProgramOverr
         const color = resolvePerformanceColor(layer.color);
         const color2 = layer.color2 ? resolvePerformanceColor(layer.color2) : deriveAccentHex(color);
         const slot = layer.slot ?? index;
+        const def = getVfxEffect(layer.effect);
+        const custom = def?.parameters ? resolveEffectCustomParams(def, layer.params) : undefined;
         return {
             key: `layer:${index}:${layer.effect}:${slot}`,
             effect: layer.effect,
@@ -223,6 +247,7 @@ export function createThemeProgram(theme: VfxTheme, overrides: ThemeProgramOverr
                         variant: layer.variant,
                         zone: layer.zone ?? "stage",
                         motion: layer.motion ?? "normal",
+                        ...(custom ? { custom } : {}),
                     },
                     gated,
                     cooldownTicks: layer.gate?.cooldown,
@@ -247,6 +272,7 @@ export interface SingleEffectConfig {
     variant?: string;
     zone?: PerformanceZone;
     motion?: PerformanceMotion;
+    params?: PerformanceParams;
     level?: number;
     scale?: number;
     seconds?: number;
@@ -258,6 +284,8 @@ export interface SingleEffectConfig {
 export function createSingleEffectProgram(config: SingleEffectConfig): VfxProgram {
     const color = resolvePerformanceColor(config.color);
     const color2 = config.color2 ? resolvePerformanceColor(config.color2) : deriveAccentHex(color);
+    const def = getVfxEffect(config.effect);
+    const custom = def?.parameters ? resolveEffectCustomParams(def, config.params) : undefined;
     const params: VfxEffectParams = {
         color,
         color2,
@@ -267,6 +295,7 @@ export function createSingleEffectProgram(config: SingleEffectConfig): VfxProgra
         variant: config.variant,
         zone: config.zone ?? "stage",
         motion: config.motion ?? "normal",
+        ...(custom ? { custom } : {}),
     };
     const autoPulse = config.autoPulseTicks ?? 45;
     return {
