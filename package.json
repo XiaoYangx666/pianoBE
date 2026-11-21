@@ -38,6 +38,7 @@
         "start:web": "npm run preview -w @piano/web",
         "build:web": "npm run build -w @piano/web",
         "sync:replay": "node tools/assets/sync-replay.mjs",
+  "sync:samples": "node tools/assets/sync-web-samples.mjs",
         "dev:generator": "npm run dev -w @piano/generator",
         "build:generator": "npm run build -w @piano/generator",
         "build:timbres": "node tools/audio/build-piano-timbres.mjs",

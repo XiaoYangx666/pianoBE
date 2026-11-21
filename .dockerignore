@@ -2,7 +2,12 @@ node_modules
 .git
 .gitignore
 bp/scripts
-packages/addon
+# 只把 addon 的采样保留在构建上下文里：web 的 /piano 静态目录由
+# tools/assets/sync-web-samples.mjs 从这里生成（其余 addon 内容无需进镜像）。
+packages/addon/*
+!packages/addon/rp
+packages/addon/rp/*
+!packages/addon/rp/sounds
 packages/generator
 packages/addon/dist
 packages/generator/dist

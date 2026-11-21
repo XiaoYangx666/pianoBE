@@ -7,7 +7,7 @@ WORKDIR /app
 COPY . .
 # 保证 packages/server/amt 存在：没有同步 AMT 时镜像仍可构建（运行时报告 AMT 不可用）
 RUN mkdir -p packages/server/amt
-# 容器内仅 core/server/web（.dockerignore 排除 addon/generator），装全量依赖
+# 容器内仅 core/server/web（.dockerignore 排除除采样外的 addon 与 generator），装全量依赖
 RUN bun install
 RUN bun run --filter @piano/core build
 RUN bun run --filter @piano/web build

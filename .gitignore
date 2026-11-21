@@ -2,6 +2,9 @@ build
 cache
 node_modules
 packages/web/public/replay
+packages/web/public/piano
+# Blockbench 切块工程是本地生成物（tools/model/*-cut 可重建），不入库
+assets/*/cut/*.bbmodel
 /scripts
 output.zip
 /dist

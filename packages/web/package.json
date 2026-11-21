@@ -9,8 +9,8 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "predev": "node ../../tools/assets/sync-replay.mjs",
-        "prebuild": "node ../../tools/assets/sync-replay.mjs"
+        "predev": "node ../../tools/assets/sync-web-samples.mjs && node ../../tools/assets/sync-replay.mjs",
+        "prebuild": "node ../../tools/assets/sync-web-samples.mjs && node ../../tools/assets/sync-replay.mjs"
     },
     "dependencies": {
         "@piano/core": "*",
