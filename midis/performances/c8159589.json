@@ -51,7 +51,7 @@
   "cues": [
     {
       "at": 2.2,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFBA7A",
       "color2": "#FFF4DC",
       "motion": "gentle",
@@ -61,7 +61,7 @@
     },
     {
       "at": 2.2,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#FFF4DC",
       "color2": "#F7FAFF",
       "brush": "blossom",
@@ -72,8 +72,8 @@
     },
     {
       "at": 2.2,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "#FFF4DC",
       "color2": "#FFBA7A",
       "level": 78,
@@ -82,7 +82,7 @@
     },
     {
       "at": 17.075,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#F4A6B8",
       "color2": "#9CE6FF",
       "motion": "gentle",
@@ -92,7 +92,7 @@
     },
     {
       "at": 17.075,
-      "method": "silk_streams",
+      "effect": "silk_streams",
       "color": "#F4A6B8",
       "color2": "#9CE6FF",
       "motion": "gentle",
@@ -102,7 +102,7 @@
     },
     {
       "at": 17.075,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "#FFF4DC",
       "color2": "#F4A6B8",
       "brush": "note",
@@ -113,17 +113,17 @@
     },
     {
       "at": 17.075,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "#F4A6B8",
       "color2": "#9CE6FF",
       "level": 82,
       "scale": 100,
-      "fade": 2.0
+      "fade": 2
     },
     {
       "at": 30.8,
-      "method": "silk_streams",
+      "effect": "silk_streams",
       "color": "#F4A6B8",
       "level": 0,
       "scale": 95,
@@ -131,7 +131,7 @@
     },
     {
       "at": 30.8,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "#FFF4DC",
       "brush": "note",
       "level": 0,
@@ -140,17 +140,17 @@
     },
     {
       "at": 31.725,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFBA7A",
       "color2": "#6D89CC",
       "motion": "gentle",
       "level": 30,
       "scale": 102,
-      "fade": 3.0
+      "fade": 3
     },
     {
       "at": 31.725,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "color2": "#FFBA7A",
       "brush": "blossom",
@@ -160,7 +160,7 @@
     },
     {
       "at": 31.725,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "color2": "#FFF4DC",
       "zone": "low",
@@ -171,19 +171,19 @@
     },
     {
       "at": 31.725,
-      "method": "key_constellation",
+      "effect": "key_constellation",
       "color": "#FFF4DC",
       "color2": "#9CE6FF",
       "brush": "star",
       "motion": "gentle",
       "level": 54,
       "scale": 96,
-      "fade": 2.0
+      "fade": 2
     },
     {
       "at": 31.725,
-      "method": "key_style",
-      "style": "blue_tears",
+      "effect": "key_style",
+      "variant": "blue_tears",
       "color": "#FFF4DC",
       "color2": "#9CE6FF",
       "level": 84,
@@ -192,7 +192,7 @@
     },
     {
       "at": 59.8,
-      "method": "key_constellation",
+      "effect": "key_constellation",
       "color": "#9CE6FF",
       "brush": "star",
       "level": 0,
@@ -201,7 +201,7 @@
     },
     {
       "at": 59.8,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "brush": "blossom",
       "level": 0,
@@ -210,7 +210,7 @@
     },
     {
       "at": 60.9,
-      "method": "floor_sweep",
+      "effect": "floor_sweep",
       "color": "#FFBA7A",
       "color2": "#FFE29A",
       "level": 64,
@@ -218,7 +218,7 @@
     },
     {
       "at": 60.9,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "#FFBA7A",
       "color2": "#F4A6B8",
       "motion": "gentle",
@@ -228,7 +228,7 @@
     },
     {
       "at": 60.9,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "color2": "#FFE29A",
       "zone": "low",
@@ -238,7 +238,7 @@
     },
     {
       "at": 75.575,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#5876BA",
       "color2": "#8EB8FF",
       "level": 44,
@@ -247,7 +247,7 @@
     },
     {
       "at": 75.575,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "#FFE29A",
       "color2": "#F4A6B8",
       "level": 72,
@@ -256,7 +256,7 @@
     },
     {
       "at": 75.575,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "color2": "#FFE29A",
       "zone": "stage",
@@ -266,8 +266,8 @@
     },
     {
       "at": 75.575,
-      "method": "key_style",
-      "style": "blue_tears",
+      "effect": "key_style",
+      "variant": "blue_tears",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "level": 90,
@@ -276,7 +276,7 @@
     },
     {
       "at": 86.2,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "#8EB8FF",
       "color2": "#D6EAFF",
       "motion": "gentle",
@@ -286,15 +286,15 @@
     },
     {
       "at": 89.5,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#5876BA",
       "level": 0,
       "scale": 98,
       "fade": 3.6
     },
     {
-      "at": 90.0,
-      "method": "firefly_rise",
+      "at": 90,
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "zone": "low",
       "motion": "gentle",
@@ -304,7 +304,7 @@
     },
     {
       "at": 96.6,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "#D6EAFF",
       "color2": "#9CE6FF",
       "motion": "gentle",
@@ -314,19 +314,19 @@
     },
     {
       "at": 96.6,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "brush": "snow",
       "motion": "gentle",
       "level": 62,
       "scale": 96,
-      "fade": 2.0
+      "fade": 2
     },
     {
       "at": 96.6,
-      "method": "key_style",
-      "style": "snow",
+      "effect": "key_style",
+      "variant": "snow",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "level": 84,
@@ -334,8 +334,8 @@
       "fade": 2.2
     },
     {
-      "at": 112.0,
-      "method": "orbit_halo",
+      "at": 112,
+      "effect": "orbit_halo",
       "color": "#9CE6FF",
       "color2": "#D8F28A",
       "brush": "star",
@@ -346,7 +346,7 @@
     },
     {
       "at": 119.5,
-      "method": "orbit_halo",
+      "effect": "orbit_halo",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "brush": "star",
@@ -356,7 +356,7 @@
     },
     {
       "at": 119.5,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "level": 48,
@@ -365,7 +365,7 @@
     },
     {
       "at": 125.6,
-      "method": "orbit_halo",
+      "effect": "orbit_halo",
       "color": "#FFE29A",
       "brush": "star",
       "level": 0,
@@ -374,7 +374,7 @@
     },
     {
       "at": 125.6,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "zone": "low",
       "level": 0,
@@ -383,7 +383,7 @@
     },
     {
       "at": 126.875,
-      "method": "shockwave",
+      "effect": "shockwave",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "level": 70,
@@ -391,7 +391,7 @@
     },
     {
       "at": 126.875,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "#FFE29A",
       "color2": "#FFB7D5",
       "level": 76,
@@ -400,19 +400,19 @@
     },
     {
       "at": 126.875,
-      "method": "petal_fall",
+      "effect": "petal_fall",
       "color": "#FFB7D5",
       "color2": "#FFF4DC",
       "brush": "petal",
       "zone": "high",
       "level": 62,
       "scale": 104,
-      "fade": 2.0
+      "fade": 2
     },
     {
       "at": 126.875,
-      "method": "key_style",
-      "style": "sakura_drift",
+      "effect": "key_style",
+      "variant": "sakura_drift",
       "color": "#FFB7D5",
       "color2": "#FFE29A",
       "level": 92,
@@ -421,7 +421,7 @@
     },
     {
       "at": 140.15,
-      "method": "hanabi_launch",
+      "effect": "hanabi_launch",
       "color": "#FFE29A",
       "color2": "#FFBA7A",
       "brush": "spark",
@@ -431,7 +431,7 @@
     },
     {
       "at": 141.325,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "#FFE29A",
       "color2": "#FFB7D5",
       "brush": "spark",
@@ -441,7 +441,7 @@
     },
     {
       "at": 145.65,
-      "method": "hanabi_launch",
+      "effect": "hanabi_launch",
       "color": "#78C8FF",
       "color2": "#FFF4DC",
       "brush": "spark",
@@ -451,7 +451,7 @@
     },
     {
       "at": 146.8,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "brush": "spark",
@@ -461,7 +461,7 @@
     },
     {
       "at": 146.8,
-      "method": "key_fountain",
+      "effect": "key_fountain",
       "color": "#FFE29A",
       "color2": "#FFB7D5",
       "brush": "spark",
@@ -471,26 +471,26 @@
     },
     {
       "at": 154.5,
-      "method": "key_fountain",
+      "effect": "key_fountain",
       "color": "#FFE29A",
       "brush": "spark",
       "level": 0,
       "scale": 98,
-      "fade": 2.0
+      "fade": 2
     },
     {
       "at": 155.5,
-      "method": "petal_fall",
+      "effect": "petal_fall",
       "color": "#FFB7D5",
       "brush": "petal",
       "zone": "high",
       "level": 0,
       "scale": 98,
-      "fade": 3.0
+      "fade": 3
     },
     {
-      "at": 156.0,
-      "method": "wing_ribbons",
+      "at": 156,
+      "effect": "wing_ribbons",
       "color": "#FFE29A",
       "level": 0,
       "scale": 98,
@@ -498,7 +498,7 @@
     },
     {
       "at": 156.5,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "#FFF4DC",
       "brush": "snow",
       "level": 0,
@@ -507,7 +507,7 @@
     },
     {
       "at": 165.025,
-      "method": "double_helix",
+      "effect": "double_helix",
       "color": "#B896FF",
       "color2": "#FFB870",
       "brush": "star",
@@ -517,7 +517,7 @@
     },
     {
       "at": 165.025,
-      "method": "wing_curtain",
+      "effect": "wing_curtain",
       "color": "#9E82E8",
       "color2": "#FFB870",
       "level": 48,
@@ -526,17 +526,17 @@
     },
     {
       "at": 165.025,
-      "method": "key_style",
-      "style": "magic_trail",
+      "effect": "key_style",
+      "variant": "magic_trail",
       "color": "#FFB870",
       "color2": "#B896FF",
       "level": 90,
       "scale": 100,
-      "fade": 2.0
+      "fade": 2
     },
     {
-      "at": 180.0,
-      "method": "double_helix",
+      "at": 180,
+      "effect": "double_helix",
       "color": "#FFB870",
       "color2": "#B896FF",
       "brush": "star",
@@ -545,8 +545,8 @@
       "fade": 2.2
     },
     {
-      "at": 180.0,
-      "method": "wing_curtain",
+      "at": 180,
+      "effect": "wing_curtain",
       "color": "#FFB870",
       "color2": "#9E82E8",
       "level": 58,
@@ -555,7 +555,7 @@
     },
     {
       "at": 193.5,
-      "method": "double_helix",
+      "effect": "double_helix",
       "color": "#B896FF",
       "brush": "star",
       "level": 0,
@@ -564,25 +564,25 @@
     },
     {
       "at": 193.5,
-      "method": "wing_curtain",
+      "effect": "wing_curtain",
       "color": "#9E82E8",
       "level": 0,
       "scale": 96,
       "fade": 3.2
     },
     {
-      "at": 195.0,
-      "method": "starfield",
+      "at": 195,
+      "effect": "starfield",
       "color": "#6D89CC",
       "color2": "#D6EAFF",
       "motion": "gentle",
       "level": 24,
       "scale": 96,
-      "fade": 3.0
+      "fade": 3
     },
     {
       "at": 198.7,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "brush": "blossom",
@@ -593,7 +593,7 @@
     },
     {
       "at": 198.7,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "brush": "mote",
@@ -604,8 +604,8 @@
     },
     {
       "at": 198.7,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "level": 76,
@@ -613,18 +613,18 @@
       "fade": 2.4
     },
     {
-      "at": 214.0,
-      "method": "firefly_rise",
+      "at": 214,
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "color2": "#FFE29A",
       "zone": "low",
       "level": 38,
       "scale": 100,
-      "fade": 3.0
+      "fade": 3
     },
     {
-      "at": 214.0,
-      "method": "horizon_glow",
+      "at": 214,
+      "effect": "horizon_glow",
       "color": "#FFBA7A",
       "color2": "#FFE29A",
       "level": 34,
@@ -633,7 +633,7 @@
     },
     {
       "at": 221.5,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#FFE29A",
       "color2": "#FFF4DC",
       "zone": "stage",
@@ -643,7 +643,7 @@
     },
     {
       "at": 221.5,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFE29A",
       "color2": "#FF857A",
       "level": 56,
@@ -652,8 +652,8 @@
     },
     {
       "at": 221.5,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "#FFE29A",
       "color2": "#FFF4DC",
       "level": 92,
@@ -662,7 +662,7 @@
     },
     {
       "at": 226.8,
-      "method": "hanabi_launch",
+      "effect": "hanabi_launch",
       "color": "#FFE29A",
       "color2": "#FFF4DC",
       "brush": "spark",
@@ -672,7 +672,7 @@
     },
     {
       "at": 227.4,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "brush": "blossom",
       "level": 0,
@@ -681,7 +681,7 @@
     },
     {
       "at": 227.4,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#FFE29A",
       "zone": "stage",
       "level": 0,
@@ -690,7 +690,7 @@
     },
     {
       "at": 228.6,
-      "method": "shockwave",
+      "effect": "shockwave",
       "color": "#FFE29A",
       "color2": "#FF857A",
       "level": 82,
@@ -698,7 +698,7 @@
     },
     {
       "at": 228.6,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "#FFE29A",
       "color2": "#FFF4DC",
       "brush": "spark",
@@ -708,7 +708,7 @@
     },
     {
       "at": 228.6,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "#FFE29A",
       "color2": "#FF857A",
       "level": 84,
@@ -717,7 +717,7 @@
     },
     {
       "at": 228.6,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "level": 44,
@@ -726,8 +726,8 @@
     },
     {
       "at": 228.6,
-      "method": "key_style",
-      "style": "prism_shards",
+      "effect": "key_style",
+      "variant": "prism_shards",
       "color": "#FFE29A",
       "color2": "#9CE6FF",
       "level": 96,
@@ -736,7 +736,7 @@
     },
     {
       "at": 241.9,
-      "method": "hanabi_launch",
+      "effect": "hanabi_launch",
       "color": "#FF857A",
       "color2": "#FFE29A",
       "brush": "spark",
@@ -746,7 +746,7 @@
     },
     {
       "at": 243.05,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "#FF857A",
       "color2": "#FFE29A",
       "brush": "spark",
@@ -756,16 +756,16 @@
     },
     {
       "at": 243.05,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "#FFE29A",
       "color2": "#FFF4DC",
       "level": 76,
       "scale": 112,
-      "fade": 1.0
+      "fade": 1
     },
     {
       "at": 243.05,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFE29A",
       "color2": "#FF857A",
       "level": 0,
@@ -774,7 +774,7 @@
     },
     {
       "at": 247.375,
-      "method": "hanabi_launch",
+      "effect": "hanabi_launch",
       "color": "#78C8FF",
       "color2": "#FFF4DC",
       "brush": "spark",
@@ -784,7 +784,7 @@
     },
     {
       "at": 248.525,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "#78C8FF",
       "color2": "#FFE29A",
       "brush": "spark",
@@ -794,7 +794,7 @@
     },
     {
       "at": 249.25,
-      "method": "hanabi_launch",
+      "effect": "hanabi_launch",
       "color": "#FFE29A",
       "color2": "#FFB7D5",
       "brush": "spark",
@@ -804,7 +804,7 @@
     },
     {
       "at": 250.375,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "#FFE29A",
       "color2": "#FFB7D5",
       "brush": "spark",
@@ -814,7 +814,7 @@
     },
     {
       "at": 250.375,
-      "method": "shockwave",
+      "effect": "shockwave",
       "color": "#FFE29A",
       "color2": "#FFF4DC",
       "level": 78,
@@ -822,7 +822,7 @@
     },
     {
       "at": 256.25,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "#FFE29A",
       "level": 0,
       "scale": 102,
@@ -830,7 +830,7 @@
     },
     {
       "at": 256.25,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "#FFBA7A",
       "color2": "#F4A6B8",
       "motion": "gentle",
@@ -840,7 +840,7 @@
     },
     {
       "at": 256.25,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFBA7A",
       "color2": "#FFF4DC",
       "motion": "gentle",
@@ -849,8 +849,8 @@
       "fade": 3.6
     },
     {
-      "at": 265.0,
-      "method": "wing_ribbons",
+      "at": 265,
+      "effect": "wing_ribbons",
       "color": "#F4A6B8",
       "motion": "gentle",
       "level": 0,
@@ -858,17 +858,17 @@
       "fade": 3.5
     },
     {
-      "at": 265.0,
-      "method": "starfield",
+      "at": 265,
+      "effect": "starfield",
       "color": "#D6EAFF",
       "motion": "gentle",
       "level": 0,
       "scale": 96,
-      "fade": 4.0
+      "fade": 4
     },
     {
-      "at": 265.0,
-      "method": "petal_fall",
+      "at": 265,
+      "effect": "petal_fall",
       "color": "#F7FAFF",
       "color2": "#FFB7D5",
       "brush": "blossom",
@@ -879,8 +879,8 @@
       "fade": 3.2
     },
     {
-      "at": 265.0,
-      "method": "firefly_rise",
+      "at": 265,
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "color2": "#FFF4DC",
       "zone": "low",
@@ -890,18 +890,18 @@
       "fade": 3.2
     },
     {
-      "at": 265.0,
-      "method": "key_style",
-      "style": "sakura_drift",
+      "at": 265,
+      "effect": "key_style",
+      "variant": "sakura_drift",
       "color": "#F7FAFF",
       "color2": "#FFE29A",
       "level": 82,
       "scale": 100,
-      "fade": 3.0
+      "fade": 3
     },
     {
       "at": 284.5,
-      "method": "petal_fall",
+      "effect": "petal_fall",
       "color": "#F7FAFF",
       "brush": "blossom",
       "zone": "high",
@@ -911,7 +911,7 @@
     },
     {
       "at": 284.5,
-      "method": "firefly_rise",
+      "effect": "firefly_rise",
       "color": "#D8F28A",
       "zone": "low",
       "level": 0,
@@ -920,7 +920,7 @@
     },
     {
       "at": 284.5,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "#F7FAFF",
       "brush": "mote",
       "level": 0,
@@ -929,7 +929,7 @@
     },
     {
       "at": 286.425,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "brush": "blossom",
@@ -941,7 +941,7 @@
     },
     {
       "at": 286.425,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFF4DC",
       "color2": "#9CE6FF",
       "motion": "gentle",
@@ -951,8 +951,8 @@
     },
     {
       "at": 286.425,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "level": 76,
@@ -961,7 +961,7 @@
     },
     {
       "at": 309.525,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "color2": "#9CE6FF",
       "brush": "blossom",
@@ -969,11 +969,11 @@
       "motion": "reverse",
       "level": 20,
       "scale": 96,
-      "fade": 3.0
+      "fade": 3
     },
     {
       "at": 309.525,
-      "method": "horizon_glow",
+      "effect": "horizon_glow",
       "color": "#FFF4DC",
       "motion": "gentle",
       "level": 0,
@@ -982,7 +982,7 @@
     },
     {
       "at": 312.8,
-      "method": "dandelion_drift",
+      "effect": "dandelion_drift",
       "color": "#F7FAFF",
       "brush": "blossom",
       "zone": "stage",
@@ -993,8 +993,8 @@
     },
     {
       "at": 312.8,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "#F7FAFF",
       "level": 0,
       "scale": 100,

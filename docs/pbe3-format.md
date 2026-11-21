@@ -166,39 +166,41 @@ PBE3 比 PBE2 **小 10.7%**，同时额外携带了 keyDuration。
 - keyDuration：25ms 网格，视觉上不可感知。
 - soundDuration：25ms 网格；游戏内声音释放本身按 50ms tick 调度，25ms 足够。
 
-## 8. 旧格式
+## 8. 旧格式与版本兼容
 
-PBE2 编解码已完全移除。仓库中不再保留 PBE2 代码、测试样本或 @piano/core/pbe2 入口；旧 .pbe2 文件只在 Git 历史中可见。
+PBE2 编解码已完全移除。仓库中不再保留 PBE2 代码、测试样本或 `@piano/core/pbe2` 入口。
 
-版本 1 的 PBE3 数据仍使用原解码路径。解码器接受版本 1、2、3：版本 2 的演出区块为每条提示内联 RGB（仅保留解码兼容），版本 3 起改用区块内颜色表 + 索引，编码器始终写版本 3。需要发给旧版客户端时，可用 `attachSongPerformance(bytes, [])` 导出同一份音符和原压缩载荷的版本 1。
+普通曲目仍保持 PBE3 版本 1；带曲目演出区块的数据使用版本 3。`@piano/core` 仅接受版本 1 与版本 3，不保留实验性的版本 2 兼容分支。通过 `attachPbe3Performance(bytes, [])`（或 `attachSongPerformance(bytes, [])`）可将带演出的曲目剥离为纯净的版本 1（还原原音符载荷，不修改普通曲目编码）。
 
-## 9. 演出区块
+## 9. 演出区块（版本 3）
 
-版本 3 在调色板后、音符载荷前写入以下字段。现有音符 CRC、压缩和跳转索引只覆盖音符流。
+版本 3 在调色板后、音符载荷前写入演出区块。`@piano/core` 仅负责演出区块的结构校验与符号/颜色表编解码，**不耦合具体 VFX 特效清单、画笔纹理编号或运行时语义**。现有音符 CRC、压缩和跳转索引只覆盖音符流。
 
 | 字段 | 编码 |
 | --- | --- |
-| 区块长度 | u16，小端序 |
-| 区块校验 | u32 CRC32，小端序 |
-| 颜色表 | `u8` 数量（1–255）+ 每项 `u8 × 3` RGB |
-| 提示列表 | 读到区块末尾，1–256 条，每区块最多 5,374 字节 |
+| 区块长度 | `u16`，小端序（上限 `MAX_PERFORMANCE_BYTES = 16,384` 字节） |
+| 区块校验 | `u32` CRC32，小端序 |
+| 符号表 | `u8` 符号数（1–255）+ 每项 `u8 len`（1–32）+ ASCII/UTF-8 字符串（`^[a-z][a-z0-9_-]{0,31}$`） |
+| 颜色表 | `u8` 颜色数（1–255）+ 每项 `u8 × 3` RGB |
+| 提示列表 | 读到区块末尾，1–256 条提示 |
 
 每个提示依次写入：
-1. 相对上一条的 40 Hz `timeDelta`（VarInt）
+1. 相对上一条提示的 40 Hz `timeDelta`（VarInt）
 2. `u8` 标志 `flags`：
    - bit 7 (`0x80`)：`0` 为持续渐变 `set`，`1` 为瞬时触发 `flash`
    - bit 6 (`0x40`)：`hasColor2`（是否存在副色索引）
-   - bit 5 (`0x20`)：`hasStyle`（是否存在样式修饰字节）
-   - bits 3–4 (`0x18`)：保留，必须为 `0`
-   - bits 0–2 (`0x07`)：`slot`（0–7，同一绘制方法允许并行占用的独立通道槽位）
-3. `u8` 内置绘制方法 `methodId`（1–255；当前已注册 33 种，对应 `PERFORMANCE_METHODS`，含 `25: key_style` 弹奏粒子替换通道）
-4. `u8` 强度（0–100%；对 `key_style` 而言，`level = 0` 表示解除覆盖恢复默认弹奏粒子，`level > 0` 表示启用覆盖并以 `color` / `color2` 作为 88 键渐变配色）
+   - bit 5 (`0x20`)：`hasBrush`（是否存在画笔符号索引）
+   - bit 4 (`0x10`)：`hasVariant`（是否存在变体符号索引）
+   - bit 3 (`0x08`)：`hasSpace`（是否存在空间高度与运动修饰字节）
+   - bits 0–2 (`0x07`)：`slot`（0–7，允许同特效并行占用的独立通道槽位）
+3. `u8` 特效名索引（指向曲目内部符号表，例如 `"starfield"`、`"shockwave"`、`"key_style"`）
+4. `u8` 强度（0–100%；对 `key_style` 而言，`level = 0` 表示解除覆盖恢复钢琴默认弹奏粒子）
 5. `u8` 缩放（50–170%）
-6. `u8` 主色索引（指向颜色表；打包工具支持 `PERFORMANCE_PALETTES` 色板名或 `#RRGGBB`，编码时按首次出现顺序去重）
-7. 若 `hasStyle = 1`：`u8` 样式修饰 `(motionId << 6) | (zoneId << 4) | brushId`（`PERFORMANCE_MOTIONS`、`PERFORMANCE_ZONES`、`PERFORMANCE_BRUSHES`；当方法为 `key_style` 时，`brush` 依次映射默认保留样式 / `blue_tears` / `stardust` / `sakura_drift` / `snow` / `neon_note` / `prism_shards` / `magic_trail` / `pulse_ring`，`motion` 中 `gentle` 仅保留琴键微光 `key_glimmer`，`reverse` 则完全关闭主弹奏粒子与琴键微光）
-8. 若 `hasColor2 = 1`：`u8` 副色索引
-9. 若 `flash = 0`（`set`）：40 Hz `fade`（VarInt）；持续通道按 `(method, slot)` 独立插值强度、缩放与主/副 RGB 颜色。
+6. `u8` 主色索引（指向颜色表；编码器支持 `PERFORMANCE_PALETTES` 命名色板或 `#RRGGBB`，按首次出现顺序去重）
+7. 若 `hasColor2 = 1`：`u8` 副色索引
+8. 若 `hasBrush = 1`：`u8` 画笔符号索引（如 `"star"`、`"petal"`、`"silk"`、`"comet"`）
+9. 若 `hasVariant = 1`：`u8` 变体符号索引（特效内部变体，或 `key_style` 的显式弹奏粒子样式名如 `"stardust"`、`"snow"`、`"glimmer"`、`"none"`）
+10. 若 `hasSpace = 1`：`u8` 空间与运动字节 `((motionId & 0x03) << 2) | (zoneId & 0x03)`（高位 bits 4–7 必须为 `0`；对应 `PERFORMANCE_MOTIONS` 与 `PERFORMANCE_ZONES`）
+11. 若 `flash = 0`（`set`）：40 Hz `fade`（VarInt）；持续通道按 `(effect, slot)` 独立插值强度、缩放与主/副 RGB 颜色。
 
-相同时间的提示按源文件顺序处理。提示和渐变终点均位于曲目时长内。
-
-内置绘制方法由 `PERFORMANCE_METHODS`（33 种：`starfield`、`petal_fall`、`firefly_rise`、`aurora_veil`、`wing_curtain`、`wing_ribbons`、`double_helix`、`orbit_halo`、`silk_streams`、`wave_ribbon`、`vortex_column`、`lissajous_weave`、`light_pillars`、`crown_fan`、`stage_truss`、`magic_circle`、`portal_arch`、`key_notes`、`key_fountain`、`key_constellation`、`floor_sweep`、`shockwave`、`prism_rewind`、`firework_bloom`、`key_style`、`hanabi_launch`、`dandelion_drift`、`horizon_glow`、`meteor_shower`、`comet_split`、`musubi_braid`、`twilight_mist`、`starfall_impact`）定义，笔刷由 `PERFORMANCE_BRUSHES`、空间高度由 `PERFORMANCE_ZONES`、运动修饰由 `PERFORMANCE_MOTIONS` 定义。解码器遇到未知 `methodId` 时会完整跳过该条提示而不报错，遇到未知 `brushId` 时降级为 `default`，仍正常播放音符。单曲存储上限仍为 2 MiB。
+相同时间的提示按源文件顺序处理，所有提示和渐变终点均位于曲目时长内。运行时引擎遇到未知 `effect` 名时安全跳过而不影响歌曲或其它通道播放；遇到未知 `brush` 时回退到该特效默认画笔；遇到未知 `variant` 时回退到默认行为。单曲总大小上限仍为 2 MiB。

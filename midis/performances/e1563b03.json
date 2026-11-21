@@ -41,7 +41,7 @@
   "cues": [
     {
       "at": 1.625,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "moon",
       "color2": "silver",
       "motion": "gentle",
@@ -51,7 +51,7 @@
     },
     {
       "at": 1.625,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "silver",
       "color2": "ice",
       "brush": "note",
@@ -61,8 +61,8 @@
     },
     {
       "at": 1.625,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "silver",
       "color2": "ice",
       "level": 85,
@@ -71,7 +71,7 @@
     },
     {
       "at": 6.1,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "ice",
       "color2": "silver",
       "level": 54,
@@ -80,7 +80,7 @@
     },
     {
       "at": 6.45,
-      "method": "floor_sweep",
+      "effect": "floor_sweep",
       "color": "silver",
       "color2": "ice",
       "level": 62,
@@ -88,7 +88,7 @@
     },
     {
       "at": 6.5,
-      "method": "double_helix",
+      "effect": "double_helix",
       "color": "aurora",
       "color2": "ice",
       "brush": "star",
@@ -99,7 +99,7 @@
     },
     {
       "at": 13.9,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "moon",
       "color2": "aurora",
       "motion": "gentle",
@@ -109,7 +109,7 @@
     },
     {
       "at": 18.1,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "ice",
       "color2": "aurora",
       "level": 42,
@@ -118,7 +118,7 @@
     },
     {
       "at": 24.175,
-      "method": "aurora_veil",
+      "effect": "aurora_veil",
       "color": "aurora",
       "color2": "ice",
       "level": 56,
@@ -127,7 +127,7 @@
     },
     {
       "at": 24.175,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "aurora",
       "color2": "ice",
       "level": 64,
@@ -136,7 +136,7 @@
     },
     {
       "at": 24.175,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "ice",
       "color2": "silver",
       "brush": "note",
@@ -146,8 +146,8 @@
     },
     {
       "at": 24.175,
-      "method": "key_style",
-      "style": "blue_tears",
+      "effect": "key_style",
+      "variant": "blue_tears",
       "color": "aurora",
       "color2": "ice",
       "level": 90,
@@ -156,7 +156,7 @@
     },
     {
       "at": 32.4,
-      "method": "portal_arch",
+      "effect": "portal_arch",
       "color": "aurora",
       "color2": "ice",
       "level": 58,
@@ -165,7 +165,7 @@
     },
     {
       "at": 32.4,
-      "method": "double_helix",
+      "effect": "double_helix",
       "color": "aurora",
       "color2": "cyan",
       "brush": "star",
@@ -176,7 +176,7 @@
     },
     {
       "at": 40,
-      "method": "double_helix",
+      "effect": "double_helix",
       "color": "aurora",
       "brush": "star",
       "zone": "high",
@@ -186,7 +186,7 @@
     },
     {
       "at": 41.2,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "ice",
       "brush": "note",
       "level": 0,
@@ -195,7 +195,7 @@
     },
     {
       "at": 42.025,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "amber",
       "color2": "gold",
       "level": 80,
@@ -204,7 +204,7 @@
     },
     {
       "at": 42.025,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "amber",
       "color2": "gold",
       "level": 62,
@@ -213,7 +213,7 @@
     },
     {
       "at": 42.025,
-      "method": "key_constellation",
+      "effect": "key_constellation",
       "color": "amber",
       "color2": "gold",
       "brush": "star",
@@ -223,8 +223,8 @@
     },
     {
       "at": 42.025,
-      "method": "key_style",
-      "style": "magic_trail",
+      "effect": "key_style",
+      "variant": "magic_trail",
       "color": "amber",
       "color2": "gold",
       "level": 95,
@@ -233,7 +233,7 @@
     },
     {
       "at": 48.5,
-      "method": "aurora_veil",
+      "effect": "aurora_veil",
       "color": "aurora",
       "level": 0,
       "scale": 96,
@@ -241,7 +241,7 @@
     },
     {
       "at": 49,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "amber",
       "color2": "moon",
       "level": 24,
@@ -250,7 +250,7 @@
     },
     {
       "at": 49,
-      "method": "portal_arch",
+      "effect": "portal_arch",
       "color": "aurora",
       "color2": "moon",
       "level": 26,
@@ -259,7 +259,7 @@
     },
     {
       "at": 53.6,
-      "method": "key_constellation",
+      "effect": "key_constellation",
       "color": "silver",
       "brush": "star",
       "level": 0,
@@ -268,7 +268,7 @@
     },
     {
       "at": 53.95,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "ice",
       "level": 0,
       "scale": 92,
@@ -276,7 +276,7 @@
     },
     {
       "at": 54.1,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "moon",
       "color2": "silver",
       "motion": "gentle",
@@ -286,7 +286,7 @@
     },
     {
       "at": 54.1,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "moon",
       "level": 0,
       "scale": 92,
@@ -294,7 +294,7 @@
     },
     {
       "at": 54.1,
-      "method": "portal_arch",
+      "effect": "portal_arch",
       "color": "moon",
       "level": 0,
       "scale": 92,
@@ -302,7 +302,7 @@
     },
     {
       "at": 54.1,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "silver",
       "color2": "moon",
       "brush": "note",
@@ -312,8 +312,8 @@
     },
     {
       "at": 54.1,
-      "method": "key_style",
-      "style": "snow",
+      "effect": "key_style",
+      "variant": "snow",
       "color": "silver",
       "color2": "moon",
       "level": 75,
@@ -322,7 +322,7 @@
     },
     {
       "at": 64.075,
-      "method": "magic_circle",
+      "effect": "magic_circle",
       "color": "ice",
       "color2": "amber",
       "brush": "star",
@@ -333,7 +333,7 @@
     },
     {
       "at": 64.075,
-      "method": "portal_arch",
+      "effect": "portal_arch",
       "color": "ice",
       "color2": "amber",
       "level": 66,
@@ -342,7 +342,7 @@
     },
     {
       "at": 64.075,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "amber",
       "color2": "gold",
       "level": 72,
@@ -351,7 +351,7 @@
     },
     {
       "at": 64.075,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "amber",
       "color2": "gold",
       "brush": "note",
@@ -361,8 +361,8 @@
     },
     {
       "at": 64.075,
-      "method": "key_style",
-      "style": "prism_shards",
+      "effect": "key_style",
+      "variant": "prism_shards",
       "color": "ice",
       "color2": "amber",
       "level": 95,
@@ -371,7 +371,7 @@
     },
     {
       "at": 66.65,
-      "method": "prism_rewind",
+      "effect": "prism_rewind",
       "color": "ice",
       "color2": "silver",
       "brush": "shard",
@@ -380,7 +380,7 @@
     },
     {
       "at": 70.05,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "amber",
       "color2": "gold",
       "level": 66,
@@ -389,7 +389,7 @@
     },
     {
       "at": 71.075,
-      "method": "prism_rewind",
+      "effect": "prism_rewind",
       "color": "ice",
       "color2": "cyan",
       "brush": "shard",
@@ -398,7 +398,7 @@
     },
     {
       "at": 71.45,
-      "method": "portal_arch",
+      "effect": "portal_arch",
       "color": "amber",
       "level": 0,
       "scale": 100,
@@ -406,7 +406,7 @@
     },
     {
       "at": 71.45,
-      "method": "magic_circle",
+      "effect": "magic_circle",
       "color": "amber",
       "brush": "star",
       "zone": "low",
@@ -416,7 +416,7 @@
     },
     {
       "at": 72.025,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "amber",
       "color2": "gold",
       "motion": "intense",
@@ -426,7 +426,7 @@
     },
     {
       "at": 72.025,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "gold",
       "color2": "amber",
       "motion": "intense",
@@ -436,7 +436,7 @@
     },
     {
       "at": 72.025,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "gold",
       "color2": "amber",
       "motion": "intense",
@@ -446,8 +446,8 @@
     },
     {
       "at": 72.025,
-      "method": "key_style",
-      "style": "magic_trail",
+      "effect": "key_style",
+      "variant": "magic_trail",
       "color": "gold",
       "color2": "ivory",
       "motion": "intense",
@@ -457,7 +457,7 @@
     },
     {
       "at": 72.05,
-      "method": "shockwave",
+      "effect": "shockwave",
       "color": "gold",
       "color2": "amber",
       "level": 82,
@@ -465,7 +465,7 @@
     },
     {
       "at": 72.35,
-      "method": "prism_rewind",
+      "effect": "prism_rewind",
       "color": "gold",
       "color2": "amber",
       "brush": "shard",
@@ -475,7 +475,7 @@
     },
     {
       "at": 72.8,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "gold",
       "color2": "rose",
       "brush": "spark",
@@ -484,7 +484,7 @@
     },
     {
       "at": 74.175,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "gold",
       "color2": "ivory",
       "motion": "intense",
@@ -494,7 +494,7 @@
     },
     {
       "at": 74.175,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "gold",
       "color2": "ivory",
       "motion": "intense",
@@ -504,7 +504,7 @@
     },
     {
       "at": 74.175,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "gold",
       "color2": "rose",
       "motion": "intense",
@@ -514,7 +514,7 @@
     },
     {
       "at": 74.2,
-      "method": "shockwave",
+      "effect": "shockwave",
       "color": "gold",
       "color2": "ivory",
       "level": 96,
@@ -522,7 +522,7 @@
     },
     {
       "at": 74.55,
-      "method": "prism_rewind",
+      "effect": "prism_rewind",
       "color": "gold",
       "color2": "ivory",
       "brush": "shard",
@@ -532,7 +532,7 @@
     },
     {
       "at": 74.95,
-      "method": "firework_bloom",
+      "effect": "firework_bloom",
       "color": "gold",
       "color2": "rose",
       "brush": "spark",
@@ -541,7 +541,7 @@
     },
     {
       "at": 78,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "silver",
       "color2": "moon",
       "motion": "gentle",
@@ -551,7 +551,7 @@
     },
     {
       "at": 78.5,
-      "method": "crown_fan",
+      "effect": "crown_fan",
       "color": "silver",
       "level": 0,
       "scale": 95,
@@ -559,7 +559,7 @@
     },
     {
       "at": 79.55,
-      "method": "wing_ribbons",
+      "effect": "wing_ribbons",
       "color": "silver",
       "level": 0,
       "scale": 90,
@@ -567,7 +567,7 @@
     },
     {
       "at": 79.9,
-      "method": "prism_rewind",
+      "effect": "prism_rewind",
       "color": "silver",
       "color2": "moon",
       "brush": "shard",
@@ -577,7 +577,7 @@
     },
     {
       "at": 79.9,
-      "method": "key_notes",
+      "effect": "key_notes",
       "color": "silver",
       "brush": "note",
       "level": 0,
@@ -586,8 +586,8 @@
     },
     {
       "at": 79.9,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "silver",
       "color2": "moon",
       "level": 65,
@@ -596,7 +596,7 @@
     },
     {
       "at": 81.35,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "moon",
       "color2": "silver",
       "motion": "gentle",
@@ -606,7 +606,7 @@
     },
     {
       "at": 82.45,
-      "method": "starfield",
+      "effect": "starfield",
       "color": "moon",
       "motion": "gentle",
       "level": 0,
@@ -615,8 +615,8 @@
     },
     {
       "at": 82.45,
-      "method": "key_style",
-      "style": "stardust",
+      "effect": "key_style",
+      "variant": "stardust",
       "color": "moon",
       "level": 0,
       "scale": 100,

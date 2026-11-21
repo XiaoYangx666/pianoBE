@@ -1,56 +1,5 @@
-import { readVarUint, writeVarUint } from "../binary/varint.js";
-
-/** Stable built-in painter IDs (1..255). Keep existing IDs stable across versions. */
-export const PERFORMANCE_METHODS = {
-    starfield: 1,
-    petal_fall: 2,
-    firefly_rise: 3,
-    aurora_veil: 4,
-    wing_curtain: 5,
-    wing_ribbons: 6,
-    double_helix: 7,
-    orbit_halo: 8,
-    silk_streams: 9,
-    wave_ribbon: 10,
-    vortex_column: 11,
-    lissajous_weave: 12,
-    light_pillars: 13,
-    crown_fan: 14,
-    stage_truss: 15,
-    magic_circle: 16,
-    portal_arch: 17,
-    key_notes: 18,
-    key_fountain: 19,
-    key_constellation: 20,
-    floor_sweep: 21,
-    shockwave: 22,
-    prism_rewind: 23,
-    firework_bloom: 24,
-    key_style: 25,
-    hanabi_launch: 26,
-    dandelion_drift: 27,
-    horizon_glow: 28,
-    meteor_shower: 29,
-    comet_split: 30,
-    musubi_braid: 31,
-    twilight_mist: 32,
-    starfall_impact: 33,
-} as const;
-export type PerformanceMethod = keyof typeof PERFORMANCE_METHODS;
-
-export const PERFORMANCE_BRUSHES = {
-    default: 0,
-    mote: 1,
-    star: 2,
-    petal: 3,
-    snow: 4,
-    note: 5,
-    shard: 6,
-    spark: 7,
-    ring: 8,
-    blossom: 9,
-} as const;
-export type PerformanceBrush = keyof typeof PERFORMANCE_BRUSHES;
+import { decodeUtf8, encodeUtf8 } from "../binary/utf8.js";
+import { readVarUint, varUintSize, writeVarUint } from "../binary/varint.js";
 
 export const PERFORMANCE_ZONES = {
     stage: 0,
@@ -86,31 +35,29 @@ export const PERFORMANCE_PALETTES = {
 } as const;
 export type PerformancePalette = keyof typeof PERFORMANCE_PALETTES;
 
+export const PERFORMANCE_SYMBOL_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+
 export type PerformanceCue = {
     tick: number;
-    method: PerformanceMethod;
-    /** 0..7, defaults to 0 (omitted). Allows parallel channels of the same method. */
+    /** 稳定字符串标识（例如 "starfield"、"shockwave"） */
+    effect: string;
+    /** 0..7，默认为 0（编码时可省略）；允许同特效多轨道并行 */
     slot?: number;
     /** 规范化大写 "#RRGGBB" */
     color: string;
-    /** Optional secondary/gradient target color "#RRGGBB". */
+    /** 可选副色 "#RRGGBB" */
     color2?: string;
-    brush?: PerformanceBrush;
+    /** 可选画笔名称 */
+    brush?: string;
+    /** 可选变体名称（如 key_style 样式名或特效内部变体） */
+    variant?: string;
     zone?: PerformanceZone;
     motion?: PerformanceMotion;
-    /** Intensity in percent (0–100). */
+    /** 强度百分比（0–100） */
     level: number;
-    /** Scale in percent (50–170). */
+    /** 缩放百分比（50–170） */
     scale: number;
 } & ({ op: "set"; fade: number } | { op: "flash" });
-
-const METHOD_BY_ID = Object.fromEntries(
-    Object.entries(PERFORMANCE_METHODS).map(([name, id]) => [id, name as PerformanceMethod]),
-) as Record<number, PerformanceMethod | undefined>;
-
-const BRUSH_BY_ID = Object.fromEntries(
-    Object.entries(PERFORMANCE_BRUSHES).map(([name, id]) => [id, name as PerformanceBrush]),
-) as Record<number, PerformanceBrush | undefined>;
 
 const ZONE_BY_ID = Object.fromEntries(
     Object.entries(PERFORMANCE_ZONES).map(([name, id]) => [id, name as PerformanceZone]),
@@ -120,17 +67,8 @@ const MOTION_BY_ID = Object.fromEntries(
     Object.entries(PERFORMANCE_MOTIONS).map(([name, id]) => [id, name as PerformanceMotion]),
 ) as Record<number, PerformanceMotion | undefined>;
 
-const INSTANT_METHODS: ReadonlySet<PerformanceMethod> = new Set([
-    "floor_sweep",
-    "shockwave",
-    "prism_rewind",
-    "firework_bloom",
-    "hanabi_launch",
-    "comet_split",
-]);
-
-export function isInstantPerformanceMethod(method: PerformanceMethod): boolean {
-    return INSTANT_METHODS.has(method);
+export function isValidPerformanceSymbol(value: unknown): value is string {
+    return typeof value === "string" && PERFORMANCE_SYMBOL_PATTERN.test(value);
 }
 
 export function resolvePerformanceColor(input: string): string {
@@ -155,29 +93,35 @@ function formatRgbHex(r: number, g: number, b: number): string {
     return `#${hex(r)}${hex(g)}${hex(b)}`;
 }
 
-function paletteAt(palette: readonly string[], index: number): string {
-    const color = palette[index];
-    if (color === undefined) throw new Error("[pbe3] 演出颜色索引无效");
-    return color;
+function tableAt<T>(table: readonly T[], index: number, label: string): T {
+    const item = table[index];
+    if (item === undefined) throw new Error(`[pbe3] ${label}索引无效`);
+    return item;
 }
 
 const MAX_CUES = 256;
-/** 最坏情况：256 条提示各自使用独立主/副色，外加最多 255 项颜色表。 */
-export const MAX_PERFORMANCE_BYTES = MAX_CUES * 18 + 1 + 255 * 3;
+const MAX_SYMBOLS = 255;
+const MAX_SYMBOL_LENGTH = 32;
+const MAX_COLORS = 255;
+/** 符号表 + 颜色表 + 最多 256 条提示的安全上限。 */
+export const MAX_PERFORMANCE_BYTES = 16 * 1024;
 
 const FLAG_FLASH = 0x80;
 const FLAG_COLOR2 = 0x40;
-const FLAG_STYLE = 0x20;
-const FLAG_RESERVED = 0x18;
+const FLAG_BRUSH = 0x20;
+const FLAG_VARIANT = 0x10;
+const FLAG_SPACE = 0x08;
 const MASK_SLOT = 0x07;
+const SPACE_RESERVED_MASK = 0xf0;
 
 function checkCue(cue: PerformanceCue, previous: number, duration: number) {
     const inRange = (value: number, min: number, max: number) =>
         Number.isInteger(value) && value >= min && value <= max;
     const slot = cue.slot ?? 0;
-    if (!Object.hasOwn(PERFORMANCE_METHODS, cue.method) ||
+    if (!isValidPerformanceSymbol(cue.effect) ||
         !inRange(slot, 0, 7) ||
-        (cue.brush !== undefined && !Object.hasOwn(PERFORMANCE_BRUSHES, cue.brush)) ||
+        (cue.brush !== undefined && !isValidPerformanceSymbol(cue.brush)) ||
+        (cue.variant !== undefined && !isValidPerformanceSymbol(cue.variant)) ||
         (cue.zone !== undefined && !Object.hasOwn(PERFORMANCE_ZONES, cue.zone)) ||
         (cue.motion !== undefined && !Object.hasOwn(PERFORMANCE_MOTIONS, cue.motion)) ||
         !inRange(cue.tick, previous, duration) ||
@@ -190,36 +134,79 @@ function checkCue(cue: PerformanceCue, previous: number, duration: number) {
 
 export function encodePerformance(cues: readonly PerformanceCue[], duration: number): Uint8Array {
     if (cues.length < 1 || cues.length > MAX_CUES) throw new Error("[pbe3] 演出提示数量超出范围");
+
+    const symbols: Uint8Array[] = [];
+    const symbolIndex = new Map<string, number>();
+    const symbolOf = (name: string) => {
+        const existing = symbolIndex.get(name);
+        if (existing !== undefined) return existing;
+        if (symbols.length >= MAX_SYMBOLS) throw new Error("[pbe3] 演出符号数量超出范围");
+        const encoded = encodeUtf8(name);
+        if (encoded.length === 0 || encoded.length > MAX_SYMBOL_LENGTH) {
+            throw new Error("[pbe3] 演出符号长度无效");
+        }
+        const index = symbols.length;
+        symbols.push(encoded);
+        symbolIndex.set(name, index);
+        return index;
+    };
+
     const palette: [number, number, number][] = [];
     const paletteIndex = new Map<number, number>();
-    const indexOf = (color: string) => {
+    const colorOf = (color: string) => {
         const [r, g, b] = parsePerformanceRgb(color);
         const key = (r << 16) | (g << 8) | b;
         const existing = paletteIndex.get(key);
         if (existing !== undefined) return existing;
-        if (palette.length >= 255) throw new Error("[pbe3] 演出颜色数量超出范围");
+        if (palette.length >= MAX_COLORS) throw new Error("[pbe3] 演出颜色数量超出范围");
+        const index = palette.length;
         palette.push([r, g, b]);
-        paletteIndex.set(key, palette.length - 1);
-        return palette.length - 1;
+        paletteIndex.set(key, index);
+        return index;
     };
 
-    // 第一遍校验并收集颜色表；第二遍才写出（表长度决定偏移）。
     let previous = 0;
-    const prepared = cues.map(cue => {
+    let bodyBytes = 0;
+    const prepared = cues.map((cue) => {
         checkCue(cue, previous, duration);
+        const delta = cue.tick - previous;
         previous = cue.tick;
-        return {
-            cue,
-            color: indexOf(cue.color),
-            color2: cue.color2 !== undefined ? indexOf(cue.color2) : undefined,
-            brushId: PERFORMANCE_BRUSHES[cue.brush ?? "default"],
-            zoneId: PERFORMANCE_ZONES[cue.zone ?? "stage"],
-            motionId: PERFORMANCE_MOTIONS[cue.motion ?? "normal"],
-        };
+        const effect = symbolOf(cue.effect);
+        const brush = cue.brush !== undefined ? symbolOf(cue.brush) : undefined;
+        const variant = cue.variant !== undefined ? symbolOf(cue.variant) : undefined;
+        const color = colorOf(cue.color);
+        const color2 = cue.color2 !== undefined ? colorOf(cue.color2) : undefined;
+        const zoneId = PERFORMANCE_ZONES[cue.zone ?? "stage"];
+        const motionId = PERFORMANCE_MOTIONS[cue.motion ?? "normal"];
+        const hasSpace = zoneId !== 0 || motionId !== 0;
+
+        bodyBytes +=
+            varUintSize(delta) +
+            5 + // flags + effect + level + scale + color
+            (color2 !== undefined ? 1 : 0) +
+            (brush !== undefined ? 1 : 0) +
+            (variant !== undefined ? 1 : 0) +
+            (hasSpace ? 1 : 0) +
+            (cue.op === "set" ? varUintSize(cue.fade) : 0);
+
+        return { cue, delta, effect, brush, variant, color, color2, zoneId, motionId, hasSpace };
     });
 
-    const data = new Uint8Array(1 + palette.length * 3 + cues.length * 18);
+    const symbolTableBytes = 1 + symbols.reduce((sum, item) => sum + 1 + item.length, 0);
+    const colorTableBytes = 1 + palette.length * 3;
+    const totalBytes = symbolTableBytes + colorTableBytes + bodyBytes;
+    if (totalBytes > MAX_PERFORMANCE_BYTES) throw new Error("[pbe3] 演出区块超过长度上限");
+
+    const data = new Uint8Array(totalBytes);
     let offset = 0;
+
+    data[offset++] = symbols.length;
+    for (const sym of symbols) {
+        data[offset++] = sym.length;
+        data.set(sym, offset);
+        offset += sym.length;
+    }
+
     data[offset++] = palette.length;
     for (const [r, g, b] of palette) {
         data[offset++] = r;
@@ -227,96 +214,105 @@ export function encodePerformance(cues: readonly PerformanceCue[], duration: num
         data[offset++] = b;
     }
 
-    previous = 0;
-    for (const { cue, color, color2, brushId, zoneId, motionId } of prepared) {
-        const hasStyle = brushId !== 0 || zoneId !== 0 || motionId !== 0;
+    for (const { cue, delta, effect, brush, variant, color, color2, zoneId, motionId, hasSpace } of prepared) {
         const slot = cue.slot ?? 0;
         const flags =
             (cue.op === "flash" ? FLAG_FLASH : 0) |
             (color2 !== undefined ? FLAG_COLOR2 : 0) |
-            (hasStyle ? FLAG_STYLE : 0) |
+            (brush !== undefined ? FLAG_BRUSH : 0) |
+            (variant !== undefined ? FLAG_VARIANT : 0) |
+            (hasSpace ? FLAG_SPACE : 0) |
             (slot & MASK_SLOT);
 
-        offset = writeVarUint(data, offset, cue.tick - previous);
+        offset = writeVarUint(data, offset, delta);
         data[offset++] = flags;
-        data[offset++] = PERFORMANCE_METHODS[cue.method];
+        data[offset++] = effect;
         data[offset++] = cue.level;
         data[offset++] = cue.scale;
         data[offset++] = color;
-        if (hasStyle) {
-            data[offset++] = ((motionId & 0x03) << 6) | ((zoneId & 0x03) << 4) | (brushId & 0x0f);
-        }
-        if (color2 !== undefined) {
-            data[offset++] = color2;
-        }
-        if (cue.op === "set") {
-            offset = writeVarUint(data, offset, cue.fade);
-        }
-        previous = cue.tick;
+        if (color2 !== undefined) data[offset++] = color2;
+        if (brush !== undefined) data[offset++] = brush;
+        if (variant !== undefined) data[offset++] = variant;
+        if (hasSpace) data[offset++] = ((motionId & 0x03) << 2) | (zoneId & 0x03);
+        if (cue.op === "set") offset = writeVarUint(data, offset, cue.fade);
     }
-    return data.subarray(0, offset);
+
+    return data;
 }
 
-/**
- * @param colorTable v3 起为 true：区块开头是颜色表，提示内只存索引；
- *   v2 旧文件为 false，提示内内联 RGB。
- */
-export function decodePerformance(data: Uint8Array, duration: number, colorTable = true): PerformanceCue[] {
-    if (!data.length || data.length > MAX_PERFORMANCE_BYTES) throw new Error("[pbe3] 演出区块长度无效");
+export function decodePerformance(data: Uint8Array, duration: number): PerformanceCue[] {
+    if (!data.length || data.length > MAX_PERFORMANCE_BYTES) {
+        throw new Error("[pbe3] 演出区块长度无效");
+    }
     const cues: PerformanceCue[] = [];
     const value = { value: 0, next: 0 };
     let offset = 0;
-    let previous = 0;
 
-    let palette: string[] = [];
-    if (colorTable) {
-        if (offset + 1 > data.length) throw new Error("[pbe3] 演出颜色表被截断");
-        const count = data[offset++];
-        if (count === 0) throw new Error("[pbe3] 演出颜色表为空");
-        if (offset + count * 3 > data.length) throw new Error("[pbe3] 演出颜色表被截断");
-        palette = Array.from({ length: count }, () => {
-            const color = formatRgbHex(data[offset++], data[offset++], data[offset++]);
-            return color;
-        });
+    if (offset + 1 > data.length) throw new Error("[pbe3] 演出符号表被截断");
+    const symbolCount = data[offset++];
+    if (symbolCount === 0) throw new Error("[pbe3] 演出符号表为空");
+    const symbols: string[] = [];
+    for (let i = 0; i < symbolCount; i++) {
+        if (offset + 1 > data.length) throw new Error("[pbe3] 演出符号表被截断");
+        const len = data[offset++];
+        if (len === 0 || len > MAX_SYMBOL_LENGTH) throw new Error("[pbe3] 演出符号长度无效");
+        if (offset + len > data.length) throw new Error("[pbe3] 演出符号表被截断");
+        const sym = decodeUtf8(data.subarray(offset, offset + len));
+        offset += len;
+        if (!isValidPerformanceSymbol(sym)) throw new Error("[pbe3] 演出符号格式无效");
+        symbols.push(sym);
     }
 
-    const minimumCueBytes = colorTable ? 5 : 7;
+    if (offset + 1 > data.length) throw new Error("[pbe3] 演出颜色表被截断");
+    const colorCount = data[offset++];
+    if (colorCount === 0) throw new Error("[pbe3] 演出颜色表为空");
+    if (offset + colorCount * 3 > data.length) throw new Error("[pbe3] 演出颜色表被截断");
+    const palette = Array.from({ length: colorCount }, () =>
+        formatRgbHex(data[offset++], data[offset++], data[offset++]),
+    );
+
+    if (offset >= data.length) throw new Error("[pbe3] 演出提示不能为空");
+
+    let previous = 0;
     while (offset < data.length) {
         if (cues.length >= MAX_CUES) throw new Error("[pbe3] 演出提示数量超出范围");
         readVarUint(data, offset, value);
         const tick = previous + value.value;
         offset = value.next;
-        if (offset + minimumCueBytes > data.length) throw new Error("[pbe3] 演出提示被截断");
+        if (offset + 5 > data.length) throw new Error("[pbe3] 演出提示被截断");
+
         const flags = data[offset++];
-        if ((flags & FLAG_RESERVED) !== 0) throw new Error("[pbe3] 演出提示保留位非 0");
-        const methodId = data[offset++];
-        if (methodId === 0) throw new Error("[pbe3] 演出绘制方法无效");
+        const effect = tableAt(symbols, data[offset++], "演出特效符号");
         const level = data[offset++];
         const scale = data[offset++];
-        const color = colorTable
-            ? paletteAt(palette, data[offset++])
-            : formatRgbHex(data[offset++], data[offset++], data[offset++]);
-
-        let brush: PerformanceBrush = "default";
-        let zone: PerformanceZone = "stage";
-        let motion: PerformanceMotion = "normal";
-        if (flags & FLAG_STYLE) {
-            if (offset + 1 > data.length) throw new Error("[pbe3] 演出提示样式被截断");
-            const style = data[offset++];
-            brush = BRUSH_BY_ID[style & 0x0f] ?? "default";
-            zone = ZONE_BY_ID[(style >>> 4) & 0x03] ?? "stage";
-            motion = MOTION_BY_ID[(style >>> 6) & 0x03] ?? "normal";
-        }
+        const color = tableAt(palette, data[offset++], "演出颜色");
 
         let color2: string | undefined;
         if (flags & FLAG_COLOR2) {
-            if (colorTable) {
-                if (offset + 1 > data.length) throw new Error("[pbe3] 演出提示副色被截断");
-                color2 = paletteAt(palette, data[offset++]);
-            } else {
-                if (offset + 3 > data.length) throw new Error("[pbe3] 演出提示副色被截断");
-                color2 = formatRgbHex(data[offset++], data[offset++], data[offset++]);
-            }
+            if (offset + 1 > data.length) throw new Error("[pbe3] 演出提示副色被截断");
+            color2 = tableAt(palette, data[offset++], "演出副色");
+        }
+
+        let brush: string | undefined;
+        if (flags & FLAG_BRUSH) {
+            if (offset + 1 > data.length) throw new Error("[pbe3] 演出提示画笔被截断");
+            brush = tableAt(symbols, data[offset++], "演出画笔符号");
+        }
+
+        let variant: string | undefined;
+        if (flags & FLAG_VARIANT) {
+            if (offset + 1 > data.length) throw new Error("[pbe3] 演出提示变体被截断");
+            variant = tableAt(symbols, data[offset++], "演出变体符号");
+        }
+
+        let zone: PerformanceZone = "stage";
+        let motion: PerformanceMotion = "normal";
+        if (flags & FLAG_SPACE) {
+            if (offset + 1 > data.length) throw new Error("[pbe3] 演出提示空间参数被截断");
+            const space = data[offset++];
+            if ((space & SPACE_RESERVED_MASK) !== 0) throw new Error("[pbe3] 演出空间参数保留位非 0");
+            zone = ZONE_BY_ID[space & 0x03] ?? "stage";
+            motion = MOTION_BY_ID[(space >>> 2) & 0x03] ?? "normal";
         }
 
         let fade = 0;
@@ -334,19 +330,18 @@ export function decodePerformance(data: Uint8Array, duration: number, colorTable
         }
         previous = tick;
 
-        const method = METHOD_BY_ID[methodId];
-        if (!method) continue;
-
         const slot = flags & MASK_SLOT;
         const cue: PerformanceCue = isFlash
-            ? { tick, method, color, level, scale, op: "flash" }
-            : { tick, method, color, level, scale, op: "set", fade };
+            ? { tick, effect, color, level, scale, op: "flash" }
+            : { tick, effect, color, level, scale, op: "set", fade };
         if (slot !== 0) cue.slot = slot;
         if (color2 !== undefined) cue.color2 = color2;
-        if (brush !== "default") cue.brush = brush;
+        if (brush !== undefined) cue.brush = brush;
+        if (variant !== undefined) cue.variant = variant;
         if (zone !== "stage") cue.zone = zone;
         if (motion !== "normal") cue.motion = motion;
         cues.push(cue);
     }
+
     return cues;
 }

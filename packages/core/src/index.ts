@@ -7,17 +7,17 @@ export * from "./midi/note.js";
 export * from "./midi/normalize.js";
 export * from "./pbe3/index.js";
 export {
-    PERFORMANCE_BRUSHES,
-    PERFORMANCE_METHODS,
+    MAX_PERFORMANCE_BYTES,
     PERFORMANCE_MOTIONS,
     PERFORMANCE_PALETTES,
+    PERFORMANCE_SYMBOL_PATTERN,
     PERFORMANCE_ZONES,
-    isInstantPerformanceMethod,
+    decodePerformance,
+    encodePerformance,
+    isValidPerformanceSymbol,
     parsePerformanceRgb,
     resolvePerformanceColor,
-    type PerformanceBrush,
     type PerformanceCue,
-    type PerformanceMethod,
     type PerformanceMotion,
     type PerformancePalette,
     type PerformanceZone,
@@ -30,4 +30,3 @@ export * from "./binary/varint.js";
 export * from "./music/index.js";
 export * from "./store/ports.js";
 export * from "./store/memory.js";
-export * from "./secretCinema.js";
