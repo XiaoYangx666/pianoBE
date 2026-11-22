@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout, PianoMark, StatusPill, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { AudioWaveform, Info, LibraryBig, PackageOpen } from "lucide-react";
-import { appPlayer, previewPlayer } from "./player";
+import { appPlayer, previewPlayer } from "./music/player";
 import { useGenerator } from "./store/generator";
 import { LibraryPage } from "./pages/LibraryPage";
 import { AddonPage } from "./pages/AddonPage";

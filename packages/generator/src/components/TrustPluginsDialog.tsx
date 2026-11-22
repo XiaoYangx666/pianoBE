@@ -1,23 +1,12 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
 import { Button, Dialog, SongBadge } from "@piano/ui";
-import type { GeneratorPluginEntry } from "../plugins";
+import { summarizePluginProvides, type GeneratorPluginEntry } from "../addon/plugins";
 
 export interface TrustPluginsDialogProps {
     plugins: readonly GeneratorPluginEntry[];
     onConfirm: (approvedIds: string[]) => void;
     onCancel: () => void;
-}
-
-function summarizeProvides(plugin: GeneratorPluginEntry): string {
-    const p = plugin.manifest.provides;
-    const parts: string[] = [];
-    if (p.effects?.length) parts.push(`${p.effects.length} 个特效`);
-    if (p.themes?.length) parts.push(`${p.themes.length} 个主题`);
-    if (p.layouts?.length) parts.push(`${p.layouts.length} 个舞台布局`);
-    if (p.keyStyles?.length) parts.push(`${p.keyStyles.length} 种琴键样式`);
-    if (p.particles?.length) parts.push(`${p.particles.length} 个粒子`);
-    return parts.length > 0 ? parts.join(" · ") : "无声明条目";
 }
 
 export function TrustPluginsDialog({ plugins, onConfirm, onCancel }: TrustPluginsDialogProps) {
@@ -109,7 +98,7 @@ export function TrustPluginsDialog({ plugins, onConfirm, onCancel }: TrustPlugin
                                         ID: <code>{plugin.id}</code> · 作者: {plugin.manifest.author} · 许可: {plugin.manifest.license}
                                     </div>
                                     <div className="mt-0.5 text-[11px] text-ore-dim">
-                                        能力: {plugin.manifest.capabilities.join(", ")} · 内容: {summarizeProvides(plugin)} ·{" "}
+                                        能力: {plugin.manifest.capabilities.join(", ")} · 内容: {summarizePluginProvides(plugin, "无声明条目")} ·{" "}
                                         {(plugin.size / 1024).toFixed(1)} KB
                                     </div>
                                     {!plugin.compatible && (

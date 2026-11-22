@@ -5,12 +5,12 @@
 import { readFileSync } from "node:fs";
 import { readAddon } from "@bepack/addon";
 import { readAddonArchiveFile } from "@bepack/addon/node";
-import { loadTemplate } from "../../packages/generator/src/template.ts";
-import { generateAddonZip } from "../../packages/generator/src/export.ts";
+import { loadTemplate } from "../../packages/generator/src/addon/template.ts";
+import { generateAddonZip } from "../../packages/generator/src/addon/export.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const TIMBRES = "packages/generator/public/timbres";
-/** preserve-modules 输出里的音色模块（与 generator/src/timbres.ts 中的常量一致） */
+/** preserve-modules 输出里的音色模块（与 generator/src/addon/timbres.ts 中的常量一致） */
 const TIMBRES_MODULE = "bp/scripts/packages/addon/src/domain/piano/timbres.js";
 const index = JSON.parse(readFileSync(`${TIMBRES}/index.json`, "utf8"));
 const optional = index.filter((t) => !t.bundled);

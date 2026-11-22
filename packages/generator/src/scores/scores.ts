@@ -500,27 +500,12 @@ function drawContain(
     width: number,
     height: number
 ): void {
-    drawContainRegion(ctx, image, 0, 0, image.width, image.height, x, y, width, height);
-}
-
-function drawContainRegion(
-    ctx: CanvasRenderingContext2D,
-    image: ImageBitmap,
-    sx: number,
-    sy: number,
-    sw: number,
-    sh: number,
-    x: number,
-    y: number,
-    width: number,
-    height: number
-): void {
-    const scale = Math.min(width / sw, height / sh);
-    const drawWidth = sw * scale;
-    const drawHeight = sh * scale;
+    const scale = Math.min(width / image.width, height / image.height);
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
     ctx.drawImage(
         image,
-        sx, sy, sw, sh,
+        0, 0, image.width, image.height,
         x + (width - drawWidth) / 2,
         y + (height - drawHeight) / 2,
         drawWidth,

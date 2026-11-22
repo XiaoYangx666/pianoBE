@@ -1,8 +1,8 @@
 import { readAddon, type AddonTemplate, type Manifest } from "@bepack/addon";
 import { decodeBase64Url, readSongHeader } from "@piano/core";
-import { pbe3ToEntry } from "./convert";
-import type { SongEntry } from "./types";
-import { parseTemplateScores, type ScoreEntry } from "./scores";
+import { pbe3ToEntry } from "../music/convert";
+import type { SongEntry } from "../types";
+import { parseTemplateScores, type ScoreEntry } from "../scores/scores";
 
 export interface TemplateInfo {
     addon: AddonTemplate;

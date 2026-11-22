@@ -1,6 +1,6 @@
 import { encodeSong, estimateSongVoiceLoad, readSongHeader } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
-import type { SongEntry } from "./types";
+import type { SongEntry } from "../types";
 
 /** .mid 文件 → 生成器列表条目（转换逻辑统一在 @piano/core，立即编码为 PBE3） */
 export async function midiFileToEntry(file: File): Promise<SongEntry> {

@@ -62,10 +62,10 @@ check(config.includes('"../../midis/js/"'), "build hook reads repository midis/j
 // --- 生成器音色开关必须指向 preserve-modules 输出中的 domain/piano/timbres.js ---
 const timbresModule = "bp/scripts/packages/addon/src/domain/piano/timbres.js";
 const timbresSource = "scripts/packages/addon/src/domain/piano/timbres.js";
-const generatorTimbres = read(path.join(root, "packages/generator/src/timbres.ts"));
+const generatorTimbres = read(path.join(root, "packages/generator/src/addon/timbres.ts"));
 check(generatorTimbres.includes(`TIMBRES_SCRIPT_PATH = "${timbresSource}"`),
     "generator timbres path matches preserve-modules output");
-const generatorExport = read(path.join(root, "packages/generator/src/export.ts"));
+const generatorExport = read(path.join(root, "packages/generator/src/addon/export.ts"));
 check(generatorExport.includes("TIMBRES_SCRIPT_PATH"), "generator export uses TIMBRES_SCRIPT_PATH");
 check(read(path.join(root, "tools/build/strip-template-timbres.mjs")).includes(timbresSource),
     "template strip uses the domain timbres path");

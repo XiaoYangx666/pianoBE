@@ -6,9 +6,10 @@
     "license": "CC-BY-NC-4.0",
     "private": true,
     "scripts": {
-        "predev": "node scripts/sync-template.mjs && node scripts/sync-plugins.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
+        "sync": "node scripts/sync-template.mjs && node scripts/sync-plugins.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
+        "predev": "npm run sync",
         "dev": "vite",
-        "prebuild": "node scripts/sync-template.mjs && node scripts/sync-plugins.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
+        "prebuild": "npm run sync",
         "build": "vite build",
         "preview": "vite preview",
         "sync:amt": "node scripts/sync-amt.mjs"

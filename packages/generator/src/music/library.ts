@@ -1,5 +1,5 @@
 import { pbe3ToEntry } from "./convert";
-import type { SongEntry } from "./types";
+import type { SongEntry } from "../types";
 
 /**
  * MIDI 曲库：只含 PBE3 曲目二进制（midis/library → public/library），
@@ -107,6 +107,6 @@ export async function loadLibrarySong(meta: LibraryMeta): Promise<Uint8Array> {
 }
 
 /** 曲库条目 → 生成器列表条目（PBE3 数据原样携带） */
-export function libraryMetaToEntry(meta: LibraryMeta, data: Uint8Array): SongEntry {
+export function libraryMetaToEntry(_meta: LibraryMeta, data: Uint8Array): SongEntry {
     return pbe3ToEntry(data, { fromLibrary: true });
 }

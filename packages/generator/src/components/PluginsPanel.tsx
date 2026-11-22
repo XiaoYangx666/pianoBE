@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { AlertTriangle, Boxes, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { Button, EmptyState, FileDropzone, SongBadge } from "@piano/ui";
-import type { GeneratorPluginEntry, SongPluginMatchResult } from "../plugins";
+import { summarizePluginProvides, type GeneratorPluginEntry, type SongPluginMatchResult } from "../addon/plugins";
 
 export interface PluginsPanelProps {
     plugins: readonly GeneratorPluginEntry[];
@@ -21,17 +21,6 @@ const SOURCE_LABELS: Record<GeneratorPluginEntry["source"], string> = {
     local: "本地导入",
     song: "随曲附带",
 };
-
-function summarizeProvides(plugin: GeneratorPluginEntry): string {
-    const p = plugin.manifest.provides;
-    const parts: string[] = [];
-    if (p.effects?.length) parts.push(`${p.effects.length} 特效`);
-    if (p.themes?.length) parts.push(`${p.themes.length} 主题`);
-    if (p.layouts?.length) parts.push(`${p.layouts.length} 舞台布局`);
-    if (p.keyStyles?.length) parts.push(`${p.keyStyles.length} 键粒样式`);
-    if (p.particles?.length) parts.push(`${p.particles.length} 粒子`);
-    return parts.join(" · ") || "基础能力";
-}
 
 function formatPluginSize(bytes: number): string {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(2)} MB`;
@@ -200,11 +189,11 @@ export function PluginsPanel({
                                         )}
                                     </div>
                                     <div className="mt-1 text-[11.5px] text-ore-dim">
-                                        {plugin.manifest.preview?.description ?? summarizeProvides(plugin)}
+                                        {plugin.manifest.preview?.description ?? summarizePluginProvides(plugin)}
                                     </div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-ore-dimmer">
                                         <span>作者：{plugin.manifest.author}</span>
-                                        <span>内容：{summarizeProvides(plugin)}</span>
+                                        <span>内容：{summarizePluginProvides(plugin)}</span>
                                         {reason && (
                                             <span>
                                                 匹配曲目：{reason.songs.slice(0, 2).join("、")}

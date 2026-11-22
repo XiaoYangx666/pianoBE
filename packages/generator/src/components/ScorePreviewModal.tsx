@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, SongBadge } from "@piano/ui";
-import type { ScoreEntry } from "../scores";
-import type { TemplateInfo } from "../template";
-import { readScorePageBlob } from "../scoreAssets";
+import type { ScoreEntry } from "../scores/scores";
+import type { TemplateInfo } from "../addon/template";
+import { readScorePageBlob } from "../scores/scoreAssets";
 
 export function ScorePreviewModal({
     score,

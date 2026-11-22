@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
-import type { ScoreEntry } from "../scores";
-import type { TemplateInfo } from "../template";
-import { readScorePageBlob } from "../scoreAssets";
+import type { ScoreEntry } from "../scores/scores";
+import type { TemplateInfo } from "../addon/template";
+import { readScorePageBlob } from "../scores/scoreAssets";
 
 export function ScoreThumb({
     score,

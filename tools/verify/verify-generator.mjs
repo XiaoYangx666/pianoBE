@@ -21,16 +21,16 @@ import {
     readPbePluginArchive,
     writePbePluginArchive,
 } from "@piano/vfx/package";
-import { TIMBRES_SCRIPT_PATH } from "../../packages/generator/src/timbres.ts";
-import { SCORE_PACK_SCRIPT_PATH, scoreStandPath } from "../../packages/generator/src/scores.ts";
-import { loadTemplate, parseExistingMidis } from "../../packages/generator/src/template.ts";
-import { generateAddonZip } from "../../packages/generator/src/export.ts";
+import { TIMBRES_SCRIPT_PATH } from "../../packages/generator/src/addon/timbres.ts";
+import { SCORE_PACK_SCRIPT_PATH, scoreStandPath } from "../../packages/generator/src/scores/scores.ts";
+import { loadTemplate, parseExistingMidis } from "../../packages/generator/src/addon/template.ts";
+import { generateAddonZip } from "../../packages/generator/src/addon/export.ts";
 import {
     archiveToPluginEntry,
     extractSongEffectIds,
     matchSongPlugins,
-} from "../../packages/generator/src/plugins.ts";
-import { songEntryToEvents } from "../../packages/generator/src/player.ts";
+} from "../../packages/generator/src/addon/plugins.ts";
+import { songEntryToEvents } from "../../packages/generator/src/music/player.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const BARE_TEMPLATE = "packages/addon/dist/template-bare.mcaddon";

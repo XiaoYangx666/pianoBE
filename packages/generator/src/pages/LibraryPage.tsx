@@ -27,11 +27,11 @@ import {
     Search,
     Upload,
 } from "lucide-react";
-import { previewPlayer } from "../player";
+import { previewPlayer } from "../music/player";
 import { useGenerator, type LibrarySort } from "../store/generator";
-import type { LibraryMeta } from "../library";
-import type { SongEntry } from "../types";
-import type { StoredSong } from "../localLibrary";
+import type { LibraryMeta } from "../music/library";
+import { formatSongDuration, type SongEntry } from "../types";
+import type { StoredSong } from "../music/localLibrary";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RenameSongDialog } from "../components/RenameSongDialog";
 
@@ -41,12 +41,6 @@ const SORT_LABELS: Record<LibrarySort, string> = {
     name: "按曲名",
     default: "曲库默认",
 };
-
-function formatDuration(scaled: number): string {
-    const seconds = Math.max(0, Math.floor(scaled / 40));
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
-}
 
 export function LibraryPage() {
     const isMobile = useMediaQuery("(max-width: 47.99em)");
@@ -192,7 +186,7 @@ export function LibraryPage() {
                     title={meta.name}
                     meta={[<span key="notes">{meta.noteCount.toLocaleString()} 音符</span>]}
                     stats={metaItems}
-                    duration={formatDuration(meta.duration)}
+                    duration={formatSongDuration(meta.duration)}
                     active={activeId === meta.id}
                     playState={rowState(meta.id)}
                     onPlay={() => void previewLibrarySong(meta)}
@@ -272,7 +266,7 @@ export function LibraryPage() {
                     title={song.name}
                     meta={[<span key="notes">{(song.noteCount ?? 0).toLocaleString()} 音符</span>]}
                     stats={[(song.noteCount ?? 0).toLocaleString(), "", ""]}
-                    duration={formatDuration(song.duration)}
+                    duration={formatSongDuration(song.duration)}
                     badges={song.fromLibrary ? <SongBadge>曲库</SongBadge> : <SongBadge>本地</SongBadge>}
                     active={activeId === song.id}
                     playState={rowState(song.id)}

@@ -1,4 +1,4 @@
-import type { SongEntry } from "./types";
+import type { SongEntry } from "../types";
 import { readSongHeader } from "@piano/core";
 
 /**

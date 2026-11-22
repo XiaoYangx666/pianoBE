@@ -1,8 +1,8 @@
 import { SampledMidiPlayer, type NoteEvent } from "@piano/core/player";
 import { TIME_SCALE, songToNoteEvents } from "@piano/core";
 import { AppPlayer } from "@piano/ui";
-import type { TemplateInfo } from "./template";
-import type { SongEntry } from "./types";
+import type { TemplateInfo } from "../addon/template";
+import type { SongEntry } from "../types";
 
 export type { NoteEvent } from "@piano/core/player";
 

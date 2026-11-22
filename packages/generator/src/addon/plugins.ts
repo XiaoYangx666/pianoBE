@@ -6,9 +6,9 @@ import {
     type VfxPluginManifest,
 } from "@piano/vfx";
 import { readPbePluginArchive, type PbePluginArchive } from "@piano/vfx/package";
-import { pbe3ToEntry } from "./convert";
+import { pbe3ToEntry } from "../music/convert";
 import type { StoredPlugin } from "./localPlugins";
-import type { SongEntry } from "./types";
+import type { SongEntry } from "../types";
 
 export type PluginSource = "builtin" | "local" | "song";
 
@@ -413,6 +413,20 @@ export async function unpackSongBundles(files: readonly File[]): Promise<Unpacke
     }
 
     return { songs, plugins, errors };
+}
+
+export function summarizePluginProvides(
+    plugin: GeneratorPluginEntry,
+    emptyLabel = "基础能力",
+): string {
+    const p = plugin.manifest.provides;
+    const parts: string[] = [];
+    if (p.effects?.length) parts.push(`${p.effects.length} 特效`);
+    if (p.themes?.length) parts.push(`${p.themes.length} 主题`);
+    if (p.layouts?.length) parts.push(`${p.layouts.length} 舞台布局`);
+    if (p.keyStyles?.length) parts.push(`${p.keyStyles.length} 键粒样式`);
+    if (p.particles?.length) parts.push(`${p.particles.length} 粒子`);
+    return parts.join(" · ") || emptyLabel;
 }
 
 export function mergePluginLists(

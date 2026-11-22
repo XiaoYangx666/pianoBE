@@ -10,9 +10,9 @@ import {
     renameSong,
 } from "@piano/core";
 import { notifications } from "@piano/ui";
-import { loadTemplate, type TemplateInfo } from "../template";
-import { generateAddonZip } from "../export";
-import { midiFileToEntry } from "../convert";
+import { loadTemplate, type TemplateInfo } from "../addon/template";
+import { generateAddonZip } from "../addon/export";
+import { midiFileToEntry } from "../music/convert";
 import {
     libraryMetaToEntry,
     loadLibraryIndex,
@@ -20,14 +20,14 @@ import {
     recordLibraryAdd,
     recordLibraryPlay,
     type LibraryMeta,
-} from "../library";
-import { previewPlayer } from "../player";
-import { loadTimbreIndex, loadTimbrePack, type LoadedTimbrePack, type TimbreIndexEntry } from "../timbres";
-import { importScorePack, MAX_TITLE_CHARS, type ScoreEntry } from "../scores";
-import { importScorePages } from "../importPages";
+} from "../music/library";
+import { previewPlayer } from "../music/player";
+import { loadTimbreIndex, loadTimbrePack, type LoadedTimbrePack, type TimbreIndexEntry } from "../addon/timbres";
+import { importScorePack, MAX_TITLE_CHARS, type ScoreEntry } from "../scores/scores";
+import { importScorePages } from "../scores/importPages";
 import type { SongEntry } from "../types";
-import { deleteLocalSong, listLocalSongs, putLocalSongs, type StoredSong } from "../localLibrary";
-import { deleteLocalPlugin, listLocalPlugins, putLocalPlugins, type StoredPlugin } from "../localPlugins";
+import { deleteLocalSong, listLocalSongs, putLocalSongs, type StoredSong } from "../music/localLibrary";
+import { deleteLocalPlugin, listLocalPlugins, putLocalPlugins, type StoredPlugin } from "../addon/localPlugins";
 import {
     loadPluginArchive,
     loadPluginIndex,
@@ -37,12 +37,10 @@ import {
     storedPluginToEntry,
     unpackSongBundles,
     type GeneratorPluginEntry,
-} from "../plugins";
+} from "../addon/plugins";
 import type { PbePluginArchive } from "@piano/vfx/package";
 
 export type LibrarySort = "adds" | "plays" | "name" | "default";
-
-export const TIME_SCALE = 40;
 
 function notifyError(title: string, error: unknown, fallback = "请稍后重试") {
     console.error(`[generator] ${title}`, error);
@@ -198,6 +196,23 @@ function computeNextSelectedPlugins(
     return [...next];
 }
 
+function withSyncedPlugins(
+    state: Pick<GeneratorState, "pluginsReady" | "plugins" | "selectedPlugins" | "manualPluginOverrides">,
+    songs: SongEntry[],
+): Pick<GeneratorState, "songs" | "selectedPlugins"> {
+    return {
+        songs,
+        selectedPlugins: state.pluginsReady
+            ? computeNextSelectedPlugins(
+                  songs,
+                  state.plugins,
+                  state.selectedPlugins,
+                  state.manualPluginOverrides,
+              )
+            : state.selectedPlugins,
+    };
+}
+
 let libraryPromise: Promise<LibraryMeta[]> | null = null;
 let initStarted = false;
 
@@ -319,16 +334,8 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             const version = header?.version;
             set((state) => ({
                 template,
-                songs: template.songs,
+                ...withSyncedPlugins(state, template.songs),
                 scores: template.scores,
-                selectedPlugins: state.pluginsReady
-                    ? computeNextSelectedPlugins(
-                          template.songs,
-                          state.plugins,
-                          state.selectedPlugins,
-                          state.manualPluginOverrides,
-                      )
-                    : state.selectedPlugins,
                 addonName: header?.name ?? "",
                 addonDesc: header?.description ?? "",
                 templateVersion: Array.isArray(version)
@@ -389,18 +396,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                     set((state) => {
                         const fresh = added.filter((entry) => !state.songs.some((song) => song.id === entry.id));
                         if (fresh.length === 0) return {};
-                        const songs = [...state.songs, ...fresh];
-                        return {
-                            songs,
-                            selectedPlugins: state.pluginsReady
-                                ? computeNextSelectedPlugins(
-                                      songs,
-                                      state.plugins,
-                                      state.selectedPlugins,
-                                      state.manualPluginOverrides,
-                                  )
-                                : state.selectedPlugins,
-                        };
+                        return withSyncedPlugins(state, [...state.songs, ...fresh]);
                     });
                 }
                 notifications.show({
@@ -453,18 +449,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             const song = await get().loadLibraryEntry(meta);
             set((state) => {
                 if (state.songs.some((item) => item.id === song.id)) return {};
-                const songs = [...state.songs, song];
-                return {
-                    songs,
-                    selectedPlugins: state.pluginsReady
-                        ? computeNextSelectedPlugins(
-                              songs,
-                              state.plugins,
-                              state.selectedPlugins,
-                              state.manualPluginOverrides,
-                          )
-                        : state.selectedPlugins,
-                };
+                return withSyncedPlugins(state, [...state.songs, song]);
             });
             notifications.show({ title: "已加入附加包", message: meta.name, color: "teal" });
             void recordLibraryAdd(id).then((counted) => {
@@ -508,18 +493,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         if (get().songs.some((song) => song.id === entry.id)) return;
         set((state) => {
             if (state.songs.some((song) => song.id === entry.id)) return {};
-            const songs = [...state.songs, entry];
-            return {
-                songs,
-                selectedPlugins: state.pluginsReady
-                    ? computeNextSelectedPlugins(
-                          songs,
-                          state.plugins,
-                          state.selectedPlugins,
-                          state.manualPluginOverrides,
-                      )
-                    : state.selectedPlugins,
-            };
+            return withSyncedPlugins(state, [...state.songs, entry]);
         });
         notifications.show({ title: "已加入附加包", message: entry.name, color: "teal" });
     },
@@ -797,15 +771,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                     const nextSongs = freshSongs.length > 0 ? [...state.songs, ...freshSongs] : state.songs;
                     return {
                         myMusic: newMine.length > 0 ? [...newMine].reverse().concat(state.myMusic) : state.myMusic,
-                        songs: nextSongs,
-                        selectedPlugins: state.pluginsReady
-                            ? computeNextSelectedPlugins(
-                                  nextSongs,
-                                  state.plugins,
-                                  state.selectedPlugins,
-                                  state.manualPluginOverrides,
-                              )
-                            : state.selectedPlugins,
+                        ...withSyncedPlugins(state, nextSongs),
                     };
                 });
                 notifications.show({

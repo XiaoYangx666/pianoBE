@@ -19,9 +19,9 @@ import {
     type TranscribeOutput,
     type TranscribeProgress,
 } from "../amt/transcribe";
-import { midiFileToEntry } from "../convert";
+import { midiFileToEntry } from "../music/convert";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { appPlayer } from "../player";
+import { appPlayer } from "../music/player";
 import { useGenerator } from "../store/generator";
 import type { SongEntry } from "../types";
 import { LicenseDisclosure } from "./convert/LicenseDisclosure";

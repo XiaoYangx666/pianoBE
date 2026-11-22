@@ -8,7 +8,7 @@ import {
     rewritePluginJsForAddon,
     type PbePluginArchive,
 } from "@piano/vfx/package";
-import type { SongEntry } from "./types";
+import type { SongEntry } from "../types";
 import type { TemplateInfo } from "./template";
 import type { LoadedTimbrePack, TimbreIndexEntry } from "./timbres";
 import { TIMBRES_SCRIPT_PATH } from "./timbres";
@@ -17,7 +17,7 @@ import {
     scoreStandPath,
     serializeScorePackModule,
     type ScoreEntry,
-} from "./scores";
+} from "../scores/scores";
 
 export interface ExportOptions {
     name: string;

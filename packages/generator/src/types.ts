@@ -1,3 +1,5 @@
+import { TIME_SCALE } from "@piano/core";
+
 /** 生成器列表条目：模板已有曲目（保留模块原文）或新导入曲目（PBE3） */
 export interface SongEntry {
     id: string;
@@ -16,6 +18,7 @@ export interface SongEntry {
     voicePeak?: number;
 }
 
-export function toMeta(entry: SongEntry) {
-    return { id: entry.id, name: entry.name, duration: entry.duration };
+export function formatSongDuration(scaled: number): string {
+    const seconds = Math.max(0, Math.floor(scaled / TIME_SCALE));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

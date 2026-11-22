@@ -1,12 +1,12 @@
 import type { ScoreEntry } from "./scores";
-import type { TemplateInfo } from "./template";
+import type { TemplateInfo } from "../addon/template";
 
 /**
  * 读取曲谱页面的 PNG 字节：
  * - 自定义曲谱：assets 里保存了量化后的 PNG
  * - 模板曲谱：从模板 RP 的原路径读取
  */
-export async function readScorePageBytes(
+async function readScorePageBytes(
     score: ScoreEntry,
     pagePath: string,
     template: TemplateInfo | null
