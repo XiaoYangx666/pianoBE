@@ -1,22 +1,27 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { PIANO_TIMBRES } from "@piano/core";
-import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, normalizePianoSettings, PIANO_PARTICLE_STYLES, PIANO_SETTINGS_LIMITS, PIANO_STAGE_THEMES, readPianoSettings, stageThemeAt, stageThemeIndexOf } from "../src/domain/piano/settings";
+import { registerBuiltinVfxPlugins } from "@piano/plugins";
+import { AVAILABLE_PIANO_TIMBRES, availablePianoTimbres, DEFAULT_PIANO_SETTINGS, listPianoParticleStyles, listPianoStageThemes, normalizePianoSettings, PIANO_SETTINGS_LIMITS, readPianoSettings, stageThemeAt, stageThemeIndexOf } from "../src/domain/piano/settings";
 import { AVAILABLE_SCORES, DEFAULT_SCORE_ID } from "../src/domain/score/score";
 import { DEFAULT_MANUAL_VELOCITY, FOLLOW_PIANO_VELOCITY, manualVelocityAt, manualVelocityIndexOf, manualVelocityPresets, resolveManualVelocity } from "../src/domain/piano/soundTypes";
+
+registerBuiltinVfxPlugins();
+beforeEach(() => registerBuiltinVfxPlugins());
 
 test("old pianos start with the score off and the former peach selection becomes sakura", () => {
     const old = readPianoSettings('{"particleStyle":5}');
     expect(old.scoreMounted).toBe(false);
-    expect(PIANO_PARTICLE_STYLES.find(style => style.value === old.particleStyle)?.style).toBe("sakura_drift");
+    expect(listPianoParticleStyles().find(style => style.value === old.particleStyle)?.style).toBe("sakura_drift");
     expect(readPianoSettings(JSON.stringify({ ...old, scoreMounted: true })).scoreMounted).toBe(true);
 });
 
 test("removed pulse ring value falls back without renumbering other styles", () => {
     const migrated = readPianoSettings('{"particleStyle":2}');
     expect(migrated.particleStyle).toBe(DEFAULT_PIANO_SETTINGS.particleStyle);
-    expect(PIANO_PARTICLE_STYLES.map(style => style.value)).toEqual([3, 4, 0, 5, 6, 7]);
-    expect(PIANO_PARTICLE_STYLES.find(style => style.value === 5)?.style).toBe("sakura_drift");
-    expect(PIANO_PARTICLE_STYLES.find(style => style.value === 7)?.style).toBe("prism_shards");
+    const styles = listPianoParticleStyles();
+    expect(styles.map(style => style.value)).toEqual([3, 4, 0, 5, 6, 7]);
+    expect(styles.find(style => style.value === 5)?.style).toBe("sakura_drift");
+    expect(styles.find(style => style.value === 7)?.style).toBe("prism_shards");
 });
 
 test("retired and style-incompatible palettes fall back safely", () => {
@@ -163,7 +168,7 @@ describe("piano stage choreography and theme settings", () => {
     });
 
     test("合法舞台字段持久化，非法值回退默认", () => {
-        for (const theme of PIANO_STAGE_THEMES) {
+        for (const theme of listPianoStageThemes()) {
             expect(normalizePianoSettings({ stageTheme: theme.id }).stageTheme).toBe(theme.id);
             expect(stageThemeAt(stageThemeIndexOf(theme.id))).toBe(theme.id);
         }

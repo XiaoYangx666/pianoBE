@@ -1,6 +1,6 @@
 import { DDUI } from "sapi-pro";
 import {
-    DEFAULT_PIANO_SETTINGS, PIANO_STAGE_THEMES, stageThemeAt, stageThemeIndexOf,
+    DEFAULT_PIANO_SETTINGS, listPianoStageThemes, stageThemeAt, stageThemeIndexOf,
 } from "@domain/piano/settings";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { settingsEditor } from "./pianoSettings";
@@ -12,6 +12,7 @@ export const StageSettingsPage = DDUI.page<{ piano: PianoRuntime }>("舞台演�
     const settings = editor.current();
     if (!settings) return;
 
+    const stageThemes = listPianoStageThemes();
     const stageChoreography = ui.boolean(settings.stageChoreography);
     ui.onChange(stageChoreography, (value) => editor.apply({ stageChoreography: value }));
     const stageKeyParticles = ui.boolean(settings.stageKeyParticles);
@@ -29,7 +30,7 @@ export const StageSettingsPage = DDUI.page<{ piano: PianoRuntime }>("舞台演�
     ui.toggle("允许舞台替换弹奏粒子", stageKeyParticles, {
         description: "开启后，曲目编排或舞台主题可替换弹奏时的琴键粒子样式与配色。",
     });
-    ui.dropdown("默认舞台主题", stageTheme, PIANO_STAGE_THEMES.map(({ label, value }) => ({ label, value })));
+    ui.dropdown("默认舞台主题", stageTheme, stageThemes.map(({ label, value }) => ({ label, value })));
     ui.button("恢复本页默认", () => {
         editor.apply({
             stageChoreography: DEFAULT_PIANO_SETTINGS.stageChoreography,

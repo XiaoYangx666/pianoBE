@@ -7,7 +7,7 @@
     "private": true,
     "scripts": {
         "pack": "npm run sync:assets && bepack pack",
-        "sync:assets": "npm run build -w @piano/vfx && node ../../tools/assets/sync-vfx-assets.mjs",
+        "sync:assets": "npm run build -w @piano/vfx && npm run build -w @piano/plugins && node ../../tools/assets/sync-vfx-assets.mjs",
         "dev": "npm run sync:assets && bepack dev",
         "build": "npm run sync:assets && bepack build",
         "copy": "npm run sync:assets && bepack copy",
@@ -24,6 +24,7 @@
         "@minecraft/server-ui": "2.2.0",
         "@minecraft/vanilla-data": "1.26.50",
         "@piano/core": "file:../core",
+        "@piano/plugins": "file:../../plugins",
         "@piano/vfx": "file:../vfx",
         "sapi-pro": "file:../../vendor/sapi-pro-dev.tgz"
     },

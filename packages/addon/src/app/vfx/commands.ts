@@ -5,8 +5,8 @@ import {
 } from "@piano/core";
 import { pianoWorld } from "@app/PianoWorld";
 import {
-    KEY_PARTICLE_STYLE_LABELS, VFX_EFFECTS, VFX_THEMES, deriveAccentHex, getVfxEffect,
-    isValidBrush, isVfxTheme, listVfxEffects, parseVfxInput, validateEffectCustomParams, validateVfxTheme,
+    deriveAccentHex, getKeyParticleStyleLabel, getVfxEffect, getVfxTheme, getVfxThemeIds,
+    isValidBrush, listVfxEffects, parseVfxInput, validateEffectCustomParams, validateVfxTheme,
     type SingleEffectConfig, type VfxCategory,
 } from "@piano/vfx";
 import { inspectInstrument, resolveInstrument } from "@platform/assembly";
@@ -98,7 +98,8 @@ export function registerVfxCommands() {
                     say(`${def.category} / ${def.id} (${def.label}) · ${def.trigger}${brushText}${variantText}${paramText}`);
                 }
                 if (!category) {
-                    say(`内置主题 ${Object.keys(VFX_THEMES).join(", ")} · 自定义 ${[...loadVfxThemes().keys()].join(", ") || "无"}`);
+                    const builtinThemes = getVfxThemeIds().join(", ") || "无";
+                    say(`内置主题 ${builtinThemes} · 自定义 ${[...loadVfxThemes().keys()].join(", ") || "无"}`);
                 }
                 return;
             }
@@ -123,7 +124,7 @@ export function registerVfxCommands() {
                     ? (statusPiano ? activeKeyParticleOverride(statusPiano) : previous.engine?.keyParticleOverride(0))
                     : undefined;
                 const keyText = keyOverride?.style
-                    ? ` · 弹奏粒子 ${KEY_PARTICLE_STYLE_LABELS[keyOverride.style]}`
+                    ? ` · 弹奏粒子 ${getKeyParticleStyleLabel(keyOverride.style)}`
                     : "";
                 if (previous && "midi" in previous.request) {
                     const channels = summarizeSessionChannels(previous, previous.request.midi.position);
@@ -178,7 +179,7 @@ export function registerVfxCommands() {
                 };
             } else if (action === "theme") {
                 const input = parseVfxInput(detail || "live");
-                const theme = isVfxTheme(name) ? VFX_THEMES[name] : loadVfxThemes().get(name);
+                const theme = getVfxTheme(name) ?? loadVfxThemes().get(name);
                 if (!theme) throw new Error(`未知主题 ${name}`);
                 request = { theme, name, input };
             } else if (action === "compose") {

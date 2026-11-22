@@ -1,5 +1,5 @@
 import { DDUI } from "sapi-pro";
-import { DEFAULT_PIANO_SETTINGS, PIANO_PARTICLE_STYLES } from "@domain/piano/settings";
+import { DEFAULT_PIANO_SETTINGS, listPianoParticleStyles } from "@domain/piano/settings";
 import { keyParticleColorOptions, normalizeKeyParticlePalette } from "@piano/vfx";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { settingsEditor } from "./pianoSettings";
@@ -11,6 +11,7 @@ export const ParticleSettingsPage = DDUI.page<{ piano: PianoRuntime }>("粒子�
     const settings = editor.current();
     if (!settings) return;
 
+    const styles = listPianoParticleStyles();
     const particles = ui.boolean(settings.particles);
     ui.onChange(particles, (value) => editor.apply({ particles: value }));
     const style = ui.number(settings.particleStyle);
@@ -26,12 +27,16 @@ export const ParticleSettingsPage = DDUI.page<{ piano: PianoRuntime }>("粒子�
 
     ui.label("§7弹奏时在琴键位置生成的特效。");
     ui.toggle("显示弹奏粒子", particles);
-    ui.dropdown("粒子样式", style, PIANO_PARTICLE_STYLES.map(({ label, value }) => ({ label, value })));
-    const colorOptions = keyParticleColorOptions(settings.particleStyle);
-    if (colorOptions) {
-        ui.dropdown("粒子配色", palette, colorOptions.map(({ label, value }) => ({ label, value })));
+    if (styles.length > 0) {
+        ui.dropdown("粒子样式", style, styles.map(({ label, value }) => ({ label, value })));
+        const colorOptions = keyParticleColorOptions(settings.particleStyle);
+        if (colorOptions) {
+            ui.dropdown("粒子配色", palette, colorOptions.map(({ label, value }) => ({ label, value })));
+        } else {
+            ui.label("§7该粒子使用固定的自然配色，无需选择颜色。");
+        }
     } else {
-        ui.label("§7该粒子使用固定的自然配色，无需选择颜色。");
+        ui.label("§7当前未安装弹奏粒子样式插件，弹奏粒子已关闭。");
     }
     ui.button("恢复本页默认", () => {
         editor.apply({

@@ -6,7 +6,7 @@ import type { MidiPlayer } from "@domain/playback/player";
 import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visualEvent";
 import {
     createPerformanceProgram, createSingleEffectProgram, createThemeProgram,
-    quietFeatures, simulatedVfxNotes, VFX_MAX_PIANOS, VFX_THEMES, VfxBudget, VfxEngine, VfxMusic,
+    getVfxTheme, quietFeatures, simulatedVfxNotes, VFX_MAX_PIANOS, VfxBudget, VfxEngine, VfxMusic,
     type ActiveChannelSummary, type MusicFeatures, type PianoParticleOverride,
     type SingleEffectConfig, type VfxInput, type VfxProgram, type VfxTheme,
 } from "@piano/vfx";
@@ -132,7 +132,8 @@ function createProgramForSession(session: VfxSession): {
                 resetOnTransport: true,
             };
         }
-        const theme = VFX_THEMES[request.theme];
+        const theme = getVfxTheme(request.theme);
+        if (!theme) return undefined;
         return {
             program: createThemeProgram(theme, { seconds: Infinity }),
             input: "live",

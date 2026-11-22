@@ -3,10 +3,14 @@ import { DEFAULT_SCORE_ID, isValidScoreId } from "@domain/score/score";
 import { ENABLED_PIANO_TIMBRES } from "./timbres";
 import { DEFAULT_MANUAL_VELOCITY, isManualVelocity } from "./soundTypes";
 import {
-    normalizeKeyParticlePalette, PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES, VFX_THEMES, VFX_THEME_ORDER,
+    DEFAULT_KEY_PARTICLE_SETTINGS,
+    listPianoParticleStyles,
+    listVfxThemes,
+    normalizeKeyParticlePalette,
+    PIANO_PARTICLE_PALETTES,
 } from "@piano/vfx";
 
-export { PIANO_PARTICLE_PALETTES, PIANO_PARTICLE_STYLES };
+export { PIANO_PARTICLE_PALETTES, listPianoParticleStyles };
 
 /** 按启用列表过滤音色；空列表回退到默认音色，保证设置里至少有一个选项。 */
 export function availablePianoTimbres(enabled: readonly string[]) {
@@ -18,23 +22,31 @@ export function availablePianoTimbres(enabled: readonly string[]) {
 /** 当前包内可选的音色（生成器可能裁剪掉部分音色） */
 export const AVAILABLE_PIANO_TIMBRES = availablePianoTimbres(ENABLED_PIANO_TIMBRES);
 
-export const PIANO_STAGE_THEMES = [
-    { value: 0, id: "off" as const, label: "关闭（仅曲目自带编排）" },
-    ...VFX_THEME_ORDER.map((id, index) => ({
-        value: index + 1,
-        id,
-        label: VFX_THEMES[id].label ?? id,
-    })),
-] as const;
+export type PianoStageThemeId = string;
 
-export type PianoStageThemeId = typeof PIANO_STAGE_THEMES[number]["id"];
+export interface PianoStageThemeOption {
+    value: number;
+    id: PianoStageThemeId;
+    label: string;
+}
+
+export function listPianoStageThemes(): PianoStageThemeOption[] {
+    return [
+        { value: 0, id: "off", label: "关闭（仅曲目自带编排）" },
+        ...listVfxThemes().map(({ id, theme }, index) => ({
+            value: index + 1,
+            id,
+            label: theme.label ?? id,
+        })),
+    ];
+}
 
 export function stageThemeIndexOf(id: PianoStageThemeId): number {
-    return PIANO_STAGE_THEMES.find(theme => theme.id === id)?.value ?? 0;
+    return listPianoStageThemes().find(theme => theme.id === id)?.value ?? 0;
 }
 
 export function stageThemeAt(value: number): PianoStageThemeId | undefined {
-    return PIANO_STAGE_THEMES.find(theme => theme.value === value)?.id;
+    return listPianoStageThemes().find(theme => theme.value === value)?.id;
 }
 
 export type PianoSoundMode = "stereo" | "3d";
@@ -47,8 +59,8 @@ export const DEFAULT_PIANO_SETTINGS = {
     scoreMounted: false,
     /** 谱架与面板同时显示的曲谱 id；生成器可替换可用曲谱列表 */
     scoreId: DEFAULT_SCORE_ID,
-    particleStyle: PIANO_PARTICLE_STYLES[0].value as number,
-    particlePalette: 0,
+    particleStyle: DEFAULT_KEY_PARTICLE_SETTINGS.particleStyle as number,
+    particlePalette: DEFAULT_KEY_PARTICLE_SETTINGS.particlePalette as number,
     volume: 100,
     timbre: DEFAULT_PIANO_TIMBRE as number,
     /** 开：按曲目自动拉平响度；关：保持原始 MIDI 动态（默认关）。 */
@@ -125,11 +137,17 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         const [min, max] = PIANO_SETTINGS_LIMITS[key];
         return Math.min(max, Math.max(min, Math.round(input)));
     };
-    const particleStyle = PIANO_PARTICLE_STYLES.find(style => style.value === saved.particleStyle)?.value
-        ?? defaults.particleStyle;
+    const particleStyles = listPianoParticleStyles();
+    const particleStyle = particleStyles.find(style => style.value === saved.particleStyle)?.value
+        ?? (particleStyles.some(style => style.value === defaults.particleStyle)
+            ? defaults.particleStyle
+            : (particleStyles[0]?.value ?? defaults.particleStyle));
     const savedPalette = typeof saved.particlePalette === "number" && Number.isFinite(saved.particlePalette)
         ? saved.particlePalette
         : defaults.particlePalette;
+    const stageThemes = listPianoStageThemes();
+    const stageTheme = stageThemes.find(theme => theme.id === saved.stageTheme)?.id
+        ?? (stageThemes.some(theme => theme.id === defaults.stageTheme) ? defaults.stageTheme : "off");
     return {
         particles: typeof saved.particles === "boolean" ? saved.particles : defaults.particles,
         stageChoreography: typeof saved.stageChoreography === "boolean"
@@ -138,8 +156,7 @@ export function normalizePianoSettings(saved: Record<string, unknown>,
         stageKeyParticles: typeof saved.stageKeyParticles === "boolean"
             ? saved.stageKeyParticles
             : defaults.stageKeyParticles,
-        stageTheme: PIANO_STAGE_THEMES.find(theme => theme.id === saved.stageTheme)?.id
-            ?? defaults.stageTheme,
+        stageTheme,
         scoreMounted: typeof saved.scoreMounted === "boolean" ? saved.scoreMounted : defaults.scoreMounted,
         scoreId: isValidScoreId(saved.scoreId) ? saved.scoreId : defaults.scoreId,
         particleStyle,

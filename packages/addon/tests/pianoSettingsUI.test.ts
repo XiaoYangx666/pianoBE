@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { registerBuiltinVfxPlugins } from "@piano/plugins";
 import { DEFAULT_PIANO_SETTINGS } from "../src/domain/piano/settings";
 import { Signal } from "../src/domain/util/signal";
 import { createDDUIHost, createSapiProMock, FakeObservable } from "./support/fakeDDUI";
@@ -102,6 +103,7 @@ function open(page: unknown, args: unknown) {
 }
 
 beforeEach(() => {
+    registerBuiltinVfxPlugins();
     host.reset();
 });
 
