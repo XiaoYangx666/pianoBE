@@ -2,12 +2,12 @@ import {
     PERFORMANCE_MOTIONS, PERFORMANCE_ZONES, isValidPerformanceSymbol, resolvePerformanceColor,
     type PerformanceMotion, type PerformanceParams, type PerformanceZone,
 } from "@piano/core";
-import { isValidBrush } from "./brushes";
+import { isValidBrush } from "../spatial/brushes";
 import { isVfxEffect, validateEffectCustomParams } from "./effects";
 import { validateKeyParticleOverride } from "./keyParticles";
-import { quietFeatures, type MusicFeatures } from "./music";
-import { vfxRegistry, type VfxRegistry } from "./registry";
-import type { PianoParticleOverride } from "./types";
+import { quietFeatures, type MusicFeatures } from "../runtime/music";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
+import type { PianoParticleOverride } from "../types";
 
 export interface VfxThemeLevelMapping {
     input: keyof MusicFeatures;

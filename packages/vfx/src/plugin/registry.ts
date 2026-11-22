@@ -6,10 +6,10 @@ import {
     type VfxPluginModule,
     type VfxPluginRegistrar,
 } from "./plugin";
-import type { KeyParticleRenderStyle } from "./keyParticles";
-import type { LightAnchor, StageVeilAnchor } from "./stage";
-import type { VfxTheme } from "./themes";
-import type { VfxCategory, VfxEffectDefinition } from "./types";
+import type { KeyParticleRenderStyle } from "../domain/keyParticles";
+import type { LightAnchor, StageVeilAnchor } from "../spatial/stage";
+import type { VfxTheme } from "../domain/themes";
+import type { VfxCategory, VfxEffectDefinition } from "../types";
 
 export const VFX_PLUGIN_MAX_CONSECUTIVE_ERRORS = 5;
 const MAX_RECENT_PLUGIN_ERRORS = 20;

@@ -1,10 +1,10 @@
 import { TIME_SCALE } from "@piano/core";
-import { resolveEffectCustomParams } from "./effects";
+import { resolveEffectCustomParams } from "../domain/effects";
 import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
 import type { VfxProgram } from "./programs";
-import type { VfxInstrument } from "./instrument";
-import { vfxRegistry, type VfxRegistry } from "./registry";
-import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams } from "./types";
+import type { VfxInstrument } from "../spatial/instrument";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
+import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams } from "../types";
 
 interface ChannelRuntime {
     nextTick: number;

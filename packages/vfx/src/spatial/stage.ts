@@ -1,6 +1,6 @@
-import type { VfxEmitter, Vec3 } from "./types";
+import type { VfxEmitter, Vec3 } from "../types";
 import { vfxStageFrame } from "./instrument";
-import { vfxRegistry, type VfxRegistry } from "./registry";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
 
 export type VfxFacing = "north" | "south" | "east" | "west";
 

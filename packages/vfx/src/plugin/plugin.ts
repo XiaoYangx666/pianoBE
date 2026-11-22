@@ -1,7 +1,7 @@
-import type { KeyParticleRenderStyle } from "./keyParticles";
-import type { LightAnchor, StageVeilAnchor } from "./stage";
-import type { VfxTheme } from "./themes";
-import type { VfxEffectDefinition } from "./types";
+import type { KeyParticleRenderStyle } from "../domain/keyParticles";
+import type { LightAnchor, StageVeilAnchor } from "../spatial/stage";
+import type { VfxTheme } from "../domain/themes";
+import type { VfxEffectDefinition } from "../types";
 
 export const VFX_API_VERSION = "1.0.0";
 

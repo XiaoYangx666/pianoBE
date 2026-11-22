@@ -1,4 +1,4 @@
-import vfxAtlas from "./data/vfxAtlas.json";
+import vfxAtlas from "../data/vfxAtlas.json";
 
 export const VFX_ATLAS = vfxAtlas;
 

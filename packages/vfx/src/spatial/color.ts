@@ -1,5 +1,5 @@
 import { parsePerformanceRgb } from "@piano/core";
-import { clampUnit, mix } from "./music";
+import { clampUnit, mix } from "../runtime/music";
 
 export function rgbToHex(r: number, g: number, b: number): string {
     const byte = (value: number) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, "0").toUpperCase();

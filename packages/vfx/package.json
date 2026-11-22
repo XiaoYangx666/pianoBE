@@ -15,9 +15,9 @@
             "import": "./dist/index.js"
         },
         "./package": {
-            "bun": "./src/pluginPackage.ts",
-            "types": "./dist/pluginPackage.d.ts",
-            "import": "./dist/pluginPackage.js"
+            "bun": "./src/plugin/pluginPackage.ts",
+            "types": "./dist/plugin/pluginPackage.d.ts",
+            "import": "./dist/plugin/pluginPackage.js"
         },
         "./assets/*": "./assets/*"
     },

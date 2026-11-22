@@ -65,8 +65,17 @@ describe("vfx package boundaries", () => {
 
     test("the public entry exports every domain module without pulling fflate or archive tooling", () => {
         const entry = readFileSync(join(sourceRoot, "index.ts"), "utf8");
-        for (const module of ["plugin", "registry", "engine", "instrument", "effects", "themes", "programs", "keyParticles"]) {
-            expect(entry).toContain(`./${module}`);
+        for (const module of [
+            "./plugin/plugin",
+            "./plugin/registry",
+            "./runtime/engine",
+            "./spatial/instrument",
+            "./domain/effects",
+            "./domain/themes",
+            "./runtime/programs",
+            "./domain/keyParticles",
+        ]) {
+            expect(entry).toContain(module);
         }
         expect(entry).not.toContain("pluginPackage");
         expect(entry).not.toContain("fflate");

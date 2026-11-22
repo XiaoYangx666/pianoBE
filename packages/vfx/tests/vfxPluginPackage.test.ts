@@ -7,7 +7,7 @@ import {
     readPbePluginArchive,
     rewritePluginJsForAddon,
     writePbePluginArchive,
-} from "../src/pluginPackage";
+} from "../src/plugin/pluginPackage";
 import type { VfxPluginManifest } from "../src";
 
 function validManifest(overrides: Partial<VfxPluginManifest> = {}): VfxPluginManifest {

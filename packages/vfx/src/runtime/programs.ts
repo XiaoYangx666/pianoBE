@@ -3,13 +3,13 @@ import {
     type PerformanceCue, type PerformanceMotion, type PerformanceParams, type PerformanceParamValue,
     type PerformanceZone,
 } from "@piano/core";
-import { deriveAccentHex, rgbToHex } from "./color";
-import { getVfxEffect, resolveEffectCustomParams } from "./effects";
+import { deriveAccentHex, rgbToHex } from "../spatial/color";
+import { getVfxEffect, resolveEffectCustomParams } from "../domain/effects";
 import { clampUnit, mix, type MusicFeatures } from "./music";
-import { interpolateSchemaParams } from "./parameters";
-import { vfxRegistry, type VfxRegistry } from "./registry";
-import type { VfxTheme } from "./themes";
-import type { PianoParticleOverride, VfxEffectParams, VfxParameterSchema } from "./types";
+import { interpolateSchemaParams } from "../plugin/parameters";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
+import type { VfxTheme } from "../domain/themes";
+import type { PianoParticleOverride, VfxEffectParams, VfxParameterSchema } from "../types";
 
 export interface ProgramChannelSample {
     params: VfxEffectParams;

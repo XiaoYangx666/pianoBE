@@ -1,9 +1,9 @@
 import { PERFORMANCE_PALETTES, resolvePerformanceColor } from "@piano/core";
-import { POINT_BRUSH_INDEX, type PointBrushId } from "./brushes";
-import { blendHex, colorVars, hexToUnitRgb } from "./color";
-import type { Point3 } from "./geometry";
-import { vfxRegistry, type VfxRegistry } from "./registry";
-import type { PianoParticleOverride, VfxEffectParams, VfxParticle } from "./types";
+import { POINT_BRUSH_INDEX, type PointBrushId } from "../spatial/brushes";
+import { blendHex, colorVars, hexToUnitRgb } from "../spatial/color";
+import type { Point3 } from "../spatial/geometry";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
+import type { PianoParticleOverride, VfxEffectParams, VfxParticle } from "../types";
 
 export interface KeyParticlePalette {
     value: number;

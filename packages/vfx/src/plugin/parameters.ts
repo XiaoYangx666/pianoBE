@@ -4,12 +4,12 @@ import {
     type PerformanceParams,
     type PerformanceParamValue,
 } from "@piano/core";
-import { mix } from "./music";
+import { mix } from "../runtime/music";
 import type {
     ResolvedVfxCustomParams,
     VfxParameterSchema,
     VfxParamSpec,
-} from "./types";
+} from "../types";
 
 const MAX_CUSTOM_PARAMS = 16;
 

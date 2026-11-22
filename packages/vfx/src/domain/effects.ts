@@ -3,8 +3,8 @@ import {
     defaultSchemaParams,
     resolveSchemaParams,
     validateSchemaParams,
-} from "../parameters";
-import { vfxRegistry, type VfxRegistry } from "../registry";
+} from "../plugin/parameters";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
 import type { VfxCategory, VfxEffectDefinition } from "../types";
 
 export type VfxEffectId = string;

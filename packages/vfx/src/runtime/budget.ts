@@ -1,4 +1,4 @@
-import type { VfxBatch, VfxEmitter } from "./types";
+import type { VfxBatch, VfxEmitter } from "../types";
 
 export const VFX_MAX_PIANOS = 4;
 export const VFX_PARTICLES_PER_PIANO = 275;

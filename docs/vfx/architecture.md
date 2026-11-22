@@ -6,21 +6,22 @@
 @piano/core (PBE3 编解码与演出提示通用格式，无具体特效耦合)
         ▲
         │
-@piano/vfx (跨平台视觉领域：基岩版与 Web 完全共享)
+@piano/vfx (跨平台视觉领域与插件宿主：基岩版与 Web 完全共享)
+   ├── src/index.ts (统一公共入口)
+   ├── src/types.ts (共享基础类型)
    ├── src/data/vfxAtlas.json (图集、画笔与贴片唯一数据源)
-   ├── src/instrument.ts (琴型、琴键坐标、弹奏粒子锚点、舞台框架)
    ├── src/data/keys.generated.ts (由模型数据生成的琴键坐标)
-   ├── src/brushes.ts / color.ts / music.ts / budget.ts / stage.ts / geometry.ts
-   ├── src/keyParticles.ts (弹奏粒子覆盖解析，显式 variant 语义)
-   ├── src/primitives.ts (底层绘图原语：点/线/面/云/彗星/光束/光幕等)
-   ├── src/effects/*.ts (33 种内置特效：atmosphere / curves / stage / keys / accents)
-   ├── src/themes.ts (7 套内置主题 + JSON 校验)
-   ├── src/programs.ts (曲目演出 / 主题 / 单特效 → 统一 VfxProgram 适配器)
-   ├── src/engine.ts (唯一运行时执行引擎 VfxEngine)
+   ├── src/plugin/ (插件协议、注册表、参数 Schema 与 .pbeplugin 归档编解码)
+   ├── src/runtime/ (统一执行引擎 VfxEngine、VfxProgram 适配器、演出编译、粒子预算与音乐特征)
+   ├── src/spatial/ (绘图原语、几何插值、琴型/琴键锚点、舞台布局、画笔与色彩)
+   ├── src/domain/ (领域模型与查询辅助：effects / themes / keyParticles)
    └── assets/ (Bedrock 粒子文档 + 图集/MER；弹奏粒子复用同一图集)
         ▲                                 ▲
         │                                 │
-packages/addon (Bedrock 平台使用者)   packages/web (Three.js + Wintersky 预览)
+plugins/* (内置与第三方 VFX 插件)          │
+        └───────── 注册到 VfxRegistry ──────┼──────► packages/web (Three.js + Wintersky 预览)
+                                          │
+                                  packages/addon (Bedrock 平台使用者)
 ```
 
 `@piano/vfx` 不依赖 `packages/addon` 或 `packages/web`，两者只通过包入口与资源路径使用它。

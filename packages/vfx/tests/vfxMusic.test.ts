@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import type { VfxNoteEvent } from "../src/music";
+import type { VfxNoteEvent } from "../src";
 import {
     createThemeProgram,
     getVfxTheme,

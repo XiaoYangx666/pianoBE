@@ -1,9 +1,9 @@
 import type {
     PerformanceMotion, PerformanceParams, PerformanceParamValue, PerformanceZone,
 } from "@piano/core";
-import type { PointBrushId, StrokeBrushId } from "./brushes";
-import type { VfxInstrument } from "./instrument";
-import type { MusicFeatures, VfxKeyNote } from "./music";
+import type { PointBrushId, StrokeBrushId } from "./spatial/brushes";
+import type { VfxInstrument } from "./spatial/instrument";
+import type { MusicFeatures, VfxKeyNote } from "./runtime/music";
 
 export interface Vec3 {
     x: number;

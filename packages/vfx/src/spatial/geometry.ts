@@ -1,5 +1,5 @@
 import type { PerformanceMotion, PerformanceZone } from "@piano/core";
-import { mix, type VfxKeyNote } from "./music";
+import { mix, type VfxKeyNote } from "../runtime/music";
 
 export type Point3 = readonly [number, number, number];
 export type Segment3 = { point: Point3; tangent: Point3; spacing: number; u: number };

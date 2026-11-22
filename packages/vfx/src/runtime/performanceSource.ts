@@ -7,8 +7,8 @@ import {
     type PerformanceSourceEffectCue,
     type PerformanceSourceSection,
 } from "@piano/core";
-import { validateEffectCustomParams } from "./effects";
-import { vfxRegistry, type VfxRegistry } from "./registry";
+import { validateEffectCustomParams } from "../domain/effects";
+import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
 
 export type {
     PerformanceSourceBlackoutCue,

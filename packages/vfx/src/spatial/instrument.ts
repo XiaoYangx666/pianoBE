@@ -1,4 +1,4 @@
-import type { Vec3 } from "./types";
+import type { Vec3 } from "../types";
 import type { Point3 } from "./geometry";
 import {
     GRAND_KEY_HITBOXES,
@@ -7,7 +7,7 @@ import {
     UPRIGHT_KEY_HITBOXES,
     UPRIGHT_PARTICLE_LINE,
     UPRIGHT_STAGE_TAIL,
-} from "./data/keys.generated";
+} from "../data/keys.generated";
 
 /** The two instrument models share every VFX stage, key origin and particle anchor. */
 export type VfxInstrument = "upright" | "grand";

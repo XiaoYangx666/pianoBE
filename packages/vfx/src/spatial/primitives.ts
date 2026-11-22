@@ -5,7 +5,7 @@ import {
 import { blendHex, colorVars, hexToUnitRgb } from "./color";
 import { segmentsAlong, type Point3 } from "./geometry";
 import { getStageLightLayout, getStageVeilLayout, type VfxLightLayout, type VfxVeilLayout } from "./stage";
-import type { VfxEmitter, VfxTransform } from "./types";
+import type { VfxEmitter, VfxTransform } from "../types";
 
 export interface DrawPointsSpec {
     group?: string;
