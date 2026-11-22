@@ -19,27 +19,30 @@ import {
     defaultEffectCustomParams,
     deriveAccentHex,
     DEFAULT_KEY_PARTICLE_SETTINGS,
+    getKeyParticleStyleLabel,
     getVfxEffect,
+    getVfxTheme,
     isVfxTheme,
-    KEY_PARTICLE_STYLE_LABELS,
     keyParticleColorOptions,
     keyParticleColorMode,
+    listPianoParticleStyles,
+    listVfxEffects,
+    listVfxPlugins,
+    listVfxThemes,
     normalizeKeyParticlePalette,
-    PIANO_PARTICLE_STYLES,
     POINT_BRUSHES,
     quietFeatures,
+    registerVfxPlugin,
     simulatedVfxNotes,
     STROKE_BRUSHES,
+    unregisterVfxPlugin,
     validateVfxTheme,
-    VFX_EFFECT_IDS,
-    VFX_EFFECTS,
+    vfxRegistry,
     VFX_PARTICLES_PER_PIANO,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
     type MusicFeatures,
     type SingleEffectConfig,
+    type VfxPluginModule,
     type VfxTheme,
-    type VfxThemeId,
     type VfxThemeLayer,
 } from "@piano/vfx";
 import { MidiPlayer, parseMidi, type NoteEvent } from "../midiPlayer";
@@ -48,7 +51,51 @@ import type { PianoModel } from "./models";
 import { MusicStrip } from "./MusicStrip";
 import "./vfxLab.css";
 
-const themeEnglishNames: Record<VfxThemeId, string> = {
+const discoveredPluginModules = import.meta.glob<{ default?: VfxPluginModule }>(
+    "../../../../plugins/*/vfx/index.{ts,js}",
+    { eager: true },
+);
+
+const DISCOVERED_PLUGINS: readonly VfxPluginModule[] = Object.values(discoveredPluginModules)
+    .map(mod => mod?.default)
+    .filter((mod): mod is VfxPluginModule =>
+        Boolean(mod && typeof mod === "object" && typeof mod.manifest?.id === "string" && typeof mod.register === "function")
+    )
+    .sort((a, b) => a.manifest.id.localeCompare(b.manifest.id));
+
+function syncDiscoveredPlugins(wantIds?: ReadonlySet<string>) {
+    for (const plugin of DISCOVERED_PLUGINS) {
+        const id = plugin.manifest.id;
+        const shouldEnable = !wantIds || wantIds.has(id);
+        const has = vfxRegistry.hasPlugin(id);
+        if (has && !shouldEnable) {
+            unregisterVfxPlugin(id);
+        } else if (!has && shouldEnable) {
+            registerVfxPlugin(plugin);
+        }
+    }
+}
+
+function readInitialLabParams() {
+    if (typeof location === "undefined") return undefined;
+    const params = new URLSearchParams(location.search);
+    if (params.has("capture")) return undefined;
+    const rawPlugins = params.get("plugins");
+    if (rawPlugins !== null) {
+        const want = rawPlugins === "none" || rawPlugins.trim() === ""
+            ? new Set<string>()
+            : new Set(rawPlugins.split(",").map(s => s.trim()).filter(Boolean));
+        syncDiscoveredPlugins(want);
+    }
+    return params;
+}
+
+syncDiscoveredPlugins();
+const INITIAL_LAB_PARAMS = readInitialLabParams();
+
+const EMPTY_THEME: VfxTheme = { label: "未安装主题", layers: [] };
+
+const themeEnglishNames: Record<string, string> = {
     galaxy: "Galaxy",
     neon: "Neon",
     stage: "Stage",
@@ -172,8 +219,8 @@ function defaultBrushLabel(effectId: string): string {
 }
 
 function variantLabel(effectId: string, variant: string): string {
-    if (effectId === "key_style" && variant in KEY_PARTICLE_STYLE_LABELS) {
-        return KEY_PARTICLE_STYLE_LABELS[variant as keyof typeof KEY_PARTICLE_STYLE_LABELS];
+    if (effectId === "key_style") {
+        return getKeyParticleStyleLabel(variant);
     }
     return variant;
 }
@@ -322,6 +369,7 @@ function ThemeLayerEditor({ layer, update, remove }: {
     remove?: () => void;
 }) {
     const def = getVfxEffect(layer.effect);
+    const effects = listVfxEffects();
     const primaryHex = resolvePerformanceColor(layer.color);
     const accentHex = layer.color2 ? resolvePerformanceColor(layer.color2) : deriveAccentHex(primaryHex);
     const levelMapped = typeof layer.level !== "number";
@@ -344,8 +392,8 @@ function ThemeLayerEditor({ layer, update, remove }: {
                                 : undefined,
                         });
                     }}>
-                        {VFX_EFFECT_IDS.map(id => (
-                            <option key={id} value={id}>{VFX_EFFECTS[id].label} ({id})</option>
+                        {effects.map(item => (
+                            <option key={item.id} value={item.id}>{item.label} ({item.id})</option>
                         ))}
                     </select>
                 </label>
@@ -473,12 +521,49 @@ function ThemeLayerEditor({ layer, update, remove }: {
     );
 }
 
+function activePluginIds(): string[] {
+    return listVfxPlugins().map(item => item.manifest.id);
+}
+
 export default function VfxLabPage() {
-    const [inspectorMode, setInspectorMode] = useState<"theme" | "effect">("theme");
-    const [themeId, setThemeId] = useState<string>("galaxy");
-    const [theme, setTheme] = useState<VfxTheme>(VFX_THEMES.galaxy);
+    const [registryVersion, setRegistryVersion] = useState(0);
+    const [enabledPlugins, setEnabledPlugins] = useState<string[]>(() => activePluginIds());
+    const registeredEffects = useMemo(() => {
+        void registryVersion;
+        return listVfxEffects();
+    }, [registryVersion]);
+    const registeredThemes = useMemo(() => {
+        void registryVersion;
+        return listVfxThemes();
+    }, [registryVersion]);
+    const registeredParticleStyles = useMemo(() => {
+        void registryVersion;
+        return listPianoParticleStyles();
+    }, [registryVersion]);
+    const requestedTheme = INITIAL_LAB_PARAMS?.get("preset") ?? undefined;
+    const requestedEffect = INITIAL_LAB_PARAMS?.get("effect") ?? undefined;
+    const requestedView = INITIAL_LAB_PARAMS?.get("view");
+    const requestedPiano = INITIAL_LAB_PARAMS?.get("piano");
+    const requestedDir = INITIAL_LAB_PARAMS?.get("direction");
+    const requestedTime = Number(INITIAL_LAB_PARAMS?.get("time"));
+    const initialTime = Number.isFinite(requestedTime) && requestedTime >= 0 ? requestedTime : 0;
+
+    const initialThemeId = requestedTheme && getVfxTheme(requestedTheme)
+        ? requestedTheme
+        : registeredThemes[0]?.id ?? "empty";
+    const defaultThemeEntry = getVfxTheme("galaxy") ?? registeredThemes[0]?.theme ?? EMPTY_THEME;
+    const initialThemeValue = getVfxTheme(initialThemeId) ?? EMPTY_THEME;
+    const initialEffectId = requestedEffect && getVfxEffect(requestedEffect)
+        ? requestedEffect
+        : getVfxEffect("magic_circle")?.id ?? registeredEffects[0]?.id ?? "";
+
+    const [inspectorMode, setInspectorMode] = useState<"theme" | "effect">(
+        INITIAL_LAB_PARAMS?.get("mode") === "effect" ? "effect" : "theme"
+    );
+    const [themeId, setThemeId] = useState<string>(initialThemeId);
+    const [theme, setTheme] = useState<VfxTheme>(initialThemeValue);
     const [singleConfig, setSingleConfig] = useState<SingleEffectConfig>({
-        effect: "magic_circle",
+        effect: initialEffectId,
         color: "#68E4FF",
         color2: "#C58CFF",
         zone: "stage",
@@ -490,14 +575,20 @@ export default function VfxLabPage() {
     const [open, setOpen] = useState<number | null>(null);
     const [fixture, setFixture] = useState<Fixture>("phrase");
     const [midi, setMidi] = useState<LabSong>();
-    const [model, setModel] = useState<PianoModel>("grand");
-    const [direction, setDirection] = useState<Direction>("south");
-    const [view, setView] = useState<View>("stage");
-    const [deck, setDeck] = useState(true);
+    const [model, setModel] = useState<PianoModel>(requestedPiano === "p88" ? "p88" : "grand");
+    const [direction, setDirection] = useState<Direction>(
+        requestedDir === "west" || requestedDir === "north" || requestedDir === "east" ? requestedDir : "south"
+    );
+    const [view, setView] = useState<View>(
+        requestedView === "performer" || requestedView === "orbit" ? requestedView : "stage"
+    );
+    const [deck, setDeck] = useState(
+        INITIAL_LAB_PARAMS?.get("deck") !== "0" && INITIAL_LAB_PARAMS?.get("deck") !== "false"
+    );
     const [debug, setDebug] = useState(false);
     const [showKeyParticles, setShowKeyParticles] = useState(true);
     const [keyParticleSettings, setKeyParticleSettings] = useState<{ particleStyle: number; particlePalette: number }>({ ...DEFAULT_KEY_PARTICLE_SETTINGS });
-    const effectCount = VFX_EFFECT_IDS.length;
+    const effectCount = registeredEffects.length;
     const [loop, setLoop] = useState(true);
     const [loopIn, setLoopIn] = useState(0);
     const [loopOut, setLoopOut] = useState(12);
@@ -505,14 +596,14 @@ export default function VfxLabPage() {
     const [ready, setReady] = useState(false);
     const [playing, setPlaying] = useState(false);
     const [loadingAudio, setLoadingAudio] = useState(false);
-    const [time, setTime] = useState(0);
+    const [time, setTime] = useState(initialTime);
     const [stats, setStats] = useState<PreviewStats>();
     const [error, setError] = useState("");
     const canvas = useRef<HTMLCanvasElement>(null);
     const stage = useRef<Stage | null>(null);
     const midiInput = useRef<HTMLInputElement>(null);
     const themeInput = useRef<HTMLInputElement>(null);
-    const position = useRef(0);
+    const position = useRef(initialTime);
     const audio = useMemo(() => new MidiPlayer(), []);
     const playGeneration = useRef(0);
     const selectionGeneration = useRef(0);
@@ -528,12 +619,50 @@ export default function VfxLabPage() {
     const keyColorOptions = keyParticleColorOptions(keyParticleSettings.particleStyle);
     const keyColorMode = keyParticleColorMode(keyParticleSettings.particleStyle);
 
-    function selectTheme(id: string, value: VfxTheme = isVfxTheme(id) ? VFX_THEMES[id] : VFX_THEMES.galaxy) {
+    function selectTheme(id: string, value: VfxTheme = getVfxTheme(id) ?? defaultThemeEntry) {
         setThemeId(id);
         setTheme(value);
         setHidden(new Set());
         setOpen(null);
     }
+
+    function applyPluginSet(nextIds: readonly string[]) {
+        syncDiscoveredPlugins(new Set(nextIds));
+        const active = activePluginIds();
+        const nextThemes = listVfxThemes();
+        const nextEffects = listVfxEffects();
+        setEnabledPlugins(active);
+        setRegistryVersion(version => version + 1);
+        if (themeId !== "custom") {
+            const currentTheme = getVfxTheme(themeId);
+            if (currentTheme) {
+                setTheme(currentTheme);
+            } else if (nextThemes.length > 0) {
+                setThemeId(nextThemes[0].id);
+                setTheme(nextThemes[0].theme);
+                setHidden(new Set());
+                setOpen(null);
+            } else {
+                setThemeId("empty");
+                setTheme(EMPTY_THEME);
+                setHidden(new Set());
+                setOpen(null);
+            }
+        }
+        if (!getVfxEffect(singleConfig.effect) && nextEffects.length > 0) {
+            const fallback = nextEffects[0];
+            setSingleConfig(prev => ({
+                ...prev,
+                effect: fallback.id,
+                brush: undefined,
+                variant: fallback.variants?.[0],
+                params: undefined,
+            }));
+        }
+    }
+
+    const applyPluginSetRef = useRef(applyPluginSet);
+    applyPluginSetRef.current = applyPluginSet;
 
     function jump(to: number, sync = true) {
         position.current = Math.max(0, Math.min(track.duration, to));
@@ -576,13 +705,13 @@ export default function VfxLabPage() {
             ? { kind: "single", config: singleConfig }
             : { kind: "theme", theme: visibleTheme };
         stage.current!.configure(mode, track, model, direction, position.current);
-    }, [ready, visibleTheme, track, model, direction, inspectorMode, singleConfig]);
+    }, [ready, visibleTheme, track, model, direction, inspectorMode, singleConfig, registryVersion]);
 
     useEffect(() => { stage.current?.setView(view); }, [ready, view]);
     useEffect(() => { stage.current?.setDeck(deck); }, [ready, deck]);
     useEffect(() => { stage.current?.setDebug(debug); }, [ready, debug]);
     useEffect(() => { stage.current?.setKeyParticles(showKeyParticles); }, [ready, showKeyParticles]);
-    useEffect(() => { stage.current?.setKeyParticleSettings(keyParticleSettings); }, [ready, keyParticleSettings]);
+    useEffect(() => { stage.current?.setKeyParticleSettings(keyParticleSettings); }, [ready, keyParticleSettings, registryVersion]);
 
     useEffect(() => {
         if (!ready || capture) return;
@@ -614,10 +743,25 @@ export default function VfxLabPage() {
     }, [ready, playing, muted, loop, loopIn, loopOut, track, audio, capture]);
 
     useEffect(() => {
+        if (!ready || capture || INITIAL_LAB_PARAMS?.get("song") !== "secret") return;
+        void selectSong(loadSecret).then(() => {
+            if (initialTime > 0) {
+                position.current = initialTime;
+                setTime(initialTime);
+            }
+        });
+    }, [ready]);
+
+    useEffect(() => {
         if (!capture || !ready) return;
         let sample: Promise<LabSong> | undefined;
         const decodeSong = (base64: string) => readPbe(Uint8Array.from(atob(base64), char => char.charCodeAt(0)));
         const lab = {
+            setPlugins: (ids?: string[]) => {
+                const target = ids ?? DISCOVERED_PLUGINS.map(item => item.manifest.id);
+                applyPluginSetRef.current(target);
+                return activePluginIds();
+            },
             render: async (options: {
                 preset: string | VfxTheme;
                 time: number;
@@ -634,15 +778,20 @@ export default function VfxLabPage() {
                 const song = custom ?? (options.preset === "secret" ? await (sample ??= loadSecret()) : undefined);
                 const input = song ? toTrack(song.notes, song.duration, "midi", song.performance) : track;
                 const selection = song
-                    ? VFX_THEMES.galaxy
+                    ? (getVfxTheme("galaxy") ?? listVfxThemes()[0]?.theme ?? EMPTY_THEME)
                     : typeof options.preset === "string"
-                        ? (isVfxTheme(options.preset) ? VFX_THEMES[options.preset] : undefined)
+                        ? (getVfxTheme(options.preset) ?? (listVfxThemes().length === 0 ? EMPTY_THEME : undefined))
                         : validateVfxTheme(options.preset);
                 if (!selection) throw new Error(`未知主题: ${String(options.preset)}`);
                 instance.configure({ kind: "theme", theme: selection }, input, options.piano ?? "grand",
                     options.direction ?? "south", options.time);
                 position.current = options.time;
-                return { ...instance.stats(), duration: song?.duration ?? track.duration };
+                return {
+                    ...instance.stats(),
+                    budgetLimit: VFX_PARTICLES_PER_PIANO,
+                    duration: song?.duration ?? track.duration,
+                    plugins: activePluginIds(),
+                };
             },
             advance: (time: number) => {
                 position.current = time;
@@ -828,7 +977,7 @@ export default function VfxLabPage() {
                                         particlePalette: normalizeKeyParticlePalette(particleStyle, previous.particlePalette),
                                     }));
                                 }}>
-                                {PIANO_PARTICLE_STYLES.map(style => (
+                                {registeredParticleStyles.map(style => (
                                     <option key={style.style} value={style.value}>{style.label}</option>
                                 ))}
                             </select>
@@ -865,7 +1014,7 @@ export default function VfxLabPage() {
                     <section>
                         <div className="vfx-mode-tabs">
                             <button type="button" aria-pressed={inspectorMode === "theme"}
-                                onClick={() => setInspectorMode("theme")}>主题编排 ({VFX_THEME_ORDER.length})</button>
+                                onClick={() => setInspectorMode("theme")}>主题编排 ({registeredThemes.length})</button>
                             <button type="button" aria-pressed={inspectorMode === "effect"}
                                 onClick={() => setInspectorMode("effect")}>单特效 ({effectCount})</button>
                         </div>
@@ -885,8 +1034,8 @@ export default function VfxLabPage() {
                                         params: undefined,
                                     }));
                                 }}>
-                                    {VFX_EFFECT_IDS.map(id => (
-                                        <option key={id} value={id}>{VFX_EFFECTS[id].label} ({id})</option>
+                                    {registeredEffects.map(item => (
+                                        <option key={item.id} value={item.id}>{item.label} ({item.id})</option>
                                     ))}
                                 </select>
                             </label>
@@ -955,10 +1104,10 @@ export default function VfxLabPage() {
                         <section>
                             <h2>舞台主题</h2>
                             <div className="vfx-presets">
-                                {VFX_THEME_ORDER.map(id => (
+                                {registeredThemes.map(({ id, theme: entry }) => (
                                     <button key={id} data-preset={id} aria-pressed={themeId === id} onClick={() => selectTheme(id)}>
                                         <i className={id} />
-                                        <span>{themeEnglishNames[id]}<small>{VFX_THEMES[id].label}</small></span>
+                                        <span>{themeEnglishNames[id] ?? id}<small>{entry.label ?? id}</small></span>
                                     </button>
                                 ))}
                             </div>
@@ -1029,13 +1178,56 @@ export default function VfxLabPage() {
                                 }));
                             }}>
                                 <option value="" disabled>添加图层</option>
-                                {VFX_EFFECT_IDS.map(id => (
-                                    <option key={id} value={id}>{VFX_EFFECTS[id].label} ({id})</option>
+                                {registeredEffects.map(item => (
+                                    <option key={item.id} value={item.id}>{item.label} ({item.id})</option>
                                 ))}
                             </select>}
                         </section>
                     </>}
                 </>}
+                <section>
+                    <div className="vfx-section-title">
+                        <h2>插件组合 ({enabledPlugins.length}/{DISCOVERED_PLUGINS.length})</h2>
+                        <span className="vfx-row" style={{ gap: "0.35rem" }}>
+                            <button
+                                type="button"
+                                onClick={() => applyPluginSet(DISCOVERED_PLUGINS.map(item => item.manifest.id))}
+                            >
+                                全部启用
+                            </button>
+                            <button type="button" onClick={() => applyPluginSet([])}>
+                                零插件
+                            </button>
+                        </span>
+                    </div>
+                    {DISCOVERED_PLUGINS.map(plugin => {
+                        const id = plugin.manifest.id;
+                        const checked = enabledPlugins.includes(id);
+                        const provides = plugin.manifest.provides;
+                        const summary = provides.effects?.length
+                            ? `${provides.effects.length} 特效`
+                            : provides.themes?.length
+                              ? `${provides.themes.length} 主题`
+                              : "";
+                        return (
+                            <label key={id} className="vfx-checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={event => {
+                                        const next = event.currentTarget.checked
+                                            ? [...enabledPlugins, id]
+                                            : enabledPlugins.filter(item => item !== id);
+                                        applyPluginSet(next);
+                                    }}
+                                />
+                                <span>
+                                    {plugin.manifest.name} {summary && <small>({summary})</small>}
+                                </span>
+                            </label>
+                        );
+                    })}
+                </section>
                 <section className="vfx-scene-controls">
                     <h2>场景</h2>
                     <label>钢琴 <select aria-label="钢琴" value={model} onChange={event => setModel(event.target.value as PianoModel)}>

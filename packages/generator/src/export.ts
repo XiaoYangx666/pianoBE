@@ -1,5 +1,13 @@
 import type { AddonTemplate } from "@bepack/addon";
 import { metasToAddonIndex, songToAddonModule } from "@piano/core";
+import { VFX_API_VERSION, isApiVersionCompatible } from "@piano/vfx";
+import {
+    HOST_PARTICLE_IDS,
+    HOST_TEXTURES,
+    pluginSlug,
+    rewritePluginJsForAddon,
+    type PbePluginArchive,
+} from "@piano/vfx/package";
 import type { SongEntry } from "./types";
 import type { TemplateInfo } from "./template";
 import type { LoadedTimbrePack, TimbreIndexEntry } from "./timbres";
@@ -19,6 +27,8 @@ export interface ExportOptions {
     timbres?: TimbreExportSelection;
     /** 曲谱列表；不传或为空则保持模板原样（只更新资源包 UUID） */
     scores?: ScoreEntry[];
+    /** VFX 插件包；传 [] 表示零插件模式，不传则保持模板原样 */
+    plugins?: readonly PbePluginArchive[];
 }
 
 export interface TimbreExportSelection {
@@ -88,6 +98,7 @@ export async function generateAddonZip(
     );
 
     if (opts.timbres) applyTimbres(addon, bpPath, rpPath, opts.timbres);
+    if (opts.plugins !== undefined) applyVfxPlugins(addon, bpPath, rpPath, opts.plugins);
 
     return addon.toBlob();
 }
@@ -301,4 +312,138 @@ interface BpEntityJson {
         [key: string]: unknown;
     };
     [key: string]: unknown;
+}
+
+const HOST_PARTICLE_SET = new Set(HOST_PARTICLE_IDS);
+const HOST_TEXTURE_SET = new Set(HOST_TEXTURES);
+const EXTRA_RP_PATHS = new WeakMap<AddonTemplate, string[]>();
+
+function isHostParticleAsset(fileName: string): boolean {
+    const match = fileName.match(/^pbe_vfx_(.+)\.particle\.json$/);
+    return match ? HOST_PARTICLE_SET.has(match[1]) : false;
+}
+
+function isHostParticleTexture(relPath: string): boolean {
+    const stem = relPath.replace(/(?:_mer|_normal)?\.(?:png|tga|texture_set\.json)$/i, "");
+    return HOST_TEXTURE_SET.has(stem);
+}
+
+function stripExistingVfxPlugins(addon: AddonTemplate, bpPath: string, rpPath: string) {
+    addon.removeTree(`${bpPath}scripts/plugins/`);
+
+    const previousExtras = EXTRA_RP_PATHS.get(addon) ?? [];
+    for (const path of previousExtras) addon.remove(path);
+
+    const particlesPrefix = `${rpPath}particles/`;
+    const particleTexturesPrefix = `${rpPath}textures/particle/`;
+    for (const entry of addon.entries()) {
+        if (entry.path.startsWith(particlesPrefix)) {
+            const name = entry.path.slice(particlesPrefix.length);
+            if (!isHostParticleAsset(name)) addon.remove(entry.path);
+        } else if (entry.path.startsWith(particleTexturesPrefix)) {
+            const relPath = entry.path.slice(rpPath.length);
+            if (!isHostParticleTexture(relPath)) addon.remove(entry.path);
+        }
+    }
+}
+
+function serializeVfxPluginsLoaderModule(
+    entries: readonly { id: string; slug: string; hasJs: boolean }[],
+): string {
+    const jsEntries = entries.filter((entry) => entry.hasJs);
+    if (jsEntries.length === 0) {
+        return `export const INSTALLED_VFX_PLUGINS = ${JSON.stringify(entries.map((e) => e.id))};\nexport function registerVfxPlugins() {}\n`;
+    }
+    const imports = [
+        `import { registerVfxPlugin, vfxRegistry } from "./host.js";`,
+        ...jsEntries.map((entry, index) => `import plugin_${index} from "../plugins/${entry.slug}/vfx/index.js";`),
+    ];
+    const refs = jsEntries.map((_, index) => `    plugin_${index},`);
+    return [
+        ...imports,
+        "",
+        "const ASSEMBLED_PLUGINS = [",
+        ...refs,
+        "];",
+        "",
+        `export const INSTALLED_VFX_PLUGINS = ${JSON.stringify(entries.map((entry) => entry.id))};`,
+        "",
+        "let registered = false;",
+        "export function registerVfxPlugins() {",
+        "    if (registered) return;",
+        "    registered = true;",
+        "    for (const plugin of ASSEMBLED_PLUGINS) {",
+        '        const pluginId = plugin?.manifest?.id ?? "unknown";',
+        "        if (vfxRegistry.hasPlugin(pluginId)) continue;",
+        "        try {",
+        "            registerVfxPlugin(plugin, vfxRegistry);",
+        "        } catch (error) {",
+        "            console.warn(`[piano-vfx] 注册插件 ${pluginId} 失败`, error);",
+        "        }",
+        "    }",
+        "}",
+        "",
+    ].join("\n");
+}
+
+/**
+ * 将选中的 .pbeplugin 包统一装配到模板中：
+ * - 先剥离旧的插件脚本与非 Host 粒子/贴图资源，确保每次导出幂等且支持零插件模式
+ * - 重写每个插件 vfx/index.js 的 `@piano/vfx` 导入为 `../../../vfx/host.js`
+ * - 写入静态加载入口 scripts/vfx/plugins.js，并将粒子与贴图合并到 RP
+ */
+function applyVfxPlugins(
+    addon: AddonTemplate,
+    bpPath: string,
+    rpPath: string,
+    plugins: readonly PbePluginArchive[],
+) {
+    stripExistingVfxPlugins(addon, bpPath, rpPath);
+
+    const seenIds = new Set<string>();
+    const seenSlugs = new Set<string>();
+    const loaderEntries: { id: string; slug: string; hasJs: boolean }[] = [];
+    const writtenRpPaths: string[] = [];
+
+    for (const archive of plugins) {
+        const { manifest } = archive;
+        if (seenIds.has(manifest.id)) {
+            throw new Error(`[generator] 插件 ID 重复：${manifest.id}`);
+        }
+        seenIds.add(manifest.id);
+
+        if (!isApiVersionCompatible(manifest.apiVersion, VFX_API_VERSION)) {
+            throw new Error(
+                `[generator] 插件 ${manifest.id} 需要 VFX API ${manifest.apiVersion}，与当前宿主 ${VFX_API_VERSION} 不兼容`
+            );
+        }
+
+        const slug = pluginSlug(manifest.id);
+        if (seenSlugs.has(slug)) {
+            throw new Error(`[generator] 插件路径别名冲突：${slug}`);
+        }
+        seenSlugs.add(slug);
+
+        const hasJs = Boolean(archive.vfxEntryJs?.trim());
+        if (hasJs && archive.vfxEntryJs) {
+            const rewritten = rewritePluginJsForAddon(archive.vfxEntryJs, "../../../vfx/host.js");
+            addon.writeText(`${bpPath}scripts/plugins/${slug}/vfx/index.js`, rewritten);
+        }
+
+        for (const [relPath, bytes] of archive.particles) {
+            const fullPath = `${rpPath}${relPath}`;
+            addon.write(fullPath, bytes);
+            writtenRpPaths.push(fullPath);
+        }
+        for (const [relPath, bytes] of archive.textures) {
+            const fullPath = `${rpPath}${relPath}`;
+            addon.write(fullPath, bytes);
+            writtenRpPaths.push(fullPath);
+        }
+
+        loaderEntries.push({ id: manifest.id, slug, hasJs });
+    }
+
+    EXTRA_RP_PATHS.set(addon, writtenRpPaths);
+    addon.writeText(`${bpPath}scripts/vfx/plugins.js`, serializeVfxPluginsLoaderModule(loaderEntries));
 }

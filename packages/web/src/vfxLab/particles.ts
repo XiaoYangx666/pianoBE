@@ -4,7 +4,7 @@ import Wintersky from "wintersky";
 import type { Config, Emitter } from "wintersky";
 import type Molang from "molangjs";
 import atlasUrl from "@piano/vfx/assets/textures/particle/vfx_lab.png";
-import pianoFxUrl from "@piano/vfx/assets/textures/particle/piano_fx.png";
+import pianoFxUrl from "../../../../plugins/keys/textures/particle/piano_fx.png";
 import type { VfxParticle } from "@piano/vfx";
 
 type Expression = number | string;
@@ -30,9 +30,13 @@ interface RuntimeEmitter extends Emitter {
     params(): object;
 }
 
-const documents = import.meta.glob<Definition>("../../../vfx/assets/particles/*.particle.json", {
+const hostDocuments = import.meta.glob<Definition>("../../../vfx/assets/particles/*.particle.json", {
     eager: true, import: "default",
 });
+const pluginDocuments = import.meta.glob<Definition>("../../../../plugins/*/particles/*.particle.json", {
+    eager: true, import: "default",
+});
+const documents = { ...hostDocuments, ...pluginDocuments };
 const stepRate = 40;
 
 export const particleStep = 1 / stepRate;

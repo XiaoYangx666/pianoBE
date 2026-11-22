@@ -9,11 +9,12 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "predev": "npm run build -w @piano/vfx && node ../../tools/assets/sync-web-samples.mjs",
-        "prebuild": "npm run build -w @piano/vfx && node ../../tools/assets/sync-web-samples.mjs"
+        "predev": "npm run build -w @piano/vfx && npm run build -w @piano/plugins && node ../../tools/assets/sync-web-samples.mjs",
+        "prebuild": "npm run build -w @piano/vfx && npm run build -w @piano/plugins && node ../../tools/assets/sync-web-samples.mjs"
     },
     "dependencies": {
         "@piano/core": "*",
+        "@piano/plugins": "*",
         "@piano/ui": "file:../ui",
         "@piano/vfx": "*",
         "@tonejs/midi": "^2.0.28",

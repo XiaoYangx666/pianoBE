@@ -27,6 +27,18 @@ import { importScorePack, MAX_TITLE_CHARS, type ScoreEntry } from "../scores";
 import { importScorePages } from "../importPages";
 import type { SongEntry } from "../types";
 import { deleteLocalSong, listLocalSongs, putLocalSongs, type StoredSong } from "../localLibrary";
+import { deleteLocalPlugin, listLocalPlugins, putLocalPlugins, type StoredPlugin } from "../localPlugins";
+import {
+    loadPluginArchive,
+    loadPluginIndex,
+    matchSongPlugins,
+    mergePluginLists,
+    parsePbePluginFile,
+    storedPluginToEntry,
+    unpackSongBundles,
+    type GeneratorPluginEntry,
+} from "../plugins";
+import type { PbePluginArchive } from "@piano/vfx/package";
 
 export type LibrarySort = "adds" | "plays" | "name" | "default";
 
@@ -83,6 +95,11 @@ interface GeneratorState {
     libSort: LibrarySort;
     timbres: TimbreIndexEntry[];
     selectedTimbres: string[];
+    plugins: GeneratorPluginEntry[];
+    selectedPlugins: string[];
+    manualPluginOverrides: Record<string, boolean>;
+    pendingTrustPlugins: GeneratorPluginEntry[];
+    pluginsReady: boolean;
     previewTimbreId: string;
     pendingPreviewId: string | null;
     pendingAddId: string | null;
@@ -117,6 +134,15 @@ interface GeneratorState {
     toggleTimbre: (id: string, checked: boolean) => void;
     setPreviewTimbre: (id: string) => Promise<void>;
     selectedTimbreSize: () => number;
+
+    togglePlugin: (id: string, checked: boolean) => void;
+    selectZeroPlugins: () => void;
+    autoSelectRequiredPlugins: () => void;
+    importPluginFiles: (files: File[]) => Promise<void>;
+    importSongBundleFiles: (files: File[]) => Promise<void>;
+    confirmTrustPlugins: (ids: string[]) => Promise<void>;
+    dismissTrustPlugins: () => void;
+    uninstallPlugin: (id: string) => Promise<void>;
 
     setScores: (scores: ScoreEntry[]) => void;
     importScorePackFiles: (files: File[]) => Promise<void>;
@@ -153,6 +179,25 @@ async function ensureTimbrePack(meta: TimbreIndexEntry): Promise<LoadedTimbrePac
     return pack;
 }
 
+function computeNextSelectedPlugins(
+    songs: readonly SongEntry[],
+    plugins: readonly GeneratorPluginEntry[],
+    currentSelected: readonly string[],
+    overrides: Readonly<Record<string, boolean>>,
+): string[] {
+    const available = new Set(
+        plugins.filter((plugin) => plugin.compatible && plugin.trusted).map((plugin) => plugin.id),
+    );
+    const next = new Set(currentSelected.filter((id) => available.has(id)));
+    const match = matchSongPlugins(songs, plugins, [...next]);
+    for (const requiredId of match.autoSelectedIds) {
+        if (available.has(requiredId) && overrides[requiredId] !== false) {
+            next.add(requiredId);
+        }
+    }
+    return [...next];
+}
+
 let libraryPromise: Promise<LibraryMeta[]> | null = null;
 let initStarted = false;
 
@@ -168,6 +213,11 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     libSort: "adds",
     timbres: [],
     selectedTimbres: ["piano"],
+    plugins: [],
+    selectedPlugins: [],
+    manualPluginOverrides: {},
+    pendingTrustPlugins: [],
+    pluginsReady: false,
     previewTimbreId: "piano",
     pendingPreviewId: null,
     pendingAddId: null,
@@ -208,6 +258,35 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             })
             .catch((error) => notifyError("音色清单加载失败", error));
 
+        Promise.all([
+            loadPluginIndex(),
+            listLocalPlugins().catch((error) => {
+                console.error("[generator] 本地插件加载失败", error);
+                return [];
+            }),
+        ])
+            .then(([builtins, storedLocals]) => {
+                const locals = storedLocals
+                    .map(storedPluginToEntry)
+                    .filter((entry): entry is GeneratorPluginEntry => entry !== null);
+                const plugins = mergePluginLists(builtins, locals);
+                const overrides = get().manualPluginOverrides;
+                const baseSelected = plugins
+                    .filter((plugin) => plugin.compatible && plugin.trusted && plugin.source === "builtin" && overrides[plugin.id] !== false)
+                    .map((plugin) => plugin.id);
+                const selectedPlugins = computeNextSelectedPlugins(
+                    get().songs,
+                    plugins,
+                    baseSelected,
+                    overrides,
+                );
+                set({ plugins, selectedPlugins, pluginsReady: true });
+            })
+            .catch((error) => {
+                console.error("[generator] 插件清单初始化失败", error);
+                set({ pluginsReady: true });
+            });
+
         try {
             set({ loadingText: "下载模板包…" });
             const res = await fetch(`./template.mcaddon?v=${Date.now()}`);
@@ -238,10 +317,18 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
 
             const header = template.bpManifest.header;
             const version = header?.version;
-            set({
+            set((state) => ({
                 template,
                 songs: template.songs,
                 scores: template.scores,
+                selectedPlugins: state.pluginsReady
+                    ? computeNextSelectedPlugins(
+                          template.songs,
+                          state.plugins,
+                          state.selectedPlugins,
+                          state.manualPluginOverrides,
+                      )
+                    : state.selectedPlugins,
                 addonName: header?.name ?? "",
                 addonDesc: header?.description ?? "",
                 templateVersion: Array.isArray(version)
@@ -249,7 +336,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                     : typeof version === "string"
                       ? version
                       : "Unknown",
-            });
+            }));
             if (!options?.silent) {
                 notifications.show({
                     title: "模板已加载",
@@ -299,9 +386,22 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                 }
                 set({ myMusic: [...added].reverse().concat(get().myMusic) });
                 if (addToAddon) {
-                    const current = get().songs;
-                    const fresh = added.filter((entry) => !current.some((song) => song.id === entry.id));
-                    if (fresh.length > 0) set({ songs: [...current, ...fresh] });
+                    set((state) => {
+                        const fresh = added.filter((entry) => !state.songs.some((song) => song.id === entry.id));
+                        if (fresh.length === 0) return {};
+                        const songs = [...state.songs, ...fresh];
+                        return {
+                            songs,
+                            selectedPlugins: state.pluginsReady
+                                ? computeNextSelectedPlugins(
+                                      songs,
+                                      state.plugins,
+                                      state.selectedPlugins,
+                                      state.manualPluginOverrides,
+                                  )
+                                : state.selectedPlugins,
+                        };
+                    });
                 }
                 notifications.show({
                     title: addToAddon ? "已导入并加入附加包" : "已加入我的音乐",
@@ -351,7 +451,21 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         set({ pendingAddId: id });
         try {
             const song = await get().loadLibraryEntry(meta);
-            set({ songs: [...get().songs, song] });
+            set((state) => {
+                if (state.songs.some((item) => item.id === song.id)) return {};
+                const songs = [...state.songs, song];
+                return {
+                    songs,
+                    selectedPlugins: state.pluginsReady
+                        ? computeNextSelectedPlugins(
+                              songs,
+                              state.plugins,
+                              state.selectedPlugins,
+                              state.manualPluginOverrides,
+                          )
+                        : state.selectedPlugins,
+                };
+            });
             notifications.show({ title: "已加入附加包", message: meta.name, color: "teal" });
             void recordLibraryAdd(id).then((counted) => {
                 if (!counted) return;
@@ -392,7 +506,21 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
 
     addToAddon: (entry) => {
         if (get().songs.some((song) => song.id === entry.id)) return;
-        set({ songs: [...get().songs, entry] });
+        set((state) => {
+            if (state.songs.some((song) => song.id === entry.id)) return {};
+            const songs = [...state.songs, entry];
+            return {
+                songs,
+                selectedPlugins: state.pluginsReady
+                    ? computeNextSelectedPlugins(
+                          songs,
+                          state.plugins,
+                          state.selectedPlugins,
+                          state.manualPluginOverrides,
+                      )
+                    : state.selectedPlugins,
+            };
+        });
         notifications.show({ title: "已加入附加包", message: entry.name, color: "teal" });
     },
 
@@ -555,6 +683,229 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             .reduce((sum, meta) => sum + meta.size, 0);
     },
 
+    togglePlugin: (id, checked) => {
+        const plugin = get().plugins.find((item) => item.id === id);
+        if (!plugin) return;
+        if (checked && (!plugin.compatible || !plugin.trusted)) {
+            notifications.show({
+                title: "无法启用插件",
+                message: !plugin.compatible
+                    ? (plugin.compatibilityReason ?? "插件与当前 VFX API 不兼容")
+                    : "请先确认信任该插件后再启用",
+                color: "yellow",
+            });
+            return;
+        }
+        const selected = new Set(get().selectedPlugins);
+        checked ? selected.add(id) : selected.delete(id);
+        const nextSelected = [...selected];
+        const overrides = { ...get().manualPluginOverrides, [id]: checked };
+        set({ selectedPlugins: nextSelected, manualPluginOverrides: overrides });
+
+        if (!checked) {
+            const match = matchSongPlugins(get().songs, get().plugins, nextSelected);
+            const affected = match.disabledRequiredEffects.filter((item) => item.pluginId === id);
+            if (affected.length > 0) {
+                const effectList = [...new Set(affected.map((item) => item.effect))].slice(0, 4).join("、");
+                notifications.show({
+                    title: "已取消曲目所需插件",
+                    message: `特效 ${effectList}${affected.length > 4 ? " 等" : ""} 将在导出包中跳过`,
+                    color: "yellow",
+                    duration: 8_000,
+                });
+            }
+        }
+    },
+
+    selectZeroPlugins: () => {
+        const overrides: Record<string, boolean> = {};
+        for (const plugin of get().plugins) overrides[plugin.id] = false;
+        set({ selectedPlugins: [], manualPluginOverrides: overrides });
+        notifications.show({
+            title: "已切换为零插件模式",
+            message: "导出包将不包含任何 VFX 特效插件，仅保留公共底座与音频播放能力",
+            color: "gray",
+        });
+    },
+
+    autoSelectRequiredPlugins: () => {
+        const { songs, plugins } = get();
+        const match = matchSongPlugins(songs, plugins, []);
+        const next = match.autoSelectedIds.filter((id) => {
+            const plugin = plugins.find((item) => item.id === id);
+            return plugin?.compatible && plugin.trusted;
+        });
+        const overrides: Record<string, boolean> = {};
+        for (const plugin of plugins) {
+            if (!next.includes(plugin.id)) overrides[plugin.id] = false;
+        }
+        set({ selectedPlugins: next, manualPluginOverrides: overrides });
+        notifications.show({
+            title: "已按曲目自动匹配插件",
+            message:
+                next.length > 0
+                    ? `已自动选中 ${next.length} 个所需 VFX 插件`
+                    : "当前曲目未声明特定 VFX 特效需求（已设为零插件）",
+            color: "teal",
+        });
+    },
+
+    importPluginFiles: async (files) => {
+        if (files.length === 0) return;
+        set({ loadingText: "正在解析插件包..." });
+        try {
+            const parsed = new Map<string, GeneratorPluginEntry>();
+            for (const file of files) {
+                try {
+                    const entry = await parsePbePluginFile(file, "local");
+                    parsed.set(entry.id, entry);
+                } catch (error) {
+                    notifyError(`插件解析失败：${file.name}`, error);
+                }
+            }
+            if (parsed.size > 0) {
+                const existing = new Map(get().pendingTrustPlugins.map((item) => [item.id, item]));
+                for (const [id, entry] of parsed) existing.set(id, entry);
+                set({ pendingTrustPlugins: [...existing.values()] });
+            }
+        } finally {
+            set({ loadingText: null });
+        }
+    },
+
+    importSongBundleFiles: async (files) => {
+        if (files.length === 0) return;
+        set({ loadingText: "正在解析曲目与附带资源..." });
+        try {
+            const bundle = await unpackSongBundles(files);
+            const existingMineIds = new Set(get().myMusic.map((item) => item.id));
+            const newMine: StoredSong[] = [];
+            const now = Date.now();
+            for (const song of bundle.songs) {
+                if (!existingMineIds.has(song.id)) {
+                    existingMineIds.add(song.id);
+                    newMine.push({ ...song, createdAt: now + newMine.length });
+                }
+            }
+            if (newMine.length > 0) {
+                await putLocalSongs(newMine);
+            }
+            if (bundle.songs.length > 0) {
+                set((state) => {
+                    const existingSongs = new Set(state.songs.map((item) => item.id));
+                    const freshSongs = bundle.songs.filter((item) => !existingSongs.has(item.id));
+                    const nextSongs = freshSongs.length > 0 ? [...state.songs, ...freshSongs] : state.songs;
+                    return {
+                        myMusic: newMine.length > 0 ? [...newMine].reverse().concat(state.myMusic) : state.myMusic,
+                        songs: nextSongs,
+                        selectedPlugins: state.pluginsReady
+                            ? computeNextSelectedPlugins(
+                                  nextSongs,
+                                  state.plugins,
+                                  state.selectedPlugins,
+                                  state.manualPluginOverrides,
+                              )
+                            : state.selectedPlugins,
+                    };
+                });
+                notifications.show({
+                    title: "已导入曲目",
+                    message: `导入 ${bundle.songs.length} 首 PBE3 曲目并加入当前附加包`,
+                    color: "teal",
+                });
+            }
+            if (bundle.plugins.length > 0) {
+                const pending = new Map(get().pendingTrustPlugins.map((item) => [item.id, item]));
+                for (const plugin of bundle.plugins) pending.set(plugin.id, plugin);
+                set({ pendingTrustPlugins: [...pending.values()] });
+            }
+            if (bundle.errors.length > 0) {
+                notifications.show({
+                    title: "部分文件导入失败",
+                    message: bundle.errors.join("；"),
+                    color: "red",
+                });
+            }
+        } catch (error) {
+            notifyError("曲目导入失败", error);
+        } finally {
+            set({ loadingText: null });
+        }
+    },
+
+    confirmTrustPlugins: async (ids) => {
+        const idSet = new Set(ids);
+        const approved = get().pendingTrustPlugins.filter((item) => idSet.has(item.id));
+        if (approved.length === 0) {
+            set({ pendingTrustPlugins: [] });
+            return;
+        }
+        const trustedEntries: GeneratorPluginEntry[] = approved.map((item) => ({
+            ...item,
+            trusted: true,
+        }));
+        const toStore: StoredPlugin[] = trustedEntries
+            .filter((item): item is GeneratorPluginEntry & { bytes: Uint8Array } => Boolean(item.bytes))
+            .map((item) => ({
+                id: item.id,
+                bytes: item.bytes,
+                source: item.source === "song" ? "song" : "local",
+                trusted: true,
+                importedAt: Date.now(),
+                ...(item.songSourceName ? { songSourceName: item.songSourceName } : {}),
+            }));
+        try {
+            await putLocalPlugins(toStore);
+        } catch (error) {
+            notifyError("保存本地插件失败", error);
+            return;
+        }
+
+        set((state) => {
+            const plugins = mergePluginLists(state.plugins, trustedEntries);
+            const overrides = { ...state.manualPluginOverrides };
+            const selected = new Set(state.selectedPlugins);
+            for (const entry of trustedEntries) {
+                if (entry.compatible) {
+                    overrides[entry.id] = true;
+                    selected.add(entry.id);
+                }
+            }
+            const nextSelected = computeNextSelectedPlugins(state.songs, plugins, [...selected], overrides);
+            return {
+                plugins,
+                selectedPlugins: nextSelected,
+                manualPluginOverrides: overrides,
+                pendingTrustPlugins: [],
+            };
+        });
+        notifications.show({
+            title: "插件已信任并安装",
+            message: `已添加 ${trustedEntries.length} 个插件`,
+            color: "teal",
+        });
+    },
+
+    dismissTrustPlugins: () => set({ pendingTrustPlugins: [] }),
+
+    uninstallPlugin: async (id) => {
+        const entry = get().plugins.find((item) => item.id === id);
+        if (!entry || entry.source === "builtin") return;
+        try {
+            await deleteLocalPlugin(id);
+            set((state) => {
+                const plugins = state.plugins.filter((item) => item.id !== id);
+                const selectedPlugins = state.selectedPlugins.filter((item) => item !== id);
+                const overrides = { ...state.manualPluginOverrides };
+                delete overrides[id];
+                return { plugins, selectedPlugins, manualPluginOverrides: overrides };
+            });
+            notifications.show({ title: "已卸载插件", message: entry.manifest.name, color: "gray" });
+        } catch (error) {
+            notifyError("卸载插件失败", error);
+        }
+    },
+
     setScores: (scores) => set({ scores }),
 
     importScorePackFiles: async (files) => {
@@ -625,16 +976,38 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     },
 
     exportAddon: async () => {
-        const { template, timbres, selectedTimbres, songs, scores } = get();
+        const { template, timbres, selectedTimbres, songs, scores, plugins, selectedPlugins } = get();
         if (!template) return;
         previewPlayer.stop();
-        set({ exporting: true, loadingText: "加载音色包..." });
+        set({ exporting: true, loadingText: "加载音色包与 VFX 插件..." });
         try {
+            const match = matchSongPlugins(songs, plugins, selectedPlugins);
+            if (match.missingEffects.length > 0 || match.disabledRequiredEffects.length > 0) {
+                const missingNames = [
+                    ...match.missingEffects.map((item) => item.effect),
+                    ...match.disabledRequiredEffects.map((item) => item.effect),
+                ];
+                const uniqueEffects = [...new Set(missingNames)];
+                notifications.show({
+                    title: "导出包的演出效果不完整",
+                    message: `缺少或未启用特效：${uniqueEffects.slice(0, 4).join("、")}${uniqueEffects.length > 4 ? " 等" : ""}（播放时将自动跳过）`,
+                    color: "yellow",
+                    duration: 9_000,
+                });
+            }
+
             const selectedPacks: LoadedTimbrePack[] = [];
             for (const meta of timbres) {
                 if (meta.bundled || !selectedTimbres.includes(meta.id)) continue;
                 selectedPacks.push(await ensureTimbrePack(meta));
             }
+
+            const selectedPluginArchives: PbePluginArchive[] = [];
+            for (const entry of plugins) {
+                if (!selectedPlugins.includes(entry.id) || !entry.trusted || !entry.compatible) continue;
+                selectedPluginArchives.push(await loadPluginArchive(entry));
+            }
+
             set({ loadingText: "导出打包中..." });
             const name = get().addonName.trim() || "Piano Addon";
             const desc = get().addonDesc.trim() || "Powered by PianoBE";
@@ -648,6 +1021,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                     enabledIds: timbres.filter((meta) => selectedTimbres.includes(meta.id)).map((meta) => meta.id),
                 },
                 scores,
+                plugins: selectedPluginArchives,
             });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
@@ -656,7 +1030,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
             notifications.show({
                 title: "附加包已导出",
-                message: `${name} · ${songs.length} 首曲目 / ${scores.length} 张曲谱`,
+                message: `${name} · ${songs.length} 首曲目 / ${selectedPluginArchives.length} 个插件 / ${scores.length} 张曲谱`,
                 color: "teal",
             });
         } catch (error) {

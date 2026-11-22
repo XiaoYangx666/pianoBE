@@ -6,9 +6,9 @@
     "license": "CC-BY-NC-4.0",
     "private": true,
     "scripts": {
-        "predev": "node scripts/sync-template.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
+        "predev": "node scripts/sync-template.mjs && node scripts/sync-plugins.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
         "dev": "vite",
-        "prebuild": "node scripts/sync-template.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
+        "prebuild": "node scripts/sync-template.mjs && node scripts/sync-plugins.mjs && node scripts/sync-library.mjs && node scripts/sync-timbres.mjs && node scripts/sync-amt.mjs",
         "build": "vite build",
         "preview": "vite preview",
         "sync:amt": "node scripts/sync-amt.mjs"
@@ -17,6 +17,7 @@
         "@bepack/addon": "^0.1.0-beta.9",
         "@piano/core": "file:../core",
         "@piano/ui": "file:../ui",
+        "@piano/vfx": "file:../vfx",
         "lucide-react": "^0.545.0",
         "onnxruntime-web": "^1.31.1",
         "pdfjs-dist": "^6.5.438",

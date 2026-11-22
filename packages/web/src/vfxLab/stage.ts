@@ -6,7 +6,7 @@ import {
     createSingleEffectProgram,
     createThemeProgram,
     DEFAULT_KEY_PARTICLE_SETTINGS,
-    KEY_PARTICLE_STYLE_LABELS,
+    getKeyParticleStyleLabel,
     keyParticleOrigin,
     normalizeKeyParticlePalette,
     placeVfxEmitter,
@@ -335,7 +335,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
                 activeChannels: engine?.activeSummary(simTime, features) ?? [],
                 keyParticle: {
                     style: resolvedKey.style,
-                    label: KEY_PARTICLE_STYLE_LABELS[resolvedKey.style],
+                    label: getKeyParticleStyleLabel(resolvedKey.style),
                     colors: resolvedKey.colors,
                     glimmer: resolvedKey.glimmer,
                     overridden: resolvedKey.overridden,

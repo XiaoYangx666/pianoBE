@@ -36,6 +36,9 @@ import { bytesToMB, useGenerator } from "../store/generator";
 import { ScoreThumb } from "../components/ScoreThumb";
 import { ScorePreviewModal } from "../components/ScorePreviewModal";
 import { RenameSongDialog } from "../components/RenameSongDialog";
+import { PluginsPanel } from "../components/PluginsPanel";
+import { TrustPluginsDialog } from "../components/TrustPluginsDialog";
+import { matchSongPlugins } from "../plugins";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const ROW_HEIGHT = 50;
@@ -61,18 +64,30 @@ export function AddonPage() {
     const scores = useGenerator((state) => state.scores);
     const timbres = useGenerator((state) => state.timbres);
     const selectedTimbres = useGenerator((state) => state.selectedTimbres);
+    const plugins = useGenerator((state) => state.plugins);
+    const selectedPlugins = useGenerator((state) => state.selectedPlugins);
+    const pluginsReady = useGenerator((state) => state.pluginsReady);
+    const pendingTrustPlugins = useGenerator((state) => state.pendingTrustPlugins);
     const previewTimbreId = useGenerator((state) => state.previewTimbreId);
     const pendingPreviewId = useGenerator((state) => state.pendingPreviewId);
     const addonName = useGenerator((state) => state.addonName);
     const addonDesc = useGenerator((state) => state.addonDesc);
     const randomUuid = useGenerator((state) => state.randomUuid);
     const addMidiFiles = useGenerator((state) => state.addMidiFiles);
+    const importSongBundleFiles = useGenerator((state) => state.importSongBundleFiles);
+    const importPluginFiles = useGenerator((state) => state.importPluginFiles);
     const addToAddon = useGenerator((state) => state.addToAddon);
     const togglePreview = useGenerator((state) => state.togglePreview);
     const removeSong = useGenerator((state) => state.removeSong);
     const renameSong = useGenerator((state) => state.renameSong);
     const clearSongs = useGenerator((state) => state.clearSongs);
     const toggleTimbre = useGenerator((state) => state.toggleTimbre);
+    const togglePlugin = useGenerator((state) => state.togglePlugin);
+    const selectZeroPlugins = useGenerator((state) => state.selectZeroPlugins);
+    const autoSelectRequiredPlugins = useGenerator((state) => state.autoSelectRequiredPlugins);
+    const confirmTrustPlugins = useGenerator((state) => state.confirmTrustPlugins);
+    const dismissTrustPlugins = useGenerator((state) => state.dismissTrustPlugins);
+    const uninstallPlugin = useGenerator((state) => state.uninstallPlugin);
     const setPreviewTimbre = useGenerator((state) => state.setPreviewTimbre);
     const selectedTimbreSize = useGenerator((state) => state.selectedTimbreSize);
     const setAddonName = useGenerator((state) => state.setAddonName);
@@ -86,7 +101,7 @@ export function AddonPage() {
     const removeScore = useGenerator((state) => state.removeScore);
     const scoreChunks = useGenerator((state) => state.scoreChunks);
 
-    const [tab, setTab] = useState<"tracks" | "timbres" | "scores" | "export">("tracks");
+    const [tab, setTab] = useState<"tracks" | "plugins" | "timbres" | "scores" | "export">("tracks");
     const [code, setCode] = useState<{ name: string; chunks: string[]; bytes?: number } | null>(null);
     const [previewScore, setPreviewScore] = useState<ScoreEntry | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -98,9 +113,33 @@ export function AddonPage() {
     const [titleError, setTitleError] = useState("");
 
     const midiRef = useRef<HTMLInputElement>(null);
+    const songBundleRef = useRef<HTMLInputElement>(null);
     const templateRef = useRef<HTMLInputElement>(null);
     const scorePackRef = useRef<HTMLInputElement>(null);
     const scorePagesRef = useRef<HTMLInputElement>(null);
+
+    const pluginMatch = useMemo(
+        () => matchSongPlugins(songs, plugins, selectedPlugins),
+        [songs, plugins, selectedPlugins]
+    );
+    const selectedPluginBytes = useMemo(
+        () => plugins.filter((item) => selectedPlugins.includes(item.id)).reduce((sum, item) => sum + item.size, 0),
+        [plugins, selectedPlugins]
+    );
+    const vfxReady =
+        pluginMatch.missingEffects.length === 0 && pluginMatch.disabledRequiredEffects.length === 0;
+
+    const handleWorkspaceDrop = useCallback(
+        (files: File[]) => {
+            const midis = files.filter((file) => /\.(mid|midi)$/i.test(file.name));
+            const bundles = files.filter((file) => /\.(pbe3|pbesong|zip)$/i.test(file.name));
+            const pluginFiles = files.filter((file) => /\.pbeplugin$/i.test(file.name));
+            if (midis.length > 0) void addMidiFiles(midis, { addToAddon: true });
+            if (bundles.length > 0) void importSongBundleFiles(bundles);
+            if (pluginFiles.length > 0) void importPluginFiles(pluginFiles);
+        },
+        [addMidiFiles, importPluginFiles, importSongBundleFiles]
+    );
 
     const activeId = usePlayingSongId(previewPlayer);
     const extraTimbreBytes = selectedTimbreSize();
@@ -232,6 +271,13 @@ export function AddonPage() {
     const summary = useMemo(
         () => [
             { label: "曲目", value: `${songs.length} 首` },
+            {
+                label: "VFX 插件",
+                value:
+                    selectedPlugins.length === 0
+                        ? "0 个（零插件模式）"
+                        : `${selectedPlugins.length} 个 (${(selectedPluginBytes / 1024).toFixed(0)} KB)`,
+            },
             { label: "音色", value: `${selectedTimbres.length} 套` },
             { label: "曲谱", value: `${scores.length} 张` },
             { label: "模板版本", value: templateVersion },
@@ -240,7 +286,15 @@ export function AddonPage() {
                 value: extraTimbreBytes > 0 ? `约 ${bytesToMB(extraTimbreBytes)}` : "仅内置",
             },
         ],
-        [songs.length, selectedTimbres.length, scores.length, templateVersion, extraTimbreBytes]
+        [
+            songs.length,
+            selectedPlugins.length,
+            selectedPluginBytes,
+            selectedTimbres.length,
+            scores.length,
+            templateVersion,
+            extraTimbreBytes,
+        ]
     );
 
     const sectionLabel = "text-[10px] font-semibold uppercase tracking-[0.14em] text-ore-dimmer";
@@ -250,7 +304,7 @@ export function AddonPage() {
             <div className="hidden md:block">
                 <PageHeader
                     title="附加包制作"
-                    description="整理曲目、音色与曲谱，导出可直接安装的 .mcaddon。"
+                    description="整理曲目、VFX 插件、音色与曲谱，导出可直接安装的 .mcaddon。"
                 />
             </div>
 
@@ -258,6 +312,16 @@ export function AddonPage() {
                 <TabBar className="gap-5 md:gap-6">
                     <TabButton type="button" selected={tab === "tracks"} onClick={() => setTab("tracks")}>
                         曲目 <span className="text-[10.5px] tabular-nums text-ore-dimmer">{songs.length}</span>
+                    </TabButton>
+                    <TabButton type="button" selected={tab === "plugins"} onClick={() => setTab("plugins")}>
+                        插件{" "}
+                        <span className="text-[10.5px] tabular-nums text-ore-dimmer">{selectedPlugins.length}</span>
+                        {!vfxReady && (
+                            <span
+                                className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--pb-warning)]"
+                                title="存在缺少或未启用的曲目特效"
+                            />
+                        )}
                     </TabButton>
                     <TabButton type="button" selected={tab === "timbres"} onClick={() => setTab("timbres")}>
                         音色 <span className="text-[10.5px] tabular-nums text-ore-dimmer">{selectedTimbres.length}</span>
@@ -309,6 +373,18 @@ export function AddonPage() {
                                         if (files.length > 0) void addMidiFiles(files, { addToAddon: true });
                                     }}
                                 />
+                                <input
+                                    ref={songBundleRef}
+                                    type="file"
+                                    accept=".pbe3,.pbesong,.zip"
+                                    multiple
+                                    hidden
+                                    onChange={(event) => {
+                                        const files = Array.from(event.target.files ?? []);
+                                        event.target.value = "";
+                                        if (files.length > 0) void importSongBundleFiles(files);
+                                    }}
+                                />
                                 {songs.length > 0 && (
                                     <>
                                         <Button
@@ -329,6 +405,14 @@ export function AddonPage() {
                                             onClick={() => setPickerOpen(true)}
                                         >
                                             <ListPlus size={13} /> 从我的音乐添加
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            color="secondary"
+                                            size="sm"
+                                            onClick={() => songBundleRef.current?.click()}
+                                        >
+                                            <FileArchive size={13} /> 导入 PBE3 / 曲目包
                                         </Button>
                                         <Button type="button" size="sm" onClick={() => midiRef.current?.click()}>
                                             <Upload size={13} /> 导入 MIDI
@@ -355,10 +439,7 @@ export function AddonPage() {
                                 onDrop={(event) => {
                                     event.preventDefault();
                                     setDragActive(false);
-                                    const files = Array.from(event.dataTransfer.files).filter((file) =>
-                                        /\.(mid|midi)$/i.test(file.name)
-                                    );
-                                    if (files.length > 0) void addMidiFiles(files, { addToAddon: true });
+                                    handleWorkspaceDrop(Array.from(event.dataTransfer.files));
                                 }}
                             >
                                 <div className="flex items-start gap-3.5">
@@ -369,7 +450,7 @@ export function AddonPage() {
                                         </span>
                                         <div className="mt-1.5 text-[14.5px] font-semibold">从第一首曲子开始</div>
                                         <p className="mt-1 max-w-[380px] text-[11.5px] leading-relaxed text-ore-dim">
-                                            导入 MIDI 会先存入「我的音乐」，再加入当前附加包。
+                                            支持导入 `.mid`、`.pbe3` 曲目及附带 `.pbeplugin` 的特效曲目包。
                                         </p>
                                     </div>
                                 </div>
@@ -381,17 +462,27 @@ export function AddonPage() {
                                         type="button"
                                         color="secondary"
                                         size="sm"
+                                        onClick={() => songBundleRef.current?.click()}
+                                    >
+                                        <FileArchive size={13} /> 导入 PBE3 / 曲目包
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        color="secondary"
+                                        size="sm"
                                         onClick={() => setPickerOpen(true)}
                                     >
                                         <ListPlus size={13} /> 从我的音乐添加
                                     </Button>
                                 </div>
                                 <div className="mt-3 text-[10.5px] text-ore-dimmer">
-                                    也可以把 .mid / .midi 文件拖到这里
+                                    也可以把 .mid / .pbe3 / .pbesong / .pbeplugin 拖到这里
                                 </div>
                             </div>
                             <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-ore-dimmer">
                                 <span className="text-ore-dim">接下来</span>
+                                <span>检查插件</span>
+                                <span aria-hidden="true">→</span>
                                 <span>选择音色</span>
                                 <span aria-hidden="true">→</span>
                                 <span>添加曲谱</span>
@@ -404,11 +495,11 @@ export function AddonPage() {
                                 <FileDropzone
                                     compact
                                     className="max-w-[520px]"
-                                    accept={[".mid", ".midi"]}
-                                    title="拖入 MIDI 文件"
-                                    description="转换后存入「我的音乐」，并同时加入当前附加包"
+                                    accept={[".mid", ".midi", ".pbe3", ".pbesong", ".zip", ".pbeplugin"]}
+                                    title="拖入 MIDI / PBE3 / 特效曲目包"
+                                    description="自动匹配所需 VFX 插件，附带插件会先弹出信任确认"
                                     icon={<Music2 size={16} />}
-                                    onDrop={(files) => void addMidiFiles(files, { addToAddon: true })}
+                                    onDrop={handleWorkspaceDrop}
                                 />
                                 <VirtualSongList
                                     className="h-[clamp(280px,calc(100dvh-360px),720px)] -mx-1 px-1"
@@ -421,6 +512,21 @@ export function AddonPage() {
                             </>
                         )}
                     </div>
+                )}
+
+                {tab === "plugins" && (
+                    <PluginsPanel
+                        plugins={plugins}
+                        selectedPlugins={selectedPlugins}
+                        match={pluginMatch}
+                        ready={pluginsReady}
+                        onTogglePlugin={togglePlugin}
+                        onAutoMatch={autoSelectRequiredPlugins}
+                        onZeroPlugins={selectZeroPlugins}
+                        onImportPluginFiles={(files) => void importPluginFiles(files)}
+                        onImportSongBundles={(files) => void importSongBundleFiles(files)}
+                        onUninstallPlugin={(id) => void uninstallPlugin(id)}
+                    />
                 )}
 
                 {tab === "timbres" && (
@@ -664,6 +770,17 @@ export function AddonPage() {
                                 <div className="flex flex-col gap-2">
                                     <CheckItem ok={Boolean(template)} label="底包模板已加载" />
                                     <CheckItem ok={songs.length > 0} label="曲目数量" optional />
+                                    <CheckItem
+                                        ok={vfxReady}
+                                        optional={selectedPlugins.length === 0 && vfxReady}
+                                        label={
+                                            vfxReady
+                                                ? selectedPlugins.length === 0
+                                                    ? "零插件模式（无 VFX 特效）"
+                                                    : `VFX 插件已就绪（${selectedPlugins.length} 个）`
+                                                : "存在缺少或未启用的曲目特效"
+                                        }
+                                    />
                                     <CheckItem ok={selectedTimbres.length > 0} label="至少选择一套音色" />
                                     <CheckItem ok={scores.length > 0} label="曲谱（可选）" optional />
                                 </div>
@@ -795,6 +912,12 @@ export function AddonPage() {
                     <p className="text-[11.5px] text-ore-dim">{titleRequest?.hint}</p>
                 </div>
             </Dialog>
+
+            <TrustPluginsDialog
+                plugins={pendingTrustPlugins}
+                onConfirm={(approvedIds) => void confirmTrustPlugins(approvedIds)}
+                onCancel={dismissTrustPlugins}
+            />
         </div>
     );
 }
