@@ -14,7 +14,6 @@ export const VFX_RIGHT_OFFSETS: Record<VfxFacing, Vec3> = {
 
 export type VfxLightLayout = string;
 export type VfxVeilLayout = string;
-export type VfxLayout = string;
 
 export interface LightAnchor {
     origin: Vec3;

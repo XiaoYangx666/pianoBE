@@ -82,6 +82,26 @@ describe("VfxRegistry & plugin system", () => {
         expect(keyResolved.style).toBe("none");
         expect(keyResolved.glimmer).toBe(false);
         expect(keyResolved.emitters).toHaveLength(0);
+
+        // Even when other plugins (without keyStyles) are loaded, resolveKeyParticle stays safe
+        registerVfxPlugin({
+            manifest: makeManifest({ id: "thirdparty.no_keys", provides: { effects: ["no_keys_fx"] } }),
+            register(api) {
+                api.registerEffect({
+                    id: "no_keys_fx",
+                    label: "No Keys FX",
+                    category: "atmosphere",
+                    trigger: "continuous",
+                    interval: 20,
+                    priority: 1,
+                    emit: () => null,
+                });
+            },
+        });
+        const partialResolved = resolveKeyParticle(60, DEFAULT_KEY_PARTICLE_SETTINGS, { x: 1, z: 0 });
+        expect(partialResolved.style).toBe("none");
+        expect(partialResolved.glimmer).toBe(false);
+        expect(partialResolved.emitters).toHaveLength(0);
     });
 
     test("unified registration exposes custom plugin effects, themes, layouts and keyStyles, and unregister removes everything cleanly", () => {

@@ -150,10 +150,6 @@ export function listPianoParticleStyles(
     return result;
 }
 
-export function getKeyParticleStyleIds(registry: VfxRegistry = vfxRegistry): KeyParticleStyleId[] {
-    return ["inherit", ...registry.getKeyStyleIds(), "glimmer", "none"];
-}
-
 export function getKeyParticleStyleLabel(id: string, registry: VfxRegistry = vfxRegistry): string {
     if (Object.hasOwn(SPECIAL_KEY_PARTICLE_STYLES, id)) {
         return SPECIAL_KEY_PARTICLE_STYLES[id as keyof typeof SPECIAL_KEY_PARTICLE_STYLES].label;
@@ -170,19 +166,12 @@ export function isKeyParticleStyleId(
 }
 
 /** Resolve a persisted numeric style value; retired values are intentionally absent. */
-export function keyParticleStyleAt(
+function keyParticleStyleAt(
     value: unknown,
     registry: VfxRegistry = vfxRegistry,
 ): KeyParticleStyleId | undefined {
     if (typeof value !== "number") return undefined;
     return listPianoParticleStyles(registry).find(option => option.value === value)?.style;
-}
-
-export function keyParticleStyleValue(
-    style: KeyParticleStyleId,
-    registry: VfxRegistry = vfxRegistry,
-): number | undefined {
-    return registry.getKeyStyle(style)?.value;
 }
 
 /** Color capability is part of the style definition, not a UI-side style-name table. */
@@ -383,7 +372,10 @@ export function resolveKeyParticle(
     override?: PianoParticleOverride,
     registry: VfxRegistry = vfxRegistry,
 ): ResolvedKeyParticle {
-    if (registry.listPlugins().length === 0) {
+    const playerStyles = listPianoParticleStyles(registry).filter(
+        option => activeKeyStyle(option.style, registry) !== undefined,
+    );
+    if (playerStyles.length === 0 && !override) {
         const colors = PIANO_PARTICLE_PALETTES[0].colors;
         return {
             color: hexToUnitRgb(colors[0]),
@@ -395,9 +387,6 @@ export function resolveKeyParticle(
         };
     }
 
-    const playerStyles = listPianoParticleStyles(registry).filter(
-        option => activeKeyStyle(option.style, registry) !== undefined,
-    );
     const baseStyle = playerStyles.find(option => option.value === settings.particleStyle) ?? playerStyles[0];
     const baseStyleId: KeyParticleStyleId = baseStyle?.style ?? "none";
 

@@ -631,8 +631,16 @@ export default function VfxLabPage() {
         const active = activePluginIds();
         const nextThemes = listVfxThemes();
         const nextEffects = listVfxEffects();
+        const nextParticleStyles = listPianoParticleStyles();
         setEnabledPlugins(active);
         setRegistryVersion(version => version + 1);
+        if (nextParticleStyles.length > 0 && !nextParticleStyles.some(style => style.value === keyParticleSettings.particleStyle)) {
+            const fallbackStyle = nextParticleStyles[0].value;
+            setKeyParticleSettings(previous => ({
+                particleStyle: fallbackStyle,
+                particlePalette: normalizeKeyParticlePalette(fallbackStyle, previous.particlePalette),
+            }));
+        }
         if (themeId !== "custom") {
             const currentTheme = getVfxTheme(themeId);
             if (currentTheme) {
@@ -965,38 +973,52 @@ export default function VfxLabPage() {
                 <section>
                     <div className="vfx-section-title">
                         <h2>琴键粒子设置</h2>
-                        <span>{keyColorMode === "fixed" ? "固定配色" : keyColorMode === "limited" ? "限定配色" : "自由配色"}</span>
+                        <span>
+                            {registeredParticleStyles.length === 0
+                                ? "未安装插件"
+                                : keyColorMode === "fixed"
+                                  ? "固定配色"
+                                  : keyColorMode === "limited"
+                                    ? "限定配色"
+                                    : "自由配色"}
+                        </span>
                     </div>
-                    <div className="vfx-painter-grid">
-                        <label>粒子样式
-                            <select aria-label="琴键粒子样式" value={keyParticleSettings.particleStyle}
-                                onChange={event => {
-                                    const particleStyle = Number(event.target.value);
-                                    setKeyParticleSettings(previous => ({
-                                        particleStyle,
-                                        particlePalette: normalizeKeyParticlePalette(particleStyle, previous.particlePalette),
-                                    }));
-                                }}>
-                                {registeredParticleStyles.map(style => (
-                                    <option key={style.style} value={style.value}>{style.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                        {keyColorOptions ? <label>粒子配色
-                            <select aria-label="琴键粒子配色" value={keyParticleSettings.particlePalette}
-                                onChange={event => setKeyParticleSettings(previous => ({
-                                    ...previous,
-                                    particlePalette: Number(event.target.value),
-                                }))}>
-                                {keyColorOptions.map(palette => (
-                                    <option key={palette.value} value={palette.value}>{palette.label}</option>
-                                ))}
-                            </select>
-                        </label> : null}
-                    </div>
-                    {!keyColorOptions && <div className="vfx-layer-stats">
-                        该粒子自带自然配色，玩家设置中不提供换色。
-                    </div>}
+                    {registeredParticleStyles.length === 0 ? (
+                        <div className="vfx-layer-stats">当前未启用琴键粒子插件（pianobe.keys）。</div>
+                    ) : (
+                        <>
+                            <div className="vfx-painter-grid">
+                                <label>粒子样式
+                                    <select aria-label="琴键粒子样式" value={keyParticleSettings.particleStyle}
+                                        onChange={event => {
+                                            const particleStyle = Number(event.target.value);
+                                            setKeyParticleSettings(previous => ({
+                                                particleStyle,
+                                                particlePalette: normalizeKeyParticlePalette(particleStyle, previous.particlePalette),
+                                            }));
+                                        }}>
+                                        {registeredParticleStyles.map(style => (
+                                            <option key={style.style} value={style.value}>{style.label}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                {keyColorOptions ? <label>粒子配色
+                                    <select aria-label="琴键粒子配色" value={keyParticleSettings.particlePalette}
+                                        onChange={event => setKeyParticleSettings(previous => ({
+                                            ...previous,
+                                            particlePalette: Number(event.target.value),
+                                        }))}>
+                                        {keyColorOptions.map(palette => (
+                                            <option key={palette.value} value={palette.value}>{palette.label}</option>
+                                        ))}
+                                    </select>
+                                </label> : null}
+                            </div>
+                            {!keyColorOptions && <div className="vfx-layer-stats">
+                                该粒子自带自然配色，玩家设置中不提供换色。
+                            </div>}
+                        </>
+                    )}
                 </section>
                 {midi?.performance ? <section>
                     <h2>{midi.title}</h2>

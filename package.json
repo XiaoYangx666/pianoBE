@@ -30,8 +30,6 @@
         "build:core": "npm run build -w @piano/core",
         "build:vfx": "npm run build -w @piano/vfx",
         "build:plugins": "npm run build -w @piano/plugins",
-        "plugin:pack": "bun tools/plugins/pack-plugin.mjs --all",
-        "plugin:check": "bun tools/plugins/validate-plugin.mjs --all",
         "pack:plugins": "bun tools/plugins/pack-plugin.mjs --all",
         "validate:plugins": "bun tools/plugins/validate-plugin.mjs --all",
         "build:template:bare": "npm run build:template && node tools/build/strip-template-vfx.mjs",

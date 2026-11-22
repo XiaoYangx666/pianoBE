@@ -1,17 +1,19 @@
 # VFX 创作与扩展指南
 
-重构后的 VFX 系统在新增特效、画笔、舞台主题或曲目演出时，无需修改通用播放器 `VfxEngine` 或 `@piano/core` PBE3 编解码器。
+重构后的 VFX 系统在新增特效、画笔、舞台主题或曲目演出时，无需修改通用播放器 `VfxEngine` 或 `@piano/core` PBE3 编解码器；所有内置内容均以独立插件形式向 `VfxRegistry` 注册，也支持直接打包为 `.pbeplugin` 供生成器按需装配。
 
-## 1. 新增内置特效
+## 1. 新增或扩展 VFX 特效插件
 
-1. 在 `packages/vfx/src/effects/` 对应分类模块（`atmosphere.ts`、`curves.ts`、`stage.ts`、`keys.ts` 或 `accents.ts`）添加定义：
-   - 填写 `id`、`label`、`category`、`trigger`（`continuous` / `note` / `instant` / `control`）、`interval`、`priority`。
+1. 在 `plugins/<name>/vfx/index.ts`（内置插件分类：`atmosphere`、`curves`、`stage`、`keys`、`accents`）或独立第三方插件目录中添加插件定义：
+   - 在 `plugin.json` 中填写 `id`、`name`、`version`、`apiVersion`（当前 `"1.0.0"`）、`minPianoBeVersion`、`capabilities`（`["vfx"]`）以及 `provides`（声明本插件注册的 `effects`、`themes`、`layouts`、`keyStyles`、`particles`）。
+   - 在 `register(api)` 中调用 `api.registerEffect({ ... })` 注册特效，填写 `id`、`label`、`category`、`trigger`（`continuous` / `note` / `instant` / `control`）、`interval`、`priority`。
    - 如需对外开放可调几何/运动/形态控制，声明 `parameters`（支持数值 `min`/`max`/`default`/`step`、布尔 `type: "boolean"` 与枚举 `type: "enum", options`），并在 `emit({ params })` 中通过 `resolveSchemaParams(SCHEMA, params.custom)` 读取（数值参数自动在 `set` + `fade` 上平滑渐变，布尔/枚举在提示时刻切换，并继续保留音乐响应叠加）。
    - 需要跨帧平滑衔接（如前一帧长度/高度）或切换状态时声明 `createState: () => ({ ... })`，避免在播放器中维护全局字段。
    - 如需动态调整间隔或与其他特效互相让步，可选声明 `nextInterval`、`tags` 与 `yields: { tag, ticks }`。
-   - 在 `emit(context)` 中调用 `primitives.ts` 提供的 `drawPoints`、`drawStrokeSegments`、`drawGroundRing` 等原语返回 `{ priority, emitters }`。
-2. 所有已并入 `effects/index.ts` 的特效及其 `parameters` 会自动出现在 Web VFX Lab「单特效」、主题图层选择器、`/pbe:vfx list` 与 `.pbe3` 参数编解码中；无需修改 `@piano/core` 或任何开关表。
-3. 运行 `npm run test:vfx`，`packages/vfx/tests/vfxRegistry.test.ts` 与 `vfxPerformance.test.ts` 会自动验证新特效的变量完备性、参数范围声明、有限性与生命周期上限。
+   - 在 `emit(context)` 中调用 `@piano/vfx` 提供的 `drawPoints`、`drawStrokeSegments`、`drawGroundRing` 等原语返回 `{ priority, emitters }`。
+   - 插件脚本仅允许导入 `@piano/vfx`、`@piano/core` 与相对路径模块，禁止依赖 `@minecraft/*` 或其它插件。
+2. 所有已注册的特效及其 `parameters` 会自动出现在 Web VFX Lab「单特效」、主题图层选择器、`/pbe:vfx list` 与 `.pbe3` 参数编解码中；无需修改 `@piano/core` 或任何开关表。
+3. 执行 `npm run pack:plugins && npm run validate:plugins && npm run test:vfx`，会自动校验 `plugin.json` 声明一致性、打包产物安全规范、变量完备性、参数范围声明、有限性与生命周期上限。
 
 ## 2. 新增画笔或粒子贴图资源
 
@@ -22,18 +24,18 @@
    npm run assets:vfx
    node tools/assets/build-vfx-lab.mjs --check
    ```
-   `brushes.ts`、`pbe_vfx_draw_point.particle.json`（二维图集网格坐标）以及 Web VFX Lab 下拉菜单都会自动读取新画笔，无需手动同步多个索引常量。
+   `packages/vfx/src/spatial/brushes.ts`、`pbe_vfx_draw_point.particle.json`（二维图集网格坐标）以及 Web VFX Lab 下拉菜单都会自动读取新画笔，无需手动同步多个索引常量。
 
 ## 3. 新增普通弹奏粒子样式
 
-普通弹奏粒子与舞台粒子共用同一张 `vfx_lab` 图集。新增样式只需要在 `packages/vfx/src/keyParticles.ts` 的 `KEY_PARTICLE_STYLES` 添加一条，并在同一个定义里声明渲染方式与配色能力：
+普通弹奏粒子由 `pianobe.keys` 插件（或其它自定义 VFX 插件）注册，多数样式复用宿主图集 `vfx_lab`。新增样式只需要在 `plugins/keys/vfx/index.ts` 的 `KEYS_PARTICLE_STYLES` 添加一条（并同步更新 `plugins/keys/plugin.json` 的 `provides.keyStyles`），在同一个定义里声明渲染方式与配色能力：
 
 ```ts
 my_style: {
     label: "我的键上粒子",
     value: 8,              // 出现在钢琴设置中；不写则仅作为 key_style 变体
     render: "point",       // point = draw_point；stream = key_stream；drift = key_drift
-    particle: "key_blue_tears", // 可选：覆盖渲染原语，使用专用粒子文档
+    particle: "key_blue_tears", // 可选：覆盖渲染原语，使用插件或宿主提供的粒子文档
     brush: "star",         // vfxAtlas 点画笔
     alpha: 0.9,
     color: { mode: "free" }, // free / limited / fixed；fixed 使用 colors
@@ -44,16 +46,16 @@ my_style: {
 - `render: "point"` 使用共享 `pbe:vfx_draw_point`；`aspect` 可做非等比尺寸，`colorRandom` 可让每个粒子在双色间随机。
 - `render: "stream"` 默认使用加法混合、竖向拉伸和 `rotate_y` Billboard 的 `pbe:vfx_key_stream`；魔法流光通过 `particle: "magic_trail"` 使用原始拖尾粒子 `pbe:vfx_magic_trail`。
 - `render: "drift"` 使用普通透明混合、`lookat_xyz` Billboard 与自然飘落运动的 `pbe:vfx_key_drift`（樱吹雪、雪晶）。
-- `particle` 可覆盖上述默认原语；魔法流光使用 `pbe:vfx_magic_trail` 的原始长拖尾，蓝眼泪使用 `pbe:vfx_key_blue_tears`，两者都以 `textures/particle/piano_fx` 的原始贴图恢复旧版观感。
+- `particle` 可覆盖上述默认原语；魔法流光使用 `pbe:vfx_magic_trail` 的原始长拖尾，蓝眼泪使用 `pbe:vfx_key_blue_tears`，两者以 `plugins/keys/textures/particle/piano_fx` 的原始贴图恢复旧版观感。
 - 配色策略集中在样式定义里：`free` 使用四套全局预设；`limited` 自带专属调色板；`fixed` 由样式提供自然色，玩家设置直接隐藏配色项。演出编排中的显式 `colors` 仍是创作者覆盖，对任何样式都优先生效。
 
 标签、设置下拉、`key_style` 变体、颜色选项和变量校验都会自动派生，不需要再改粒子文档或 UI 样式名判断。运行 `npm run test:vfx` 会按实际 `render` 对应的粒子文档验证变量。
 
 ## 4. 新增或编辑舞台主题
 
-1. 在 `packages/vfx/src/themes.ts` 中的 `VFX_THEME_ORDER` 与 `VFX_THEMES` 添加条目（或在 Web VFX Lab 的「主题编排」面板实时调整并点击「导出 JSON」）。
+1. 在 `plugins/themes/vfx/index.ts` 中的 `BUILTIN_THEMES` 添加条目并更新 `plugins/themes/plugin.json` 的 `provides.themes`（也可在 Web VFX Lab 的「主题编排」面板实时调整并点击「导出 JSON」，或随自定义 `.pbeplugin` 通过 `api.registerTheme(id, theme)` 注册）。
 2. 每个图层按需配置：`effect`、`slot`（同特效多轨槽位）、`color`、`color2`、`brush`、`variant`、`zone`、`motion`、`params`（该特效声明的专属参数）、`level`（固定数值或 `{ input, from, to }` 音乐特征映射）、`scale` 与瞬时特效门限 `gate`。
-3. 需同步到游戏内菜单选项时，在 `packages/addon/src/domain/piano/settings.ts` 登记主题 ID 与显示标题。
+3. 游戏内舞台设置菜单会从 `VfxRegistry` 动态读取已注册主题（`listPianoStageThemes()`），无需再到 `settings.ts` 手动登记硬编码列表。
 4. 运行 `npm run test:vfx` 确认 4 架钢琴错峰演奏 0 丢弃、单架峰值 ≤ 275 粒子。
 
 ## 5. 为新曲目创作独立演出编排
@@ -88,8 +90,7 @@ my_style: {
 
 ## 6. 发布前回归检查项
 
-- [ ] `node tools/assets/build-vfx-lab.mjs --check` 通过
-- [ ] `npm run build:core && npm run build:vfx && npm run test` 通过
-- [ ] `npm run test:vfx && npm run test -w @piano/addon` 全部通过（含 33 种特效、7 套主题、3 首演出曲目与生命周期边界测试）
-- [ ] `npx tsc --noEmit -p packages/addon/tsconfig.json && npx tsc --noEmit -p packages/web/tsconfig.json` 无错误
-- [ ] `npm run build:web && npm run verify:addon-build` 成功
+- [ ] `npm run check`（`node tools/verify/check-all.mjs`）12 项全量校验通过（涵盖 `@piano/core` / `@piano/vfx` / `@piano/plugins` 构建、`@piano/web` & `@piano/generator` 类型检查、资产校验、`.pbeplugin` 打包校验、全部单元测试与 Client/Server Addon 构建验证）
+- [ ] `npm run check:vfx` 9 项 VFX 专项检查通过
+- [ ] `npm run build:web` 与 `npm run build:generator` 成功
+- [ ] 需要验证生成器端到端装配时，生成 `npm run build:template && npm run build:template:bare` 后执行 `bun tools/verify/verify-generator.mjs` 通过

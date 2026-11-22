@@ -151,31 +151,6 @@ export function segmentsAlong(points: readonly Point3[], count: number): Segment
     return segments;
 }
 
-export function sampleCircle(radius: number, y: number, count: number, depthRatio = 0.9, phaseDeg = 0): Point3[] {
-    const start = (phaseDeg * Math.PI) / 180;
-    return Array.from({ length: count + 1 }, (_, i) => {
-        const a = start + (i / count) * Math.PI * 2;
-        return [radius * Math.cos(a), y, radius * depthRatio * Math.sin(a)];
-    });
-}
-
-export function sampleHelix(
-    radius: number,
-    yStart: number,
-    yEnd: number,
-    turns: number,
-    count: number,
-    phaseDeg = 0,
-    depthRatio = 0.9,
-): Point3[] {
-    const start = (phaseDeg * Math.PI) / 180;
-    return Array.from({ length: count }, (_, i) => {
-        const u = count > 1 ? i / (count - 1) : 0;
-        const a = start + u * turns * Math.PI * 2;
-        return [radius * Math.cos(a), mix(yStart, yEnd, u), radius * depthRatio * Math.sin(a)];
-    });
-}
-
 export function sampleLissajous(
     rx: number,
     ry: number,

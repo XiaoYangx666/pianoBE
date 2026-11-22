@@ -19,14 +19,6 @@ export const STROKE_BRUSH_INDEX: Readonly<Record<StrokeBrushId, number>> = Objec
     STROKE_BRUSHES.map((entry, index) => [entry.id, index]),
 ) as Record<StrokeBrushId, number>;
 
-export const POINT_BRUSH_LABELS: Readonly<Record<PointBrushId, string>> = Object.fromEntries(
-    POINT_BRUSHES.map(entry => [entry.id, entry.label]),
-) as Record<PointBrushId, string>;
-
-export const STROKE_BRUSH_LABELS: Readonly<Record<StrokeBrushId, string>> = Object.fromEntries(
-    STROKE_BRUSHES.map(entry => [entry.id, entry.label]),
-) as Record<StrokeBrushId, string>;
-
 const POINT_TO_STROKE: Readonly<Record<string, StrokeBrushId>> = Object.fromEntries(
     POINT_BRUSHES.map(entry => [entry.id, entry.stroke as StrokeBrushId]),
 );
