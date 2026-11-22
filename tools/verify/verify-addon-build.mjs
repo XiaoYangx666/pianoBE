@@ -139,6 +139,14 @@ if (fs.existsSync(builtManager)) {
     }
 }
 
+const vfxHost = path.join(scripts, "vfx/host.js");
+const vfxHostSource = fs.existsSync(vfxHost) ? read(vfxHost) : "";
+check(fs.existsSync(vfxHost), "built vfx/host.js exists");
+check(
+    vfxHostSource.includes("registerVfxPlugin") && vfxHostSource.includes("drawPoints"),
+    "built vfx/host.js exports VFX Host API (registerVfxPlugin, drawPoints)",
+);
+
 if (failed > 0) {
     console.error(`\n${failed} check(s) failed`);
     process.exit(1);

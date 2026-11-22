@@ -3,10 +3,12 @@
  * 真实流程：读取 addon 构建产物 template.mcaddon → 解析模板 →
  * 转换真实 .mid → 生成最终 mcaddon → 解包断言（含 PBE3 回读闭环）。
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { unzipSync } from "fflate";
 import { readAddon } from "@bepack/addon";
 import { midiBufferToSong } from "@piano/core/convert";
 import {
+    attachPbe3Performance,
     decodePbe3,
     encodePbe3,
     metasToAddonIndex,
@@ -14,11 +16,24 @@ import {
     planImportChunks,
     ImportAssembler,
 } from "@piano/core";
+import {
+    HOST_PARTICLE_IDS,
+    readPbePluginArchive,
+    writePbePluginArchive,
+} from "@piano/vfx/package";
+import { TIMBRES_SCRIPT_PATH } from "../../packages/generator/src/timbres.ts";
+import { SCORE_PACK_SCRIPT_PATH, scoreStandPath } from "../../packages/generator/src/scores.ts";
 import { loadTemplate, parseExistingMidis } from "../../packages/generator/src/template.ts";
 import { generateAddonZip } from "../../packages/generator/src/export.ts";
+import {
+    archiveToPluginEntry,
+    extractSongEffectIds,
+    matchSongPlugins,
+} from "../../packages/generator/src/plugins.ts";
 import { songEntryToEvents } from "../../packages/generator/src/player.ts";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
+const BARE_TEMPLATE = "packages/addon/dist/template-bare.mcaddon";
 const MIDI_A = "midis/files/Beyond - 海阔天空.mid";
 const MIDI_B = "midis/files/ChiliChill - 让风告诉你.mid";
 
@@ -164,6 +179,268 @@ assert(libModule === pbe3ToAddonModule(libBytes), "曲库曲目导出模块与 P
     assert(
         JSON.stringify(Array.from(result.payload)) === JSON.stringify(Array.from(pbe3B)),
         "装配结果与原始 PBE3 字节一致"
+    );
+}
+
+// 11. 零插件模式导出：从含插件模板剥离并输出纯净底包
+async function inspectZip(blob) {
+    const raw = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const dec = new TextDecoder();
+    return {
+        paths: Object.keys(raw),
+        has: (p) => Object.hasOwn(raw, p),
+        readTextSync: (p) => (raw[p] ? dec.decode(raw[p]) : undefined),
+    };
+}
+
+{
+    const zeroBlob = await generateAddonZip(libTpl, [libEntry], {
+        name: "零插件测试",
+        desc: "bare",
+        randomUuid: false,
+        plugins: [],
+    });
+    const zeroZip = await inspectZip(zeroBlob);
+    const zBp = "bp/";
+    const zRp = "rp/";
+    const entries = zeroZip.paths;
+    const pluginScripts = entries.filter((p) => p.startsWith(`${zBp}scripts/plugins/`));
+    const rpParticles = entries.filter((p) =>
+        new RegExp(`^${zRp}particles/pbe_vfx_.+\\.particle\\.json$`).test(p)
+    );
+    const keysTextures = entries.filter((p) => p.startsWith(`${zRp}textures/particle/piano_fx`));
+    const pluginsJs = zeroZip.readTextSync(`${zBp}scripts/vfx/plugins.js`) ?? "";
+
+    assert(zeroZip.has(`${zBp}scripts/vfx/host.js`), "零插件包保留 Host VFX API 入口 (host.js)");
+    assert(pluginsJs.includes("INSTALLED_VFX_PLUGINS = []"), "零插件包 plugins.js 注册列表为空");
+    assert(pluginScripts.length === 0, "零插件包无 scripts/plugins/ 残留脚本");
+    assert(
+        rpParticles.length === HOST_PARTICLE_IDS.length,
+        `零插件包保留 ${HOST_PARTICLE_IDS.length} 个 Host 粒子文档（实际 ${rpParticles.length}）`
+    );
+    assert(keysTextures.length === 0, "零插件包无 keys 插件专属贴图残留");
+}
+
+// 12. PBE3 特效需求提取与插件自动匹配
+{
+    const pbe3Perf = attachPbe3Performance(pbe3B, [
+        { tick: 0, op: "set", effect: "starfield", fade: 8, color: "#8EB8FF", level: 80, scale: 100 },
+        { tick: 40, op: "flash", effect: "key_notes", color: "#FFE29A", level: 90, scale: 100 },
+        { tick: 80, op: "flash", effect: "unknown_custom_fx", color: "#FFFFFF", level: 70, scale: 100 },
+    ]);
+    const extracted = extractSongEffectIds(pbe3Perf);
+    assert(
+        JSON.stringify(extracted) === JSON.stringify(["key_notes", "starfield", "unknown_custom_fx"]),
+        `PBE3 特效 ID 提取正确：${extracted.join(", ")}`
+    );
+
+    const pluginFiles = readdirSync("build/plugins").filter((f) => f.endsWith(".pbeplugin")).sort();
+    const archives = pluginFiles.map((file) =>
+        readPbePluginArchive(new Uint8Array(readFileSync(`build/plugins/${file}`)))
+    );
+    const entries = archives.map((archive) =>
+        archiveToPluginEntry(archive, "builtin", { trusted: true })
+    );
+    const perfSong = { ...libEntry, id: "perf-b", name: "测试演出曲目", data: pbe3Perf };
+
+    const fullMatch = matchSongPlugins([perfSong], entries, entries.map((e) => e.id));
+    assert(
+        fullMatch.autoSelectedIds.includes("pianobe.atmosphere") &&
+            fullMatch.autoSelectedIds.includes("pianobe.keys"),
+        "PBE3 特效匹配选中 pianobe.atmosphere 与 pianobe.keys"
+    );
+    assert(
+        fullMatch.reasons.get("pianobe.atmosphere")?.effects.includes("starfield") === true,
+        "匹配原因包含 starfield"
+    );
+    assert(
+        fullMatch.missingEffects.some((m) => m.effect === "unknown_custom_fx"),
+        "未知特效 unknown_custom_fx 报告为缺失特效"
+    );
+
+    const deselectedMatch = matchSongPlugins(
+        [perfSong],
+        entries,
+        entries.map((e) => e.id).filter((id) => id !== "pianobe.keys")
+    );
+    assert(
+        deselectedMatch.disabledRequiredEffects.some(
+            (d) => d.effect === "key_notes" && d.pluginId === "pianobe.keys"
+        ),
+        "手动取消 pianobe.keys 后报告 key_notes 将无法呈现"
+    );
+}
+
+// 13. 多插件统一装配到基础模板（template-bare.mcaddon）
+const bareTpl = await loadTemplate(new Uint8Array(readFileSync(BARE_TEMPLATE)));
+{
+    const selectedArchives = [
+        "pianobe.atmosphere.pbeplugin",
+        "pianobe.keys.pbeplugin",
+        "pianobe.themes.pbeplugin",
+    ].map((name) => readPbePluginArchive(new Uint8Array(readFileSync(`build/plugins/${name}`))));
+
+    const assembledBlob = await generateAddonZip(bareTpl, [libEntry], {
+        name: "插件装配测试",
+        desc: "multi-plugin assembly",
+        randomUuid: false,
+        plugins: selectedArchives,
+    });
+    const out = await inspectZip(assembledBlob);
+    const oBp = bareTpl.bpPath;
+    const oRp = bareTpl.rpPath;
+
+    const atmoJs = out.readTextSync(`${oBp}scripts/plugins/pianobe_atmosphere/vfx/index.js`) ?? "";
+    const keysJs = out.readTextSync(`${oBp}scripts/plugins/pianobe_keys/vfx/index.js`) ?? "";
+    const themesJs = out.readTextSync(`${oBp}scripts/plugins/pianobe_themes/vfx/index.js`) ?? "";
+    assert(atmoJs.length > 0 && keysJs.length > 0 && themesJs.length > 0, "三个插件 vfx/index.js 均已装配写入");
+    assert(
+        atmoJs.includes('"../../../vfx/host.js"') && keysJs.includes('"../../../vfx/host.js"'),
+        "插件 @piano/vfx 导入已重写为 ../../../vfx/host.js"
+    );
+    assert(
+        !/["']@piano\/vfx["']/.test(atmoJs) && !/["']@piano\/vfx["']/.test(keysJs) && !/["']@piano\/vfx["']/.test(themesJs),
+        "已装配插件脚本不含裸 @piano/vfx 导入"
+    );
+
+    const loaderText = out.readTextSync(`${oBp}scripts/vfx/plugins.js`) ?? "";
+    assert(
+        loaderText.includes('from "./host.js"') &&
+            loaderText.includes("registerVfxPlugin") &&
+            loaderText.includes('from "../plugins/pianobe_atmosphere/vfx/index.js"') &&
+            loaderText.includes('from "../plugins/pianobe_keys/vfx/index.js"') &&
+            loaderText.includes('from "../plugins/pianobe_themes/vfx/index.js"'),
+        "scripts/vfx/plugins.js 静态导入所有已选插件与宿主注册 API"
+    );
+    assert(
+        loaderText.includes('"pianobe.atmosphere"') &&
+            loaderText.includes('"pianobe.keys"') &&
+            loaderText.includes('"pianobe.themes"'),
+        "INSTALLED_VFX_PLUGINS 列表包含全部已装配插件 ID"
+    );
+    assert(
+        out.has(`${oRp}particles/pbe_vfx_key_stream.particle.json`) &&
+            out.has(`${oRp}textures/particle/piano_fx.png`),
+        "keys 插件专属粒子与贴图已正确合并至 rp/"
+    );
+}
+
+// 14. 第三方插件 + 音色 + 曲谱组合装配与二次导出零残留清理
+{
+    const thirdPartyBytes = writePbePluginArchive({
+        "plugin.json": JSON.stringify({
+            id: "acme.custom_fx",
+            name: "Acme Custom FX",
+            version: "1.0.0",
+            apiVersion: "1.0.0",
+            minPianoBeVersion: "1.3.0",
+            capabilities: ["vfx"],
+            author: "Acme",
+            license: "MIT",
+            provides: {
+                effects: ["acme_spark"],
+                particles: ["acme_spark"],
+            },
+        }),
+        "vfx/index.js": [
+            'import { drawPoints } from "@piano/vfx";',
+            "const plugin = {",
+            '  manifest: { id: "acme.custom_fx", name: "Acme Custom FX", version: "1.0.0", apiVersion: "1.0.0", minPianoBeVersion: "1.3.0", capabilities: ["vfx"], author: "Acme", license: "MIT", provides: { effects: ["acme_spark"], particles: ["acme_spark"] } },',
+            "  register(api) {",
+            '    api.registerEffect({ id: "acme_spark", label: "Acme Spark", category: "accent", trigger: "instant", emit: () => ({ emitters: drawPoints({ count: 1, particle: "acme_spark", color: "#FFFFFF" }), interval: 1 }) });',
+            "  },",
+            "};",
+            "export default plugin;",
+        ].join("\n"),
+        "particles/pbe_vfx_acme_spark.particle.json": JSON.stringify({
+            format_version: "1.10.0",
+            particle_effect: {
+                description: {
+                    identifier: "pbe:vfx_acme_spark",
+                    basic_render_parameters: {
+                        material: "particles_alpha",
+                        texture: "textures/custom/acme_spark",
+                    },
+                },
+                components: {},
+            },
+        }),
+        "textures/custom/acme_spark.png": new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    });
+    const thirdPartyArchive = readPbePluginArchive(thirdPartyBytes);
+    const pagePath = "textures/ui/piano_score/custom_score/page_1.png";
+    const standPath = scoreStandPath("custom_score");
+    const dummyPng = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    const comboBlob = await generateAddonZip(bareTpl, [libEntry], {
+        name: "组合装配测试",
+        desc: "third-party + timbre + score",
+        randomUuid: false,
+        plugins: [thirdPartyArchive],
+        timbres: {
+            all: [
+                {
+                    id: "piano",
+                    value: 0,
+                    label: "标准钢琴",
+                    description: "",
+                    required: true,
+                    bundled: true,
+                    dirs: { v1: "grand" },
+                    notes: [],
+                    layers: ["v1"],
+                    size: 0,
+                    file: null,
+                },
+            ],
+            selected: [],
+            enabledIds: ["piano"],
+        },
+        scores: [
+            {
+                id: "custom_score",
+                title: "测试曲谱",
+                pages: [pagePath],
+                source: "custom",
+                assets: new Map([
+                    [pagePath, dummyPng],
+                    [standPath, dummyPng],
+                ]),
+            },
+        ],
+    });
+
+    const comboOut = await inspectZip(comboBlob);
+    const cBp = bareTpl.bpPath;
+    const cRp = bareTpl.rpPath;
+    const tpJs = comboOut.readTextSync(`${cBp}scripts/plugins/acme_custom_fx/vfx/index.js`) ?? "";
+    assert(tpJs.includes('"../../../vfx/host.js"'), "第三方插件脚本导入已重写为 ../../../vfx/host.js");
+    assert(
+        comboOut.has(`${cRp}particles/pbe_vfx_acme_spark.particle.json`) &&
+            comboOut.has(`${cRp}textures/custom/acme_spark.png`),
+        "第三方插件自定义粒子与非 particle/ 路径纹理已写入 rp/"
+    );
+    assert(
+        (comboOut.readTextSync(`${cBp}${TIMBRES_SCRIPT_PATH}`) ?? "").includes("ENABLED_PIANO_TIMBRES") &&
+            (comboOut.readTextSync(`${cBp}${SCORE_PACK_SCRIPT_PATH}`) ?? "").includes("custom_score") &&
+            comboOut.has(`${cRp}${pagePath}`),
+        "第三方 VFX 插件与音色、曲谱组合装配共存完整"
+    );
+
+    // 同一 TemplateInfo 实例第二次切换为零插件模式导出，断言上一次插件脚本/粒子/纹理零残留
+    const cleanupBlob = await generateAddonZip(bareTpl, [libEntry], {
+        name: "二次清理测试",
+        desc: "repeat export zero-plugin cleanup",
+        randomUuid: false,
+        plugins: [],
+    });
+    const cleanOut = await inspectZip(cleanupBlob);
+    assert(
+        !cleanOut.has(`${cBp}scripts/plugins/acme_custom_fx/vfx/index.js`) &&
+            !cleanOut.has(`${cRp}particles/pbe_vfx_acme_spark.particle.json`) &&
+            !cleanOut.has(`${cRp}textures/custom/acme_spark.png`) &&
+            !cleanOut.has(`${cRp}textures/particle/piano_fx.png`),
+        "二次切换零插件重复导出后，上一次插件脚本/粒子/自定义纹理零残留"
     );
 }
 
