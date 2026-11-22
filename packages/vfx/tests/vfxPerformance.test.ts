@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
     attachSongPerformance,
@@ -18,6 +18,10 @@ import {
     createPerformanceProgram,
     createSingleEffectProgram,
     createThemeProgram,
+    getVfxEffect,
+    getVfxEffectIds,
+    getVfxTheme,
+    getVfxThemeIds,
     POINT_BRUSH_IDS,
     POINT_BRUSH_INDEX,
     quietFeatures,
@@ -26,17 +30,17 @@ import {
     STROKE_BRUSH_IDS,
     validateEffectCustomParams,
     validateVfxTheme,
-    VFX_EFFECT_IDS,
-    VFX_EFFECTS,
     VFX_EMITTERS_PER_TICK,
     VFX_MAX_PIANOS,
     VFX_PARTICLES_PER_PIANO,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
     VfxBudget,
     VfxEngine,
     VfxMusic,
 } from "../src";
+import { ensureBuiltinPluginsRegistered, readParticleDoc } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 const allowedVariablesByParticle = new Map<string, Set<string>>();
 const runtimeSupplied = new Set(["right_x", "right_z", "scale", "stage_depth"]);
@@ -44,7 +48,7 @@ const runtimeSupplied = new Set(["right_x", "right_z", "scale", "stage_depth"]);
 function allowedVariablesFor(particleName: string): Set<string> {
     let set = allowedVariablesByParticle.get(particleName);
     if (!set) {
-        const source = readFileSync(new URL(`../assets/particles/pbe_vfx_${particleName}.particle.json`, import.meta.url), "utf8");
+        const source = readParticleDoc(particleName);
         set = new Set([...source.matchAll(/variable\.vfx_(\w+)/g)].map(match => match[1]));
         allowedVariablesByParticle.set(particleName, set);
     }
@@ -99,7 +103,8 @@ test("seeking into an in-flight transition reconstructs intensity, scale, dual R
 });
 
 test("all registered effects emit valid finite parameters and declared particle variables", () => {
-    expect(VFX_EFFECT_IDS.length).toBeGreaterThanOrEqual(33);
+    const effectIds = getVfxEffectIds();
+    expect(effectIds.length).toBeGreaterThanOrEqual(38);
     const zones = Object.keys(PERFORMANCE_ZONES) as PerformanceZone[];
     const motions = Object.keys(PERFORMANCE_MOTIONS) as PerformanceMotion[];
     const allBrushes = [...POINT_BRUSH_IDS, ...STROKE_BRUSH_IDS];
@@ -111,9 +116,9 @@ test("all registered effects emit valid finite parameters and declared particle 
         { midi: 84, velocity: 0.92, duration: 0.6, tick: 10 },
     ];
 
-    for (const definition of ["grand", "upright"]) {
-        for (const [index, id] of VFX_EFFECT_IDS.entries()) {
-            const def = VFX_EFFECTS[id];
+    for (const instrument of ["grand", "upright"] as const) {
+        for (const [index, id] of effectIds.entries()) {
+            const def = getVfxEffect(id)!;
             if (def.trigger === "control") {
                 expect(def.emit).toBeUndefined();
                 expect(typeof def.resolveKeyParticle).toBe("function");
@@ -144,7 +149,7 @@ test("all registered effects emit valid finite parameters and declared particle 
                     music: { ...quietFeatures, activity: 0.72, sustain: 0.75, pitch: 0.62, surge: 0.80, density: 0.68, chord: 0.5, onset: 1 },
                     recentNotes,
                     lastNoteTick: 5,
-                    definition,
+                    instrument,
                     phase: 30,
                     solo: false,
                     state,
@@ -172,13 +177,14 @@ test("all registered effects emit valid finite parameters and declared particle 
 });
 
 test("all 7 unified stage themes complete four staggered pianos with zero dropped batches", () => {
-    expect(VFX_THEME_ORDER).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival"]);
-    for (const name of VFX_THEME_ORDER) {
+    const themeOrder = getVfxThemeIds();
+    expect(themeOrder).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival"]);
+    for (const name of themeOrder) {
         const pianos = Array.from({ length: VFX_MAX_PIANOS }, (_, i) => ({
             start: i * 13,
             budget: new VfxBudget(),
             music: new VfxMusic(),
-            engine: new VfxEngine(createThemeProgram(VFX_THEMES[name], { seconds: 24 }), "grand"),
+            engine: new VfxEngine(createThemeProgram(getVfxTheme(name)!, { seconds: 24 }), "grand"),
         }));
         let peakReserved = 0;
         let peakDispatch = 0;

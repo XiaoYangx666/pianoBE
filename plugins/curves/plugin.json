@@ -1,0 +1,26 @@
+{
+    "id": "pianobe.curves",
+    "name": "PianoBE Curves",
+    "version": "1.0.0",
+    "apiVersion": "1.0.0",
+    "minPianoBeVersion": "1.3.0",
+    "capabilities": ["vfx"],
+    "author": "PianoBE",
+    "license": "CC-BY-NC-4.0",
+    "provides": {
+        "effects": [
+            "wing_ribbons",
+            "double_helix",
+            "orbit_halo",
+            "silk_streams",
+            "wave_ribbon",
+            "vortex_column",
+            "lissajous_weave",
+            "musubi_braid",
+            "time_warp"
+        ]
+    },
+    "preview": {
+        "description": "曲线与轨迹特效插件：丝带、双螺旋、星芒环、音浪、时空旋涡、利萨如织光、组纽与时空裂隙。"
+    }
+}

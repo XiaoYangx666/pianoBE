@@ -1,20 +1,22 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
     compilePerformanceSource,
     createPerformanceProgram,
     createThemeProgram,
+    listVfxEffects,
+    listVfxThemes,
     placeVfxEmitter,
     quietFeatures,
-    VFX_EFFECT_IDS,
-    VFX_EFFECTS,
     VFX_PARTICLES_PER_PIANO,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
     VfxEngine,
     vfxStageFrame,
     type VfxEmitter,
 } from "../src";
+import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 const right = { x: 1, y: 0, z: 0 };
 const stage = vfxStageFrame();
@@ -56,8 +58,7 @@ test("all performance JSON cues place finite variables through unified VfxEngine
 test("all registered effects place finite variables across solo and music modes", () => {
     const music = { ...quietFeatures, velocity: 0.5, activity: 0.55, density: 0.5, sustain: 0.4, surge: 0.45, chord: 0.5, onset: 0.5 };
     const failures: string[] = [];
-    for (const id of VFX_EFFECT_IDS) {
-        const def = VFX_EFFECTS[id];
+    for (const def of listVfxEffects()) {
         if (!def.emit) continue;
         for (const solo of [true, false]) {
             for (const phase of [0, 137, 359]) {
@@ -74,11 +75,12 @@ test("all registered effects place finite variables across solo and music modes"
                     music,
                     recentNotes: [{ midi: 48, velocity: 0.7, duration: 0.8, tick: 1 }],
                     lastNoteTick: 0,
+                    instrument: "upright",
                     phase,
                     solo,
                     state,
                 });
-                for (const emitter of batch?.emitters ?? []) check(`effect ${id}`, emitter, 3.7, failures);
+                for (const emitter of batch?.emitters ?? []) check(`effect ${def.id}`, emitter, 3.7, failures);
             }
         }
     }
@@ -88,8 +90,8 @@ test("all registered effects place finite variables across solo and music modes"
 test("all 7 stage themes place finite variables under unified VfxEngine", () => {
     const music = { ...quietFeatures, velocity: 0.5, activity: 0.62, density: 0.5, sustain: 0.5, surge: 0.6, chord: 0.6, onset: 0.6 };
     const failures: string[] = [];
-    for (const name of VFX_THEME_ORDER) {
-        const engine = new VfxEngine(createThemeProgram(VFX_THEMES[name], { seconds: 24 }));
+    for (const { id: name, theme } of listVfxThemes()) {
+        const engine = new VfxEngine(createThemeProgram(theme, { seconds: 24 }));
         for (let t = 0; t < 20; t += 0.15) {
             const tick = Math.round(t * 20);
             const batches = engine.update(t, tick, music, [{ midi: 60, velocity: 0.8, duration: 0.8, tick }]);
@@ -104,8 +106,7 @@ test("all 7 stage themes place finite variables under unified VfxEngine", () => 
 test("all parameterized effects remain finite and within per-piano particle budget at min/max/alt extremes", () => {
     const music = { ...quietFeatures, velocity: 0.9, activity: 0.95, density: 0.9, sustain: 0.9, surge: 0.95, chord: 0.8, onset: 1 };
     const failures: string[] = [];
-    for (const id of VFX_EFFECT_IDS) {
-        const def = VFX_EFFECTS[id];
+    for (const def of listVfxEffects()) {
         if (!def.parameters || !def.emit) continue;
         const minParams: Record<string, number | boolean | string> = {};
         const maxParams: Record<string, number | boolean | string> = {};
@@ -148,7 +149,7 @@ test("all parameterized effects remain finite and within per-piano particle budg
             for (const emitter of emitters) {
                 expect(emitter.lifetime).toBeGreaterThan(0);
                 expect(emitter.lifetime).toBeLessThan(7);
-                check(`${id}:${mode}`, emitter, 2.5, failures);
+                check(`${def.id}:${mode}`, emitter, 2.5, failures);
             }
         }
     }

@@ -1,23 +1,26 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import {
     createThemeProgram,
+    listVfxThemes,
     simulatedVfxNotes,
     VFX_EMITTERS_PER_TICK,
     VFX_MAX_PIANOS,
     VFX_PARTICLES_PER_PIANO,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
     VfxBudget,
     VfxEngine,
     VfxMusic,
 } from "../src";
+import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 test("four staggered pianos share the real dispatch limits across all built-in themes with zero drops", () => {
-    for (const name of VFX_THEME_ORDER) {
+    for (const { theme } of listVfxThemes()) {
         const pianos = Array.from({ length: VFX_MAX_PIANOS }, (_, i) => ({
             start: i * 13,
             budget: new VfxBudget(),
-            engine: new VfxEngine(createThemeProgram(VFX_THEMES[name], { seconds: 32 })),
+            engine: new VfxEngine(createThemeProgram(theme, { seconds: 32 })),
             music: new VfxMusic(),
         }));
         expect(pianos).toHaveLength(VFX_MAX_PIANOS);

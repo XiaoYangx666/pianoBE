@@ -4,7 +4,6 @@ import type {
 import type { PointBrushId, StrokeBrushId } from "./brushes";
 import type { VfxInstrument } from "./instrument";
 import type { MusicFeatures, VfxKeyNote } from "./music";
-import type { KeyParticleStyleId } from "./keyParticles";
 
 export interface Vec3 {
     x: number;
@@ -15,7 +14,7 @@ export interface Vec3 {
 /** Alias kept for the public API surface: instruments are selected by id, not by addon assembly. */
 export type { VfxInstrument };
 
-export type VfxParticle =
+export type VfxBuiltinParticle =
     | "field"
     | "wave"
     | "beam"
@@ -37,6 +36,8 @@ export type VfxParticle =
     | "magic_trail"
     | "dust"
     | "shock";
+
+export type VfxParticle = VfxBuiltinParticle | (string & {});
 
 export interface VfxTransform {
     x?: number;
@@ -67,7 +68,7 @@ export type VfxCategory = "atmosphere" | "curve" | "stage" | "keys" | "accent" |
 export type VfxTrigger = "continuous" | "note" | "instant" | "control";
 
 export interface PianoParticleOverride {
-    style?: KeyParticleStyleId;
+    style?: string;
     colors?: readonly string[];
     glimmer?: boolean;
     intensity?: number;

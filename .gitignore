@@ -17,9 +17,11 @@ tools/piano_timbres_source/*
 # 本地音频实验环境，不随正式仓库提交
 tools/audio-lab/
 packages/*/dist
+plugins/dist
 packages/*/data
 packages/generator/public/library
 packages/generator/public/timbres
+packages/generator/public/plugins
 # AMT 转录资源（模型/ORT 运行时/Rust CLI），由 npm run sync:amt 生成
 packages/generator/public/amt
 packages/server/amt

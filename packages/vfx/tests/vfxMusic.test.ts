@@ -1,15 +1,19 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import type { VfxNoteEvent } from "../src/music";
 import {
     createThemeProgram,
+    getVfxTheme,
+    listVfxThemes,
     quietFeatures,
     simulatedVfxNotes,
     validateVfxTheme,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
     VfxEngine,
     VfxMusic,
 } from "../src";
+import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 const note = (midi: number, tick: number, extras: Partial<VfxNoteEvent> = {}): VfxNoteEvent => ({
     midi, tick, velocity: 100, duration: 0.55, hasVelocity: true, source: "midi", ...extras,
@@ -73,7 +77,7 @@ test("continuous wave_ribbon effect carries amplitude continuity across ticks", 
 });
 
 test("galaxy theme maps sustained pitch and sustain to height and length for silk_streams", () => {
-    const galaxy = new VfxEngine(createThemeProgram(VFX_THEMES.galaxy, { seconds: 30 }));
+    const galaxy = new VfxEngine(createThemeProgram(getVfxTheme("galaxy")!, { seconds: 30 }));
     const beamAt = (tick: number, pitch: number, sustain: number) =>
         galaxy.update(tick / 20, tick, { ...quietFeatures, pitch, sustain })
             .flatMap(batch => batch.emitters)
@@ -87,7 +91,7 @@ test("galaxy theme maps sustained pitch and sustain to height and length for sil
 });
 
 test("neon remains anchored while stage reserves crown fan and sparks for sustained crests", () => {
-    const neon = new VfxEngine(createThemeProgram(VFX_THEMES.neon, { seconds: 30 }));
+    const neon = new VfxEngine(createThemeProgram(getVfxTheme("neon")!, { seconds: 30 }));
     const pillarsAt = (tick: number, sustain: number) =>
         neon.update(tick / 20, tick, { ...quietFeatures, sustain })
             .flatMap(batch => batch.emitters)
@@ -103,7 +107,7 @@ test("neon remains anchored while stage reserves crown fan and sparks for sustai
     expect(next[0].variables.previous_length).toBeCloseTo(first[0].variables.length);
 
     const music = new VfxMusic();
-    const stage = new VfxEngine(createThemeProgram(VFX_THEMES.stage, { seconds: 30 }));
+    const stage = new VfxEngine(createThemeProgram(getVfxTheme("stage")!, { seconds: 30 }));
     const emitAt = (tick: number) => stage.update(tick / 20, tick, music.sample(tick)).flatMap(batch => batch.emitters);
     const isCrest = (emitter: ReturnType<typeof emitAt>[number]) =>
         emitter.particle === "fountain" || emitter.variables.shaft_style === 1;
@@ -123,9 +127,9 @@ test("neon remains anchored while stage reserves crown fan and sparks for sustai
 });
 
 test("all 7 built-in themes respond to deterministic music fixture with finite parameters", () => {
-    for (const name of VFX_THEME_ORDER) {
+    for (const { theme } of listVfxThemes()) {
         const music = new VfxMusic();
-        const engine = new VfxEngine(createThemeProgram(validateVfxTheme(VFX_THEMES[name]), { seconds: 24 }));
+        const engine = new VfxEngine(createThemeProgram(validateVfxTheme(theme), { seconds: 24 }));
         let emitterCount = 0;
         for (let tick = 0; tick < 240; tick++) {
             for (const event of simulatedVfxNotes(tick, tick, "phrase")) music.note(event);

@@ -1,4 +1,6 @@
 export * from "./types";
+export * from "./plugin";
+export * from "./registry";
 export * from "./parameters";
 export * from "./brushes";
 export * from "./color";

@@ -4,7 +4,8 @@
     "license": "CC-BY-NC-4.0",
     "private": true,
     "workspaces": [
-        "packages/*"
+        "packages/*",
+        "plugins"
     ],
     "overrides": {
         "@minecraft/server": "2.11.0",
@@ -28,8 +29,17 @@
         "bench:pbe3": "node tools/midi/bench-pbe3.mjs",
         "build:core": "npm run build -w @piano/core",
         "build:vfx": "npm run build -w @piano/vfx",
-        "build:ci": "npm run build:core && npm run build:vfx && npm run build:template && npm run build:generator",
-        "build:all": "npm run build:core && npm run build:vfx && npm run build:template && npm run build:generator && npm run build:web && npm run build:server && npm run build && node tools/verify/verify-addon-build.mjs client",
+        "build:plugins": "npm run build -w @piano/plugins",
+        "plugin:pack": "bun tools/plugins/pack-plugin.mjs --all",
+        "plugin:check": "bun tools/plugins/validate-plugin.mjs --all",
+        "pack:plugins": "bun tools/plugins/pack-plugin.mjs --all",
+        "validate:plugins": "bun tools/plugins/validate-plugin.mjs --all",
+        "build:template:bare": "npm run build:template && node tools/build/strip-template-vfx.mjs",
+        "check:vfx": "node tools/verify/check-vfx.mjs",
+        "vfx:shot": "node tools/assets/capture-vfx-lab.mjs",
+        "check": "node tools/verify/check-all.mjs",
+        "build:ci": "npm run build:core && npm run build:vfx && npm run build:plugins && npm run build:template && npm run build:generator",
+        "build:all": "npm run build:core && npm run build:vfx && npm run build:plugins && npm run build:template && npm run build:generator && npm run build:web && npm run build:server && npm run build && node tools/verify/verify-addon-build.mjs client",
         "test": "npm run test -w @piano/core && npm run test -w @piano/vfx",
         "test:vfx": "npm run test -w @piano/vfx",
         "assets:vfx": "node tools/assets/build-vfx-lab.mjs",

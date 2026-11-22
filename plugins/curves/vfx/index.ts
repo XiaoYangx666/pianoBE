@@ -1,12 +1,26 @@
 import {
-    catmullRom, motionFactors, sampleLissajous, sampleWingPair, zoneBaseY, ZONE_Y_OFFSET, type Point3,
-} from "../geometry";
-import { mix } from "../music";
-import { resolveSchemaParams } from "../parameters";
-import {
-    drawBeam, drawComet, drawPoints, drawStrokeSegments, drawWave, resolvePointBrush, resolveStrokeBrush,
-} from "../primitives";
-import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
+    catmullRom,
+    drawBeam,
+    drawComet,
+    drawPoints,
+    drawStrokeSegments,
+    drawWave,
+    mix,
+    motionFactors,
+    resolvePointBrush,
+    resolveSchemaParams,
+    resolveStrokeBrush,
+    sampleLissajous,
+    sampleWingPair,
+    zoneBaseY,
+    ZONE_Y_OFFSET,
+    type Point3,
+    type VfxEffectDefinition,
+    type VfxParameterSchema,
+    type VfxPluginManifest,
+    type VfxPluginModule,
+} from "@piano/vfx";
+import rawManifest from "../plugin.json";
 
 const WING_RIBBONS_PARAMS = {
     radius: { label: "翼展半径", default: 1.56, min: 0.6, max: 3.2, step: 0.1 },
@@ -68,8 +82,8 @@ const TIME_WARP_PARAMS = {
     streakLength: { label: "光丝长度", default: 1.65, min: 0.6, max: 3.4, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
-export const CURVE_EFFECTS = {
-    wing_ribbons: {
+const CURVE_EFFECTS: readonly VfxEffectDefinition[] = [
+    {
         id: "wing_ribbons",
         label: "双翼流光丝带",
         category: "curve",
@@ -118,7 +132,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    double_helix: {
+    {
         id: "double_helix",
         label: "双螺旋星轨",
         category: "curve",
@@ -166,7 +180,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    orbit_halo: {
+    {
         id: "orbit_halo",
         label: "倾斜星芒环",
         category: "curve",
@@ -213,7 +227,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    silk_streams: {
+    {
         id: "silk_streams",
         label: "穿场丝带",
         category: "curve",
@@ -306,7 +320,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition<{ previousHeight?: number }>,
 
-    wave_ribbon: {
+    {
         id: "wave_ribbon",
         label: "律动音浪环",
         category: "curve",
@@ -378,7 +392,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition<{ previousAmplitude?: number }>,
 
-    vortex_column: {
+    {
         id: "vortex_column",
         label: "时空旋涡柱",
         category: "curve",
@@ -451,7 +465,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    lissajous_weave: {
+    {
         id: "lissajous_weave",
         label: "利萨如织光",
         category: "curve",
@@ -498,7 +512,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    musubi_braid: {
+    {
         id: "musubi_braid",
         label: "绯红组纽",
         category: "curve",
@@ -550,7 +564,7 @@ export const CURVE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    time_warp: {
+    {
         id: "time_warp",
         label: "时空穿越裂隙",
         category: "curve",
@@ -659,4 +673,15 @@ export const CURVE_EFFECTS = {
             return { priority: 4, emitters };
         },
     } satisfies VfxEffectDefinition,
+];
+
+export const curvesPlugin: VfxPluginModule = {
+    manifest: rawManifest as VfxPluginManifest,
+    register(api) {
+        for (const effect of CURVE_EFFECTS) {
+            api.registerEffect(effect);
+        }
+    },
 };
+
+export default curvesPlugin;

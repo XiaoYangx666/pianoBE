@@ -1,14 +1,145 @@
-import { POINT_BRUSH_INDEX } from "../brushes";
-import { blendHex, colorVars, pitchGradientHex } from "../color";
-import { motionFactors, pickRecentKeys, ZONE_Y_OFFSET, type Point3 } from "../geometry";
-import { keyOriginFor, vfxStageFrame } from "../instrument";
-import { keyParticleOverrideFromParams } from "../keyParticles";
-import { drawPoints, resolvePointBrush, resolveStrokeBrush } from "../primitives";
-import { KEY_PARTICLE_STYLE_IDS } from "../keyParticles";
-import { type VfxEffectDefinition, type VfxEmitter } from "../types";
+import {
+    blendHex,
+    colorVars,
+    drawPoints,
+    keyOriginFor,
+    keyParticleOverrideFromParams,
+    motionFactors,
+    pickRecentKeys,
+    pitchGradientHex,
+    POINT_BRUSH_INDEX,
+    resolvePointBrush,
+    resolveStrokeBrush,
+    vfxStageFrame,
+    ZONE_Y_OFFSET,
+    type KeyParticlePalette,
+    type KeyParticleRenderStyle,
+    type Point3,
+    type VfxEffectDefinition,
+    type VfxEmitter,
+    type VfxPluginManifest,
+    type VfxPluginModule,
+} from "@piano/vfx";
+import rawManifest from "../plugin.json";
 
-export const KEY_EFFECTS = {
-    key_notes: {
+const BLUE_TEAR_PALETTES: readonly KeyParticlePalette[] = [
+    { value: 0, label: "冰蓝 · 深蓝到亮青", colors: ["#2F6BFF", "#6FE9FF"] },
+    { value: 1, label: "青碧 · 湖蓝到薄荷", colors: ["#1FB6D8", "#A6F5EA"] },
+    { value: 2, label: "月白 · 冰白到淡蓝", colors: ["#C8E6FF", "#7FB8FF"] },
+];
+
+const PRISM_PALETTES: readonly KeyParticlePalette[] = [
+    { value: 0, label: "棱彩 · 青蓝到紫金", colors: ["#4EEBFF", "#C58CFF", "#FFE29A"] },
+    { value: 1, label: "霞光 · 粉金到浅橙", colors: ["#FF8DA8", "#FFB870", "#FFE29A"] },
+    { value: 2, label: "极光棱 · 青蓝到淡紫", colors: ["#64DBF2", "#9E8CFF", "#E1A0F7"] },
+];
+
+const SAKURA_PALETTE = ["#F2A7C3", "#FFF4E8"] as const;
+const SNOW_PALETTE = ["#DCEBFF", "#FFFFFF"] as const;
+
+const KEYS_PARTICLE_STYLES: Readonly<Record<string, KeyParticleRenderStyle>> = {
+    magic_trail: {
+        label: "魔法流光",
+        value: 3,
+        render: "stream",
+        particle: "magic_trail",
+        brush: "spark",
+        alpha: 0.92,
+        color: { mode: "free" },
+        draw: {
+            count: 1, life: 0.62, size: 0.09, sizeEnd: 0.045,
+            velocity: [0, 1.35, 0], accel: [0, 0.16, 0],
+            twinkle: 0.18, fadeIn: 0.04, fadeOut: 0.34,
+        },
+    },
+    blue_tears: {
+        label: "蓝眼泪 · 发光气泡",
+        value: 4,
+        render: "point",
+        particle: "key_blue_tears",
+        brush: "mote",
+        alpha: 0.9,
+        color: { mode: "limited", palettes: BLUE_TEAR_PALETTES },
+        draw: {
+            count: 5, life: 0.6, lifeJitter: 0.3, size: 0.045, sizeEnd: 0.028, sizeJitter: 0.32,
+            spread: [0.05, 0.14, 0.05], velocity: [0, 1.5, 0], accel: [0, 0.34, 0],
+            twinkle: 0.45, fadeIn: 0.04, fadeOut: 0.36,
+        },
+    },
+    neon_note: {
+        label: "霓虹音符",
+        value: 0,
+        render: "point",
+        brush: "note",
+        alpha: 0.94,
+        color: { mode: "free" },
+        draw: {
+            count: 1, life: 0.48, size: 0.105, sizeEnd: 0.075, spinJitter: 10, spinRate: 24,
+            velocity: [0, 1.1, 0], accel: [0, 0.24, 0], fadeIn: 0.03, fadeOut: 0.3,
+        },
+    },
+    sakura_drift: {
+        label: "樱吹雪 · 粉色花瓣",
+        value: 5,
+        render: "drift",
+        brush: "petal",
+        alpha: 0.94,
+        color: { mode: "fixed", colors: SAKURA_PALETTE },
+        draw: {
+            count: 3, life: 0.85, lifeJitter: 0.2, size: 0.058, sizeEnd: 0.042, sizeJitter: 0.3, aspect: 1.15,
+            spread: [0.06, 0.08, 0.06], velocity: [0, 1, 0], accel: [0, 0.12, 0],
+            flutter: 0.12, spinJitter: 180, spinRate: 135, fadeIn: 0.05, fadeOut: 0.42,
+        },
+    },
+    stardust: {
+        label: "星火 · 闪烁星芒",
+        value: 6,
+        render: "point",
+        brush: "star",
+        alpha: 0.9,
+        color: { mode: "free" },
+        draw: {
+            count: 4, life: 0.55, lifeJitter: 0.3, size: 0.045, sizeEnd: 0.024, sizeJitter: 0.36,
+            spread: [0.08, 0.1, 0.08], velocity: [0, 1.2, 0], accel: [0, 0.26, 0],
+            twinkle: 0.82, fadeIn: 0.03, fadeOut: 0.3,
+        },
+    },
+    prism_shards: {
+        label: "棱光 · 彩色晶片",
+        value: 7,
+        render: "point",
+        brush: "shard",
+        alpha: 0.86,
+        color: { mode: "limited", palettes: PRISM_PALETTES },
+        draw: {
+            count: 3, life: 0.6, lifeJitter: 0.25, size: 0.052, sizeEnd: 0.028, sizeJitter: 0.3, aspect: 2.05,
+            colorRandom: 1, spread: [0.06, 0.1, 0.06], velocity: [0, 1.4, 0], accel: [0, 0.28, 0],
+            spinJitter: 180, spinRate: 180, twinkle: 0.3, fadeOut: 0.32,
+        },
+    },
+    snow: {
+        label: "雪晶飘雪",
+        render: "drift",
+        brush: "snow",
+        alpha: 0.9,
+        color: { mode: "fixed", colors: SNOW_PALETTE },
+        draw: {
+            count: 4, life: 0.82, lifeJitter: 0.22, size: 0.056, sizeEnd: 0.03, sizeJitter: 0.28,
+            spread: [0.05, 0.03, 0.04], velocity: [0, 0.92, 0], accel: [0, -0.42, 0],
+            flutter: 0.09, spinJitter: 180, spinRate: 95, twinkle: 0.45, fadeIn: 0.08, fadeOut: 0.34,
+        },
+    },
+};
+
+const KEY_STYLE_VARIANTS = [
+    "inherit",
+    ...Object.keys(KEYS_PARTICLE_STYLES),
+    "glimmer",
+    "none",
+] as const;
+
+const KEY_EFFECTS: readonly VfxEffectDefinition[] = [
+    {
         id: "key_notes",
         label: "琴键飞音符",
         category: "keys",
@@ -53,7 +184,7 @@ export const KEY_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    key_fountain: {
+    {
         id: "key_fountain",
         label: "琴键音泉喷涌",
         category: "keys",
@@ -99,7 +230,7 @@ export const KEY_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    key_constellation: {
+    {
         id: "key_constellation",
         label: "琴键星座连线",
         category: "keys",
@@ -189,14 +320,28 @@ export const KEY_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    key_style: {
+    {
         id: "key_style",
         label: "弹奏粒子样式",
         category: "control",
         trigger: "control",
         interval: 20,
         priority: 0,
-        variants: KEY_PARTICLE_STYLE_IDS,
+        variants: KEY_STYLE_VARIANTS,
         resolveKeyParticle: keyParticleOverrideFromParams,
     } satisfies VfxEffectDefinition,
+];
+
+export const keysPlugin: VfxPluginModule = {
+    manifest: rawManifest as VfxPluginManifest,
+    register(api) {
+        for (const [id, style] of Object.entries(KEYS_PARTICLE_STYLES)) {
+            api.registerKeyStyle(id, style);
+        }
+        for (const effect of KEY_EFFECTS) {
+            api.registerEffect(effect);
+        }
+    },
 };
+
+export default keysPlugin;

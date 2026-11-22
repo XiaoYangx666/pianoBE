@@ -1,17 +1,21 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import {
     createSingleEffectProgram,
+    getVfxEffect,
     POINT_BRUSH_IDS,
     quietFeatures,
     STROKE_BRUSH_IDS,
     VFX_ATLAS,
-    VFX_EFFECTS,
     VfxEngine,
     vfxStageFrame,
     type VfxParticle,
 } from "../src";
+import { ensureBuiltinPluginsRegistered, readParticleDoc } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 const ALL_VFX_PARTICLES: readonly VfxParticle[] = [
     "field",
@@ -39,14 +43,15 @@ const ALL_VFX_PARTICLES: readonly VfxParticle[] = [
 
 test("single vfx_lab atlas and MER textures match declared dimensions without secret_cinema leftovers", () => {
     const resource = new URL("../assets/", import.meta.url);
+    const keysPluginAssets = new URL("../../../plugins/keys/", import.meta.url);
     expect(existsSync(new URL("textures/particle/secret_cinema.png", resource))).toBe(false);
     expect(existsSync(new URL("textures/particle/secret_cinema.texture_set.json", resource))).toBe(false);
     expect(existsSync(new URL("particles/pbe_vfx_cinema_dust.particle.json", resource))).toBe(false);
     expect(existsSync(new URL("particles/pbe_vfx_cinema_shock.particle.json", resource))).toBe(false);
-    expect(existsSync(new URL("textures/particle/piano_fx.png", resource))).toBe(true);
-    const pianoFxMer = readFileSync(new URL("textures/particle/piano_fx_mer.png", resource));
+    expect(existsSync(new URL("textures/particle/piano_fx.png", keysPluginAssets))).toBe(true);
+    const pianoFxMer = readFileSync(new URL("textures/particle/piano_fx_mer.png", keysPluginAssets));
     expect([pianoFxMer.readUInt32BE(16), pianoFxMer.readUInt32BE(20)]).toEqual([256, 128]);
-    const pianoFxSet = JSON.parse(readFileSync(new URL("textures/particle/piano_fx.texture_set.json", resource), "utf8"));
+    const pianoFxSet = JSON.parse(readFileSync(new URL("textures/particle/piano_fx.texture_set.json", keysPluginAssets), "utf8"));
     expect(pianoFxSet["minecraft:texture_set"]).toEqual({
         color: "piano_fx",
         metalness_emissive_roughness: "piano_fx_mer",
@@ -73,9 +78,8 @@ test("single vfx_lab atlas and MER textures match declared dimensions without se
 });
 
 test("all 21 pbe_vfx particle definitions use declared textures and clean Molang variables", () => {
-    const resource = new URL("../assets/", import.meta.url);
     for (const particle of ALL_VFX_PARTICLES) {
-        const source = readFileSync(new URL(`particles/pbe_vfx_${particle}.particle.json`, resource), "utf8");
+        const source = readParticleDoc(particle);
         const doc = JSON.parse(source).particle_effect;
         const pianoFx = particle === "key_blue_tears" || particle === "magic_trail";
         expect(doc.description.identifier).toBe(`pbe:vfx_${particle}`);
@@ -141,26 +145,30 @@ test("stage frame adapts to upright vs grand piano and emitters surround the ins
     const wave = waveEngine.update(0, 0, { ...quietFeatures, activity: 0.7 }).flatMap(batch => batch.emitters);
     expect(wave.some(emitter => emitter.offset.y > 0.5)).toBe(true);
 
-    const wingOffsets = VFX_EFFECTS.wing_ribbons.emit!({
+    const wingRibbons = getVfxEffect("wing_ribbons")!;
+    const wingOffsets = wingRibbons.emit!({
         params: { color: "#90C8FF", color2: "#C58CFF", intensity: 0.8, scale: 1, zone: "stage", motion: "normal" },
         music: { ...quietFeatures, surge: 0.7, sustain: 0.6 },
         recentNotes: [],
         lastNoteTick: -1,
+        instrument: "upright",
         phase: 0,
         solo: false,
-        state: VFX_EFFECTS.wing_ribbons.createState?.(),
+        state: wingRibbons.createState?.(),
     })!.emitters.map(emitter => emitter.offset);
     expect(wingOffsets.some(offset => offset.x < -1.5)).toBe(true);
     expect(wingOffsets.some(offset => offset.x > 1.5)).toBe(true);
 
-    const depths = VFX_EFFECTS.magic_circle.emit!({
+    const magicCircle = getVfxEffect("magic_circle")!;
+    const depths = magicCircle.emit!({
         params: { color: "#68E4FF", color2: "#C58CFF", intensity: 0.8, scale: 1, zone: "stage", motion: "normal" },
         music: quietFeatures,
         recentNotes: [],
         lastNoteTick: -1,
+        instrument: "grand",
         phase: 0,
         solo: false,
-        state: VFX_EFFECTS.magic_circle.createState?.(),
+        state: magicCircle.createState?.(),
     })!.emitters.map(emitter => grand.centerZ + grand.depth * emitter.offset.z);
     expect(Math.min(...depths)).toBeLessThan(0);
     expect(Math.max(...depths)).toBeGreaterThan(3);

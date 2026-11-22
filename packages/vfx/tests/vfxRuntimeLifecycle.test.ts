@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import {
     createPerformanceProgram,
     createSingleEffectProgram,
@@ -6,6 +6,10 @@ import {
     VfxBudget,
     VfxEngine,
 } from "../src";
+import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 test("unknown effects and unknown brushes in performance cues degrade safely without blocking valid cues", () => {
     const program = createPerformanceProgram([

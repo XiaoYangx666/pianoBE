@@ -1,8 +1,9 @@
 import { TIME_SCALE } from "@piano/core";
-import { getVfxEffect, resolveEffectCustomParams } from "./effects";
+import { resolveEffectCustomParams } from "./effects";
 import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
 import type { VfxProgram } from "./programs";
 import type { VfxInstrument } from "./instrument";
+import { vfxRegistry, type VfxRegistry } from "./registry";
 import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams } from "./types";
 
 interface ChannelRuntime {
@@ -39,11 +40,74 @@ export class VfxEngine {
     constructor(
         private program: VfxProgram,
         private readonly instrument: VfxInstrument = "upright",
+        private readonly registry: VfxRegistry = vfxRegistry,
     ) {}
 
     setProgram(program: VfxProgram, resetState = true) {
         this.program = program;
         if (resetState) this.reset(0);
+    }
+
+    private getActiveEffect(effectId: string): VfxEffectDefinition | undefined {
+        const def = this.registry.getEffect(effectId);
+        if (!def) return undefined;
+        const owner = this.registry.getEffectOwner(effectId);
+        if (owner && this.registry.isPluginDisabled(owner)) return undefined;
+        return def;
+    }
+
+    private reportFailure(def: VfxEffectDefinition, phase: string, error: unknown) {
+        const owner = this.registry.getEffectOwner(def.id);
+        if (owner) {
+            const disabled = this.registry.recordPluginError(owner, {
+                effectId: def.id,
+                phase,
+                error,
+            });
+            if (disabled) {
+                console.warn(`[piano-vfx] 插件 ${owner} 连续出错，已自动禁用`, error);
+            }
+        } else {
+            console.warn(`[piano-vfx] 特效 ${def.id} (${phase}) 执行异常`, error);
+        }
+    }
+
+    private reportSuccess(def: VfxEffectDefinition) {
+        const owner = this.registry.getEffectOwner(def.id);
+        if (owner) this.registry.recordPluginSuccess(owner);
+    }
+
+    private safeCreateState(def: VfxEffectDefinition | undefined): unknown {
+        if (!def?.createState) return undefined;
+        try {
+            return def.createState();
+        } catch (error) {
+            this.reportFailure(def, "createState", error);
+            return undefined;
+        }
+    }
+
+    private safeNextInterval(def: VfxEffectDefinition, params: VfxEffectParams, state: unknown): number {
+        if (!def.nextInterval) return def.interval;
+        try {
+            const next = def.nextInterval(this.resolvedParams(def, params), state);
+            return Number.isFinite(next) ? next : def.interval;
+        } catch (error) {
+            this.reportFailure(def, "nextInterval", error);
+            return def.interval;
+        }
+    }
+
+    private safeResolveKeyParticle(def: VfxEffectDefinition, params: VfxEffectParams): PianoParticleOverride | undefined {
+        if (!def.resolveKeyParticle) return undefined;
+        try {
+            const override = def.resolveKeyParticle(this.resolvedParams(def, params));
+            this.reportSuccess(def);
+            return override;
+        } catch (error) {
+            this.reportFailure(def, "resolveKeyParticle", error);
+            return undefined;
+        }
     }
 
     reset(gameTick = 0) {
@@ -55,12 +119,12 @@ export class VfxEngine {
         this.manualFlashPending = false;
         if (gameTick > 0) {
             for (const channel of this.program.channels) {
-                const def = getVfxEffect(channel.effect);
+                const def = this.getActiveEffect(channel.effect);
                 this.runtimes.set(channel.key, {
                     nextTick: gameTick,
                     lastNoteTick: -1,
                     soloStep: 0,
-                    effectState: def?.createState?.(),
+                    effectState: this.safeCreateState(def),
                 });
             }
         }
@@ -74,12 +138,12 @@ export class VfxEngine {
             this.runtimes.clear();
             this.yieldUntilByTag.clear();
             for (const channel of this.program.channels) {
-                const def = getVfxEffect(channel.effect);
+                const def = this.getActiveEffect(channel.effect);
                 this.runtimes.set(channel.key, {
                     nextTick: gameTick,
                     lastNoteTick: -1,
                     soloStep: 0,
-                    effectState: def?.createState?.(),
+                    effectState: this.safeCreateState(def),
                 });
             }
         }
@@ -96,7 +160,7 @@ export class VfxEngine {
         const gameTick = Math.floor(timeSeconds * 20 + 1e-6);
         const summary: ActiveChannelSummary[] = [];
         for (const channel of this.program.channels) {
-            const def = getVfxEffect(channel.effect);
+            const def = this.getActiveEffect(channel.effect);
             if (!def || def.trigger === "control") continue;
             const sample = channel.sample(timeSeconds, gameTick, music, solo);
             if (!sample || sample.params.intensity < 0.005) continue;
@@ -116,12 +180,12 @@ export class VfxEngine {
         let matchedSlot = -1;
         let matched: PianoParticleOverride | undefined;
         for (const channel of this.program.channels) {
-            const def = getVfxEffect(channel.effect);
+            const def = this.getActiveEffect(channel.effect);
             if (!def || def.trigger !== "control" || !def.resolveKeyParticle) continue;
             const sample = channel.sample(timeSeconds, gameTick, music, solo);
             if (!sample || sample.params.intensity < 0.005) continue;
             if (channel.slot >= matchedSlot) {
-                const override = def.resolveKeyParticle(sample.params);
+                const override = this.safeResolveKeyParticle(def, sample.params);
                 if (override) {
                     matchedSlot = channel.slot;
                     matched = override;
@@ -138,7 +202,7 @@ export class VfxEngine {
                 nextTick: 0,
                 lastNoteTick: -1,
                 soloStep: 0,
-                effectState: def.createState?.(),
+                effectState: this.safeCreateState(def),
             };
             this.runtimes.set(key, runtime);
         }
@@ -157,7 +221,7 @@ export class VfxEngine {
 
     private resolvedParams(def: VfxEffectDefinition, params: VfxEffectParams): VfxEffectParams {
         if (!def.parameters) return params;
-        return { ...params, custom: resolveEffectCustomParams(def, params.custom) };
+        return { ...params, custom: resolveEffectCustomParams(def, params.custom, this.registry) };
     }
 
     private emitChannel(
@@ -171,16 +235,23 @@ export class VfxEngine {
         state: unknown,
     ): VfxBatch | null {
         if (!def.emit) return null;
-        return def.emit({
-            params: this.resolvedParams(def, params),
-            music,
-            recentNotes,
-            lastNoteTick,
-            instrument: this.instrument,
-            phase,
-            solo,
-            state,
-        });
+        try {
+            const batch = def.emit({
+                params: this.resolvedParams(def, params),
+                music,
+                recentNotes,
+                lastNoteTick,
+                instrument: this.instrument,
+                phase,
+                solo,
+                state,
+            });
+            this.reportSuccess(def);
+            return batch;
+        } catch (error) {
+            this.reportFailure(def, "emit", error);
+            return null;
+        }
     }
 
     update(
@@ -203,7 +274,7 @@ export class VfxEngine {
         while (this.flashIndex < this.program.flashes.length && this.program.flashes[this.flashIndex].tick40 <= tick40) {
             const cue = this.program.flashes[this.flashIndex++];
             if (!emitFlashes || cue.tick40 <= this.lastTick40) continue;
-            const def = getVfxEffect(cue.effect);
+            const def = this.getActiveEffect(cue.effect);
             if (!def || !def.emit) continue;
             const batch = this.emitChannel(
                 def,
@@ -213,15 +284,15 @@ export class VfxEngine {
                 -1,
                 (cue.tick40 * 17) % 360,
                 solo,
-                def.createState?.(),
+                this.safeCreateState(def),
             );
-            if (batch && batch.emitters.length) batches.push(batch);
+            if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
             this.recordYield(def, gameTick);
         }
 
         if (timeSeconds < this.program.durationSeconds) {
             for (const channel of this.program.channels) {
-                const def = getVfxEffect(channel.effect);
+                const def = this.getActiveEffect(channel.effect);
                 if (!def || def.trigger === "control") continue;
                 const runtime = this.runtimeFor(channel.key, def);
 
@@ -242,7 +313,7 @@ export class VfxEngine {
                         solo,
                         runtime.effectState,
                     );
-                    if (batch && batch.emitters.length) batches.push(batch);
+                    if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
                     this.recordYield(def, gameTick);
                     runtime.nextTick = gameTick + Math.max(1, sample.cooldownTicks ?? 45);
                     continue;
@@ -278,7 +349,7 @@ export class VfxEngine {
                         runtime.nextTick = gameTick + 8;
                         runtime.soloStep += 5;
                     }
-                    if (batch && batch.emitters.length) batches.push(batch);
+                    if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
                     continue;
                 }
 
@@ -293,12 +364,10 @@ export class VfxEngine {
                     solo,
                     runtime.effectState,
                 );
-                const interval = def.nextInterval
-                    ? def.nextInterval(sample.params, runtime.effectState)
-                    : def.interval;
+                const interval = this.safeNextInterval(def, sample.params, runtime.effectState);
                 runtime.nextTick = gameTick + Math.max(1, interval);
                 this.recordYield(def, gameTick);
-                if (batch && batch.emitters.length) batches.push(batch);
+                if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
             }
         }
 

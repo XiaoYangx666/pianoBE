@@ -1,4 +1,6 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import {
     isValidPerformanceParamKey,
     isValidPerformanceSymbol,
@@ -6,31 +8,39 @@ import {
     PERFORMANCE_ZONES,
 } from "@piano/core";
 import {
+    getVfxEffect,
+    getVfxEffectIds,
+    getVfxTheme,
+    getVfxThemeIds,
     isPointBrush,
     isStrokeBrush,
     isValidBrush,
+    listVfxEffects,
+    listVfxPlugins,
     POINT_BRUSH_IDS,
     POINT_BRUSH_INDEX,
     STROKE_BRUSH_IDS,
     STROKE_BRUSH_INDEX,
     validateVfxTheme,
     VFX_ATLAS,
-    VFX_EFFECT_IDS,
-    VFX_EFFECTS,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
 } from "../src";
+import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 test("effect registry keeps all registered effects valid, uniquely keyed, covering every category and backed by the single atlas", () => {
-    expect(VFX_EFFECT_IDS.length).toBeGreaterThanOrEqual(33);
-    expect(new Set(VFX_EFFECT_IDS).size).toBe(VFX_EFFECT_IDS.length);
-    const categories = new Set(VFX_EFFECT_IDS.map(id => VFX_EFFECTS[id].category));
+    const effectIds = getVfxEffectIds();
+    expect(effectIds.length).toBeGreaterThanOrEqual(38);
+    expect(new Set(effectIds).size).toBe(effectIds.length);
+    const categories = new Set(listVfxEffects().map(effect => effect.category));
     for (const required of ["atmosphere", "curve", "stage", "keys", "accent", "control"] as const) {
         expect(categories.has(required)).toBe(true);
     }
 
-    for (const id of VFX_EFFECT_IDS) {
-        const effect = VFX_EFFECTS[id];
+    for (const id of effectIds) {
+        const effect = getVfxEffect(id)!;
+        expect(effect).toBeDefined();
         expect(effect.id).toBe(id);
         expect(effect.label.trim().length).toBeGreaterThan(0);
         expect(["atmosphere", "curve", "stage", "keys", "accent", "control"]).toContain(effect.category);
@@ -107,17 +117,48 @@ test("single-source vfxAtlas.json brushes and tile regions fit within the 1024x1
 });
 
 test("all 7 built-in stage themes pass validation and only reference registered effects, brushes, zones and motions", () => {
-    expect(VFX_THEME_ORDER).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival"]);
-    for (const name of VFX_THEME_ORDER) {
-        const theme = VFX_THEMES[name];
+    const themeOrder = getVfxThemeIds();
+    expect(themeOrder).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival"]);
+    for (const name of themeOrder) {
+        const theme = getVfxTheme(name)!;
+        expect(theme).toBeDefined();
         expect(theme.layers.length).toBeGreaterThan(0);
         const validated = validateVfxTheme(theme);
         expect(validated.layers.length).toBe(theme.layers.length);
         for (const layer of theme.layers) {
-            expect(Object.hasOwn(VFX_EFFECTS, layer.effect)).toBe(true);
+            expect(getVfxEffect(layer.effect)).toBeDefined();
             if (layer.brush) expect(isValidBrush(layer.brush)).toBe(true);
             if (layer.zone) expect(Object.hasOwn(PERFORMANCE_ZONES, layer.zone)).toBe(true);
             if (layer.motion) expect(Object.hasOwn(PERFORMANCE_MOTIONS, layer.motion)).toBe(true);
         }
+    }
+});
+
+test("built-in plugin manifests accurately declare every registered effect, theme, layout and keyStyle", () => {
+    const plugins = listVfxPlugins();
+    expect(plugins.map(p => p.manifest.id)).toEqual([
+        "pianobe.atmosphere",
+        "pianobe.curves",
+        "pianobe.stage",
+        "pianobe.keys",
+        "pianobe.accents",
+        "pianobe.themes",
+    ]);
+    const pluginsRoot = join(import.meta.dir, "..", "..", "..", "plugins");
+    for (const record of plugins) {
+        expect(record.effects).toEqual([...(record.manifest.provides.effects ?? [])]);
+        expect(record.themes).toEqual([...(record.manifest.provides.themes ?? [])]);
+        expect([...record.lightLayouts, ...record.veilLayouts]).toEqual([...(record.manifest.provides.layouts ?? [])]);
+        expect(record.keyStyles).toEqual([...(record.manifest.provides.keyStyles ?? [])]);
+
+        const shortDir = record.manifest.id.replace(/^pianobe\./, "");
+        const particlesDir = join(pluginsRoot, shortDir, "particles");
+        const diskParticles = existsSync(particlesDir)
+            ? readdirSync(particlesDir)
+                .filter(name => name.startsWith("pbe_vfx_") && name.endsWith(".particle.json"))
+                .map(name => name.slice("pbe_vfx_".length, -".particle.json".length))
+                .sort()
+            : [];
+        expect([...(record.manifest.provides.particles ?? [])].sort()).toEqual(diskParticles);
     }
 });

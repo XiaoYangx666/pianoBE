@@ -18,6 +18,8 @@ const { values } = parseArgs({ options: {
     time: { type: "string", multiple: true },
     video: { type: "boolean", default: false },
     flat: { type: "boolean", default: false },
+    plugins: { type: "string" },
+    "allow-over-budget": { type: "boolean", default: false },
 } });
 const project = fileURLToPath(new URL("../../", import.meta.url));
 const output = resolve(values.out);
@@ -68,6 +70,13 @@ try {
     await page.waitForFunction(() => window.pianoVfxLab || document.querySelector(".vfx-capture p"), undefined, { timeout: 20_000 });
     const initError = await page.locator(".vfx-capture p").textContent({ timeout: 50 }).catch(() => undefined);
     if (initError) throw new Error(initError);
+    if (values.plugins !== undefined) {
+        const ids = values.plugins === "none" || values.plugins === ""
+            ? []
+            : values.plugins.split(",").map(item => item.trim()).filter(Boolean);
+        const active = await page.evaluate(pluginIds => window.pianoVfxLab.setPlugins(pluginIds), ids);
+        console.log(`plugins · ${active.length ? active.join(", ") : "(none)"}`);
+    }
     const report = [];
     for (const preset of presets) {
         const duration = values.song
@@ -81,7 +90,20 @@ try {
                     ...(values.song ? { songBase64 } : {}) });
             const image = `${preset}-${label}.png`;
             await page.locator("canvas").screenshot({ path: join(output, image) });
-            report.push({ ...options, image, ...stats });
+            const budgetLimit = stats.budgetLimit ?? 275;
+            const withinBudget = stats.reserved <= budgetLimit;
+            report.push({
+                ...options,
+                image,
+                ...stats,
+                budgetLimit,
+                withinBudget,
+            });
+            if (!values["allow-over-budget"] && (!withinBudget || stats.dropped > 0)) {
+                failures.push(
+                    `${image}: particle budget check failed (reserved=${stats.reserved}/${budgetLimit}, dropped=${stats.dropped})`
+                );
+            }
             console.log(`${image} · ${stats.particles} live · ${stats.reserved} reserved`);
         }
     }
@@ -151,8 +173,8 @@ try {
         }
         await writeFile(join(output, "playback.json"), JSON.stringify({ ...stats, scenes }, null, 2) + "\n");
     }
-    if (failures.length) throw new Error(failures.join("\n"));
     await writeFile(join(output, "metrics.json"), JSON.stringify(report, null, 2) + "\n");
+    if (failures.length) throw new Error(failures.join("\n"));
 } finally {
     await browser?.close();
     server?.kill();

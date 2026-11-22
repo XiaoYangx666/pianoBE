@@ -7,6 +7,7 @@ import { deriveAccentHex, rgbToHex } from "./color";
 import { getVfxEffect, resolveEffectCustomParams } from "./effects";
 import { clampUnit, mix, type MusicFeatures } from "./music";
 import { interpolateSchemaParams } from "./parameters";
+import { vfxRegistry, type VfxRegistry } from "./registry";
 import type { VfxTheme } from "./themes";
 import type { PianoParticleOverride, VfxEffectParams, VfxParameterSchema } from "./types";
 
@@ -113,13 +114,17 @@ function toEffectParams(state: ChannelState): VfxEffectParams {
 }
 
 /** 将 PBE3 演出提示编译为统一的 VfxProgram。未知特效安全跳过，不阻断播放。 */
-export function createPerformanceProgram(cues: readonly PerformanceCue[], durationSeconds: number): VfxProgram {
+export function createPerformanceProgram(
+    cues: readonly PerformanceCue[],
+    durationSeconds: number,
+    registry: VfxRegistry = vfxRegistry,
+): VfxProgram {
     const channels: ProgramChannel[] = [];
     const flashes: ProgramFlash[] = [];
     const byChannel = new Map<string, Transition[]>();
 
     for (const cue of cues) {
-        const def = getVfxEffect(cue.effect);
+        const def = getVfxEffect(cue.effect, registry);
         if (!def) continue;
         if (cue.op === "flash" || def.trigger === "instant") {
             const color2 = cue.color2 ?? deriveAccentHex(cue.color);
@@ -135,7 +140,7 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
                     variant: cue.variant,
                     zone: cue.zone ?? "stage",
                     motion: cue.motion ?? "normal",
-                    ...(def.parameters ? { custom: resolveEffectCustomParams(def, cue.params) } : {}),
+                    ...(def.parameters ? { custom: resolveEffectCustomParams(def, cue.params, registry) } : {}),
                 },
             });
             continue;
@@ -163,7 +168,7 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
         const prev = sampleTransitions(transitions, cue.tick);
         const isActive = transitions.length > 0 && prev.intensity > 0.001;
         const custom = def.parameters
-            ? resolveEffectCustomParams(def, isActive ? { ...prev.custom, ...cue.params } : cue.params)
+            ? resolveEffectCustomParams(def, isActive ? { ...prev.custom, ...cue.params } : cue.params, registry)
             : {};
         const target: ChannelState = {
             intensity: cue.level / 100,
@@ -189,7 +194,7 @@ export function createPerformanceProgram(cues: readonly PerformanceCue[], durati
                 motion: cue.motion ?? prev.motion,
                 schema: def.parameters,
                 custom: def.parameters
-                    ? resolveEffectCustomParams(def, { ...prev.custom, ...cue.params })
+                    ? resolveEffectCustomParams(def, { ...prev.custom, ...cue.params }, registry)
                     : {},
             }
             : target;
@@ -205,7 +210,11 @@ export interface ThemeProgramOverrides {
 }
 
 /** 将音乐响应主题编译为统一的 VfxProgram。 */
-export function createThemeProgram(theme: VfxTheme, overrides: ThemeProgramOverrides = {}): VfxProgram {
+export function createThemeProgram(
+    theme: VfxTheme,
+    overrides: ThemeProgramOverrides = {},
+    registry: VfxRegistry = vfxRegistry,
+): VfxProgram {
     const durationSeconds = overrides.seconds ?? theme.seconds ?? Infinity;
     const durationTicks = Number.isFinite(durationSeconds) ? Math.ceil(durationSeconds * 20) : Infinity;
     const fadeInTicks = (theme.fadeIn ?? 0.48) * 20;
@@ -215,8 +224,8 @@ export function createThemeProgram(theme: VfxTheme, overrides: ThemeProgramOverr
         const color = resolvePerformanceColor(layer.color);
         const color2 = layer.color2 ? resolvePerformanceColor(layer.color2) : deriveAccentHex(color);
         const slot = layer.slot ?? index;
-        const def = getVfxEffect(layer.effect);
-        const custom = def?.parameters ? resolveEffectCustomParams(def, layer.params) : undefined;
+        const def = getVfxEffect(layer.effect, registry);
+        const custom = def?.parameters ? resolveEffectCustomParams(def, layer.params, registry) : undefined;
         return {
             key: `layer:${index}:${layer.effect}:${slot}`,
             effect: layer.effect,
@@ -281,11 +290,14 @@ export interface SingleEffectConfig {
 }
 
 /** 将单个特效调试/预览配置编译为统一的 VfxProgram。 */
-export function createSingleEffectProgram(config: SingleEffectConfig): VfxProgram {
+export function createSingleEffectProgram(
+    config: SingleEffectConfig,
+    registry: VfxRegistry = vfxRegistry,
+): VfxProgram {
     const color = resolvePerformanceColor(config.color);
     const color2 = config.color2 ? resolvePerformanceColor(config.color2) : deriveAccentHex(color);
-    const def = getVfxEffect(config.effect);
-    const custom = def?.parameters ? resolveEffectCustomParams(def, config.params) : undefined;
+    const def = getVfxEffect(config.effect, registry);
+    const custom = def?.parameters ? resolveEffectCustomParams(def, config.params, registry) : undefined;
     const params: VfxEffectParams = {
         color,
         color2,

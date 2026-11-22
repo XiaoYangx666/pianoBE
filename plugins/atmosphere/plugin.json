@@ -1,0 +1,25 @@
+{
+    "id": "pianobe.atmosphere",
+    "name": "PianoBE Atmosphere",
+    "version": "1.0.0",
+    "apiVersion": "1.0.0",
+    "minPianoBeVersion": "1.3.0",
+    "capabilities": ["vfx"],
+    "author": "PianoBE",
+    "license": "CC-BY-NC-4.0",
+    "provides": {
+        "effects": [
+            "starfield",
+            "petal_fall",
+            "firefly_rise",
+            "aurora_veil",
+            "wing_curtain",
+            "dandelion_drift",
+            "meteor_shower",
+            "twilight_mist"
+        ]
+    },
+    "preview": {
+        "description": "氛围与环境特效插件：星尘雾海、落樱雪舞、流萤、极光天幕、双翼光幕、夏风白絮、流星雨与黄昏云海。"
+    }
+}

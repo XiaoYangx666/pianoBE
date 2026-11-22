@@ -1,12 +1,28 @@
-import { blendHex, colorVars } from "../color";
-import { catmullRom, motionFactors, zoneBaseY, ZONE_Y_OFFSET, type Point3 } from "../geometry";
-import { mix } from "../music";
-import { resolveSchemaParams } from "../parameters";
 import {
-    drawFountain, drawGroundRing, drawPoints, drawShards, drawShock, drawStrokeSegments,
-    resolvePointBrush, resolveStrokeBrush,
-} from "../primitives";
-import type { VfxEffectDefinition, VfxEmitter, VfxParameterSchema } from "../types";
+    blendHex,
+    catmullRom,
+    colorVars,
+    drawFountain,
+    drawGroundRing,
+    drawPoints,
+    drawShards,
+    drawShock,
+    drawStrokeSegments,
+    mix,
+    motionFactors,
+    resolvePointBrush,
+    resolveSchemaParams,
+    resolveStrokeBrush,
+    zoneBaseY,
+    ZONE_Y_OFFSET,
+    type Point3,
+    type VfxEffectDefinition,
+    type VfxEmitter,
+    type VfxParameterSchema,
+    type VfxPluginManifest,
+    type VfxPluginModule,
+} from "@piano/vfx";
+import rawManifest from "../plugin.json";
 
 const FLOOR_SWEEP_PARAMS = {
     extent: { label: "扫光跨度", default: 2.15, min: 0.8, max: 4.0, step: 0.1 },
@@ -53,8 +69,8 @@ const HANABI_SHELL_PARAMS = {
     burstRadius: { label: "绽放半径", default: 1.75, min: 0.8, max: 3.2, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
-export const ACCENT_EFFECTS = {
-    floor_sweep: {
+const ACCENT_EFFECTS: readonly VfxEffectDefinition[] = [
+    {
         id: "floor_sweep",
         label: "地面扫光弧",
         category: "accent",
@@ -96,7 +112,7 @@ export const ACCENT_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    shockwave: {
+    {
         id: "shockwave",
         label: "重拍冲击波",
         category: "accent",
@@ -212,7 +228,7 @@ export const ACCENT_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    prism_rewind: {
+    {
         id: "prism_rewind",
         label: "棱晶时空回卷",
         category: "accent",
@@ -276,7 +292,7 @@ export const ACCENT_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    firework_bloom: {
+    {
         id: "firework_bloom",
         label: "高空烟花盛放",
         category: "accent",
@@ -341,7 +357,7 @@ export const ACCENT_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    hanabi_launch: {
+    {
         id: "hanabi_launch",
         label: "龙势升空",
         category: "accent",
@@ -407,7 +423,7 @@ export const ACCENT_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    comet_split: {
+    {
         id: "comet_split",
         label: "彗星分裂",
         category: "accent",
@@ -594,7 +610,7 @@ export const ACCENT_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    hanabi_shell: {
+    {
         id: "hanabi_shell",
         label: "日式大玉花火",
         category: "accent",
@@ -721,4 +737,15 @@ export const ACCENT_EFFECTS = {
             return { priority: 8, emitters };
         },
     } satisfies VfxEffectDefinition,
+];
+
+export const accentsPlugin: VfxPluginModule = {
+    manifest: rawManifest as VfxPluginManifest,
+    register(api) {
+        for (const effect of ACCENT_EFFECTS) {
+            api.registerEffect(effect);
+        }
+    },
 };
+
+export default accentsPlugin;

@@ -4,7 +4,7 @@ import {
 } from "./brushes";
 import { blendHex, colorVars, hexToUnitRgb } from "./color";
 import { segmentsAlong, type Point3 } from "./geometry";
-import { stageLights, stageVeils, type VfxLightLayout, type VfxVeilLayout } from "./stage";
+import { getStageLightLayout, getStageVeilLayout, type VfxLightLayout, type VfxVeilLayout } from "./stage";
 import type { VfxEmitter, VfxTransform } from "./types";
 
 export interface DrawPointsSpec {
@@ -534,7 +534,7 @@ export function drawCurtain(opts: {
     const previous = opts.previousLength ?? opts.length;
     const life = opts.layout === "aurora" ? 2.4 : 1.8;
     const rgb = hexToUnitRgb(opts.color);
-    return stageVeils[opts.layout].map(anchor => ({
+    return getStageVeilLayout(opts.layout).map(anchor => ({
         particle: "curtain",
         group: "curtain",
         offset: {
@@ -578,7 +578,7 @@ export function drawShaft(opts: {
     const upright = opts.layout === "neon-sides" || opts.layout === "neon-rear";
     const haze = opts.layout === "fan";
     const rgb = hexToUnitRgb(opts.color);
-    return stageLights[opts.layout].map(anchor => {
+    return getStageLightLayout(opts.layout).map(anchor => {
         const { x, y, z } = anchor.direction;
         const magnitude = Math.hypot(x, y, z) || 1;
         return {

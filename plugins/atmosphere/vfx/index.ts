@@ -1,10 +1,23 @@
-import { motionFactors, zoneBaseY, ZONE_Y_OFFSET } from "../geometry";
-import { mix } from "../music";
-import { resolveSchemaParams } from "../parameters";
 import {
-    drawCloud, drawComet, drawCurtain, drawDust, drawField, drawFountain, drawPoints, resolvePointBrush,
-} from "../primitives";
-import type { VfxEffectDefinition, VfxParameterSchema } from "../types";
+    drawCloud,
+    drawComet,
+    drawCurtain,
+    drawDust,
+    drawField,
+    drawFountain,
+    drawPoints,
+    mix,
+    motionFactors,
+    resolvePointBrush,
+    resolveSchemaParams,
+    zoneBaseY,
+    ZONE_Y_OFFSET,
+    type VfxEffectDefinition,
+    type VfxParameterSchema,
+    type VfxPluginManifest,
+    type VfxPluginModule,
+} from "@piano/vfx";
+import rawManifest from "../plugin.json";
 
 const STARFIELD_PARAMS = {
     radius: { label: "覆盖半径", default: 2.25, min: 0.8, max: 4.2, step: 0.1 },
@@ -43,8 +56,8 @@ const METEOR_SHOWER_PARAMS = {
     speed: { label: "划落速度", default: 2.65, min: 1.0, max: 5.0, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
-export const ATMOSPHERE_EFFECTS = {
-    starfield: {
+const ATMOSPHERE_EFFECTS: readonly VfxEffectDefinition[] = [
+    {
         id: "starfield",
         label: "星尘雾海",
         category: "atmosphere",
@@ -127,7 +140,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    petal_fall: {
+    {
         id: "petal_fall",
         label: "落樱雪舞",
         category: "atmosphere",
@@ -172,7 +185,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    firefly_rise: {
+    {
         id: "firefly_rise",
         label: "流萤升腾",
         category: "atmosphere",
@@ -233,7 +246,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    aurora_veil: {
+    {
         id: "aurora_veil",
         label: "极光天幕",
         category: "atmosphere",
@@ -269,7 +282,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition<{ previousLength?: number }>,
 
-    wing_curtain: {
+    {
         id: "wing_curtain",
         label: "双翼光幕",
         category: "atmosphere",
@@ -305,7 +318,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition<{ previousLength?: number }>,
 
-    dandelion_drift: {
+    {
         id: "dandelion_drift",
         label: "夏风白絮",
         category: "atmosphere",
@@ -356,7 +369,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    meteor_shower: {
+    {
         id: "meteor_shower",
         label: "划空流星雨",
         category: "atmosphere",
@@ -432,7 +445,7 @@ export const ATMOSPHERE_EFFECTS = {
         },
     } satisfies VfxEffectDefinition,
 
-    twilight_mist: {
+    {
         id: "twilight_mist",
         label: "黄昏云海",
         category: "atmosphere",
@@ -476,4 +489,15 @@ export const ATMOSPHERE_EFFECTS = {
             return { priority: 2, emitters };
         },
     } satisfies VfxEffectDefinition,
+];
+
+export const atmospherePlugin: VfxPluginModule = {
+    manifest: rawManifest as VfxPluginManifest,
+    register(api) {
+        for (const effect of ATMOSPHERE_EFFECTS) {
+            api.registerEffect(effect);
+        }
+    },
 };
+
+export default atmospherePlugin;

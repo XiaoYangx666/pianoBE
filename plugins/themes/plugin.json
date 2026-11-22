@@ -1,0 +1,24 @@
+{
+    "id": "pianobe.themes",
+    "name": "PianoBE Themes",
+    "version": "1.0.0",
+    "apiVersion": "1.0.0",
+    "minPianoBeVersion": "1.3.0",
+    "capabilities": ["vfx"],
+    "author": "PianoBE",
+    "license": "CC-BY-NC-4.0",
+    "provides": {
+        "themes": [
+            "galaxy",
+            "neon",
+            "stage",
+            "sakura",
+            "starlight",
+            "cathedral",
+            "carnival"
+        ]
+    },
+    "preview": {
+        "description": "内置 7 套音乐响应舞台主题插件：梦幻星河、霓虹音乐会、高能舞台、落樱星庭、星空法阵、圣光时空与璀璨烟花夜。"
+    }
+}

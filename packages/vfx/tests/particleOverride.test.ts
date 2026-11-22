@@ -1,5 +1,4 @@
-import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { PERFORMANCE_PALETTES } from "@piano/core";
 import {
     createPerformanceProgram,
@@ -7,18 +6,22 @@ import {
     keyParticleColorOptions,
     keyParticleColorMode,
     keyParticleOverrideFromParams,
-    KEY_PARTICLE_STYLES,
+    listKeyParticleStyles,
+    listPianoParticleStyles,
+    listVfxThemes,
     normalizeKeyParticlePalette,
     PIANO_PARTICLE_PALETTES,
-    PIANO_PARTICLE_STYLES,
     POINT_BRUSH_INDEX,
     resolveKeyParticle,
     validateKeyParticleOverride,
     validateVfxTheme,
-    VFX_THEME_ORDER,
-    VFX_THEMES,
+    vfxRegistry,
     VfxEngine,
 } from "../src";
+import { ensureBuiltinPluginsRegistered, readParticleDoc } from "./helpers/builtinPlugins";
+
+ensureBuiltinPluginsRegistered();
+beforeEach(ensureBuiltinPluginsRegistered);
 
 describe("弹奏粒子覆盖 resolveKeyParticle", () => {
     const baseSettings = { particleStyle: 3, particlePalette: 0 };
@@ -47,9 +50,9 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
 
     test("六种玩家样式按渲染原语拆分，并保留显式多色音域渐变", () => {
         const particles = { point: "draw_point", stream: "key_stream", drift: "key_drift" } as const;
-        for (const option of PIANO_PARTICLE_STYLES) {
-            const definition = KEY_PARTICLE_STYLES[option.style];
-            if (!("render" in definition)) throw new Error(`${option.style} 应为渲染样式`);
+        for (const option of listPianoParticleStyles()) {
+            const definition = vfxRegistry.getKeyStyle(option.style)!;
+            expect(definition).toBeDefined();
             const resolved = resolveKeyParticle(64, baseSettings, right, {
                 style: option.style,
                 colors: ["#000000", "#FFFFFF"],
@@ -73,7 +76,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
 
     test("弹奏粒子只使用已声明的变量，并允许非等比尺寸", () => {
         const runtimeSupplied = new Set(["stage_depth"]);
-        for (const option of PIANO_PARTICLE_STYLES) {
+        for (const option of listPianoParticleStyles()) {
             const resolved = resolveKeyParticle(72, baseSettings, { x: 0, z: -1 }, {
                 style: option.style,
                 colors: [PERFORMANCE_PALETTES.ice, PERFORMANCE_PALETTES.silver],
@@ -84,10 +87,7 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
             for (const emitter of resolved.emitters) {
                 expect(Object.values(emitter.variables).every(Number.isFinite)).toBe(true);
                 if (emitter.onKey) continue;
-                const doc = readFileSync(
-                    new URL(`../assets/particles/pbe_vfx_${emitter.particle}.particle.json`, import.meta.url),
-                    "utf8",
-                );
+                const doc = readParticleDoc(emitter.particle);
                 const used = new Set([...doc.matchAll(/variable\.vfx_(\w+)/g)].map(match => match[1]));
                 for (const name of used) {
                     if (!runtimeSupplied.has(name)) expect(emitter.variables).toHaveProperty(name);
@@ -133,10 +133,11 @@ describe("弹奏粒子覆盖 resolveKeyParticle", () => {
     });
 
     test("电光涟漪已移除，旧存档数值安全回退", () => {
-        expect("pulse_ring" in KEY_PARTICLE_STYLES).toBe(false);
-        expect(PIANO_PARTICLE_STYLES.some(style => style.value === 2)).toBe(false);
+        const styles = listPianoParticleStyles();
+        expect(listKeyParticleStyles().some(entry => entry.id === "pulse_ring")).toBe(false);
+        expect(styles.some(style => style.value === 2)).toBe(false);
         const resolved = resolveKeyParticle(60, { particleStyle: 2, particlePalette: 0 }, right);
-        expect(resolved.style).toBe(PIANO_PARTICLE_STYLES[0].style);
+        expect(resolved.style).toBe(styles[0].style);
     });
 
     test("inherit 仅替换颜色而保留玩家自选样式；none 支持仅微光与完全静音", () => {
@@ -240,9 +241,9 @@ describe("显式 variant 语义、校验与统一引擎的弹奏粒子覆盖接�
     });
 
     test("统一 VfxEngine 为全部 7 套舞台主题与曲目编排提供弹奏粒子覆盖", () => {
-        for (const name of VFX_THEME_ORDER) {
-            const engine = new VfxEngine(createThemeProgram(VFX_THEMES[name], { seconds: 20 }), "grand");
-            expect(engine.keyParticleOverride()?.style).toBe(VFX_THEMES[name].keyParticle?.style);
+        for (const { theme } of listVfxThemes()) {
+            const engine = new VfxEngine(createThemeProgram(theme, { seconds: 20 }), "grand");
+            expect(engine.keyParticleOverride()?.style).toBe(theme.keyParticle?.style);
         }
 
         const engine = new VfxEngine(createPerformanceProgram([
