@@ -4,7 +4,7 @@
 
 ## 1. 新增或扩展 VFX 特效插件
 
-1. 在 `plugins/<name>/vfx/index.ts`（内置插件分类：`atmosphere`、`curves`、`stage`、`keys`、`accents`）或独立第三方插件目录中添加插件定义：
+1. 在 `plugins/<name>/vfx/index.ts`（内置插件目录：`atmosphere`、`curves`、`stage`、`keys`、`accents`、`themes`、`chinese`、`floral`）或独立第三方插件目录中添加插件定义：
    - 在 `plugin.json` 中填写 `id`、`name`、`version`、`apiVersion`（当前 `"1.0.0"`）、`minPianoBeVersion`、`capabilities`（`["vfx"]`）以及 `provides`（声明本插件注册的 `effects`、`themes`、`layouts`、`keyStyles`、`particles`）。
    - 在 `register(api)` 中调用 `api.registerEffect({ ... })` 注册特效，填写 `id`、`label`、`category`、`trigger`（`continuous` / `note` / `instant` / `control`）、`interval`、`priority`。
    - 如需对外开放可调几何/运动/形态控制，声明 `parameters`（支持数值 `min`/`max`/`default`/`step`、布尔 `type: "boolean"` 与枚举 `type: "enum", options`），并在 `emit({ params })` 中通过 `resolveSchemaParams(SCHEMA, params.custom)` 读取（数值参数自动在 `set` + `fade` 上平滑渐变，布尔/枚举在提示时刻切换，并继续保留音乐响应叠加）。

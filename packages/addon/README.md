@@ -23,12 +23,12 @@
 
 | 来源 | 启用条件 | 说明 |
 |---|---|---|
-| 内嵌曲库 | 默认（所有环境） | 构建时打入包的 `scripts/midis/`，懒加载播放 |
-| 远程曲库 | BDS 专用服务器 + 配置文件 | 经 `@minecraft/server-admin` 读配置、`@minecraft/server-net` 从后端拉取 PBE3 曲目 |
+| 内嵌曲库 | 客户端构建（`npm run build` / 模板包） | 构建时把 `midis/js/` 拷进 `scripts/packages/addon/src/midis/`，懒加载播放 |
+| 远程曲库 | BDS + 服务器专用构建（`npm run build:server`）+ 配置文件 | manifest 声明 `@minecraft/server-net` / `@minecraft/server-admin`，启动时动态加载 `serverAdmin` 读配置并拉取 PBE3 曲目 |
 
-两个模块均为**动态导入 + try/catch 探测**（`manifest` 不声明依赖）：
-- 客户端/普通世界 → import 失败 → 静默使用内嵌曲库，不受影响
-- BDS → 配置好 `variables.json` / `secrets.json` 即自动切换远程曲库
+远程分支只在 `__PIANO_TARGET__ === "server"` 时被 `import()`；`serverAdmin.ts` 与 `platform/server/net` 内部是**静态导入**，两个原生模块的依赖由 `bepack.server.config.ts` 写入服务器包 manifest（版本 `beta`）。客户端构建通过常量折叠 + 死代码消除裁掉整个分支，产物不含这些模块，因此普通世界不需要 server-net，也没有远程能力。
+
+注意：**服务器专用构建不打包内嵌曲库**（`midis = []`），远程初始化失败后它没有任何曲目可用。单机/客户端测试请使用客户端包。
 
 ### BDS 配置（配置文件示例）
 
@@ -40,11 +40,11 @@ config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
 - `pianoBackendUrl`：后端地址（`variables`，普通可读配置）
 - `pianoBackendToken`：令牌（`secrets`，**SecretString**：脚本环境读不到值，
   请求时由 HttpHeader 解析；因无法拼接前缀，需保存完整的 `Bearer <token>`）
-- 未配置 URL 或模块不可用 → 保持内嵌曲库并输出一行警告
+- 未配置 URL 或模块不可用 → 初始化返回 false 并输出警告；客户端构建仍使用内嵌曲库，服务器专用构建则没有任何曲目
 
 ### 远程模式行为
 
-- 曲目列表：每次打开**现拉**（`GET /api/songs` 分页取全），游戏内不持久化完整列表，后端新上传的曲目即时可见
+- 曲目列表：每次打开按页**现拉**（`GET /api/songs?page=…&pageSize=…`，搜索走服务端 `q`），游戏内不持久化完整列表，后端新上传的曲目即时可见；「一键添加」等批量操作才用 `metaAll` 分页取全
 - 单曲：播放时按 id 拉取 `GET /api/songs/:id`，后端返回 **PBE3（Base64URL）**；缓存与淘汰统一由 `SongCache` 负责（不再有来源私有的 LRU）
 - 已加载曲目在引用期间断网仍可播放；无活跃引用时按内存预算 LRU 淘汰，下次播放重新拉取
 - 后端 API 鉴权与部署见 `packages/server/README.md`（Hono + bun:sqlite + Docker）
@@ -58,11 +58,16 @@ server 构建会在控制台输出逐步诊断（不打印令牌）：
 [piano] server 构建：20 tick 后尝试初始化远程曲库
 [serverAdmin] step1 读取配置 pianoBackendUrl = "http://...:35050"
 [serverAdmin] step2 获取 @minecraft/server-net 适配器
-[serverAdmin] step3 已读取 secrets 令牌 / 未读取到 secrets 令牌
+[serverAdmin] @minecraft/server-net 适配器就绪
+[serverAdmin] step3 已读取 secrets 令牌（SecretString，透传不输出值）  ← 或「未读取到 secrets 令牌」
 [serverAdmin] step4 切换到远程曲库: http://...:35050
-[netSource] 拉取曲目列表: GET http://.../api/songs?pageSize=100
-[netSource] 曲目列表响应状态: 200
-[netSource] 曲目列表拉取成功: N 首
+[serverAdmin] 远程曲库已启用: http://...:35050
+[piano] 远程曲库初始化结果: 成功
+[netSource] 拉取曲目第 1 页: GET http://.../api/songs?pageSize=5&page=1
+[netSource] 第 1 页响应状态: 200
+[netSource] 第 1 页 5 首（共 N 首）
+[netSource] 拉取单曲: GET http://.../api/songs/<id>
+[netSource] 单曲 <id> 响应状态: 200
 ```
 
 对照判断：
@@ -70,6 +75,9 @@ server 构建会在控制台输出逐步诊断（不打印令牌）：
 | 日志表现 | 含义 |
 |---|---|
 | 完全没有 `[piano] 主脚本已加载` | 装的是模板包（client）或脚本未运行 |
+| `Module [@minecraft/server-net] is unrecognized` | 装的包里 manifest 没声明该原生模块（常见于客户端/服务器构建混装），或客户端/单机环境装了服务器专用包——客户端不提供 server-net |
+| `初始化失败，使用内嵌曲库` + 上面那条 | 同上；单机请改装客户端包，BDS 请用 `dist/server.mcaddon` |
+| `曲目内容不存在: 名称 (id)` | 当前没有可用曲库来源：服务器包内嵌曲库为空且远程未启用，或该曲目只残留在队列里 |
 | `step1 ... (未配置)` | `variables.json` 路径/格式不对（应为 `config/default/variables.json`） |
 | `step3 未读取到 secrets 令牌` | `secrets.json` 缺失或键名不对（`pianoBackendToken` 需含完整 `Bearer ` 前缀） |
 | `[netSource] ... 拉取失败: ... 网络/超时/连接被拒` | 后端不可达：确认 URL 端口、BDS 与后端网络互通（容器内 BDS 需用宿主 IP） |
@@ -129,10 +137,16 @@ server 构建会在控制台输出逐步诊断（不打印令牌）：
 
 ```bash
 npm run build:template   # 产出 dist/template.mcaddon（生成器底包）
-npm run build            # 编译 + 拷贝到测试服
+npm run build            # 客户端构建（含内嵌曲库）+ 拷贝到测试服
+npm run build:server     # 服务器专用构建（不含内嵌曲库）→ dist/server.mcaddon
 npm run test -w @piano/addon  # bun test（架构边界、MIDI、生命周期、UI 回归等）
 npm run verify:addon-build    # client/server 构建 + MIDI 路径与 server-only 隔离检查
 ```
+
+> 两种构建共用 `packages/addon/bp/` 目录并各自重写 `scripts/` 与 `manifest.json`。
+> 不要在交替构建后手动挑文件拷贝，也不要只拷 `bp/` 的一部分：脚本与 manifest 不匹配时
+> 会出现「服务器脚本 + 客户端 manifest」的混装包（表现为 `@minecraft/server-net` unrecognized）。
+> 部署时始终使用 `dist/` 下对应的 `.mcaddon`。
 
 ### 仍需 Minecraft 实机确认（脚本测试无法覆盖）
 

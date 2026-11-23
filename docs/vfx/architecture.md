@@ -33,8 +33,8 @@ plugins/* (内置与第三方 VFX 插件)          │
 | 通用格式层 | `packages/core/src/pbe3/performance.ts` | 使用曲目内部符号表与颜色表读写演出提示；不依赖任何具体特效表或画笔编号 |
 | 单一数据源 | `packages/vfx/src/data/vfxAtlas.json` | 声明图集尺寸、8×2 点画笔网格、条带线条笔刷、贴片区域与默认亲和关系 |
 | 资产生成器 | `tools/assets/build-vfx-lab.mjs`, `tools/assets/vfx/*` | 从 `vfxAtlas.json` 生成图集、MER 与 17 个 `pbe_vfx_*` 粒子文档；同时从模型数据同步 `keys.generated.ts` |
-| 资源同步 | `tools/assets/sync-vfx-assets.mjs` | 把 `packages/vfx/assets` 下的粒子与纹理同步进 Addon 资源包（生成物不重复提交） |
-| VFX 领域层 | `packages/vfx/src/` | 特效注册、绘制原语、主题组合、音乐特征提取、琴型/琴键/舞台锚点、粒子预算（275/架，6 发射/刻）与统一 `VfxEngine` |
+| 资源同步 | `tools/assets/sync-vfx-assets.mjs` | 把宿主 `packages/vfx/assets` 与各插件目录（`plugins/*/particles`、`plugins/*/textures`）下的资源同步进 Addon 资源包（生成物不重复提交） |
+| VFX 领域层 | `packages/vfx/src/` | 特效注册、绘制原语、主题组合、音乐特征提取、琴型/琴键/舞台锚点、粒子预算（每架 275、最多 4 架，6 发射/刻）与统一 `VfxEngine` |
 | Bedrock 适配 | `packages/addon/src/app/vfx/` & `platform/vfxParticle.ts` | 会话调度、订阅 `PianoRuntime.noteSignal`/`transportSignal`、`spawnParticle` 投放与开发调试命令 |
 | Web 预览层 | `packages/web/src/vfxLab/` | 仅负责 Three.js 场景与 Wintersky MoLang 渲染；运行完全相同的 `VfxEngine` / `VfxBudget` / `VfxMusic` |
 

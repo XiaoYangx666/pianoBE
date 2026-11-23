@@ -65,7 +65,7 @@ npm run build:server   # 产出 packages/addon/dist/server.mcaddon
 #   secrets.json   → { "pianoBackendToken": "Bearer <令牌>" }
 ```
 
-addon 启动时动态导入 `@minecraft/server-admin` 读取配置、`@minecraft/server-net` 拉取曲目；任一环节不可用（客户端环境/未配置）时自动降级为内嵌曲库。详见 `packages/addon/README.md`。
+只有服务器专用构建会在启动后动态 `import()` `serverAdmin`；该模块静态导入 `@minecraft/server-admin`（读配置）与 `@minecraft/server-net`（拉曲目），依赖由服务器包 manifest 声明。客户端构建会整体裁掉这个分支，继续使用内嵌曲库；服务器专用构建**不打包内嵌曲库**，配置不可用时没有任何曲目。详见 `packages/addon/README.md`。
 
 ---
 
