@@ -48,19 +48,44 @@ jobs:
           set -euo pipefail
           core_dir="$RUNNER_TEMP/pianobe-core"
           vfx_dir="$RUNNER_TEMP/pianobe-vfx"
-          mkdir -p "$vfx_dir/node_modules/@piano"
+          deps_dir="$RUNNER_TEMP/pianobe-vfx-deps"
+          mkdir -p "$vfx_dir/node_modules/@piano" "$deps_dir"
           cp -R packages/vfx/src packages/vfx/package.json packages/vfx/tsconfig.json "$vfx_dir/"
+          printf '{"name":"pianobe-vfx-deps","private":true}\n' > "$deps_dir/package.json"
+          (cd "$deps_dir" && bun add fflate @types/node)
           ln -s "$core_dir" "$vfx_dir/node_modules/@piano/core"
+          ln -s "$deps_dir/node_modules/fflate" "$vfx_dir/node_modules/fflate"
+          ln -s "$deps_dir/node_modules/@types" "$vfx_dir/node_modules/@types"
           (cd "$vfx_dir" && "$core_dir/node_modules/.bin/tsc" -p tsconfig.json)
           mkdir -p packages/addon/node_modules/@piano
           ln -s "$vfx_dir" packages/addon/node_modules/@piano/vfx
+      - name: Assemble built-in VFX plugins without private vendor archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          core_dir="$RUNNER_TEMP/pianobe-core"
+          vfx_dir="$RUNNER_TEMP/pianobe-vfx"
+          plugins_dir="$RUNNER_TEMP/pianobe-plugins"
+          mkdir -p "$plugins_dir/node_modules/@piano"
+          cp -R plugins/index.ts plugins/package.json plugins/tsconfig.json "$plugins_dir/"
+          for name in accents atmosphere chinese curves floral keys stage themes; do
+            cp -R "plugins/$name" "$plugins_dir/"
+          done
+          ln -s "$core_dir" "$plugins_dir/node_modules/@piano/core"
+          ln -s "$vfx_dir" "$plugins_dir/node_modules/@piano/vfx"
+          mkdir -p packages/addon/node_modules/@piano
+          ln -s "$plugins_dir" packages/addon/node_modules/@piano/plugins
       - name: Run VFX domain tests
         shell: bash
         run: |
           set -euo pipefail
           core_dir="$RUNNER_TEMP/pianobe-core"
-          mkdir -p packages/vfx/node_modules/@piano
+          deps_dir="$RUNNER_TEMP/pianobe-vfx-deps"
+          mkdir -p packages/vfx/node_modules/@piano plugins/node_modules/@piano
           ln -s "$core_dir" packages/vfx/node_modules/@piano/core
+          ln -s "$deps_dir/node_modules/fflate" packages/vfx/node_modules/fflate
+          ln -s "$core_dir" plugins/node_modules/@piano/core
+          ln -s "$PWD/packages/vfx" plugins/node_modules/@piano/vfx
           cd packages/vfx
           bun test
       - name: Ensure obsolete PianoViewModel is absent
