@@ -1,4 +1,15 @@
-"""Build the Bedrock stage vase geometry and wraparound underglaze textures."""
+"""Build the Bedrock stage vase geometry and wraparound underglaze textures.
+
+The vase is a fake lathe: a ring of flat panels, each split along the profile.
+Because Bedrock shades these cubes per face, the panel count is what makes the
+glaze read as round, so the geometry keeps its authored density and only the
+numeric precision is trimmed.
+
+The textures are the heavy part, so they are authored at 1024 (the ornament
+coordinates below are tuned for that canvas), downscaled to ``SIZE``, and saved
+as indexed PNG. The heightmap is gone: the entity material has no parallax, so
+it could never be sampled in game.
+"""
 
 import json
 import math
@@ -8,8 +19,11 @@ from PIL import Image, ImageDraw, ImageFilter
 
 
 RP = Path(__file__).resolve().parents[2] / "packages/addon/rp"
-SIZE = 1024
-BODY_UV_HEIGHT = 960
+# Art and UV coordinates are authored against this edge, then scaled to SIZE.
+AUTHORED = 1024
+SIZE = 512
+UV_SCALE = SIZE / AUTHORED
+BODY_UV_HEIGHT = round(960 * UV_SCALE)
 SIDES = 24
 HEIGHT = 56.8
 PROFILE = [
@@ -24,7 +38,7 @@ PROFILE = [
 
 def model():
     faces = []
-    uv_width = SIZE / SIDES
+    uv_width = round(SIZE / SIDES, 2)
     for side in range(SIDES):
         azimuth = side * 360 / SIDES
         cubes = []
@@ -37,26 +51,29 @@ def model():
             half_width = max(lower, upper) * math.tan(math.pi / SIDES) + .012
             thickness = .37 if end < .989 else .82
             cubes.append({
-                "origin": [round(-half_width, 4), round(y - length / 2, 4), round(radius - thickness, 4)],
-                "size": [round(2 * half_width, 4), round(length + .025, 4), thickness],
-                "pivot": [0, round(y, 4), round(radius, 4)],
-                "rotation": [round(slant, 4), 0, 0],
+                "origin": [round(-half_width, 3), round(y - length / 2, 3), round(radius - thickness, 3)],
+                "size": [round(2 * half_width, 3), round(length + .025, 3), round(thickness, 3)],
+                "pivot": [0, round(y, 3), round(radius, 3)],
+                "rotation": [round(slant, 3), 0, 0],
                 "uv": {
-                    "south": {"uv": [round(side * uv_width, 4), round((1 - end) * BODY_UV_HEIGHT, 4)],
-                              "uv_size": [round(uv_width, 4), round((end - start) * BODY_UV_HEIGHT, 4)]},
-                    **({"north": {"uv": [4, 966], "uv_size": [16, 16]}} if end > .92 else {}),
-                    **({"up": {"uv": [28, 966], "uv_size": [16, 16]}} if end == 1 else {}),
+                    "south": {"uv": [round(side * uv_width, 2), round((1 - end) * BODY_UV_HEIGHT, 2)],
+                              "uv_size": [uv_width, round((end - start) * BODY_UV_HEIGHT, 2)]},
+                    **({"north": {"uv": [round(4 * UV_SCALE, 2), round(966 * UV_SCALE, 2)],
+                                  "uv_size": [round(16 * UV_SCALE, 2), round(16 * UV_SCALE, 2)]}} if end > .92 else {}),
+                    **({"up": {"uv": [round(28 * UV_SCALE, 2), round(966 * UV_SCALE, 2)],
+                               "uv_size": [round(16 * UV_SCALE, 2), round(16 * UV_SCALE, 2)]}} if end == 1 else {}),
                 },
             })
         faces.append({
             "name": f"panel_{side}", "parent": "vase", "pivot": [0, 0, 0],
-            "rotation": [0, round(azimuth, 4), 0], "cubes": cubes,
+            "rotation": [0, round(azimuth, 3), 0], "cubes": cubes,
         })
     # Short inner well prevents the top view from seeing straight through the neck.
     faces.append({
         "name": "mouth_well", "parent": "vase", "pivot": [0, 0, 0],
         "cubes": [{"origin": [-5.4, 50.1, -5.4], "size": [10.8, .18, 10.8],
-                   "uv": {"up": {"uv": [4, 966], "uv_size": [16, 16]}}}],
+                   "uv": {"up": {"uv": [round(4 * UV_SCALE, 2), round(966 * UV_SCALE, 2)],
+                                 "uv_size": [round(16 * UV_SCALE, 2), round(16 * UV_SCALE, 2)]}}}],
     })
     description = {
         "identifier": "geometry.pbe.vfx_porcelain_vase", "texture_width": SIZE, "texture_height": SIZE,
@@ -81,10 +98,10 @@ def petal(draw, x, y, angle, length, width, color):
 
 
 def ornament():
-    ink = Image.new("L", (SIZE, SIZE))
+    ink = Image.new("L", (AUTHORED, AUTHORED))
     draw = ImageDraw.Draw(ink)
     for y, width in [(14, 8), (40, 3), (100, 4), (162, 6), (178, 3), (757, 4), (780, 8), (884, 4), (928, 7)]:
-        draw.line((0, y, SIZE, y), fill=230, width=width)
+        draw.line((0, y, AUTHORED, y), fill=230, width=width)
 
     for i in range(-1, 17):
         x = i * 64
@@ -99,7 +116,7 @@ def ornament():
         return 486 + 65 * math.sin(x * 2 * math.pi / 256)
 
     for delta, shade, width in [(0, 238, 9), (178, 182, 5)]:
-        draw.line([(x, stem(x) + delta) for x in range(SIZE + 1)], fill=shade, width=width)
+        draw.line([(x, stem(x) + delta) for x in range(AUTHORED + 1)], fill=shade, width=width)
     for i in range(-1, 9):
         x = 53 + i * 128
         y = stem(x)
@@ -122,22 +139,39 @@ def ornament():
 def textures():
     ink = ornament()
     bleed = ink.filter(ImageFilter.GaussianBlur(2))
+    if SIZE != AUTHORED:
+        ink = ink.resize((SIZE, SIZE), Image.LANCZOS)
+        bleed = bleed.resize((SIZE, SIZE), Image.LANCZOS)
     color = Image.new("RGB", ink.size)
     mer = Image.new("RGB", ink.size)
-    height = Image.new("L", ink.size)
+    # Pattern frequencies stay in authored pixels so the downscale cannot shift them.
+    step = AUTHORED / SIZE
     for y in range(SIZE):
         for x in range(SIZE):
             pigment = min(1, (ink.getpixel((x, y)) * .86 + bleed.getpixel((x, y)) * .19) / 255)
-            variation = math.sin(x * .041 + y * .02) * 1.7 + math.sin(x * .39 - y * .17) * .7
+            u, v = x * step, y * step
+            variation = math.sin(u * .041 + v * .02) * 1.7 + math.sin(u * .39 - v * .17) * .7
             ivory = (237, 242, 228)
             cobalt = (22, 57, 122)
             color.putpixel((x, y), tuple(round(a * (1 - pigment) + b * pigment + variation) for a, b in zip(ivory, cobalt)))
-            mer.putpixel((x, y), (0, round(8 * (1 - pigment) ** 2), round(42 + pigment * 25 + variation)))
-            height.putpixel((x, y), round(128 + variation * .68 - pigment * 1.5))
+            # Metalness stays 0; emissive and roughness only carry the ink mask.
+            # No grain here: sub-2/255 roughness noise is invisible in game but
+            # makes the map uncompressible (40 KB vs 6 KB), so it stays in color only.
+            mer.putpixel((x, y), (0, round(8 * (1 - pigment) ** 2), round(42 + pigment * 25)))
 
     target = RP / "textures/entity"
-    for image, suffix in [(color, ""), (mer, "_mer"), (height, "_height")]:
-        image.save(target / f"pbe_vfx_porcelain{suffix}.png", optimize=True)
+    color.quantize(colors=256, dither=Image.FLOYDSTEINBERG).save(target / "pbe_vfx_porcelain.png", optimize=True)
+    mer.quantize(colors=64, dither=Image.NONE).save(target / "pbe_vfx_porcelain_mer.png", optimize=True)
+    stale = target / "pbe_vfx_porcelain_height.png"
+    if stale.exists():
+        stale.unlink()
+    (target / "pbe_vfx_porcelain.texture_set.json").write_text(json.dumps({
+        "format_version": "1.21.30",
+        "minecraft:texture_set": {
+            "color": "pbe_vfx_porcelain",
+            "metalness_emissive_roughness": "pbe_vfx_porcelain_mer",
+        },
+    }, indent=4) + "\n")
 
 
 if __name__ == "__main__":

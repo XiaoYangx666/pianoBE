@@ -2,7 +2,6 @@ import * as THREE from "three";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import model from "../../../addon/rp/models/entity/vfx_porcelain_vase.geo.json?raw";
 import colorUrl from "../../../addon/rp/textures/entity/pbe_vfx_porcelain.png";
-import heightUrl from "../../../addon/rp/textures/entity/pbe_vfx_porcelain_height.png";
 
 type Triple = [number, number, number];
 type Face = { uv: [number, number]; uv_size: [number, number] };
@@ -47,10 +46,12 @@ export async function createPorcelainProp() {
     const meshGeometry = mergeBufferGeometries(parts)!;
     parts.forEach(part => part.dispose());
     const textureLoader = new THREE.TextureLoader();
-    const [map, bumpMap] = await Promise.all([textureLoader.loadAsync(colorUrl), textureLoader.loadAsync(heightUrl)]);
+    // No bump map: the in-game entity material has no height/parallax input, so
+    // the lab should not preview relief the shipped pack cannot produce.
+    const map = await textureLoader.loadAsync(colorUrl);
     map.encoding = THREE.sRGBEncoding;
     const mesh = new THREE.Mesh(meshGeometry, new THREE.MeshPhysicalMaterial({
-        map, bumpMap, bumpScale: 0.055, roughness: 0.28, metalness: 0,
+        map, roughness: 0.28, metalness: 0,
         clearcoat: 0.75, clearcoatRoughness: 0.24,
     }));
     mesh.visible = false;

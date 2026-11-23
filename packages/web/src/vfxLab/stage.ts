@@ -362,7 +362,6 @@ export async function createStage(canvas: HTMLCanvasElement) {
             music.clear();
             particles.dispose();
             orbit.dispose();
-            porcelain.material.bumpMap?.dispose();
             const materials = new Set<THREE.Material>();
             scene.traverse(object => {
                 const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
