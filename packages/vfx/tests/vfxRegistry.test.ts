@@ -116,9 +116,9 @@ test("single-source vfxAtlas.json brushes and tile regions fit within the 1024x1
     }
 });
 
-test("all 7 built-in stage themes pass validation and only reference registered effects, brushes, zones and motions", () => {
+test("all built-in stage themes pass validation and only reference registered effects, brushes, zones and motions", () => {
     const themeOrder = getVfxThemeIds();
-    expect(themeOrder).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival"]);
+    expect(themeOrder).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival", "chinese_misty_rain"]);
     for (const name of themeOrder) {
         const theme = getVfxTheme(name)!;
         expect(theme).toBeDefined();
@@ -143,6 +143,7 @@ test("built-in plugin manifests accurately declare every registered effect, them
         "pianobe.keys",
         "pianobe.accents",
         "pianobe.themes",
+        "pianobe.chinese",
     ]);
     const pluginsRoot = join(import.meta.dir, "..", "..", "..", "plugins");
     for (const record of plugins) {

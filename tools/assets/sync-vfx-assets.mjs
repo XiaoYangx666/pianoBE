@@ -22,7 +22,8 @@ const trees = [
         managed: (name) => name.startsWith(`${textureBase}.`)
             || name.startsWith(`${textureBase}_`)
             || name.startsWith("piano_fx.")
-            || name.startsWith("piano_fx_"),
+            || name.startsWith("piano_fx_")
+            || name.startsWith("pbe_chinese_"),
     },
 ];
 

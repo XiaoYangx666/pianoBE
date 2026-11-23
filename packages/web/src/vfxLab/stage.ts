@@ -10,6 +10,7 @@ import {
     keyParticleOrigin,
     normalizeKeyParticlePalette,
     placeVfxEmitter,
+    placeVfxStageProp,
     quietFeatures,
     resolveKeyParticle,
     VFX_RIGHT_OFFSETS,
@@ -29,6 +30,7 @@ import {
 import { createCast, type PianoModel } from "./models";
 import { loadParticles, particleStep } from "./particles";
 import { createDeck } from "./deck";
+import { createPorcelainProp } from "./stageProps";
 
 export type Direction = keyof typeof VFX_RIGHT_OFFSETS;
 export type View = "stage" | "performer" | "orbit";
@@ -65,7 +67,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    const [cast, particles] = await Promise.all([createCast(), loadParticles()]).catch(error => {
+    const [cast, particles, porcelain] = await Promise.all([createCast(), loadParticles(), createPorcelainProp()]).catch(error => {
         renderer.dispose();
         throw error;
     });
@@ -98,6 +100,9 @@ export async function createStage(canvas: HTMLCanvasElement) {
     const fill = new THREE.PointLight(0xc4cdff, 0.48, 11, 1.25);
     fill.position.set(4.2, 2.7, 4.5);
     scene.add(key, key.target, rim, rim.target, fill, particles.space);
+    const porcelainFill = new THREE.PointLight(0xfff2df, 5.5, 9, 1.65);
+    porcelainFill.visible = false;
+    scene.add(porcelain, porcelainFill);
     scene.add(cast.grand.group, cast.p88.group);
 
     const axes = new THREE.AxesHelper(2);
@@ -206,7 +211,8 @@ export async function createStage(canvas: HTMLCanvasElement) {
                     }
                 }
                 if (tick % 4 === 0) features = music.sample(tick);
-                budget.enqueue(engine!.update(tick / 20, tick, features, music.recent(), { emitFlashes: true }));
+                const nativeStageProp = Boolean(engine!.stageProp(tick / 20, features));
+                budget.enqueue(engine!.update(tick / 20, tick, features, music.recent(), { emitFlashes: true, nativeStageProp }));
                 budget.dispatch(tick, emitter => {
                     const placement = placeVfxEmitter(center, right, stage, emitter, tick / 20);
                     particles.spawn(emitter.group, emitter.particle, placement.position, placement.variables);
@@ -231,6 +237,15 @@ export async function createStage(canvas: HTMLCanvasElement) {
             }
         }
         cast[model].pose(time, features.activity, features.pitch);
+        const prop = engine!.stageProp(time, features);
+        porcelain.visible = porcelainFill.visible = Boolean(prop);
+        if (prop) {
+            const { position, yaw } = placeVfxStageProp(center, right, stage, prop);
+            porcelain.position.set(position.x, position.y, position.z);
+            porcelain.scale.set(prop.size, prop.size, -prop.size);
+            porcelain.rotation.y = -THREE.MathUtils.degToRad(yaw + prop.turn);
+            porcelainFill.position.set(position.x + 1.8, position.y + 2.7, position.z + 2.5);
+        }
     }
 
     function render() {
@@ -347,6 +362,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
             music.clear();
             particles.dispose();
             orbit.dispose();
+            porcelain.material.bumpMap?.dispose();
             const materials = new Set<THREE.Material>();
             scene.traverse(object => {
                 const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;

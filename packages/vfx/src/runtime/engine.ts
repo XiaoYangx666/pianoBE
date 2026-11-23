@@ -4,7 +4,7 @@ import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
 import type { VfxProgram } from "./programs";
 import type { VfxInstrument } from "../spatial/instrument";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
-import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams } from "../types";
+import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams, VfxStageProp } from "../types";
 
 interface ChannelRuntime {
     nextTick: number;
@@ -16,6 +16,7 @@ interface ChannelRuntime {
 export interface VfxEngineUpdateOptions {
     emitFlashes?: boolean;
     solo?: boolean;
+    nativeStageProp?: boolean;
 }
 
 export interface ActiveChannelSummary {
@@ -195,6 +196,25 @@ export class VfxEngine {
         return matched ?? this.program.staticKeyParticle;
     }
 
+    stageProp(timeSeconds: number, music: Readonly<MusicFeatures>, solo = false): VfxStageProp | undefined {
+        if (timeSeconds < 0 || timeSeconds >= this.program.durationSeconds) return undefined;
+        const tick = Math.floor(timeSeconds * 20 + 1e-6);
+        for (const channel of this.program.channels) {
+            const def = this.getActiveEffect(channel.effect);
+            if (!def?.resolveStageProp) continue;
+            const sample = channel.sample(timeSeconds, tick, solo ? quietFeatures : music, solo);
+            if (!sample || sample.params.intensity < 0.005) continue;
+            try {
+                const prop = def.resolveStageProp(this.resolvedParams(def, sample.params));
+                this.reportSuccess(def);
+                if (prop) return prop;
+            } catch (error) {
+                this.reportFailure(def, "resolveStageProp", error);
+            }
+        }
+        return undefined;
+    }
+
     private runtimeFor(key: string, def: VfxEffectDefinition): ChannelRuntime {
         let runtime = this.runtimes.get(key);
         if (!runtime) {
@@ -233,6 +253,7 @@ export class VfxEngine {
         phase: number,
         solo: boolean,
         state: unknown,
+        nativeStageProp = false,
     ): VfxBatch | null {
         if (!def.emit) return null;
         try {
@@ -245,6 +266,7 @@ export class VfxEngine {
                 phase,
                 solo,
                 state,
+                nativeStageProp,
             });
             this.reportSuccess(def);
             return batch;
@@ -363,6 +385,7 @@ export class VfxEngine {
                     (gameTick * 9 + channel.slot * 41) % 360,
                     solo,
                     runtime.effectState,
+                    options.nativeStageProp,
                 );
                 const interval = this.safeNextInterval(def, sample.params, runtime.effectState);
                 runtime.nextTick = gameTick + Math.max(1, interval);

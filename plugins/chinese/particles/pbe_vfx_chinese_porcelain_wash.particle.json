@@ -1,0 +1,31 @@
+{
+    "format_version": "1.10.0",
+    "particle_effect": {
+        "description": {
+            "identifier": "pbe:vfx_chinese_porcelain_wash",
+            "basic_render_parameters": {
+                "material": "particles_blend",
+                "texture": "textures/particle/pbe_chinese_porcelain"
+            }
+        },
+        "components": {
+            "minecraft:emitter_rate_instant": { "num_particles": 1 },
+            "minecraft:emitter_lifetime_once": { "active_time": 0.05 },
+            "minecraft:emitter_shape_point": { "offset": [0, 0, 0] },
+            "minecraft:particle_lifetime_expression": { "max_lifetime": "(variable.vfx_life ?? 1.97)" },
+            "minecraft:particle_appearance_billboard": {
+                "facing_camera_mode": "lookat_y",
+                "size": ["1.26 * (variable.vfx_scale ?? 1)", "1.85 * (variable.vfx_scale ?? 1)"],
+                "uv": { "texture_width": 128, "texture_height": 192, "uv": [0, 0], "uv_size": [128, 192] }
+            },
+            "minecraft:particle_appearance_tinting": {
+                "color": [
+                    "(variable.vfx_red ?? 1)",
+                    "(variable.vfx_green ?? 1)",
+                    "(variable.vfx_blue ?? 1)",
+                    "(variable.vfx_opacity ?? 1) * math.clamp(variable.particle_age / 0.38, 0, 1) * math.clamp((variable.particle_lifetime - variable.particle_age) / 0.46, 0, 1)"
+                ]
+            }
+        }
+    }
+}

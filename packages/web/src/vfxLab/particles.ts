@@ -4,7 +4,6 @@ import Wintersky from "wintersky";
 import type { Config, Emitter } from "wintersky";
 import type Molang from "molangjs";
 import atlasUrl from "@piano/vfx/assets/textures/particle/vfx_lab.png";
-import pianoFxUrl from "../../../../plugins/keys/textures/particle/piano_fx.png";
 import type { VfxParticle } from "@piano/vfx";
 
 type Expression = number | string;
@@ -36,6 +35,9 @@ const hostDocuments = import.meta.glob<Definition>("../../../vfx/assets/particle
 const pluginDocuments = import.meta.glob<Definition>("../../../../plugins/*/particles/*.particle.json", {
     eager: true, import: "default",
 });
+const pluginTextures = import.meta.glob<string>("../../../../plugins/*/textures/particle/*.png", {
+    eager: true, import: "default", query: "?url",
+});
 const documents = { ...hostDocuments, ...pluginDocuments };
 const stepRate = 40;
 
@@ -43,16 +45,17 @@ export const particleStep = 1 / stepRate;
 
 export async function loadParticles() {
     const loader = new TextureLoader();
-    const [texture, pianoFxTexture] = await Promise.all([
-        loader.loadAsync(atlasUrl),
-        loader.loadAsync(pianoFxUrl),
-    ]);
-    for (const loaded of [texture, pianoFxTexture]) {
+    const textureUrls = new Map([["textures/particle/vfx_lab", atlasUrl]]);
+    for (const [path, url] of Object.entries(pluginTextures)) {
+        const name = path.slice(path.lastIndexOf("/") + 1, -4);
+        textureUrls.set(`textures/particle/${name}`, url);
+    }
+    const textures = new Map(await Promise.all([...textureUrls].map(async ([id, url]) => {
+        const loaded = await loader.loadAsync(url);
         loaded.magFilter = LinearFilter;
         loaded.minFilter = LinearFilter;
-    }
-    const textureFor = (doc: Definition) =>
-        doc.particle_effect.description.basic_render_parameters.texture.includes("piano_fx") ? pianoFxTexture : texture;
+        return [id, loaded] as const;
+    })));
     const scene = new Wintersky.Scene();
     scene.global_options.tick_rate = stepRate;
     scene.global_options.ground_collision = false;
@@ -61,6 +64,8 @@ export async function loadParticles() {
     for (const doc of Object.values(documents)) {
         const identifier = doc.particle_effect.description.identifier;
         if (!identifier.startsWith("pbe:vfx_")) continue;
+        const texture = textures.get(doc.particle_effect.description.basic_render_parameters.texture);
+        if (!texture) throw new Error(`${identifier} 缺少 VFX 粒子贴图`);
         const config = new Wintersky.Config(scene, doc);
         config.texture.dispose();
 
@@ -71,7 +76,7 @@ export async function loadParticles() {
                 `((${expr}) * (${expr}))`).join(" + ")})`;
         }
         const particle = identifier.slice("pbe:vfx_".length) as VfxParticle;
-        config.texture = textureFor(doc);
+        config.texture = texture;
         // The built-in steady scheduler rounds 1/rate to whole ticks. Integrate the authored rate here.
         if (config.emitter_rate_mode === "steady") {
             rates.set(particle, config.emitter_rate_rate);
@@ -152,6 +157,9 @@ export async function loadParticles() {
         },
         face(camera: Camera) { scene.updateFacingRotation(camera); },
         reset,
-        dispose() { reset(); texture.dispose(); pianoFxTexture.dispose(); },
+        dispose() {
+            reset();
+            for (const texture of textures.values()) texture.dispose();
+        },
     };
 }

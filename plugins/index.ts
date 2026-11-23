@@ -1,6 +1,7 @@
 import { vfxRegistry, type VfxPluginModule, type VfxRegistry } from "@piano/vfx";
 import { accentsPlugin } from "./accents/vfx";
 import { atmospherePlugin } from "./atmosphere/vfx";
+import { chinesePlugin } from "./chinese/vfx";
 import { curvesPlugin } from "./curves/vfx";
 import { keysPlugin } from "./keys/vfx";
 import { stagePlugin } from "./stage/vfx";
@@ -9,6 +10,7 @@ import { themesPlugin } from "./themes/vfx";
 export {
     accentsPlugin,
     atmospherePlugin,
+    chinesePlugin,
     curvesPlugin,
     keysPlugin,
     stagePlugin,
@@ -22,6 +24,7 @@ export const BUILTIN_PLUGINS: readonly VfxPluginModule[] = [
     keysPlugin,
     accentsPlugin,
     themesPlugin,
+    chinesePlugin,
 ];
 
 /** Idempotently registers all built-in plugins into the provided (or global) registry. */

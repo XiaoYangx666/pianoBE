@@ -13,6 +13,7 @@ import {
 import { inspectInstrument, instrumentDestroyed, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { vfxInstrumentFor } from "@domain/instrument/definition";
 import { spawnVfxEmitter } from "@platform/vfxParticle";
+import { VfxPropRenderer } from "@platform/vfxProp";
 
 export type AutoRequest = { auto: true; piano: PianoRuntime } & (
     | { kind: "performance"; midi: MidiPlayer; performance: NonNullable<MidiPlayer["performance"]>; transport: PianoTransportEvent }
@@ -35,6 +36,7 @@ export interface VfxSession {
     start: number;
     duration: number;
     budget: VfxBudget;
+    prop: VfxPropRenderer;
     features: Readonly<MusicFeatures>;
     isPerformance?: boolean;
     midi?: MidiPlayer;
@@ -57,6 +59,7 @@ function stopSession(session: VfxSession) {
     session.engine = undefined;
     session.music.clear();
     session.budget.clearPending();
+    session.prop.clear();
 }
 
 export function getVfxSession(location: InstrumentLocation): VfxSession | undefined {
@@ -203,6 +206,7 @@ function startSession(location: InstrumentLocation, request: LabRequest | AutoRe
         start,
         duration: Infinity,
         budget,
+        prop: new VfxPropRenderer(location),
         features: quietFeatures,
         lastManualNoteAt: "auto" in request && request.kind === "manualTheme" ? request.lastNoteAt : undefined,
     };
@@ -314,13 +318,15 @@ function updateTick() {
                         session.features = session.input === "solo" ? quietFeatures : session.music.sample(tick);
                     }
                     const timeSeconds = session.midi ? session.midi.position : elapsed / 20;
+                    const solo = session.input === "solo";
+                    const nativeStageProp = session.prop.render(session.engine.stageProp(timeSeconds, session.features, solo), tick);
                     const before = session.budget.dropped;
                     const batches = session.engine.update(
                         timeSeconds,
                         elapsed,
                         session.features,
                         session.music.recent(),
-                        { emitFlashes: true, solo: session.input === "solo" },
+                        { emitFlashes: true, solo, nativeStageProp },
                     );
                     session.budget.enqueue(batches);
                     dropped += session.budget.dropped - before;

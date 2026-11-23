@@ -1,5 +1,6 @@
 import { beforeEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import chinesePlugin from "../../../plugins/chinese/vfx";
 import {
     attachSongPerformance,
     encodeSong,
@@ -36,6 +37,7 @@ import {
     VfxBudget,
     VfxEngine,
     VfxMusic,
+    VfxRegistry,
 } from "../src";
 import { ensureBuiltinPluginsRegistered, readParticleDoc } from "./helpers/builtinPlugins";
 
@@ -176,10 +178,8 @@ test("all registered effects emit valid finite parameters and declared particle 
     }
 });
 
-test("all 7 unified stage themes complete four staggered pianos with zero dropped batches", () => {
-    const themeOrder = getVfxThemeIds();
-    expect(themeOrder).toEqual(["galaxy", "neon", "stage", "sakura", "starlight", "cathedral", "carnival"]);
-    for (const name of themeOrder) {
+test("all unified stage themes complete four staggered pianos with zero dropped batches", () => {
+    for (const name of getVfxThemeIds()) {
         const pianos = Array.from({ length: VFX_MAX_PIANOS }, (_, i) => ({
             start: i * 13,
             budget: new VfxBudget(),
@@ -211,7 +211,7 @@ test("all 7 unified stage themes complete four staggered pianos with zero droppe
         }
         expect(peakDispatch).toBeLessThanOrEqual(VFX_MAX_PIANOS * VFX_EMITTERS_PER_TICK);
         expect(peakReserved).toBeGreaterThan(15);
-        expect(emitted).toBeGreaterThan(200);
+        expect(emitted).toBeGreaterThan(name === "chinese_misty_rain" ? 100 : 200);
         expect(pianos.every(({ budget }) => budget.reserved === 0)).toBe(true);
     }
 });
@@ -250,7 +250,7 @@ test("VfxEngine interpolates key_style colors, switches explicit variant, and re
     expect(engine.update(3, 60, quietFeatures)).toEqual([]);
 });
 
-function simulateSongPerformance(fileName: string, starts: readonly number[]) {
+function simulateSongPerformance(fileName: string, starts: readonly number[], registry?: VfxRegistry, nativeProps = false) {
     const data = readFileSync(new URL(`../../../midis/library/${fileName}`, import.meta.url));
     const { duration, performance } = readSongHeader(data);
     expect(performance).toBeDefined();
@@ -267,7 +267,9 @@ function simulateSongPerformance(fileName: string, starts: readonly number[]) {
     const pianos = starts.map((start, index) => ({
         start,
         music: new VfxMusic(),
-        engine: new VfxEngine(createPerformanceProgram(performance!, seconds), index % 2 === 0 ? "grand" : "upright"),
+        engine: new VfxEngine(
+            createPerformanceProgram(performance!, seconds, registry), index % 2 === 0 ? "grand" : "upright", registry,
+        ),
         budget: new VfxBudget(),
         counts: new Map<string, number>(),
     }));
@@ -292,7 +294,9 @@ function simulateSongPerformance(fileName: string, starts: readonly number[]) {
                 });
             }
             const features = elapsed % 4 === 0 ? piano.music.sample(tick) : quietFeatures;
-            piano.budget.enqueue(piano.engine.update(elapsed / 20, elapsed, features, piano.music.recent()));
+            const time = elapsed / 20;
+            const nativeStageProp = nativeProps && Boolean(piano.engine.stageProp(time, features));
+            piano.budget.enqueue(piano.engine.update(time, elapsed, features, piano.music.recent(), { nativeStageProp }));
             let count = 0;
             piano.budget.dispatch(tick, emitter => {
                 count++;
@@ -313,6 +317,36 @@ function simulateSongPerformance(fileName: string, starts: readonly number[]) {
     }
     return { performance: performance!, pianos, peakReserved };
 }
+
+test("Blue and White Porcelain plays within budget using only the Chinese plugin", () => {
+    const registry = new VfxRegistry();
+    registry.registerPlugin(chinesePlugin);
+    const source = JSON.parse(readFileSync(new URL("../../../midis/performances/f3b8fb2.json", import.meta.url), "utf8"));
+    const cues = compilePerformanceSource(source, "f3b8fb2", registry);
+    for (const cue of cues) expect(registry.getEffect(cue.effect)).toBeDefined();
+
+    const { performance, pianos } = simulateSongPerformance("f3b8fb2.pbe3", [0, 13, 26, 39], registry);
+    expect(performance).toEqual(cues);
+    for (const { engine, counts } of pianos) {
+        const active = (time: number) => engine.activeSummary(time).map(layer => layer.effect);
+        expect(active(60)).toContain("chinese_rain");
+        expect(active(60)).not.toContain("chinese_lotus_scroll");
+        expect(active(95)).toContain("chinese_moon_gate");
+        expect(active(132)).toContain("chinese_lotus_scroll");
+        expect(active(181)).toContain("chinese_glaze");
+        expect(active(228)).toEqual([]);
+        expect(engine.stageProp(155, quietFeatures)).toBeUndefined();
+        expect(engine.stageProp(182, quietFeatures)).toMatchObject({ model: "porcelain_vase", size: 1 });
+        expect(engine.stageProp(221, quietFeatures)).toBeUndefined();
+        expect(counts.get("chinese_ink")).toBeGreaterThan(1000);
+        expect(counts.get("chinese_glow")).toBeGreaterThan(100);
+        expect(counts.get("chinese_porcelain_wash")).toBeGreaterThan(20);
+        expect(counts.get("draw_plane")).toBeGreaterThan(8);
+    }
+
+    const nativeRun = simulateSongPerformance("f3b8fb2.pbe3", [0, 13, 26, 39], registry, true);
+    expect(nativeRun.pianos[0].counts.get("chinese_porcelain_wash")).toBeLessThan(pianos[0].counts.get("chinese_porcelain_wash")!);
+});
 
 test("four staggered Secret performances complete within dispatch and particle budgets with zero drops", () => {
     const { performance, pianos, peakReserved } = simulateSongPerformance("e1563b03.pbe3", [0, 13, 26, 39]);

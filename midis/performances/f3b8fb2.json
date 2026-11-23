@@ -1,0 +1,136 @@
+{
+    "song": "f3b8fb2",
+    "title": "青花瓷 · 雨过见青",
+    "sections": [
+        {
+            "at": 0,
+            "label": "前奏 · 落笔",
+            "note": "从第一颗琴键引出钴蓝笔锋，远景稍亮，整件器物先留在暗处。",
+            "cues": [
+                { "at": 1.6, "op": "flash", "effect": "chinese_brush", "color": "#315CAC", "color2": "#99C4DD", "level": 93 },
+                { "at": 3.15, "op": "set", "effect": "chinese_ink_trace", "color": "#315CAC", "color2": "#7DA4C8", "level": 54, "fade": 1.75, "params": { "reach": 1 } },
+                { "at": 6.725, "op": "set", "effect": "chinese_key_light", "color": "#EDF4E8", "color2": "#B7D4D6", "level": 42, "fade": 1 },
+                { "at": 12.15, "op": "set", "effect": "chinese_mist", "color": "#80A9B3", "color2": "#BCD4CF", "level": 31, "fade": 4 },
+                { "at": 15.775, "op": "set", "effect": "chinese_ink_trace", "color": "#315CAC", "color2": "#7DA4C8", "level": 17, "fade": 3.55, "params": { "reach": 0.38 } }
+            ]
+        },
+        {
+            "at": 19.925,
+            "label": "第一段主歌 · 描胎",
+            "note": "主旋律每次回转便多描一截，先露瓶口和一边瓶肩。",
+            "cues": [
+                { "at": 19.925, "op": "set", "effect": "chinese_porcelain", "color": "#709AC5", "color2": "#335A9C", "level": 37, "fade": 1.9, "params": { "outline": 0.02, "wash": 0, "solid": false } },
+                { "at": 19.925, "op": "set", "effect": "chinese_landscape", "color": "#365D87", "color2": "#A0C9D1", "level": 59, "fade": 5 },
+                { "at": 20.2, "op": "set", "effect": "chinese_ink_trace", "level": 0, "fade": 3.2 },
+                { "at": 24.375, "op": "set", "effect": "chinese_porcelain", "color": "#789FC9", "color2": "#426FAE", "level": 49, "fade": 3.9, "params": { "outline": 0.3 } },
+                { "at": 34.375, "op": "set", "effect": "chinese_porcelain", "color": "#8CB2D6", "color2": "#426FAE", "level": 55, "fade": 4.5, "params": { "outline": 0.54 } },
+                { "at": 43.25, "op": "set", "effect": "chinese_mist", "color": "#90BABC", "color2": "#C8DDD4", "level": 46, "fade": 4.5 },
+                { "at": 50.75, "op": "set", "effect": "chinese_landscape", "level": 0, "fade": 4.65 },
+                { "at": 51.6, "op": "set", "effect": "chinese_porcelain", "color": "#94B7DC", "color2": "#527CAF", "level": 48, "fade": 2.7, "params": { "outline": 0.62 } }
+            ]
+        },
+        {
+            "at": 55.475,
+            "label": "第一遍副歌 · 初见烟雨",
+            "note": "雨从琴后落下，瓶足露出来，瓶腹留白。后半遍把水纹推到两侧。",
+            "cues": [
+                { "at": 55.475, "op": "set", "effect": "chinese_rain", "variant": "back", "color": "#A7CED6", "color2": "#6BA0BC", "level": 74, "fade": 0.65 },
+                { "at": 55.475, "op": "set", "effect": "chinese_porcelain", "color": "#AECDDF", "color2": "#4D76B3", "level": 66, "fade": 4, "params": { "outline": 1 } },
+                { "at": 56.025, "op": "set", "effect": "chinese_mist", "color": "#8EBBBC", "color2": "#D2E5D7", "level": 69, "fade": 3 },
+                { "at": 64.925, "op": "flash", "effect": "chinese_ripple", "variant": "single", "color": "#8EBCCF", "color2": "#4F80AB", "level": 47, "scale": 78 },
+                { "at": 73.25, "op": "flash", "effect": "chinese_ripple", "variant": "sides", "color": "#B1D7DC", "color2": "#5286AA", "level": 60 },
+                { "at": 73.25, "op": "flash", "effect": "chinese_lotus_bloom", "variant": "pair", "color": "#DDE8D5", "color2": "#86AEC8", "level": 82 },
+                { "at": 73.25, "op": "set", "effect": "chinese_rain", "variant": "back", "motion": "gentle", "color": "#B1D7DC", "color2": "#6C9EB8", "level": 57, "fade": 2.6 },
+                { "at": 82.975, "op": "flash", "effect": "chinese_ripple", "variant": "single", "color": "#9DBFCE", "color2": "#628CB9", "level": 42, "scale": 90 },
+                { "at": 86.6, "op": "set", "effect": "chinese_rain", "level": 0, "fade": 3 },
+                { "at": 87.7, "op": "set", "effect": "chinese_porcelain", "color": "#7199C2", "color2": "#3F659D", "level": 38, "fade": 3.8 }
+            ]
+        },
+        {
+            "at": 89.1,
+            "label": "间奏 · 雨歇",
+            "note": "余雾向外散，双道青石月洞门沿间奏合圆。一道淡蓝高光绕过瓶肩，露出缠枝起笔。",
+            "cues": [
+                { "at": 89.1, "op": "set", "effect": "chinese_mist", "color": "#79ADB6", "color2": "#C6E1D6", "level": 37, "fade": 3.7 },
+                { "at": 89.1, "op": "set", "effect": "chinese_moon_gate", "color": "#80AEB7", "color2": "#C5DDD0", "level": 60, "fade": 2.2, "params": { "opening": 0.28 } },
+                { "at": 91.325, "op": "set", "effect": "chinese_moon_gate", "color": "#8AB4C1", "color2": "#DBE7CF", "level": 79, "fade": 6.05, "params": { "opening": 1 } },
+                { "at": 92.15, "op": "set", "effect": "chinese_glaze", "color": "#8CB6D5", "color2": "#BCD8D8", "level": 45, "fade": 0.65, "params": { "sweep": 0.06 } },
+                { "at": 92.85, "op": "set", "effect": "chinese_glaze", "color": "#8CB6D5", "color2": "#BCD8D8", "level": 42, "fade": 3.2, "params": { "sweep": 0.91 } },
+                { "at": 96.05, "op": "set", "effect": "chinese_glaze", "level": 0, "fade": 1.25 },
+                { "at": 103.55, "op": "set", "effect": "chinese_moon_gate", "level": 0, "fade": 3.5 },
+                { "at": 103.55, "op": "set", "effect": "chinese_lotus_scroll", "color": "#315BA7", "color2": "#729DCF", "level": 39, "fade": 2.8, "params": { "growth": 0.12 } }
+            ]
+        },
+        {
+            "at": 108.825,
+            "label": "第二段主歌 · 缠枝",
+            "note": "先长枝，再翻叶与开花。琴前仍留空，给旋律和琴手留出视线。",
+            "cues": [
+                { "at": 108.825, "op": "set", "effect": "chinese_lotus_scroll", "color": "#3C67B1", "color2": "#8AB4D5", "level": 78, "fade": 7.8, "params": { "growth": 0.41 } },
+                { "at": 110.2, "op": "set", "effect": "chinese_porcelain", "color": "#86AAD0", "color2": "#527AAF", "level": 49, "fade": 3.6 },
+                { "at": 121.05, "op": "set", "effect": "chinese_lotus_scroll", "color": "#3864AE", "color2": "#86B1D9", "level": 82, "fade": 8.4, "params": { "growth": 0.65 } },
+                { "at": 121.05, "op": "flash", "effect": "chinese_lotus_bloom", "variant": "left", "color": "#CADDD0", "color2": "#7CA7C8", "level": 77 },
+                { "at": 132.15, "op": "set", "effect": "chinese_lotus_scroll", "color": "#3968B1", "color2": "#89B6D9", "level": 91, "fade": 6.5, "params": { "growth": 0.82 } },
+                { "at": 139.65, "op": "set", "effect": "chinese_mist", "color": "#9ABDCA", "color2": "#D2E6D7", "level": 51, "fade": 3.7 }
+            ]
+        },
+        {
+            "at": 144.375,
+            "label": "第二遍副歌 · 青花入釉",
+            "note": "雨只落两翼，缠枝补齐，瓷面产生第一次浅光。升调前将环境声势收紧。",
+            "cues": [
+                { "at": 144.375, "op": "set", "effect": "chinese_lotus_scroll", "color": "#3867B4", "color2": "#97BFDF", "level": 98, "fade": 4.8, "params": { "growth": 1 } },
+                { "at": 144.375, "op": "set", "effect": "chinese_rain", "variant": "wings", "motion": "gentle", "color": "#A8D0D7", "color2": "#6C9EBF", "level": 42, "fade": 0.95 },
+                { "at": 145.2, "op": "set", "effect": "chinese_porcelain", "color": "#B1CBDD", "color2": "#628CB9", "level": 64, "fade": 4.8, "params": { "wash": 0.16 } },
+                { "at": 153.275, "op": "flash", "effect": "chinese_ripple", "variant": "sides", "color": "#A0C7D1", "color2": "#527BA6", "level": 61, "scale": 98 },
+                { "at": 154.65, "op": "flash", "effect": "chinese_lotus_bloom", "variant": "right", "color": "#EBE8D0", "color2": "#7EAAC6", "level": 72 },
+                { "at": 162.15, "op": "set", "effect": "chinese_glaze", "color": "#BBD9E2", "color2": "#DCEADC", "level": 45, "fade": 0.7, "params": { "sweep": 0.15 } },
+                { "at": 162.875, "op": "set", "effect": "chinese_glaze", "color": "#BBD9E2", "color2": "#DCEADC", "level": 42, "fade": 2.8, "params": { "sweep": 0.72 } },
+                { "at": 165.7, "op": "set", "effect": "chinese_glaze", "level": 0, "fade": 1 },
+                { "at": 175.2, "op": "set", "effect": "chinese_rain", "level": 0, "fade": 2 },
+                { "at": 175.2, "op": "set", "effect": "chinese_mist", "level": 0, "fade": 2.25 },
+                { "at": 176.3, "op": "set", "effect": "chinese_porcelain", "color": "#769CC3", "color2": "#446B9E", "level": 34, "fade": 2.65, "params": { "wash": 0.04 } },
+                { "at": 176.3, "op": "set", "effect": "chinese_lotus_scroll", "color": "#325FA9", "color2": "#7DA6D3", "level": 50, "fade": 2.65 }
+            ]
+        },
+        {
+            "at": 179.925,
+            "label": "升调 · 开釉",
+            "note": "首音擦亮瓶肩，缠枝与器身同转十几度，天青雾向左右两侧展开。",
+            "cues": [
+                { "at": 179.925, "op": "set", "effect": "chinese_glaze", "color": "#F2F3DF", "color2": "#B4D9E3", "level": 100, "params": { "sweep": 0.04 } },
+                { "at": 179.95, "op": "set", "effect": "chinese_glaze", "color": "#F2F3DF", "color2": "#B4D9E3", "level": 95, "fade": 2.45, "params": { "sweep": 0.98 } },
+                { "at": 179.925, "op": "flash", "effect": "chinese_glaze_spray", "color": "#F0F0D5", "color2": "#75B3DF", "level": 99 },
+                { "at": 179.925, "op": "set", "effect": "chinese_porcelain", "color": "#E4EDE3", "color2": "#7CA7D2", "level": 97, "fade": 1.8, "params": { "turn": -12, "wash": 0.92, "solid": true } },
+                { "at": 179.925, "op": "set", "effect": "chinese_lotus_scroll", "color": "#416CB4", "color2": "#9EC5E6", "level": 100, "fade": 1.8, "params": { "turn": -12 } },
+                { "at": 179.925, "op": "set", "effect": "chinese_mist", "color": "#97C6CA", "color2": "#DFECDD", "level": 93, "fade": 2.35 },
+                { "at": 181.325, "op": "flash", "effect": "chinese_ripple", "variant": "sides", "color": "#C6E5E6", "color2": "#628FC0", "level": 74, "scale": 108 },
+                { "at": 182.4, "op": "set", "effect": "chinese_glaze", "level": 0, "fade": 1.05 },
+                { "at": 183.25, "op": "set", "effect": "chinese_porcelain", "color": "#DCEBE4", "color2": "#7BA6CF", "level": 88, "fade": 9.25, "params": { "turn": 13 } },
+                { "at": 183.25, "op": "set", "effect": "chinese_lotus_scroll", "color": "#416AB3", "color2": "#9BC2DE", "level": 99, "fade": 9.25, "params": { "turn": 13 } },
+                { "at": 190.225, "op": "set", "effect": "chinese_rain", "variant": "wings", "motion": "gentle", "color": "#BFDEDD", "color2": "#79AFC1", "level": 42, "fade": 2.5 },
+                { "at": 197.7, "op": "flash", "effect": "chinese_ripple", "variant": "single", "color": "#BAD7D9", "color2": "#6A95BB", "level": 59, "scale": 112 },
+                { "at": 200.2, "op": "flash", "effect": "chinese_lotus_bloom", "variant": "left", "color": "#E5EBDC", "color2": "#8FB7CE", "level": 77 },
+                { "at": 204.65, "op": "set", "effect": "chinese_rain", "level": 0, "fade": 3.2 },
+                { "at": 207.45, "op": "set", "effect": "chinese_mist", "level": 0, "fade": 3.8 }
+            ]
+        },
+        {
+            "at": 212.15,
+            "label": "尾奏 · 收笔",
+            "note": "花和器形分开淡去。末音回收起笔，地上只留一圈水纹。",
+            "cues": [
+                { "at": 212.15, "op": "set", "effect": "chinese_lotus_scroll", "color": "#3D69AE", "color2": "#9CBAD3", "level": 32, "fade": 4, "params": { "growth": 0.43 } },
+                { "at": 212.15, "op": "set", "effect": "chinese_porcelain", "color": "#89AFD2", "color2": "#547FB5", "level": 40, "fade": 5.6, "params": { "outline": 0.33, "wash": 0 } },
+                { "at": 216.15, "op": "set", "effect": "chinese_lotus_scroll", "level": 0, "fade": 2.3 },
+                { "at": 217.75, "op": "set", "effect": "chinese_porcelain", "level": 0, "fade": 3.1 },
+                { "at": 218.3, "op": "set", "effect": "chinese_landscape", "color": "#4B7097", "color2": "#94B6C0", "level": 29, "fade": 2.15 },
+                { "at": 219.65, "op": "set", "effect": "chinese_ink_trace", "color": "#577CBD", "color2": "#ADCBD6", "motion": "reverse", "level": 57, "fade": 2, "params": { "reach": 1 } },
+                { "at": 222.7, "op": "set", "effect": "chinese_ink_trace", "color": "#577CBD", "color2": "#ADCBD6", "motion": "reverse", "level": 26, "fade": 3.6, "params": { "reach": 0.27 } },
+                { "at": 226.3, "op": "blackout", "fade": 0.75 },
+                { "at": 227.45, "op": "flash", "effect": "chinese_brush", "motion": "reverse", "color": "#5279B6", "color2": "#A8C5D3", "level": 33 },
+                { "at": 227.45, "op": "flash", "effect": "chinese_ripple", "variant": "front", "color": "#C3DDDC", "color2": "#6D9DBB", "level": 58, "scale": 99, "params": { "linger": 4.7 } }
+            ]
+        }
+    ]
+}

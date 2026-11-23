@@ -73,9 +73,23 @@ check(read(path.join(root, "tools/verify/verify-timbres.mjs")).includes(timbresM
     "timbres verifier uses the domain timbres path");
 
 const templatePath = path.join(addon, "dist/template.mcaddon");
+const vaseEntityPath = "bp/entities/vfx_porcelain_vase.json";
+
+function hasFloatingVaseSizeRange(source) {
+    if (!source) return false;
+    const size = JSON.parse(source)["minecraft:entity"]?.description?.properties?.["pbe:vfx_size"];
+    // Bedrock distinguishes integer and float JSON tokens. Non-integer bounds survive reserialization.
+    return size?.type === "float"
+        && Array.isArray(size.range)
+        && size.range.length === 2
+        && size.range.every(value => Number.isFinite(value) && !Number.isInteger(value));
+}
+
+check(hasFloatingVaseSizeRange(read(path.join(addon, vaseEntityPath))), "porcelain size range uses float bounds");
 if (fs.existsSync(templatePath)) {
     const template = await readAddonFile(templatePath);
     check(template.has(timbresModule), `template includes ${timbresModule}`);
+    check(hasFloatingVaseSizeRange(template.readTextSync(vaseEntityPath)), "template preserves porcelain float bounds");
 }
 
 // --- 实际产物 ---

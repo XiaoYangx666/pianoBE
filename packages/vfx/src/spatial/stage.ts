@@ -1,4 +1,4 @@
-import type { VfxEmitter, Vec3 } from "../types";
+import type { VfxEmitter, VfxStageProp, Vec3 } from "../types";
 import { vfxStageFrame } from "./instrument";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
 
@@ -38,6 +38,19 @@ export function getStageLightLayout(id: VfxLightLayout, registry: VfxRegistry = 
 
 export function getStageVeilLayout(id: VfxVeilLayout, registry: VfxRegistry = vfxRegistry): readonly StageVeilAnchor[] {
     return registry.getVeilLayout(id) ?? [];
+}
+
+export function placeVfxStageProp(center: Vec3, right: Vec3, stage: ReturnType<typeof vfxStageFrame>, prop: VfxStageProp) {
+    const { x, y, z } = prop.offset;
+    const depth = stage.centerZ + z * stage.depth;
+    return {
+        position: {
+            x: center.x + right.x * x + right.z * depth,
+            y: center.y + y,
+            z: center.z + right.z * x - right.x * depth,
+        },
+        yaw: Math.atan2(right.z, right.x) * 180 / Math.PI,
+    };
 }
 
 /** 统一解析发射器的世界坐标与 Molang 输入（Web 与 Bedrock 共用）。 */
