@@ -2492,6 +2492,13 @@
   "bytes": 5639
  },
  {
+  "id": "d6e499ee",
+  "name": "周杰伦 - 断了的弦（无语伦比演唱会）",
+  "duration": 11583,
+  "noteCount": 2108,
+  "bytes": 4216
+ },
+ {
   "id": "f3004b7e",
   "name": "周杰伦 - 发如雪",
   "duration": 11444,
@@ -2996,6 +3003,13 @@
   "bytes": 4737
  },
  {
+  "id": "c0c2625f",
+  "name": "周杰伦 - 说了再见（钢琴版）",
+  "duration": 11174,
+  "noteCount": 1984,
+  "bytes": 4243
+ },
+ {
   "id": "d1e6fb1a",
   "name": "周杰伦 - 算什么男人",
   "duration": 11292,
@@ -3057,13 +3071,6 @@
   "duration": 10856,
   "noteCount": 2235,
   "bytes": 4486
- },
- {
-  "id": "66145b60",
-  "name": "周杰伦 - 听看见下雨的声音",
-  "duration": 5510,
-  "noteCount": 668,
-  "bytes": 974
  },
  {
   "id": "b2e6ae55",
@@ -3290,6 +3297,20 @@
   "bytes": 2903
  },
  {
+  "id": "6c67d01c",
+  "name": "周杰伦 & 费玉清 - 千里之外（合唱）",
+  "duration": 10260,
+  "noteCount": 1665,
+  "bytes": 3606
+ },
+ {
+  "id": "8e6806e8",
+  "name": "周杰伦 & 梁心颐 - 珊瑚海（合唱）",
+  "duration": 10141,
+  "noteCount": 2029,
+  "bytes": 4019
+ },
+ {
   "id": "39aa064b",
   "name": "周杰伦 & 袁咏琳 - 怎麼了",
   "duration": 13186,
@@ -3302,34 +3323,6 @@
   "duration": 11520,
   "noteCount": 2065,
   "bytes": 6908
- },
- {
-  "id": "d6e499ee",
-  "name": "周杰伦 断了的弦 无语伦比演唱会",
-  "duration": 11583,
-  "noteCount": 2108,
-  "bytes": 4216
- },
- {
-  "id": "6c67d01c",
-  "name": "周杰伦 费玉清 千里之外",
-  "duration": 10260,
-  "noteCount": 1665,
-  "bytes": 3606
- },
- {
-  "id": "8e6806e8",
-  "name": "周杰伦 梁心颐 珊瑚海",
-  "duration": 10141,
-  "noteCount": 2029,
-  "bytes": 4019
- },
- {
-  "id": "c0c2625f",
-  "name": "周杰伦 说了再见 钢琴版 (BV15bs7z9ECk)",
-  "duration": 11174,
-  "noteCount": 1984,
-  "bytes": 4243
  },
  {
   "id": "3b56fc5b",
