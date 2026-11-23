@@ -144,6 +144,7 @@ test("built-in plugin manifests accurately declare every registered effect, them
         "pianobe.accents",
         "pianobe.themes",
         "pianobe.chinese",
+        "pianobe.floral",
     ]);
     const pluginsRoot = join(import.meta.dir, "..", "..", "..", "plugins");
     for (const record of plugins) {

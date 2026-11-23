@@ -3,6 +3,7 @@ import { accentsPlugin } from "./accents/vfx";
 import { atmospherePlugin } from "./atmosphere/vfx";
 import { chinesePlugin } from "./chinese/vfx";
 import { curvesPlugin } from "./curves/vfx";
+import { floralPlugin } from "./floral/vfx";
 import { keysPlugin } from "./keys/vfx";
 import { stagePlugin } from "./stage/vfx";
 import { themesPlugin } from "./themes/vfx";
@@ -12,6 +13,7 @@ export {
     atmospherePlugin,
     chinesePlugin,
     curvesPlugin,
+    floralPlugin,
     keysPlugin,
     stagePlugin,
     themesPlugin,
@@ -25,6 +27,7 @@ export const BUILTIN_PLUGINS: readonly VfxPluginModule[] = [
     accentsPlugin,
     themesPlugin,
     chinesePlugin,
+    floralPlugin,
 ];
 
 /** Idempotently registers all built-in plugins into the provided (or global) registry. */

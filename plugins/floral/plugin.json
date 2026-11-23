@@ -1,0 +1,18 @@
+{
+    "id": "pianobe.floral",
+    "name": "PianoBE 花海",
+    "version": "1.0.0",
+    "apiVersion": "1.0.0",
+    "minPianoBeVersion": "1.3.0",
+    "capabilities": ["vfx"],
+    "author": "PianoBE",
+    "license": "CC-BY-NC-4.0",
+    "provides": {
+        "effects": ["floral_meadow", "floral_tide", "floral_petal_phrase", "floral_key_style"],
+        "keyStyles": ["floral_touch"],
+        "particles": ["floral_ground"]
+    },
+    "preview": {
+        "description": "斜过琴台的地表花潮、乐句末尾翻飞的花瓣，以及暖白至贝粉的碎瓣琴键。"
+    }
+}

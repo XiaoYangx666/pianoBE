@@ -37,6 +37,7 @@ test("all performance JSON cues place finite variables through unified VfxEngine
         ["c8159589", 317, 0.2],
         ["b0cae095", 385, 0.25],
         ["ff9c1534", 287, 0.25],
+        ["2f434124", 307.575, 0.1],
     ] as const;
     const music = { ...quietFeatures, velocity: 0.55, activity: 0.6, density: 0.55, sustain: 0.5, surge: 0.6, chord: 0.6, onset: 0.55 };
     const failures: string[] = [];

@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import chinesePlugin from "../../../plugins/chinese/vfx";
+import floralPlugin from "../../../plugins/floral/vfx";
 import {
     attachSongPerformance,
     encodeSong,
@@ -27,6 +28,7 @@ import {
     POINT_BRUSH_INDEX,
     quietFeatures,
     resolveEffectCustomParams,
+    resolveKeyParticle,
     simulatedVfxNotes,
     STROKE_BRUSH_IDS,
     validateEffectCustomParams,
@@ -346,6 +348,40 @@ test("Blue and White Porcelain plays within budget using only the Chinese plugin
 
     const nativeRun = simulateSongPerformance("f3b8fb2.pbe3", [0, 13, 26, 39], registry, true);
     expect(nativeRun.pianos[0].counts.get("chinese_porcelain_wash")).toBeLessThan(pianos[0].counts.get("chinese_porcelain_wash")!);
+});
+
+test("Floral Sea leaves space for the orbit and finishes with a single farewell petal", () => {
+    const source = JSON.parse(readFileSync(new URL("../../../midis/performances/2f434124.json", import.meta.url), "utf8"));
+    const { performance, pianos } = simulateSongPerformance("2f434124.pbe3", [0, 9, 17, 29]);
+    expect(performance).toEqual(compilePerformanceSource(source, "2f434124"));
+    for (const { engine, counts } of pianos) {
+        expect(engine.activeSummary(232.6).map(layer => layer.effect)).not.toContain("sea_reflection");
+        expect(engine.activeSummary(235).filter(layer => layer.effect === "floral_tide").map(layer => layer.slot))
+            .toEqual([1]);
+        expect(engine.activeSummary(301)).toEqual([]);
+        expect(engine.keyParticleOverride(18)?.style).toBe("floral_touch");
+        expect(engine.keyParticleOverride(300)?.style).toBe("glimmer");
+        expect(engine.keyParticleOverride(308)).toBeUndefined();
+        expect(counts.get("draw_point")).toBeGreaterThan(100);
+    }
+
+    const registry = new VfxRegistry();
+    registry.registerPlugin(floralPlugin);
+    const program = createPerformanceProgram(performance, 307.575, registry);
+    const engine = new VfxEngine(program, "grand", registry);
+    engine.seek(232.6);
+    const orbit = engine.update(232.65, 4653, quietFeatures).flatMap(batch => batch.emitters)
+        .filter(emitter => emitter.group === "floral_petal_phrase");
+    expect(orbit).toHaveLength(6);
+    expect(orbit.every(emitter => emitter.variables.omega > 0)).toBe(true);
+    const touch = resolveKeyParticle(75, { particleStyle: 3, particlePalette: 0 }, { x: 1, z: 0 },
+        engine.keyParticleOverride(233), registry);
+    expect(touch.style).toBe("floral_touch");
+    expect(touch.emitters[0]).toMatchObject({ particle: "draw_point", variables: { count: 2 } });
+    engine.seek(301.6);
+    const farewell = engine.update(301.65, 6033, quietFeatures).flatMap(batch => batch.emitters);
+    expect(farewell).toHaveLength(1);
+    expect(farewell[0]).toMatchObject({ group: "floral_petal_phrase", particles: 1, lifetime: 5.8 });
 });
 
 test("four staggered Secret performances complete within dispatch and particle budgets with zero drops", () => {

@@ -1,0 +1,105 @@
+{
+    "song": "2f434124",
+    "title": "花海 · 潮起时，花开",
+    "sections": [
+        {
+            "at": 0,
+            "label": "前奏 · 岸边",
+            "cues": [
+                { "at": 0, "op": "set", "effect": "floral_key_style", "variant": "petal", "color": "#D6B0C7", "color2": "#FFE7D6", "level": 49, "scale": 79 },
+                { "at": 0, "op": "set", "effect": "twilight_mist", "zone": "low", "motion": "gentle", "color": "#45547F", "color2": "#A1A8C3", "level": 27, "fade": 4.7 },
+                { "at": 3.55, "op": "set", "effect": "sea_reflection", "motion": "gentle", "color": "#4B5F87", "color2": "#8C99BD", "level": 22, "fade": 4, "params": { "width": 4.4, "depth": 3, "shimmer": 0.17, "tideSpeed": 0.23 } },
+                { "at": 7.525, "op": "set", "effect": "floral_meadow", "color": "#AB7C9E", "color2": "#E7CBCB", "level": 34, "fade": 3.2, "params": { "coverage": 0.22 } },
+                { "at": 22.8, "op": "set", "effect": "floral_meadow", "color": "#BD8CA9", "color2": "#F1D5CA", "level": 43, "fade": 5, "params": { "coverage": 0.38 } }
+            ]
+        },
+        {
+            "at": 30.85,
+            "label": "主歌 · 风动",
+            "cues": [
+                { "at": 36.175, "op": "set", "effect": "floral_meadow", "color": "#CF91A9", "color2": "#F1D6C9", "level": 49, "fade": 5, "params": { "coverage": 0.35 } },
+                { "at": 47.3, "op": "flash", "effect": "floral_petal_phrase", "variant": "left", "color": "#D694BA", "color2": "#FFE5CD", "level": 34, "scale": 92 },
+                { "at": 54.35, "op": "set", "effect": "floral_key_style", "variant": "petal", "color": "#ECAABC", "color2": "#FFE9D1", "level": 63, "scale": 91, "fade": 5 },
+                { "at": 65.25, "op": "set", "effect": "floral_meadow", "color": "#C191AF", "color2": "#F5D7C6", "level": 56, "fade": 9, "params": { "coverage": 0.48 } },
+                { "at": 75.6, "op": "flash", "effect": "floral_petal_phrase", "variant": "right", "color": "#DC9AB9", "color2": "#FCE2CE", "level": 46, "scale": 95 },
+                { "at": 85.825, "op": "set", "effect": "floral_tide", "color": "#EC9FB8", "color2": "#FFE3D0", "level": 55, "params": { "front": -0.24, "crest": 0.34, "span": 0.22 } }
+            ]
+        },
+        {
+            "at": 89.325,
+            "label": "初潮 · 花在近处开放",
+            "cues": [
+                { "at": 89.325, "op": "set", "effect": "floral_tide", "color": "#E99CB6", "color2": "#FFE4D5", "level": 82, "fade": 6.3, "params": { "front": 1.24, "crest": 0.62 } },
+                { "at": 89.325, "op": "set", "effect": "floral_meadow", "color": "#D18AA8", "color2": "#FFE7D4", "level": 68, "fade": 4, "params": { "coverage": 0.95 } },
+                { "at": 99.225, "op": "flash", "effect": "floral_petal_phrase", "variant": "right", "color": "#F4B3C2", "color2": "#FFE8D2", "level": 65 },
+                { "at": 103, "op": "set", "effect": "floral_tide", "color": "#DF94B4", "color2": "#FFDEBE", "level": 63, "params": { "front": -0.24, "crest": 0.57 } },
+                { "at": 105.95, "op": "set", "effect": "floral_tide", "color": "#DF94B4", "color2": "#FFDEBE", "level": 74, "fade": 5.6, "params": { "front": 1.24, "crest": 0.52 } },
+                { "at": 112.675, "op": "flash", "effect": "floral_petal_phrase", "variant": "left", "color": "#EFA7C3", "color2": "#FFF0D4", "level": 36, "scale": 89 },
+                { "at": 116, "op": "set", "effect": "floral_tide", "color": "#E5A6BF", "color2": "#FFF0DF", "level": 82, "params": { "front": -0.24, "crest": 0.65, "span": 0.28 } },
+                { "at": 119.2, "op": "set", "effect": "floral_tide", "color": "#F4ADC2", "color2": "#FFF0D9", "level": 86, "fade": 7.3, "params": { "front": 1.24, "crest": 0.72 } },
+                { "at": 128.95, "op": "flash", "effect": "floral_petal_phrase", "variant": "right", "color": "#F5B7C7", "color2": "#FFE9D5", "level": 73 },
+                { "at": 135.65, "op": "set", "effect": "floral_meadow", "color": "#917A9F", "color2": "#D3B2BE", "level": 47, "fade": 6.9, "params": { "coverage": 0.68 } }
+            ]
+        },
+        {
+            "at": 142.575,
+            "label": "间奏和主歌 · 望向远处",
+            "cues": [
+                { "at": 142.575, "op": "set", "effect": "floral_tide", "level": 0, "fade": 1 },
+                { "at": 142.575, "op": "set", "effect": "floral_meadow", "level": 0, "fade": 3.2 },
+                { "at": 142.575, "op": "set", "effect": "sea_reflection", "motion": "gentle", "color": "#5270A8", "color2": "#B5D8F4", "level": 67, "fade": 3, "params": { "shimmer": 0.48, "tideSpeed": 0.18 } },
+                { "at": 142.575, "op": "set", "effect": "twilight_mist", "zone": "low", "motion": "gentle", "color": "#56658E", "color2": "#9C9DBC", "level": 41, "fade": 5.5 },
+                { "at": 145.7, "op": "flash", "effect": "floral_petal_phrase", "variant": "left", "color": "#ABA4C8", "color2": "#F8DDE4", "level": 40, "scale": 84 },
+                { "at": 146.1, "op": "set", "effect": "floral_key_style", "variant": "glimmer", "color": "#90B4E4", "color2": "#E1EDF8", "level": 62, "scale": 79, "fade": 4.8 },
+                { "at": 162.45, "op": "flash", "effect": "floral_petal_phrase", "variant": "right", "color": "#BAA5CF", "color2": "#F8E2DD", "level": 47, "scale": 90 },
+                { "at": 169.2, "op": "set", "effect": "sea_reflection", "motion": "gentle", "color": "#536587", "color2": "#95A8C7", "level": 25, "fade": 5, "params": { "shimmer": 0.17 } },
+                { "at": 173.075, "op": "set", "effect": "floral_meadow", "color": "#A287A9", "color2": "#D4B8C4", "level": 37, "fade": 4.4, "params": { "coverage": 0.26 } },
+                { "at": 183.575, "op": "set", "effect": "floral_key_style", "variant": "petal", "color": "#E6A8BB", "color2": "#FFF1DE", "level": 69, "scale": 94, "fade": 10 },
+                { "at": 190.1, "op": "set", "effect": "floral_meadow", "color": "#D298B2", "color2": "#FFDFCC", "level": 61, "fade": 6.5, "params": { "coverage": 0.73 } },
+                { "at": 193.275, "op": "set", "effect": "floral_tide", "color": "#DCA6C8", "color2": "#FFE0CC", "level": 75, "params": { "front": -0.24, "crest": 0.6, "span": 0.29 } }
+            ]
+        },
+        {
+            "at": 196.675,
+            "label": "满潮 · 花海漫过来",
+            "cues": [
+                { "at": 196.675, "op": "set", "effect": "floral_tide", "color": "#E5A3C3", "color2": "#FFE3D0", "level": 86, "fade": 8.7, "params": { "front": 1.24, "crest": 0.79 } },
+                { "at": 196.675, "op": "set", "effect": "sea_reflection", "motion": "gentle", "color": "#52608B", "color2": "#B8ABC9", "level": 33, "fade": 7, "params": { "shimmer": 0.24 } },
+                { "at": 206.6, "op": "flash", "effect": "floral_petal_phrase", "variant": "right", "color": "#EDA5C2", "color2": "#FFEBD2", "level": 69, "scale": 104 },
+                { "at": 210, "op": "set", "effect": "floral_tide", "color": "#EAB0C8", "color2": "#FFF1DD", "level": 82, "params": { "front": -0.24, "crest": 0.78, "span": 0.32 } },
+                { "at": 213, "op": "set", "effect": "floral_tide", "color": "#EBABC5", "color2": "#FFE9D6", "level": 91, "fade": 7.2, "params": { "front": 1.24, "crest": 0.83 } },
+                { "at": 219.475, "op": "set", "effect": "floral_meadow", "color": "#A97D9B", "color2": "#DDB9C6", "level": 37, "fade": 3.1, "params": { "coverage": 0.63 } },
+                { "at": 222.75, "op": "set", "effect": "floral_tide", "color": "#E9AEC6", "color2": "#FFF5DE", "level": 90, "params": { "front": -0.24, "crest": 0.81, "span": 0.34 } },
+                { "at": 223.175, "op": "set", "effect": "sea_reflection", "level": 0, "fade": 2.6 },
+                { "at": 224.85, "op": "set", "effect": "floral_tide", "color": "#DCA4C1", "color2": "#FBE2D6", "level": 68, "fade": 6.75, "params": { "front": 1.24, "crest": 0.84 } },
+                { "at": 225.575, "op": "flash", "effect": "floral_petal_phrase", "variant": "left", "color": "#E3A6BC", "color2": "#FFDDCD", "level": 53, "scale": 94 },
+                { "at": 226, "op": "set", "effect": "floral_tide", "slot": 1, "color": "#B3A3CF", "color2": "#FFCBD3", "level": 51, "params": { "front": -0.24, "crest": 0.84, "span": 0.23 } },
+                { "at": 226, "op": "set", "effect": "floral_key_style", "variant": "petal", "color": "#DBA6BB", "color2": "#FFF2DC", "level": 61, "scale": 90, "fade": 3.75 },
+                { "at": 229.45, "op": "set", "effect": "twilight_mist", "level": 0, "fade": 2.3 },
+                { "at": 232.55, "op": "set", "effect": "floral_tide", "level": 0 },
+                { "at": 232.65, "op": "set", "effect": "floral_meadow", "color": "#F498AD", "color2": "#FFE9BF", "level": 100, "fade": 1.35, "params": { "coverage": 1 } },
+                { "at": 232.65, "op": "flash", "effect": "floral_petal_phrase", "variant": "orbit", "color": "#FF9EB8", "color2": "#FFF2C5", "level": 100, "scale": 101 },
+                { "at": 232.65, "op": "set", "effect": "floral_tide", "slot": 1, "color": "#FBAAC1", "color2": "#FFF0C8", "level": 92, "fade": 6.35, "params": { "front": 1.24, "crest": 1.04, "span": 0.28 } },
+                { "at": 239, "op": "set", "effect": "floral_meadow", "color": "#BC87A4", "color2": "#EBC9C6", "level": 62, "fade": 6.55, "params": { "coverage": 0.8 } },
+                { "at": 245.55, "op": "set", "effect": "twilight_mist", "zone": "low", "motion": "gentle", "color": "#485575", "color2": "#A498AE", "level": 22, "fade": 5 }
+            ]
+        },
+        {
+            "at": 249.35,
+            "label": "尾奏 · 风停",
+            "cues": [
+                { "at": 249.35, "op": "set", "effect": "floral_tide", "level": 0, "fade": 0.75 },
+                { "at": 249.35, "op": "set", "effect": "floral_tide", "slot": 1, "level": 0, "fade": 0.75 },
+                { "at": 249.35, "op": "set", "effect": "sea_reflection", "level": 0, "fade": 3 },
+                { "at": 249.35, "op": "set", "effect": "floral_meadow", "color": "#A57997", "color2": "#E0BAC5", "level": 43, "fade": 4, "params": { "coverage": 0.54 } },
+                { "at": 253.9, "op": "set", "effect": "floral_key_style", "variant": "petal", "color": "#BCA1C4", "color2": "#FFE1CC", "level": 55, "scale": 86, "fade": 8 },
+                { "at": 263.925, "op": "set", "effect": "floral_meadow", "color": "#987797", "color2": "#D0B4BF", "level": 37, "fade": 9.2, "params": { "coverage": 0.51 } },
+                { "at": 274.4, "op": "flash", "effect": "floral_petal_phrase", "variant": "left", "color": "#C79DBC", "color2": "#F5DBCC", "level": 49, "scale": 92 },
+                { "at": 279, "op": "set", "effect": "floral_key_style", "variant": "glimmer", "color": "#D3ADB9", "color2": "#FFE6CD", "level": 38, "scale": 78, "fade": 4 },
+                { "at": 282.95, "op": "flash", "effect": "floral_petal_phrase", "variant": "right", "color": "#BA9CBD", "color2": "#FFE4D0", "level": 23, "scale": 77 },
+                { "at": 287.8, "op": "blackout", "fade": 9, "except": ["floral_key_style"] },
+                { "at": 301.65, "op": "flash", "effect": "floral_petal_phrase", "variant": "farewell", "color": "#F9BFC6", "color2": "#FFF0D8", "level": 89 }
+            ]
+        }
+    ]
+}
