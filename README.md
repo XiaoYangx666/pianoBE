@@ -55,7 +55,7 @@ FluidR3 GM，各音色的来源与授权见 `packages/addon/rp/THIRD_PARTY_NOTIC
 # 启动后端（Docker，根目录 compose；镜像内含 core/web 构建产物）
 docker compose up -d
 # 管理页 http://<host>:35050 登录 → 上传曲目、生成导入码、签发令牌
-# （.env 中 BOOTSTRAP_TOKEN 为管理员令牌；对外端口 35050，容器内 3000）
+# （不设 BOOTSTRAP_TOKEN 时首次启动会自动生成随机管理员令牌，打印在 docker logs 里）
 
 # 构建服务器专用包
 npm run build:server   # 产出 packages/addon/dist/server.mcaddon
@@ -147,6 +147,11 @@ npm run test -w @piano/addon  # addon netSource 缓存/降级
 
 # 运行
 npm run dev:generator    # 生成器开发模式（predev 自动同步底包与曲库到 public/）
+
+# 本机直接跑后端（非 Docker）
+cp .env.example packages/server/.env   # 按需改端口 / 令牌
+npm run build:core                     # @piano/server 依赖 core 的构建产物
+npm run start:server                   # http://127.0.0.1:3000，日志在 packages/server/data/logs/
 ```
 
 ### 音频转 MIDI（AMT）资源

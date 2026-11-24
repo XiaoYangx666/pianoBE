@@ -7,9 +7,10 @@ services:
         ports:
             - "35050:3000"
         environment:
-            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-change-me-admin-token}
+            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
             DB_PATH: /app/data/piano.db
             MIDIS_DIR: /app/data/midis
+            LOG_FILE: /app/data/logs/server.log
             WEB_ROOT: /app/packages/studio/dist
             BUILTIN_PLUGINS_DIR: /app/build/plugins
             ALLOW_PUBLIC_READ: ${ALLOW_PUBLIC_READ:-false}

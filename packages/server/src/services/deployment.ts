@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { writeFileAtomic } from "../atomic.js";
 import { readAddonArchive } from "@bepack/addon";
 import {
     MAX_SCORES,
@@ -112,7 +113,7 @@ export class DeploymentService {
     saveServerTemplate(bytes: Uint8Array): void {
         const path = this.customTemplatePath();
         mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, bytes);
+        writeFileAtomic(path, bytes);
     }
 
     resolveTemplatePath(): string | undefined {
@@ -256,7 +257,7 @@ export class DeploymentService {
     private saveScoresMeta(scores: readonly ServerScoreMeta[]): void {
         const dir = this.scoresDir();
         mkdirSync(dir, { recursive: true });
-        writeFileSync(this.scoresMetaPath(), `${JSON.stringify(scores, null, 2)}\n`);
+        writeFileAtomic(this.scoresMetaPath(), `${JSON.stringify(scores, null, 2)}\n`);
     }
 
     addScore(input: {
@@ -292,7 +293,7 @@ export class DeploymentService {
                 : encoded.includes("+") || encoded.includes("/") || encoded.endsWith("=")
                   ? Uint8Array.from(Buffer.from(encoded, "base64"))
                   : decodeBase64Url(encoded);
-            writeFileSync(outPath, bytes);
+            writeFileAtomic(outPath, bytes);
         }
         const entry: ServerScoreMeta = {
             id,
@@ -567,7 +568,7 @@ export class DeploymentService {
     }
 
     /**
-     * 每次部署都把 BP/RP 的 header.version patch 位 +1，并同步 BP 对 RP 的依赖版本。
+     * 每次部署都把 BP/RP 的 header.version patch 位 +1，并同步两侧依赖版本。
      * 客户端按 uuid+version 缓存附加包：版本不变时重进服务器不会重新下载资源包，
      * 会出现"资源包内容已更新但客户端仍是旧缓存"的问题。
      */
@@ -601,16 +602,26 @@ export class DeploymentService {
 
         const bpManifest = JSON.parse(decoder.decode(bpRaw)) as Record<string, unknown>;
         const rpManifest = JSON.parse(decoder.decode(rpRaw)) as Record<string, unknown>;
-        bump(bpManifest);
+        const bpVersion = bump(bpManifest);
         const rpVersion = bump(rpManifest);
 
+        // BP → RP 与 RP → BP 的依赖版本都对齐，避免 manifest 里残留旧版本
+        const bpUuid = (bpManifest.header as { uuid?: string }).uuid;
         const rpUuid = (rpManifest.header as { uuid?: string }).uuid;
-        const deps = Array.isArray(bpManifest.dependencies) ? bpManifest.dependencies : [];
-        for (const dep of deps) {
-            if (dep && typeof dep === "object" && rpUuid && (dep as { uuid?: string }).uuid === rpUuid) {
-                (dep as { version?: string }).version = rpVersion.text;
+        const syncDependency = (
+            manifest: Record<string, unknown>,
+            uuid: string | undefined,
+            version: string
+        ) => {
+            const deps = Array.isArray(manifest.dependencies) ? manifest.dependencies : [];
+            for (const dep of deps) {
+                if (dep && typeof dep === "object" && uuid && (dep as { uuid?: string }).uuid === uuid) {
+                    (dep as { version?: string }).version = version;
+                }
             }
-        }
+        };
+        syncDependency(bpManifest, rpUuid, rpVersion.text);
+        syncDependency(rpManifest, bpUuid, bpVersion.text);
 
         bpFiles.set("manifest.json", encoder.encode(`${JSON.stringify(bpManifest, null, 4)}\n`));
         rpFiles.set("manifest.json", encoder.encode(`${JSON.stringify(rpManifest, null, 4)}\n`));
@@ -698,7 +709,7 @@ function updateWorldPackFile(filePath: string, packId: string, version: number[]
     } else {
         entries.push(nextEntry);
     }
-    writeFileSync(filePath, `${JSON.stringify(entries, null, 2)}\n`);
+    writeFileAtomic(filePath, `${JSON.stringify(entries, null, 2)}\n`);
 }
 
 function parseList(raw?: string): string[] {
