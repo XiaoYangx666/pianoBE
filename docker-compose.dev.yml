@@ -10,14 +10,18 @@ services:
             BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-change-me-admin-token}
             DB_PATH: /app/data/piano.db
             MIDIS_DIR: /app/data/midis
-            WEB_ROOT: /app/packages/web/dist
+            WEB_ROOT: /app/packages/studio/dist
+            BUILTIN_PLUGINS_DIR: /app/build/plugins
             ALLOW_PUBLIC_READ: ${ALLOW_PUBLIC_READ:-false}
         volumes:
             # 本地源码热重载（bun --watch）
             - ./packages/server/src:/app/packages/server/src
-            # 本地构建产物（改 core/web 后 npm run build:* 生效）
+            # 本地构建产物（改 core/vfx/assembly/studio 后 npm run build:* 生效）
             - ./packages/core/dist:/app/packages/core/dist
-            - ./packages/web/dist:/app/packages/web/dist
+            - ./packages/vfx/dist:/app/packages/vfx/dist
+            - ./packages/assembly/dist:/app/packages/assembly/dist
+            - ./packages/studio/dist:/app/packages/studio/dist
+            - ./build/plugins:/app/build/plugins
             # 数据持久化
             - ./packages/server/data:/app/data
         command: ["bun", "--watch", "src/index.ts"]

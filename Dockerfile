@@ -11,7 +11,10 @@ RUN mkdir -p packages/server/amt
 RUN bun install
 RUN bun run --filter @piano/core build
 RUN bun run --filter @piano/vfx build
-RUN bun run --filter @piano/web build
+RUN bun run --filter @piano/plugins build
+RUN bun run --filter @piano/assembly build
+RUN bun tools/plugins/pack-plugin.mjs --all
+RUN bun run --filter @piano/studio build
 
 # ---- 运行阶段 ----
 # 用 Debian（glibc）而不是 Alpine：AMT 官方的 amt-cli / libonnxruntime.so 是 glibc 构建
@@ -30,7 +33,12 @@ COPY --from=builder /app/packages/server/package.json packages/server/
 COPY --from=builder /app/packages/server/amt packages/server/amt
 COPY --from=builder /app/packages/core/dist packages/core/dist
 COPY --from=builder /app/packages/core/package.json packages/core/
-COPY --from=builder /app/packages/web/dist packages/web/dist
+COPY --from=builder /app/packages/vfx/dist packages/vfx/dist
+COPY --from=builder /app/packages/vfx/package.json packages/vfx/
+COPY --from=builder /app/packages/assembly/dist packages/assembly/dist
+COPY --from=builder /app/packages/assembly/package.json packages/assembly/
+COPY --from=builder /app/packages/studio/dist packages/studio/dist
+COPY --from=builder /app/build/plugins build/plugins
 
 # 交叉准备（Windows 主机）时不带无版本号的 .so 链接，这里补上
 RUN cd packages/server/amt \
@@ -42,6 +50,6 @@ RUN cd packages/server/amt \
 RUN bun install --production --no-save --filter @piano/server
 
 WORKDIR /app/packages/server
-ENV PORT=3000 DB_PATH=/app/data/piano.db MIDIS_DIR=/app/data/midis WEB_ROOT=/app/packages/web/dist
+ENV PORT=3000 DB_PATH=/app/data/piano.db MIDIS_DIR=/app/data/midis WEB_ROOT=/app/packages/studio/dist BUILTIN_PLUGINS_DIR=/app/build/plugins
 VOLUME /app/data
 CMD ["bun", "src/index.ts"]
