@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AudioWaveform, Boxes, HardDrive, LogOut, Music2, PackageCheck, Server } from "lucide-react";
+import { PIANO_TIMBRES } from "@piano/core";
 import { AppLayout, PianoMark, Spinner, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { studioPlayer } from "./audio/player";
 import { LoginView } from "./components/LoginView";
@@ -18,21 +19,54 @@ export default function App() {
     const authRequired = useStudio((s) => s.authRequired);
     const authenticated = useStudio((s) => s.authenticated);
     const songsCount = useStudio((s) => s.songs.length);
-    const pluginsCount = useStudio((s) => s.plugins.length);
+    const installedPluginsCount = useStudio((s) => s.plugins.filter((p) => p.installed).length);
+    const timbreIndex = useStudio((s) => s.timbreIndex);
+    const selectedTimbreIds = useStudio((s) => s.selectedTimbreIds);
+    const deploymentStatus = useStudio((s) => s.deploymentStatus);
+    const previewTimbreId = useStudio((s) => s.previewTimbreId);
+    const normalizeLoudness = useStudio((s) => s.normalizeLoudness);
 
     const init = useStudio((s) => s.init);
     const switchMode = useStudio((s) => s.switchMode);
     const loginServer = useStudio((s) => s.loginServer);
     const logoutServer = useStudio((s) => s.logoutServer);
+    const setPreviewTimbre = useStudio((s) => s.setPreviewTimbre);
+    const setNormalizeLoudness = useStudio((s) => s.setNormalizeLoudness);
 
     useEffect(() => {
         void init();
     }, [init]);
 
+    const activeTimbreIds = useMemo(
+        () =>
+            mode === "server"
+                ? (deploymentStatus?.enabledTimbres ?? ["piano"])
+                : selectedTimbreIds,
+        [mode, deploymentStatus?.enabledTimbres, selectedTimbreIds],
+    );
+
+    const playerTimbres = useMemo(() => {
+        const activeSet = new Set(["piano", ...activeTimbreIds]);
+        const filtered = timbreIndex
+            .filter((item) => item.bundled || activeSet.has(item.id))
+            .map((item) => ({
+                id: item.id,
+                label: item.label,
+            }));
+        return filtered.length > 0
+            ? filtered
+            : [{ id: PIANO_TIMBRES[0].id, label: PIANO_TIMBRES[0].label }];
+    }, [timbreIndex, activeTimbreIds]);
+
     const nav = useMemo<AppNavItem[]>(
         () => [
             { to: "/", end: true, label: "音乐库", icon: <Music2 size={16} />, badge: songsCount },
-            { to: "/extensions", label: "扩展中心", icon: <Boxes size={16} />, badge: pluginsCount },
+            {
+                to: "/extensions",
+                label: "扩展中心",
+                icon: <Boxes size={16} />,
+                badge: installedPluginsCount,
+            },
             { to: "/tools", label: "音乐工具", icon: <AudioWaveform size={16} /> },
             {
                 to: "/addon",
@@ -40,7 +74,7 @@ export default function App() {
                 icon: mode === "server" ? <Server size={16} /> : <PackageCheck size={16} />,
             },
         ],
-        [songsCount, pluginsCount, mode],
+        [songsCount, installedPluginsCount, mode],
     );
 
     if (!initialized && loading) {
@@ -74,6 +108,15 @@ export default function App() {
             nav={nav}
             bottomNav={nav}
             player={studioPlayer}
+            playerExtras={{
+                timbres: playerTimbres,
+                timbreId: previewTimbreId,
+                onTimbreChange: (id) => void setPreviewTimbre(id),
+                normalize: {
+                    enabled: normalizeLoudness,
+                    onToggle: setNormalizeLoudness,
+                },
+            }}
             headerActions={<ThemeToggle />}
             sidebarFooter={
                 <div className="flex flex-col gap-2">

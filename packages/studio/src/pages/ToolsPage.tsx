@@ -52,8 +52,12 @@ function formatDur(sec: number): string {
 
 export function ToolsPage() {
     const mode = useStudio((s) => s.mode);
+    const libraries = useStudio((s) => s.libraries);
     const saveConvertedMidi = useStudio((s) => s.saveConvertedMidi);
+    const importFiles = useStudio((s) => s.importFiles);
 
+    const writableLibraries = useMemo(() => libraries.filter((l) => !l.readonly), [libraries]);
+    const [targetLibraryId, setTargetLibraryId] = useState("");
     const [toolTab, setToolTab] = useState<"amt" | "inspect">("amt");
     const playerState = usePlayerState(studioPlayer);
 
@@ -407,11 +411,27 @@ export function ToolsPage() {
                                                 void saveConvertedMidi(
                                                     songName || "转录曲目",
                                                     localOutput.midi,
+                                                    targetLibraryId || undefined,
                                                 )
                                             }
                                         >
                                             <Save size={13} /> 保存到音乐库
                                         </Button>
+                                        {writableLibraries.length > 0 && (
+                                            <select
+                                                value={targetLibraryId}
+                                                onChange={(e) => setTargetLibraryId(e.target.value)}
+                                                aria-label="目标曲库"
+                                                className="h-8 rounded border border-[var(--pb-control-border)] bg-ore-sunken px-2 text-[12px]"
+                                            >
+                                                <option value="">默认曲库</option>
+                                                {writableLibraries.map((lib) => (
+                                                    <option key={lib.id} value={lib.id}>
+                                                        {lib.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
                                     </div>
                                 </div>
                                 <NoteRoll notes={rollNotes} duration={localOutput.duration} />
@@ -621,7 +641,7 @@ export function ToolsPage() {
                                         size="sm"
                                         onClick={() => {
                                             const f = new File([inspected.pbe3.slice().buffer], `${inspected.name}.pbe3`);
-                                            void useStudio.getState().importFiles([f]);
+                                            void importFiles([f], targetLibraryId || undefined);
                                         }}
                                     >
                                         <Download size={13} /> 导入当前曲库

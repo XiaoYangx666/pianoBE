@@ -4,18 +4,18 @@ import {
     computeMusicFingerprint,
     encodeSong,
     extractCueEffects,
+    mergeSongCatalog,
     planImportChunks,
     readSongHeader,
-    sameSongMusic,
+    rebuildContentIndex,
+    type ContentIndexSource,
     type LibraryRecord,
-    type MidiSongMeta,
     type PerformanceCue,
     type PerformanceDescriptor,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
-import { pluginHasExecutableCode } from "@piano/vfx";
+import { isApiVersionCompatible, pluginHasExecutableCode, VFX_API_VERSION, type VfxPluginManifest } from "@piano/vfx";
 import { readPbePluginArchive, type PbePluginArchive } from "@piano/vfx/package";
-import { unzipSync } from "fflate";
 import {
     assembleAddonBlob,
     checkPluginUninstall,
@@ -24,25 +24,24 @@ import {
     packLibraryAsPlugin,
     resolvePluginDependencies,
     type AssemblySongEntry,
-    type LoadedTimbrePack,
     type PluginCatalogEntry,
     type TemplateInfo,
-    type TimbreIndexEntry,
 } from "@piano/assembly";
-import { loadTimbreIndex, loadTimbrePack } from "./timbres";
 import { importScorePack, type ScoreEntry } from "../scores/scores";
 import type {
-    OfficialCatalog,
-    OfficialCollection,
+    PluginContentCounts,
+    PluginTimbreMeta,
     StudioPlugin,
     StudioSong,
+    UserPerformanceRecord,
 } from "./types";
 
 const DB_NAME = "pianobe-studio-v1";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_SONGS = "songs";
 const STORE_LIBRARIES = "libraries";
 const STORE_PLUGINS = "plugins";
+const STORE_PERFORMANCES = "performances";
 const STORE_META = "meta";
 
 const LEGACY_GEN_DB = "pianobe-generator";
@@ -64,10 +63,21 @@ interface StoredLocalSong {
 interface StoredLocalPlugin {
     id: string;
     bytes: Uint8Array;
-    source: "local" | "song";
+    source: "builtin" | "local" | "song";
     enabled: boolean;
     trusted: boolean;
     songSourceName?: string;
+}
+
+export interface BuiltinPluginIndexItem {
+    id: string;
+    file: string;
+    size: number;
+    source: "builtin";
+    hasExecutableCode: boolean;
+    manifest: VfxPluginManifest;
+    contents: PluginContentCounts;
+    timbreEntries?: PluginTimbreMeta[];
 }
 
 function openStudioDb(): Promise<IDBDatabase> {
@@ -83,6 +93,9 @@ function openStudioDb(): Promise<IDBDatabase> {
             }
             if (!db.objectStoreNames.contains(STORE_PLUGINS)) {
                 db.createObjectStore(STORE_PLUGINS, { keyPath: "id" });
+            }
+            if (!db.objectStoreNames.contains(STORE_PERFORMANCES)) {
+                db.createObjectStore(STORE_PERFORMANCES, { keyPath: "id" });
             }
             if (!db.objectStoreNames.contains(STORE_META)) {
                 db.createObjectStore(STORE_META, { keyPath: "key" });
@@ -158,10 +171,9 @@ async function idbGetMeta<T>(key: string): Promise<T | undefined> {
 
 async function readLegacyStore<T>(dbName: string, storeName: string): Promise<T[]> {
     try {
-        const list = await new Promise<T[]>((resolve) => {
+        return await new Promise<T[]>((resolve) => {
             const req = indexedDB.open(dbName);
             req.onupgradeneeded = () => {
-                // 没有旧库时不保留新建空库
                 req.transaction?.abort();
             };
             req.onsuccess = () => {
@@ -184,7 +196,6 @@ async function readLegacyStore<T>(dbName: string, storeName: string): Promise<T[
             };
             req.onerror = () => resolve([]);
         });
-        return list;
     } catch {
         return [];
     }
@@ -203,9 +214,10 @@ export async function migrateLegacyGeneratorIfNeeded(): Promise<void> {
             noteCount: number;
             data: Uint8Array;
         }>(LEGACY_GEN_DB, "songs");
+        const toPut: StoredLocalSong[] = [];
         for (const s of legacySongs) {
             if (!s?.id || !(s.data instanceof Uint8Array)) continue;
-            await idbPut<StoredLocalSong>(STORE_SONGS, {
+            toPut.push({
                 id: s.id,
                 name: s.name,
                 duration: s.duration,
@@ -216,6 +228,7 @@ export async function migrateLegacyGeneratorIfNeeded(): Promise<void> {
                 addedAt: Date.now(),
             });
         }
+        await idbPutMany(STORE_SONGS, toPut);
     }
 
     const existingPlugins = await idbGetAll<StoredLocalPlugin>(STORE_PLUGINS);
@@ -227,9 +240,10 @@ export async function migrateLegacyGeneratorIfNeeded(): Promise<void> {
             trusted?: boolean;
             songSourceName?: string;
         }>(LEGACY_PLUGIN_DB, "plugins");
+        const toPut: StoredLocalPlugin[] = [];
         for (const p of legacyPlugins) {
             if (!p?.id || !(p.bytes instanceof Uint8Array)) continue;
-            await idbPut<StoredLocalPlugin>(STORE_PLUGINS, {
+            toPut.push({
                 id: p.id,
                 bytes: p.bytes,
                 source: p.source ?? "local",
@@ -238,6 +252,7 @@ export async function migrateLegacyGeneratorIfNeeded(): Promise<void> {
                 songSourceName: p.songSourceName,
             });
         }
+        await idbPutMany(STORE_PLUGINS, toPut);
     }
 
     const existingLibs = await idbGetAll<LibraryRecord>(STORE_LIBRARIES);
@@ -259,7 +274,7 @@ export async function migrateLegacyGeneratorIfNeeded(): Promise<void> {
 function previewToDataUrl(archive: PbePluginArchive): string | undefined {
     const thumb = archive.manifest.preview?.thumbnail;
     const entry =
-        (thumb ? [thumb, archive.previews.get(thumb)] as const : undefined) ??
+        (thumb ? ([thumb, archive.previews.get(thumb)] as const) : undefined) ??
         [...archive.previews.entries()][0];
     if (!entry?.[1]) return undefined;
     const [filePath, bytes] = entry;
@@ -274,16 +289,47 @@ function previewToDataUrl(archive: PbePluginArchive): string | undefined {
     return `data:${mime};base64,${btoa(bin)}`;
 }
 
+function summarizeArchiveCounts(archive: PbePluginArchive): PluginContentCounts {
+    const p = archive.manifest.provides ?? {};
+    return {
+        songs: archive.songs.size,
+        performances: archive.performances.length,
+        libraries: archive.libraries.length,
+        timbres: archive.timbres.length,
+        effects: p.effects?.length ?? 0,
+        themes: p.themes?.length ?? 0,
+        keyStyles: p.keyStyles?.length ?? 0,
+        particles: p.particles?.length ?? 0,
+        stageProps: archive.stageProps.length,
+    };
+}
+
+function summarizeArchiveTimbres(archive: PbePluginArchive): PluginTimbreMeta[] | undefined {
+    if (archive.timbres.length === 0) return undefined;
+    return archive.timbres.map(({ soundDefinitions: _defs, ...meta }) => meta);
+}
+
 export function archiveToStudioPlugin(
     archive: PbePluginArchive,
     opts: {
         source: StudioPlugin["source"];
+        installed?: boolean;
         enabled: boolean;
         trusted: boolean;
+        file?: string;
         songSourceName?: string;
         bytes?: Uint8Array;
     },
 ): StudioPlugin {
+    const hasExecutableCode =
+        archive.hasExecutableCode ||
+        pluginHasExecutableCode({
+            manifest: archive.manifest,
+            vfxEntryJs: archive.vfxEntryJs,
+            files: archive.files,
+        });
+    const compatible = isApiVersionCompatible(archive.manifest.apiVersion, VFX_API_VERSION);
+    const timbreEntries = summarizeArchiveTimbres(archive);
     return {
         id: archive.manifest.id,
         name: archive.manifest.name,
@@ -293,146 +339,105 @@ export function archiveToStudioPlugin(
         license: archive.manifest.license,
         source: opts.source,
         visibility: archive.manifest.visibility ?? "public",
+        installed: opts.installed ?? true,
         enabled: opts.enabled,
         trusted: opts.trusted,
-        hasExecutableCode: archive.hasExecutableCode || pluginHasExecutableCode({
-            manifest: archive.manifest,
-            vfxEntryJs: archive.vfxEntryJs,
-            files: archive.files,
-        }),
-        compatible: true,
+        hasExecutableCode,
+        requiresPackDeploy:
+            hasExecutableCode ||
+            archive.particles.size > 0 ||
+            archive.textures.size > 0 ||
+            archive.stageProps.length > 0 ||
+            archive.timbres.length > 0 ||
+            archive.sounds.size > 0,
+        compatible,
+        ...(!compatible ? { compatibilityNote: `需要 API ${archive.manifest.apiVersion}` } : {}),
         sizeBytes: opts.bytes?.byteLength ?? archive.size,
+        ...(opts.file ? { file: opts.file } : {}),
         previewDataUrl: previewToDataUrl(archive),
         dependencies: (archive.manifest.dependencies ?? []).map((id) => ({ id })),
+        missingDependencies: [],
         provides: archive.manifest.provides as Record<string, string[] | undefined>,
+        contents: summarizeArchiveCounts(archive),
+        ...(timbreEntries ? { timbreEntries } : {}),
         status: opts.enabled ? "active" : "unavailable",
         songSourceName: opts.songSourceName,
         archive,
     };
 }
 
-export async function loadBuiltinPlugins(): Promise<StudioPlugin[]> {
-    builtinPluginsCache ??= loadBuiltinPluginsUncached();
-    return builtinPluginsCache;
+function indexItemToUninstalledPlugin(item: BuiltinPluginIndexItem): StudioPlugin {
+    const m = item.manifest;
+    const compatible = isApiVersionCompatible(m.apiVersion, VFX_API_VERSION);
+    const p = m.provides ?? {};
+    const contents: PluginContentCounts = item.contents ?? {
+        songs: p.songs?.length ?? 0,
+        performances: p.performances?.length ?? 0,
+        libraries: p.libraries?.length ?? 0,
+        timbres: p.timbres?.length ?? 0,
+        effects: p.effects?.length ?? 0,
+        themes: p.themes?.length ?? 0,
+        keyStyles: p.keyStyles?.length ?? 0,
+        particles: p.particles?.length ?? 0,
+        stageProps: m.stageProps?.length ?? 0,
+    };
+    return {
+        id: m.id,
+        name: m.name,
+        version: m.version,
+        author: m.author,
+        description: m.preview?.description ?? "",
+        license: m.license,
+        source: "builtin",
+        visibility: m.visibility ?? "public",
+        installed: false,
+        enabled: false,
+        trusted: true,
+        hasExecutableCode: item.hasExecutableCode,
+        requiresPackDeploy:
+            item.hasExecutableCode ||
+            Boolean(contents.particles || contents.stageProps || contents.timbres),
+        compatible,
+        ...(!compatible ? { compatibilityNote: `需要 API ${m.apiVersion}` } : {}),
+        sizeBytes: item.size,
+        file: item.file,
+        dependencies: (m.dependencies ?? []).map((id) => ({ id })),
+        missingDependencies: [],
+        provides: p as Record<string, string[] | undefined>,
+        contents,
+        ...(item.timbreEntries?.length ? { timbreEntries: item.timbreEntries } : {}),
+        status: "unavailable",
+    };
 }
 
-let builtinPluginsCache: Promise<StudioPlugin[]> | null = null;
+let builtinIndexCache: Promise<BuiltinPluginIndexItem[]> | null = null;
+const builtinArchiveCache = new Map<string, Promise<Uint8Array>>();
 
-async function loadBuiltinPluginsUncached(): Promise<StudioPlugin[]> {
-    try {
-        const res = await fetch("./plugins/index.json");
-        if (!res.ok) return [];
-        const entries = (await res.json()) as Array<{
-            id: string;
-            file: string;
-        }>;
-        const out: StudioPlugin[] = [];
-        for (const item of entries) {
-            try {
-                const pkgRes = await fetch(`./plugins/${item.file}`);
-                if (!pkgRes.ok) continue;
-                const bytes = new Uint8Array(await pkgRes.arrayBuffer());
-                const archive = readPbePluginArchive(bytes);
-                out.push(
-                    archiveToStudioPlugin(archive, {
-                        source: "builtin",
-                        enabled: true,
-                        trusted: true,
-                        bytes,
-                    }),
-                );
-            } catch {
-                // 跳过损坏包
-            }
-        }
-        return out;
-    } catch {
-        return [];
-    }
-}
-
-export async function loadOfficialCatalog(): Promise<OfficialCatalog | null> {
-    try {
-        const [indexRes, catalogRes] = await Promise.all([
-            fetch("./library/index.json"),
-            fetch("./library/catalog.json"),
-        ]);
-        if (!indexRes.ok) return null;
-        const songs = (await indexRes.json()) as OfficialCatalog["songs"];
-        if (!catalogRes.ok) {
-            return {
-                version: 1,
-                totalSongs: songs.length,
-                collections: [
-                    {
-                        id: "official-all",
-                        name: "在线曲库",
-                        description: "全部在线曲目",
-                        songIds: songs.map((s) => s.id),
-                    },
-                ],
-                performances: {},
-                songs,
-            };
-        }
-        const catalog = (await catalogRes.json()) as {
-            version: number;
-            totalSongs: number;
-            collections: OfficialCollection[];
-            performances: Record<string, PerformanceDescriptor[]>;
-        };
-        return {
-            ...catalog,
-            songs,
-        };
-    } catch {
-        return null;
-    }
-}
-
-export async function fetchOfficialSongBytes(songId: string): Promise<Uint8Array> {
-    const res = await fetch(`./library/${encodeURIComponent(songId)}.pbe3`);
-    if (!res.ok) throw new Error(`获取曲目失败 (${songId}: ${res.status})`);
-    return new Uint8Array(await res.arrayBuffer());
-}
-
-export async function fetchOfficialPerformanceCues(songId: string): Promise<PerformanceCue[] | null> {
-    try {
-        const res = await fetch(`./performances/${encodeURIComponent(songId)}.json`);
-        if (!res.ok) return null;
-        const data = (await res.json()) as {
-            cues?: unknown;
-            sections?: unknown;
-        };
-        return compilePerformanceSource(data, { expectedSongId: songId });
-    } catch {
-        return null;
-    }
-}
-
-/**
- * 在线曲库单文件包（sync 时生成）：一次下载整库，避免整库导入时逐曲请求。
- */
-let officialPackCache: Promise<Map<string, Uint8Array> | null> | null = null;
-
-export function loadOfficialLibraryPack(): Promise<Map<string, Uint8Array> | null> {
-    officialPackCache ??= (async () => {
+export function loadBuiltinPluginIndex(): Promise<BuiltinPluginIndexItem[]> {
+    builtinIndexCache ??= (async () => {
         try {
-            const res = await fetch("./library/official.pack.zip");
-            if (!res.ok) return null;
-            const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
-            const songs = new Map<string, Uint8Array>();
-            for (const [name, data] of Object.entries(files)) {
-                if (!name.toLowerCase().endsWith(".pbe3")) continue;
-                const id = name.split("/").pop()!.replace(/\.pbe3$/i, "");
-                songs.set(id, data);
-            }
-            return songs.size > 0 ? songs : null;
+            const res = await fetch("./plugins/index.json");
+            if (!res.ok) return [];
+            return (await res.json()) as BuiltinPluginIndexItem[];
         } catch {
-            return null;
+            return [];
         }
     })();
-    return officialPackCache;
+    return builtinIndexCache;
+}
+
+export function fetchBuiltinPluginBytes(file: string): Promise<Uint8Array> {
+    let pending = builtinArchiveCache.get(file);
+    if (!pending) {
+        pending = (async () => {
+            const res = await fetch(`./plugins/${file}`);
+            if (!res.ok) throw new Error(`获取扩展包失败 (${file}: ${res.status})`);
+            return new Uint8Array(await res.arrayBuffer());
+        })();
+        pending.catch(() => builtinArchiveCache.delete(file));
+        builtinArchiveCache.set(file, pending);
+    }
+    return pending;
 }
 
 export async function loadDefaultTemplate(): Promise<TemplateInfo> {
@@ -442,122 +447,129 @@ export async function loadDefaultTemplate(): Promise<TemplateInfo> {
     return loadAddonTemplate(blob);
 }
 
-function buildPerformanceDescriptors(
-    songId: string,
-    fp: string,
-    bytes: Uint8Array,
-    existing?: PerformanceDescriptor[],
-): PerformanceDescriptor[] {
-    const header = readSongHeader(bytes);
-    const list: PerformanceDescriptor[] = existing ? [...existing] : [];
-    const seen = new Set(list.map((p) => p.id));
-
-    if (header.performance && header.performance.length > 0) {
-        const id = `embedded:${songId}`;
-        if (!seen.has(id)) {
-            seen.add(id);
-            list.push({
-                id,
-                name: header.name ? `${header.name} · 默认演出` : "默认演出",
-                songId,
-                musicFingerprint: fp,
-                cues: header.performance,
-                requiredEffects: extractCueEffects(header.performance),
-                origin: { kind: "embedded", id: songId, name: "PBE3 内嵌" },
-            });
-        }
-    }
-
-    if (!seen.has(PLAIN_PERFORMANCE_ID)) {
-        list.unshift({
-            id: PLAIN_PERFORMANCE_ID,
-            name: "普通演奏",
-            songId,
-            musicFingerprint: fp,
-            requiredEffects: [],
-            origin: { kind: "user", name: "纯音乐" },
-        });
-    }
-
-    return list;
+function buildPlainPerformance(songId: string, fp?: string): PerformanceDescriptor {
+    return {
+        id: PLAIN_PERFORMANCE_ID,
+        name: "普通演奏",
+        songId,
+        musicFingerprint: fp,
+        requiredEffects: [],
+        origin: { kind: "user", name: "纯音乐" },
+    };
 }
 
-export async function loadLocalState(officialCatalog: OfficialCatalog | null): Promise<{
+function withPlainPerformance(
+    songId: string,
+    fp: string | undefined,
+    list: readonly PerformanceDescriptor[],
+): PerformanceDescriptor[] {
+    const filtered = list.filter((p) => p.id !== PLAIN_PERFORMANCE_ID);
+    return [buildPlainPerformance(songId, fp), ...filtered];
+}
+
+export async function loadLocalState(): Promise<{
     songs: StudioSong[];
     libraries: LibraryRecord[];
     plugins: StudioPlugin[];
 }> {
     await migrateLegacyGeneratorIfNeeded();
-    const [storedSongs, storedLibs, storedPlugins, builtins] = await Promise.all([
+    const [storedSongs, storedLibs, storedPlugins, storedPerfs, builtinIndex] = await Promise.all([
         idbGetAll<StoredLocalSong>(STORE_SONGS),
         idbGetAll<LibraryRecord>(STORE_LIBRARIES),
         idbGetAll<StoredLocalPlugin>(STORE_PLUGINS),
-        loadBuiltinPlugins(),
+        idbGetAll<UserPerformanceRecord>(STORE_PERFORMANCES),
+        loadBuiltinPluginIndex(),
     ]);
 
+    const builtinById = new Map(builtinIndex.map((b) => [b.id, b]));
     const pluginMap = new Map<string, StudioPlugin>();
-    for (const b of builtins) pluginMap.set(b.id, b);
 
-    const pluginSongs: StudioSong[] = [];
-    const pluginLibs: LibraryRecord[] = [];
+    for (const item of builtinIndex) {
+        pluginMap.set(item.id, indexItemToUninstalledPlugin(item));
+    }
 
     for (const sp of storedPlugins) {
         try {
             const archive = readPbePluginArchive(sp.bytes);
+            const builtinMeta = builtinById.get(archive.manifest.id);
             const p = archiveToStudioPlugin(archive, {
-                source: sp.source,
+                source: builtinMeta ? "builtin" : sp.source,
+                installed: true,
                 enabled: sp.enabled,
                 trusted: sp.trusted,
+                file: builtinMeta?.file,
                 songSourceName: sp.songSourceName,
                 bytes: sp.bytes,
             });
             pluginMap.set(p.id, p);
-
-            if (p.enabled) {
-                for (const ps of archive.songs.values()) {
-                    const fp = ps.musicFingerprint || computeMusicFingerprint(ps.bytes);
-                    pluginSongs.push({
-                        id: ps.id,
-                        name: ps.name,
-                        duration: ps.duration,
-                        noteCount: ps.noteCount,
-                        bytes: ps.bytes.byteLength,
-                        musicFingerprint: fp,
-                        libraries: [`plugin:${p.id}`],
-                        origin: { kind: "plugin", id: p.id, name: p.name },
-                        origins: [{ kind: "plugin", id: p.id, name: p.name }],
-                        performanceEntries: buildPerformanceDescriptors(ps.id, fp, ps.bytes),
-                        data: ps.bytes,
-                    });
-                }
-                for (const pl of archive.libraries) {
-                    pluginLibs.push({
-                        id: pl.id,
-                        name: pl.name,
-                        description: pl.description,
-                        author: pl.author ?? p.author,
-                        kind: "plugin",
-                        pluginId: p.id,
-                        songIds: [...pl.songs],
-                        readonly: true,
-                    });
-                }
-            }
         } catch {
-            // 忽略损坏的本地插件记录
+            // ignore corrupted stored plugin
         }
     }
 
-    // 把 catalog 中的演出元数据挂上对应插件归属
     const plugins = [...pluginMap.values()];
+    const catalogEntries: PluginCatalogEntry[] = plugins
+        .filter((p) => p.installed && p.archive)
+        .map((p) => ({
+            id: p.id,
+            manifest: p.archive!.manifest,
+            trusted: p.trusted,
+            compatible: p.compatible,
+            hasExecutableCode: p.hasExecutableCode,
+        }));
+    for (const p of plugins) {
+        if (!p.installed) continue;
+        const dep = resolvePluginDependencies([p.id], catalogEntries);
+        p.missingDependencies = [
+            ...dep.missingDependencies.map((d) => d.dependencyId),
+            ...dep.untrustedDependencies.map((d) => d.dependencyId),
+        ];
+    }
 
-    // 将 StoredLocalSong 与启用插件带来的 songs 合并（按指纹复用/叠加演出）
-    const byId = new Map<string, StudioSong>();
-    const byFp = new Map<string, StudioSong>();
+    // 规范化用户曲库
+    const normalizedUserLibs: LibraryRecord[] = storedLibs.map((lib) =>
+        lib.id === "user-default" && lib.name === "我的曲库"
+            ? { ...lib, name: "默认曲库" }
+            : lib,
+    );
+    if (!normalizedUserLibs.some((l) => l.id === "user-default")) {
+        normalizedUserLibs.unshift({
+            id: "user-default",
+            name: "默认曲库",
+            description: "本地自定义与导入曲目",
+            kind: "user",
+            songIds: [],
+        });
+    }
 
-    for (const s of storedSongs) {
+    // 用户库歌曲候选（纯音乐本体 + 内嵌演出）
+    const userSongCandidates: StudioSong[] = storedSongs.map((s) => {
         const fp = s.musicFingerprint ?? computeMusicFingerprint(s.data);
-        const entry: StudioSong = {
+        const header = readSongHeader(s.data);
+        const libSet = new Set(s.libraries ?? []);
+        for (const ul of normalizedUserLibs) {
+            if (ul.songIds.includes(s.id)) libSet.add(ul.id);
+        }
+
+        const embeddedPerfs: PerformanceDescriptor[] = [];
+        if (header.performance?.length) {
+            embeddedPerfs.push({
+                id: `embedded:${s.id}`,
+                name: header.name ? `${header.name} · 默认演出` : "默认演出",
+                songId: s.id,
+                musicFingerprint: fp,
+                cues: header.performance,
+                requiredEffects: extractCueEffects(header.performance),
+                origin: { kind: "embedded", id: s.id, name: "PBE3 内嵌" },
+            });
+        }
+        for (const p of s.performanceEntries ?? []) {
+            if (p.id !== PLAIN_PERFORMANCE_ID && !embeddedPerfs.some((e) => e.id === p.id)) {
+                embeddedPerfs.push(p);
+            }
+        }
+
+        return {
             id: s.id,
             name: s.name,
             duration: s.duration,
@@ -565,47 +577,94 @@ export async function loadLocalState(officialCatalog: OfficialCatalog | null): P
             bytes: s.data.byteLength,
             musicFingerprint: fp,
             aliases: s.aliases ?? [],
-            libraries: s.libraries ?? ["user-default"],
+            libraries: [...libSet],
             origin: { kind: "user", name: "本地曲库" },
             origins: [{ kind: "user", name: "本地曲库" }],
-            performanceEntries: buildPerformanceDescriptors(
-                s.id,
-                fp,
-                s.data,
-                s.performanceEntries ?? officialCatalog?.performances[s.id],
-            ),
+            performanceEntries: embeddedPerfs,
             addedAt: s.addedAt,
             data: s.data,
         };
-        byId.set(entry.id, entry);
-        byFp.set(fp, entry);
-    }
+    });
 
-    for (const ps of pluginSongs) {
-        const fp = ps.musicFingerprint!;
-        const match = byId.get(ps.id) ?? byFp.get(fp);
-        if (match && match.data && ps.data && sameSongMusic(match.data, ps.data)) {
-            if (ps.name !== match.name) {
-                match.aliases = [...new Set([...(match.aliases ?? []), ps.name])];
-            }
-            match.libraries = [...new Set([...(match.libraries ?? []), ...(ps.libraries ?? [])])];
-            match.origins = [...(match.origins ?? []), ...(ps.origins ?? [])];
-            const existingPerfIds = new Set(match.performanceEntries.map((p) => p.id));
-            for (const perf of ps.performanceEntries) {
-                if (!existingPerfIds.has(perf.id)) {
-                    existingPerfIds.add(perf.id);
-                    match.performanceEntries.push(perf);
-                }
-            }
-        } else if (!byId.has(ps.id)) {
-            byId.set(ps.id, ps);
-            byFp.set(fp, ps);
-        }
-    }
+    // 用户库曲目归属以 STORE_SONGS.libraries 为唯一真相源
+    const userLibRecords: LibraryRecord[] = normalizedUserLibs.map((lib) => ({
+        ...lib,
+        songIds: userSongCandidates
+            .filter((s) => s.libraries?.includes(lib.id))
+            .map((s) => s.id),
+    }));
 
-    // 也把来自启用插件 performaces 目录中的演出附加到对应曲目
+    const sources: ContentIndexSource<StudioSong>[] = [
+        { songs: userSongCandidates, libraries: userLibRecords },
+    ];
+
     for (const p of plugins) {
-        if (!p.enabled || !p.archive) continue;
+        if (!p.installed || !p.enabled || !p.archive) continue;
+        const archive = p.archive;
+        const songLibMap = new Map<string, string[]>();
+        for (const pl of archive.libraries) {
+            for (const sid of pl.songs) {
+                const arr = songLibMap.get(sid) ?? [];
+                arr.push(pl.id);
+                songLibMap.set(sid, arr);
+            }
+        }
+
+        const pSongs: StudioSong[] = [];
+        for (const ps of archive.songs.values()) {
+            const perfs: PerformanceDescriptor[] = archive.performances
+                .filter((pf) => pf.songId === ps.id || pf.musicFingerprint === ps.musicFingerprint)
+                .map((pf) => ({
+                    id: pf.id,
+                    name: pf.name,
+                    author: pf.author ?? p.author,
+                    description: pf.description,
+                    songId: ps.id,
+                    musicFingerprint: pf.musicFingerprint ?? ps.musicFingerprint,
+                    cues: pf.cues,
+                    requiredEffects: [...pf.requiredEffects],
+                    origin: { kind: "plugin", id: p.id, name: p.name },
+                }));
+            pSongs.push({
+                id: ps.id,
+                name: ps.name,
+                duration: ps.duration,
+                noteCount: ps.noteCount,
+                bytes: ps.bytes.byteLength,
+                musicFingerprint: ps.musicFingerprint,
+                libraries: songLibMap.get(ps.id) ?? [],
+                origin: { kind: "plugin", id: p.id, name: p.name },
+                origins: [{ kind: "plugin", id: p.id, name: p.name }],
+                performanceEntries: perfs,
+                data: ps.bytes,
+            });
+        }
+
+        const pLibs: LibraryRecord[] = archive.libraries.map((pl) => ({
+            id: pl.id,
+            name: pl.name,
+            description: pl.description,
+            author: pl.author ?? p.author,
+            kind: "plugin",
+            pluginId: p.id,
+            songIds: [...pl.songs],
+            readonly: true,
+        }));
+
+        sources.push({ songs: pSongs, libraries: pLibs });
+    }
+
+    const rebuilt = rebuildContentIndex(sources, { reidentifyOnIdConflict: true });
+
+    const byId = new Map(rebuilt.songs.map((s) => [s.id, s]));
+    const byFp = new Map<string, StudioSong>();
+    for (const s of rebuilt.songs) {
+        if (s.musicFingerprint) byFp.set(s.musicFingerprint, s);
+    }
+
+    // 附加跨插件的独立演出（演出在另一个插件，歌曲来自用户或其它包）
+    for (const p of plugins) {
+        if (!p.installed || !p.enabled || !p.archive) continue;
         for (const perf of p.archive.performances) {
             const target =
                 (perf.songId ? byId.get(perf.songId) : undefined) ??
@@ -620,32 +679,55 @@ export async function loadLocalState(officialCatalog: OfficialCatalog | null): P
                 songId: target.id,
                 musicFingerprint: perf.musicFingerprint ?? target.musicFingerprint,
                 cues: perf.cues,
-                requiredEffects: extractCueEffects(perf.cues),
+                requiredEffects: [...perf.requiredEffects],
                 origin: { kind: "plugin", id: p.id, name: p.name },
             });
         }
     }
 
-    const libraries: LibraryRecord[] = [
-        ...storedLibs.map((lib) =>
-            lib.id === "user-default" && lib.name === "我的曲库"
-                ? { ...lib, name: "默认曲库" }
-                : lib,
-        ),
-        ...pluginLibs,
-    ];
-    if (libraries.length === 0) {
-        libraries.push({
-            id: "user-default",
-            name: "默认曲库",
-            kind: "user",
-            songIds: [],
+    // 附加用户独立导入的演出
+    for (const up of storedPerfs) {
+        const target =
+            (up.songId ? byId.get(up.songId) : undefined) ??
+            (up.musicFingerprint ? byFp.get(up.musicFingerprint) : undefined);
+        if (!target) continue;
+        if (target.performanceEntries.some((item) => item.id === up.id)) continue;
+        target.performanceEntries.push({
+            id: up.id,
+            name: up.name,
+            author: up.author,
+            description: up.description,
+            songId: target.id,
+            musicFingerprint: up.musicFingerprint ?? target.musicFingerprint,
+            cues: up.cues,
+            requiredEffects: up.requiredEffects,
+            origin: { kind: "user", name: "独立演出" },
         });
     }
 
+    const finalSongs = rebuilt.songs
+        .map((s) => ({
+            ...s,
+            performanceEntries: withPlainPerformance(s.id, s.musicFingerprint, s.performanceEntries),
+        }))
+        .sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0));
+
+    // 用最终合并后的 song.libraries 同步各 library.songIds（确保 ID 重映射后也准确）
+    const libSongsById = new Map<string, Set<string>>();
+    for (const lib of rebuilt.libraries) libSongsById.set(lib.id, new Set());
+    for (const s of finalSongs) {
+        for (const lid of s.libraries ?? []) {
+            libSongsById.get(lid)?.add(s.id);
+        }
+    }
+    const finalLibs = rebuilt.libraries.map((lib) => ({
+        ...lib,
+        songIds: [...(libSongsById.get(lib.id) ?? lib.songIds)],
+    }));
+
     return {
-        songs: [...byId.values()].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0)),
-        libraries,
+        songs: finalSongs,
+        libraries: finalLibs,
         plugins,
     };
 }
@@ -660,30 +742,44 @@ export interface LocalSongBulkResult {
     merged: number;
     conflicts: string[];
     mergedTitles: string[];
+    songIds: string[];
 }
 
-/**
- * 批量写入本地曲库：只读取一次现有记录、复用指纹与合并逻辑，并在单个事务中落盘。
- * 整库导入（数百首）时避免逐曲 `getAll` 造成的 O(n²) 结构化克隆。
- */
 export async function saveLocalSongsBulk(
     items: readonly LocalSongBulkItem[],
     libraryId?: string,
 ): Promise<LocalSongBulkResult> {
-    const result: LocalSongBulkResult = { added: 0, merged: 0, conflicts: [], mergedTitles: [] };
+    const result: LocalSongBulkResult = {
+        added: 0,
+        merged: 0,
+        conflicts: [],
+        mergedTitles: [],
+        songIds: [],
+    };
     if (items.length === 0) return result;
 
     const existing = await idbGetAll<StoredLocalSong>(STORE_SONGS);
-    const byId = new Map(existing.map((s) => [s.id, s]));
-    const byFp = new Map<string, StoredLocalSong>();
-    for (const song of existing) {
-        byFp.set(song.musicFingerprint ?? computeMusicFingerprint(song.data), song);
-    }
-    const dirty = new Map<string, StoredLocalSong>();
+    const existingCandidates: StudioSong[] = existing.map((s) => ({
+        id: s.id,
+        name: s.name,
+        duration: s.duration,
+        noteCount: s.noteCount,
+        bytes: s.data.byteLength,
+        musicFingerprint: s.musicFingerprint ?? computeMusicFingerprint(s.data),
+        aliases: s.aliases,
+        libraries: s.libraries ?? ["user-default"],
+        performanceEntries: s.performanceEntries ?? [],
+        addedAt: s.addedAt,
+        data: s.data,
+    }));
+
+    const incomingCandidates: StudioSong[] = [];
+    const targetLib = libraryId || "user-default";
 
     for (const item of items) {
         const cleanName = item.fileName.replace(/\.(mid|midi|pbe3)$/i, "").trim() || "未命名曲目";
-        const isPbe3 = item.fileName.toLowerCase().endsWith(".pbe3") ||
+        const isPbe3 =
+            item.fileName.toLowerCase().endsWith(".pbe3") ||
             (item.bytes.length >= 4 &&
                 item.bytes[0] === 0x50 &&
                 item.bytes[1] === 0x42 &&
@@ -692,56 +788,65 @@ export async function saveLocalSongsBulk(
         const pbe3 = isPbe3 ? item.bytes : encodeSong(midiBufferToSong(item.bytes, cleanName));
         const header = readSongHeader(pbe3);
         const fp = computeMusicFingerprint(pbe3);
-
-        const sameId = byId.get(header.id);
-        if (sameId && !sameSongMusic(sameId.data, pbe3)) {
-            result.conflicts.push(cleanName);
-            continue;
-        }
-
-        const target = sameId ?? byFp.get(fp);
-        if (target) {
-            const libs = new Set(target.libraries ?? ["user-default"]);
-            if (libraryId) libs.add(libraryId);
-            const aliases = new Set(target.aliases ?? []);
-            if (header.name && header.name !== target.name) aliases.add(header.name);
-            const updated: StoredLocalSong = {
-                ...target,
-                libraries: [...libs],
-                aliases: [...aliases],
-                performanceEntries: buildPerformanceDescriptors(
-                    target.id,
-                    fp,
-                    pbe3,
-                    target.performanceEntries,
-                ),
-            };
-            dirty.set(updated.id, updated);
-            byId.set(updated.id, updated);
-            byFp.set(fp, updated);
-            result.merged++;
-            result.mergedTitles.push(target.name);
-            continue;
-        }
-
-        const record: StoredLocalSong = {
+        incomingCandidates.push({
             id: header.id,
             name: header.name || cleanName,
             duration: header.duration,
             noteCount: header.noteCount,
-            data: pbe3,
+            bytes: pbe3.byteLength,
             musicFingerprint: fp,
-            libraries: [libraryId || "user-default"],
-            performanceEntries: buildPerformanceDescriptors(header.id, fp, pbe3),
+            libraries: [targetLib],
+            performanceEntries: header.performance?.length
+                ? [
+                      {
+                          id: `embedded:${header.id}`,
+                          name: header.name ? `${header.name} · 默认演出` : "默认演出",
+                          songId: header.id,
+                          musicFingerprint: fp,
+                          cues: header.performance,
+                          requiredEffects: extractCueEffects(header.performance),
+                          origin: { kind: "embedded", id: header.id, name: "PBE3 内嵌" },
+                      },
+                  ]
+                : [],
             addedAt: Date.now(),
-        };
-        dirty.set(record.id, record);
-        byId.set(record.id, record);
-        byFp.set(fp, record);
-        result.added++;
+            data: pbe3,
+        });
     }
 
-    await idbPutMany(STORE_SONGS, [...dirty.values()]);
+    const merged = mergeSongCatalog(existingCandidates, incomingCandidates, {
+        reidentifyOnIdConflict: false,
+    });
+    for (const conflict of merged.conflicts) {
+        result.conflicts.push(conflict.incomingName ?? conflict.songId);
+    }
+
+    const existingIds = new Set(existing.map((s) => s.id));
+    const dirty: StoredLocalSong[] = [];
+    for (const song of merged.changed) {
+        if (!song.data) continue;
+        result.songIds.push(song.id);
+        if (existingIds.has(song.id)) {
+            result.merged++;
+            result.mergedTitles.push(song.name);
+        } else {
+            result.added++;
+        }
+        dirty.push({
+            id: song.id,
+            name: song.name,
+            duration: song.duration,
+            noteCount: song.noteCount,
+            data: song.data,
+            aliases: song.aliases,
+            libraries: song.libraries,
+            performanceEntries: song.performanceEntries,
+            musicFingerprint: song.musicFingerprint,
+            addedAt: song.addedAt ?? Date.now(),
+        });
+    }
+
+    await idbPutMany(STORE_SONGS, dirty);
     return result;
 }
 
@@ -749,7 +854,7 @@ export async function saveLocalSongBytes(
     fileName: string,
     bytes: Uint8Array,
     libraryId?: string,
-): Promise<{ status: "added" | "merged" | "conflict"; song?: StudioSong; message?: string }> {
+): Promise<{ status: "added" | "merged" | "conflict"; songId?: string; message?: string }> {
     const res = await saveLocalSongsBulk([{ fileName, bytes }], libraryId);
     if (res.conflicts.length > 0) {
         return {
@@ -760,10 +865,11 @@ export async function saveLocalSongBytes(
     if (res.merged > 0) {
         return {
             status: "merged",
+            songId: res.songIds[0],
             message: `检测到相同音乐本体，已合并到「${res.mergedTitles[0] ?? ""}」`,
         };
     }
-    return { status: "added" };
+    return { status: "added", songId: res.songIds[0] };
 }
 
 export async function renameLocalSong(songId: string, name: string): Promise<void> {
@@ -773,21 +879,41 @@ export async function renameLocalSong(songId: string, name: string): Promise<voi
     await idbPut(STORE_SONGS, { ...hit, name: name.trim() || hit.name });
 }
 
-export async function deleteLocalSong(songId: string): Promise<void> {
-    const libraries = await idbGetAll<LibraryRecord>(STORE_LIBRARIES);
-    const dirty = libraries
-        .filter((lib) => lib.songIds.includes(songId))
+async function purgeStoredLocalSongs(songIds: ReadonlySet<string>): Promise<void> {
+    if (songIds.size === 0) return;
+    const [libraries, perfs] = await Promise.all([
+        idbGetAll<LibraryRecord>(STORE_LIBRARIES),
+        idbGetAll<UserPerformanceRecord>(STORE_PERFORMANCES),
+    ]);
+    const dirtyLibs = libraries
+        .filter((lib) => lib.songIds.some((id) => songIds.has(id)))
         .map((lib) => ({
             ...lib,
-            songIds: lib.songIds.filter((id) => id !== songId),
+            songIds: lib.songIds.filter((id) => !songIds.has(id)),
             updatedAt: Date.now(),
         }));
-    await idbPutMany(STORE_LIBRARIES, dirty);
-    await idbDelete(STORE_SONGS, songId);
+    await idbPutMany(STORE_LIBRARIES, dirtyLibs);
+    for (const id of songIds) {
+        await idbDelete(STORE_SONGS, id);
+    }
+    for (const p of perfs) {
+        if (songIds.has(p.songId)) {
+            await idbDelete(STORE_PERFORMANCES, p.id);
+        }
+    }
+}
+
+export async function deleteLocalSong(songId: string, musicFingerprint?: string): Promise<void> {
+    const songs = await idbGetAll<StoredLocalSong>(STORE_SONGS);
+    const matched = songs.filter(
+        (s) => s.id === songId || (Boolean(musicFingerprint) && s.musicFingerprint === musicFingerprint),
+    );
+    const idsToDelete = new Set<string>([songId, ...matched.map((s) => s.id)]);
+    await purgeStoredLocalSongs(idsToDelete);
 }
 
 export async function saveLocalLibrary(lib: LibraryRecord): Promise<void> {
-    await idbPut(STORE_LIBRARIES, { ...lib, updatedAt: Date.now() });
+    await idbPut(STORE_LIBRARIES, { ...lib, songIds: [], updatedAt: Date.now() });
 }
 
 export async function deleteLocalLibrary(libraryId: string): Promise<void> {
@@ -803,18 +929,133 @@ export async function deleteLocalLibrary(libraryId: string): Promise<void> {
     await idbPutMany(STORE_SONGS, dirty);
 }
 
-export async function addSongsToLocalLibrary(libraryId: string, songIds: string[]): Promise<void> {
+export async function addSongsToLocalLibrary(
+    libraryId: string,
+    songIds: string[],
+    fallbackSongs: readonly StudioSong[] = [],
+): Promise<void> {
     const idSet = new Set(songIds);
-    const songs = await idbGetAll<StoredLocalSong>(STORE_SONGS);
-    const dirty = songs
-        .filter((s) => idSet.has(s.id))
-        .map((s) => ({ ...s, libraries: [...new Set([...(s.libraries ?? []), libraryId])] }));
+    const existing = await idbGetAll<StoredLocalSong>(STORE_SONGS);
+    const byId = new Map(existing.map((s) => [s.id, s]));
+    const dirty: StoredLocalSong[] = [];
+
+    for (const songId of idSet) {
+        const hit = byId.get(songId);
+        if (hit) {
+            dirty.push({
+                ...hit,
+                libraries: [...new Set([...(hit.libraries ?? []), libraryId])],
+            });
+            continue;
+        }
+        // 如果是启用中的插件曲目加入用户曲库，则将其音乐本体持久化到用户仓库，卸载插件后仍保留
+        const pluginSong = fallbackSongs.find((s) => s.id === songId && s.data);
+        if (pluginSong?.data) {
+            dirty.push({
+                id: pluginSong.id,
+                name: pluginSong.name,
+                duration: pluginSong.duration,
+                noteCount: pluginSong.noteCount,
+                data: pluginSong.data,
+                aliases: pluginSong.aliases,
+                libraries: [libraryId],
+                musicFingerprint: pluginSong.musicFingerprint ?? computeMusicFingerprint(pluginSong.data),
+                addedAt: Date.now(),
+            });
+        }
+    }
     await idbPutMany(STORE_SONGS, dirty);
+}
+
+export async function removeSongFromLocalLibrary(
+    libraryId: string,
+    songId: string,
+    musicFingerprint?: string,
+): Promise<void> {
+    const [libraries, songs] = await Promise.all([
+        idbGetAll<LibraryRecord>(STORE_LIBRARIES),
+        idbGetAll<StoredLocalSong>(STORE_SONGS),
+    ]);
+    const matchedSongs = songs.filter(
+        (s) => s.id === songId || (Boolean(musicFingerprint) && s.musicFingerprint === musicFingerprint),
+    );
+    const matchedIds = new Set<string>([songId, ...matchedSongs.map((s) => s.id)]);
+
+    const lib = libraries.find((l) => l.id === libraryId);
+    if (lib && lib.songIds.some((id) => matchedIds.has(id))) {
+        await idbPut(STORE_LIBRARIES, {
+            ...lib,
+            songIds: lib.songIds.filter((id) => !matchedIds.has(id)),
+            updatedAt: Date.now(),
+        });
+    }
+
+    const idsToDelete = new Set<string>();
+    const dirtySongs: StoredLocalSong[] = [];
+    for (const song of matchedSongs) {
+        const nextLibs = (song.libraries ?? []).filter((id) => id !== libraryId);
+        if (libraryId === "user-default" && nextLibs.length === 0) {
+            idsToDelete.add(song.id);
+        } else {
+            dirtySongs.push({ ...song, libraries: nextLibs });
+        }
+    }
+    await idbPutMany(STORE_SONGS, dirtySongs);
+    await purgeStoredLocalSongs(idsToDelete);
+}
+
+export async function clearLocalLibrary(libraryId: string): Promise<number> {
+    const [libraries, songs] = await Promise.all([
+        idbGetAll<LibraryRecord>(STORE_LIBRARIES),
+        idbGetAll<StoredLocalSong>(STORE_SONGS),
+    ]);
+    const lib = libraries.find((l) => l.id === libraryId);
+    const libSongSet = new Set(lib?.songIds ?? []);
+    if (lib && lib.songIds.length > 0) {
+        await idbPut(STORE_LIBRARIES, {
+            ...lib,
+            songIds: [],
+            updatedAt: Date.now(),
+        });
+    }
+
+    const idsToDelete = new Set<string>();
+    const dirtySongs: StoredLocalSong[] = [];
+    let cleared = 0;
+
+    for (const song of songs) {
+        const belongs = Boolean(song.libraries?.includes(libraryId)) || libSongSet.has(song.id);
+        if (!belongs) continue;
+        cleared++;
+        const nextLibs = (song.libraries ?? []).filter((id) => id !== libraryId);
+        if (libraryId === "user-default" && nextLibs.length === 0) {
+            idsToDelete.add(song.id);
+        } else {
+            dirtySongs.push({ ...song, libraries: nextLibs });
+        }
+    }
+    await idbPutMany(STORE_SONGS, dirtySongs);
+    await purgeStoredLocalSongs(idsToDelete);
+    return Math.max(cleared, libSongSet.size);
+}
+
+export async function saveLocalPerformance(perf: Omit<UserPerformanceRecord, "createdAt">): Promise<void> {
+    await idbPut<UserPerformanceRecord>(STORE_PERFORMANCES, {
+        ...perf,
+        createdAt: Date.now(),
+    });
+}
+
+export async function deleteLocalPerformance(perfId: string): Promise<boolean> {
+    const all = await idbGetAll<UserPerformanceRecord>(STORE_PERFORMANCES);
+    if (!all.some((p) => p.id === perfId)) return false;
+    await idbDelete(STORE_PERFORMANCES, perfId);
+    return true;
 }
 
 export async function installLocalPluginBytes(
     bytes: Uint8Array,
-    source: "local" | "song",
+    source: "builtin" | "local" | "song",
     trusted: boolean,
     songSourceName?: string,
 ): Promise<StudioPlugin> {
@@ -829,6 +1070,7 @@ export async function installLocalPluginBytes(
     });
     return archiveToStudioPlugin(archive, {
         source,
+        installed: true,
         enabled: trusted,
         trusted,
         songSourceName,
@@ -853,7 +1095,7 @@ export async function setLocalPluginEnabled(pluginId: string, enabled: boolean):
 
 export async function uninstallLocalPlugin(pluginId: string, allPlugins: StudioPlugin[]): Promise<void> {
     const enabled = allPlugins
-        .filter((p) => p.enabled && p.archive)
+        .filter((p) => p.installed && p.enabled && p.archive)
         .map((p) => ({ id: p.id, manifest: p.archive!.manifest }));
     const res = checkPluginUninstall(pluginId, enabled);
     if (!res.ok) throw new Error(res.message);
@@ -895,17 +1137,16 @@ export function exportLocalLibraryPlugin(
 export async function exportLocalAddon(params: {
     template: TemplateInfo;
     songs: StudioSong[];
+    libraries: LibraryRecord[];
     plugins: StudioPlugin[];
     selectedPluginIds: string[];
-    timbreIds: string[];
-    timbreIndex: TimbreIndexEntry[];
     scores: ScoreEntry[];
     name: string;
     desc: string;
     randomUuid: boolean;
 }): Promise<Blob> {
     const catalog: PluginCatalogEntry[] = params.plugins
-        .filter((p) => p.archive)
+        .filter((p) => p.installed && p.archive)
         .map((p) => ({
             id: p.id,
             manifest: p.archive!.manifest,
@@ -918,16 +1159,12 @@ export async function exportLocalAddon(params: {
     if (depRes.missingDependencies.length > 0) {
         throw new Error(`缺少插件依赖：${depRes.missingDependencies.map((d) => d.dependencyId).join("、")}`);
     }
+    if (depRes.untrustedDependencies.length > 0) {
+        throw new Error(`依赖插件尚未信任：${depRes.untrustedDependencies.map((d) => d.dependencyId).join("、")}`);
+    }
     const archives = depRes.resolvedIds
         .map((id) => params.plugins.find((p) => p.id === id)?.archive)
         .filter((a): a is PbePluginArchive => Boolean(a));
-
-    const optionalPacks: LoadedTimbrePack[] = [];
-    for (const meta of params.timbreIndex) {
-        if (!meta.bundled && params.timbreIds.includes(meta.id)) {
-            optionalPacks.push(await loadTimbrePack(meta));
-        }
-    }
 
     const assemblySongs: AssemblySongEntry[] = params.songs
         .filter((s) => s.data)
@@ -947,11 +1184,8 @@ export async function exportLocalAddon(params: {
         desc: params.desc,
         randomUuid: params.randomUuid,
         plugins: archives,
-        timbres: {
-            all: params.timbreIndex,
-            selected: optionalPacks,
-            enabledIds: params.timbreIds,
-        },
+        libraries: params.libraries.map((l) => ({ id: l.id, name: l.name })),
+        skipPluginSongs: true,
         scores: params.scores,
         embedSongs: true,
     });
@@ -976,7 +1210,7 @@ export function computeLocalSongPluginMatch(
         data: s.data,
     }));
     const catalog: PluginCatalogEntry[] = plugins
-        .filter((p) => p.archive)
+        .filter((p) => p.installed && p.archive)
         .map((p) => ({
             id: p.id,
             manifest: p.archive!.manifest,
@@ -986,6 +1220,46 @@ export function computeLocalSongPluginMatch(
             archive: p.archive,
         }));
     return matchSongsToPlugins(assemblySongs, catalog, selectedPluginIds);
+}
+
+export function parsePerformanceJsonText(
+    text: string,
+    songId: string,
+    fallbackName: string,
+    musicFingerprint?: string,
+): Omit<UserPerformanceRecord, "createdAt"> {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("演出文件必须是 JSON 对象");
+    }
+    const firstCue = Array.isArray(parsed.cues)
+        ? (parsed.cues[0] as Record<string, unknown> | undefined)
+        : undefined;
+    const cues: PerformanceCue[] =
+        Array.isArray(parsed.cues) && parsed.cues.length > 0 && typeof firstCue?.tick === "number"
+            ? (parsed.cues as PerformanceCue[])
+            : compilePerformanceSource({ ...parsed, song: songId }, { expectedSongId: songId });
+    if (cues.length === 0) throw new Error("演出文件不包含有效 cues");
+    const name =
+        (typeof parsed.name === "string" && parsed.name.trim()) ||
+        (typeof parsed.title === "string" && parsed.title.trim()) ||
+        fallbackName;
+    const id =
+        typeof parsed.id === "string" && parsed.id.trim()
+            ? parsed.id.trim()
+            : `user:${songId}:${Date.now().toString(36)}`;
+    return {
+        id,
+        songId,
+        musicFingerprint,
+        name,
+        ...(typeof parsed.author === "string" && parsed.author.trim() ? { author: parsed.author.trim() } : {}),
+        ...(typeof parsed.description === "string" && parsed.description.trim()
+            ? { description: parsed.description.trim() }
+            : {}),
+        cues,
+        requiredEffects: extractCueEffects(cues),
+    };
 }
 
 export function getLocalImportCode(song: StudioSong): { name: string; chunks: string[]; bytes: number } {
@@ -998,6 +1272,5 @@ export function getLocalImportCode(song: StudioSong): { name: string; chunks: st
     };
 }
 
-export { loadTimbreIndex };
 export type { MetaWithStats };
-type MetaWithStats = MidiSongMeta;
+type MetaWithStats = import("@piano/core").MidiSongMeta;

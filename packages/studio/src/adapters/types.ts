@@ -1,9 +1,10 @@
 import type {
     ContentOrigin,
-    LibraryRecord,
+    PerformanceCue,
     PerformanceDescriptor,
     ResourceDeployStatus,
 } from "@piano/core";
+import type { TimbreIndexEntry } from "@piano/assembly";
 import type { PbePluginArchive } from "@piano/vfx/package";
 
 export type { PerformanceDescriptor } from "@piano/core";
@@ -22,34 +23,42 @@ export interface StudioSong {
     origin?: ContentOrigin;
     origins?: ContentOrigin[];
     performanceEntries: PerformanceDescriptor[];
-    isOriginal?: boolean;
-    fromLibrary?: boolean;
     addedAt?: number;
-    playCount?: number;
-    createdAt?: number;
     data?: Uint8Array;
-    moduleText?: string;
 }
 
-export interface OfficialCollection {
+export interface UserPerformanceRecord {
     id: string;
+    songId: string;
+    musicFingerprint?: string;
     name: string;
-    description: string;
-    songIds: string[];
+    author?: string;
+    description?: string;
+    cues: PerformanceCue[];
+    requiredEffects: string[];
+    createdAt: number;
 }
 
-export interface OfficialCatalog {
-    version: number;
-    totalSongs: number;
-    collections: OfficialCollection[];
-    performances: Record<string, PerformanceDescriptor[]>;
-    songs: Array<{
-        id: string;
-        name: string;
-        duration: number;
-        noteCount: number;
-        bytes: number;
-    }>;
+export interface PluginContentCounts {
+    songs: number;
+    performances: number;
+    libraries: number;
+    timbres: number;
+    effects: number;
+    themes: number;
+    keyStyles: number;
+    particles: number;
+    stageProps: number;
+}
+
+export interface PluginTimbreMeta {
+    id: string;
+    value?: number;
+    label: string;
+    description?: string;
+    dirs: Record<string, string>;
+    notes: readonly string[];
+    layers: readonly string[];
 }
 
 export interface StudioPlugin {
@@ -61,32 +70,49 @@ export interface StudioPlugin {
     license?: string;
     source: "builtin" | "local" | "upload" | "song";
     visibility: "public" | "internal";
+    installed: boolean;
     enabled: boolean;
     trusted: boolean;
     hasExecutableCode: boolean;
+    requiresPackDeploy: boolean;
     compatible: boolean;
     compatibilityNote?: string;
     sizeBytes: number;
+    file?: string;
     previewDataUrl?: string;
     dependencies: Array<{ id: string; range?: string }>;
+    missingDependencies: string[];
     provides: Record<string, string[] | undefined>;
+    contents: PluginContentCounts;
+    timbreEntries?: PluginTimbreMeta[];
     status: ResourceDeployStatus;
     songSourceName?: string;
     archive?: PbePluginArchive;
 }
 
+export interface ServerScoreMeta {
+    id: string;
+    title: string;
+    pages: string[];
+    pageCount?: number;
+}
+
 export interface StudioDeploymentStatus {
     supported: boolean;
-    status: ResourceDeployStatus | "unconfigured";
+    status: ResourceDeployStatus;
     templateReady: boolean;
-    configHash: string;
-    deployedHash: string | null;
-    loadedHash: string | null;
-    lastDeployedAt: number | null;
-    lastLoadedAt: number | null;
-    pendingPlugins: string[];
+    targetConfigHash: string;
+    deployedConfigHash?: string;
+    loadedConfigHash?: string;
+    deployedAt?: number;
+    loadedAt?: number;
+    enabledPlugins: string[];
     deployedPlugins: string[];
     loadedPlugins: string[];
+    enabledTimbres: string[];
+    availableTimbres: TimbreIndexEntry[];
+    scores: ServerScoreMeta[];
+    issues: string[];
     bdsConfig: {
         bdsDir: string;
         bdsWorld: string;
@@ -101,11 +127,4 @@ export interface StudioTokenInfo {
     role: string;
     createdAt: number;
     lastUsedAt: number | null;
-}
-
-export interface ImportSummary {
-    added: number;
-    merged: number;
-    conflicts: string[];
-    songs: StudioSong[];
 }

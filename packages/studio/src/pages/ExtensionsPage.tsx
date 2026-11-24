@@ -1,41 +1,51 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
-    AlertTriangle,
+    AudioWaveform,
     Boxes,
     Code2,
+    Download,
     Eye,
     EyeOff,
-    Plus,
+    ListMusic,
+    Music2,
+    Search,
     ShieldCheck,
     Sparkles,
     Trash2,
     Upload,
-    Wand2,
 } from "lucide-react";
 import {
     Button,
     ConfirmDialog,
     EmptyState,
-    FileDropzone,
     PageHeader,
+    RowPlayButton,
     Segmented,
     SongBadge,
+    Textfield,
     notify,
+    usePlayerState,
 } from "@piano/ui";
 import type { ResourceDeployStatus } from "@piano/core";
-import { computeLocalSongPluginMatch } from "../adapters/localAdapter";
+import { bundledPianoEntry } from "../adapters/timbres";
 import type { StudioPlugin } from "../adapters/types";
+import { studioPlayer } from "../audio/player";
+import { PluginContentDialog } from "../components/PluginContentDialog";
 import { TrustPluginsDialog } from "../components/TrustPluginsDialog";
 import { summarizePluginCapabilities, useStudio } from "../store/studio";
 
 const SOURCE_LABELS: Record<StudioPlugin["source"], string> = {
-    builtin: "内置",
+    builtin: "官方内置",
     local: "本地导入",
     upload: "已上传",
     song: "随曲附带",
 };
 
-const DEPLOY_STATUS_LABELS: Record<ResourceDeployStatus, { label: string; tone?: "brand" | "default" }> = {
+const DEPLOY_STATUS_LABELS: Record<
+    ResourceDeployStatus,
+    { label: string; tone?: "brand" | "default" }
+> = {
     active: { label: "已生效", tone: "brand" },
     pending_deploy: { label: "待部署" },
     pending_restart: { label: "待重启" },
@@ -48,57 +58,110 @@ function formatBytes(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
+function isContentPack(p: StudioPlugin): boolean {
+    return Boolean(p.contents.songs || p.contents.libraries || p.contents.performances);
+}
+
+function isVfxPack(p: StudioPlugin): boolean {
+    return Boolean(
+        p.contents.effects || p.contents.themes || p.contents.keyStyles || p.contents.stageProps,
+    );
+}
+
+function isTimbrePack(p: StudioPlugin): boolean {
+    return Boolean(p.contents.timbres || p.timbreEntries?.length || p.provides.timbres?.length);
+}
+
 export function ExtensionsPage() {
     const mode = useStudio((s) => s.mode);
     const plugins = useStudio((s) => s.plugins);
     const songs = useStudio((s) => s.songs);
-    const selectedSongIds = useStudio((s) => s.selectedSongIds);
-    const selectedPluginIds = useStudio((s) => s.selectedPluginIds);
+    const libraries = useStudio((s) => s.libraries);
+    const previewTimbreId = useStudio((s) => s.previewTimbreId);
     const pendingTrustPlugins = useStudio((s) => s.pendingTrustPlugins);
     const busy = useStudio((s) => s.busy);
 
     const importFiles = useStudio((s) => s.importFiles);
+    const installBuiltinPlugin = useStudio((s) => s.installBuiltinPlugin);
     const trustPlugin = useStudio((s) => s.trustPlugin);
     const togglePlugin = useStudio((s) => s.togglePlugin);
     const uninstallPlugin = useStudio((s) => s.uninstallPlugin);
-    const autoMatchLocalPlugins = useStudio((s) => s.autoMatchLocalPlugins);
-    const zeroLocalPlugins = useStudio((s) => s.zeroLocalPlugins);
     const confirmPendingTrust = useStudio((s) => s.confirmPendingTrust);
     const cancelPendingTrust = useStudio((s) => s.cancelPendingTrust);
+    const loadPluginArchive = useStudio((s) => s.loadPluginArchive);
+    const importSingleSongFromPlugin = useStudio((s) => s.importSingleSongFromPlugin);
+    const previewTimbreDemo = useStudio((s) => s.previewTimbreDemo);
+    const auditionTimbreSample = useStudio((s) => s.auditionTimbreSample);
 
-    const [filter, setFilter] = useState<"all" | "enabled" | "effects" | "content">("all");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get("tab");
+    const [category, setCategory] = useState<"libraries" | "effects" | "timbres">(() =>
+        tabParam === "effects" || tabParam === "timbres" || tabParam === "libraries"
+            ? tabParam
+            : "libraries",
+    );
+
+    useEffect(() => {
+        if (tabParam === "effects" || tabParam === "timbres" || tabParam === "libraries") {
+            setCategory(tabParam);
+        }
+    }, [tabParam]);
+    const [installedOnly, setInstalledOnly] = useState(false);
+    const [query, setQuery] = useState("");
     const [uninstallTarget, setUninstallTarget] = useState<StudioPlugin | null>(null);
+    const [browsePlugin, setBrowsePlugin] = useState<StudioPlugin | null>(null);
+    const [installingId, setInstallingId] = useState<string | null>(null);
+    const [dragOver, setDragOver] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
+    const playerState = usePlayerState(studioPlayer);
+
+    const existingSongIds = useMemo(() => new Set(songs.map((s) => s.id)), [songs]);
+    const existingFingerprints = useMemo(
+        () => new Set(songs.map((s) => s.musicFingerprint).filter((x): x is string => Boolean(x))),
+        [songs],
+    );
 
     const filtered = useMemo(() => {
-        return plugins.filter((p) => {
-            if (filter === "enabled") {
-                return mode === "local" ? selectedPluginIds.includes(p.id) : p.enabled;
-            }
-            if (filter === "effects") {
-                return Boolean(p.provides.effects?.length || p.provides.themes?.length || p.provides.stageProps?.length);
-            }
-            if (filter === "content") {
-                return Boolean(p.provides.songs?.length || p.provides.performances?.length || p.provides.libraries?.length);
-            }
-            return true;
-        });
-    }, [plugins, filter, mode, selectedPluginIds]);
+        const q = query.trim().toLowerCase();
+        return plugins
+            .filter((p) => {
+                if (category === "libraries" && !isContentPack(p)) return false;
+                if (category === "effects" && !isVfxPack(p)) return false;
+                if (category === "timbres" && !isTimbrePack(p)) return false;
+                if (installedOnly && !p.installed) return false;
+                if (!q) return true;
+                return (
+                    p.name.toLowerCase().includes(q) ||
+                    p.id.toLowerCase().includes(q) ||
+                    p.description.toLowerCase().includes(q)
+                );
+            })
+            .sort((a, b) => {
+                if (a.installed !== b.installed) return a.installed ? -1 : 1;
+                return a.name.localeCompare(b.name, "zh-CN");
+            });
+    }, [plugins, category, installedOnly, query]);
 
-    const localMatch = useMemo(() => {
-        if (mode !== "local") return null;
-        const picked = songs.filter((s) => selectedSongIds.includes(s.id));
-        return computeLocalSongPluginMatch(picked, plugins, selectedPluginIds);
-    }, [mode, songs, selectedSongIds, plugins, selectedPluginIds]);
+    const bundledPiano = useMemo(() => bundledPianoEntry(), []);
+
+    const handleInstall = async (plugin: StudioPlugin) => {
+        setInstallingId(plugin.id);
+        try {
+            await installBuiltinPlugin(plugin.id);
+        } catch (err) {
+            notify({
+                title: "安装失败",
+                message: err instanceof Error ? err.message : String(err),
+                color: "red",
+            });
+        } finally {
+            setInstallingId(null);
+        }
+    };
 
     const handleToggle = async (plugin: StudioPlugin) => {
         try {
-            if (mode === "local") {
-                const currentlySelected = selectedPluginIds.includes(plugin.id);
-                await togglePlugin(plugin.id, !currentlySelected);
-            } else {
-                await togglePlugin(plugin.id, !plugin.enabled);
-            }
+            await togglePlugin(plugin.id, !plugin.enabled);
         } catch (err) {
             notify({
                 title: "操作失败",
@@ -136,116 +199,172 @@ export function ExtensionsPage() {
     };
 
     return (
-        <div className="flex flex-col gap-5">
-            <PageHeader
-                eyebrow="Unified .pbeplugin Extensions"
-                title="扩展中心"
-                description="所有歌曲、曲库、演出编排、舞台特效与样式均通过统一的 .pbeplugin 格式安装和管理。"
-                actions={
-                    <div className="flex flex-wrap gap-2">
-                        <input
-                            ref={fileRef}
-                            type="file"
-                            accept=".pbeplugin"
-                            multiple
-                            hidden
-                            onChange={(e) => {
-                                const files = Array.from(e.target.files ?? []);
-                                e.target.value = "";
-                                if (files.length > 0) void importFiles(files);
-                            }}
-                        />
-                        {mode === "local" && (
-                            <>
-                                <Button type="button" color="ghost" size="sm" onClick={zeroLocalPlugins}>
-                                    零插件模式
-                                </Button>
-                                <Button type="button" color="secondary" size="sm" onClick={autoMatchLocalPlugins}>
-                                    <Wand2 size={14} /> 按曲目自动匹配
-                                </Button>
-                            </>
-                        )}
-                        <Button type="button" size="sm" loading={busy} onClick={() => fileRef.current?.click()}>
-                            <Upload size={14} /> 安装 .pbeplugin
-                        </Button>
-                    </div>
+        <div
+            className="relative flex flex-col gap-5"
+            onDragOver={(e) => {
+                if (e.dataTransfer.types.includes("Files")) {
+                    e.preventDefault();
+                    setDragOver(true);
                 }
+            }}
+            onDragLeave={(e) => {
+                if (e.currentTarget === e.target) setDragOver(false);
+            }}
+            onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const files = Array.from(e.dataTransfer.files ?? []);
+                if (files.length > 0) void importFiles(files);
+            }}
+        >
+            <input
+                ref={fileRef}
+                type="file"
+                accept=".pbeplugin"
+                multiple
+                hidden
+                onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = "";
+                    if (files.length > 0) void importFiles(files);
+                }}
             />
 
-            {localMatch && (localMatch.missingEffects.length > 0 || localMatch.disabledRequiredEffects.length > 0) && (
-                <div className="flex flex-col gap-2 rounded-lg border border-[color:var(--pb-warning)]/40 bg-[color:var(--pb-warning)]/10 p-3 text-[12px]">
-                    {localMatch.missingEffects.length > 0 && (
-                        <div className="flex items-start gap-2">
-                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-[color:var(--pb-warning)]" />
-                            <div>
-                                <div className="font-semibold text-ore-text">部分已选曲目的演出缺少特效插件</div>
-                                <div className="mt-0.5 text-[11.5px] text-ore-dim">
-                                    缺少插件不影响音乐本体正常播放；缺失部分将在游戏内提示不可用：
-                                    {localMatch.missingEffects
-                                        .map((item) => ` ${item.effect}（${item.songs.join("、")}）`)
-                                        .join("；")}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {localMatch.disabledRequiredEffects.length > 0 && (
-                        <div className="flex items-start gap-2">
-                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-[color:var(--pb-warning)]" />
-                            <div>
-                                <div className="font-semibold text-ore-text">以下所需扩展当前未勾选</div>
-                                <div className="mt-0.5 text-[11.5px] text-ore-dim">
-                                    可点击上方「按曲目自动匹配」一键启用：
-                                    {localMatch.disabledRequiredEffects
-                                        .map((item) => ` ${item.pluginName}（${item.effect}）`)
-                                        .join("、")}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+            {dragOver && (
+                <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-black/55 backdrop-blur-[1px]">
+                    <div className="rounded-xl border-2 border-dashed border-brand bg-ore-raised px-8 py-6 text-center shadow-xl">
+                        <Upload size={26} className="mx-auto text-brand" />
+                        <div className="mt-2 text-[14px] font-semibold">松开以安装 .pbeplugin 扩展包</div>
+                    </div>
                 </div>
             )}
 
+            <PageHeader
+                eyebrow="Unified .pbeplugin Distribution"
+                title="扩展中心"
+                description="按曲库、特效与钢琴音色分类分发 .pbeplugin 扩展包；支持按需整包安装、浏览曲包挑单曲与在线试听音色。"
+                actions={
+                    <Button
+                        type="button"
+                        size="sm"
+                        loading={busy}
+                        onClick={() => fileRef.current?.click()}
+                    >
+                        <Upload size={14} /> 导入 .pbeplugin
+                    </Button>
+                }
+            />
+
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <Segmented
-                    value={filter}
-                    onChange={(v) => setFilter(v as typeof filter)}
+                    value={category}
+                    onChange={(v) => {
+                        const next = v as typeof category;
+                        setCategory(next);
+                        setSearchParams({ tab: next }, { replace: true });
+                    }}
                     options={[
-                        { value: "all", label: "全部扩展", count: plugins.length },
                         {
-                            value: "enabled",
-                            label: mode === "local" ? "已装配" : "已启用",
-                            count: plugins.filter((p) =>
-                                mode === "local" ? selectedPluginIds.includes(p.id) : p.enabled,
-                            ).length,
+                            value: "libraries",
+                            label: "曲库",
+                            count: plugins.filter(isContentPack).length,
                         },
-                        { value: "effects", label: "特效与样式" },
-                        { value: "content", label: "曲库与演出" },
+                        {
+                            value: "effects",
+                            label: "特效",
+                            count: plugins.filter(isVfxPack).length,
+                        },
+                        {
+                            value: "timbres",
+                            label: "钢琴音色",
+                            count: plugins.filter(isTimbrePack).length,
+                        },
                     ]}
                 />
+                <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] text-ore-dim">
+                        <input
+                            type="checkbox"
+                            checked={installedOnly}
+                            onChange={(e) => setInstalledOnly(e.currentTarget.checked)}
+                            className="h-3.5 w-3.5 accent-[var(--pb-primary)]"
+                        />
+                        <span>仅看已安装</span>
+                    </label>
+                    <div className="min-w-[200px] flex-1 sm:w-[240px]">
+                        <Textfield
+                            leading={<Search size={14} />}
+                            placeholder="搜索扩展名 / ID…"
+                            value={query}
+                            onInput={(e) => {
+                                const t = e.target as unknown as { value?: unknown };
+                                if (typeof t?.value === "string") setQuery(t.value);
+                            }}
+                        />
+                    </div>
+                </div>
             </div>
 
-            <FileDropzone
-                accept={[".pbeplugin"]}
-                multiple
-                title="安装 .pbeplugin 扩展"
-                description="拖拽 .pbeplugin 文件到此处安装，支持曲库包、VFX 插件与专属演出合集"
-                onDrop={(files) => void importFiles(files)}
-            />
+            {category === "timbres" && !query.trim() && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-ore-border bg-ore-raised px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-ore-divider bg-ore-sunken text-brand">
+                            <AudioWaveform size={17} />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-semibold">
+                                <span>{bundledPiano.label}</span>
+                                <SongBadge tone="brand">内置必选</SongBadge>
+                                {previewTimbreId === bundledPiano.id && (
+                                    <SongBadge tone="brand">当前试听</SongBadge>
+                                )}
+                            </div>
+                            <p className="mt-0.5 text-[12px] text-ore-dim">
+                                {bundledPiano.description}（默认随附加包底包内置，无需额外安装）
+                            </p>
+                        </div>
+                    </div>
+                    <RowPlayButton
+                        playState={
+                            playerState.songId === `timbre-demo:${bundledPiano.id}` &&
+                            playerState.status === "playing"
+                                ? "playing"
+                                : "idle"
+                        }
+                        label={`试听 ${bundledPiano.label}`}
+                        onPlay={() => {
+                            if (
+                                playerState.songId === `timbre-demo:${bundledPiano.id}` &&
+                                playerState.status === "playing"
+                            ) {
+                                studioPlayer.pause();
+                            } else {
+                                void previewTimbreDemo(bundledPiano.id);
+                            }
+                        }}
+                    />
+                </div>
+            )}
 
             {filtered.length === 0 ? (
                 <EmptyState
                     icon={<Boxes size={24} />}
                     title="暂无匹配的扩展"
-                    description="请尝试切换筛选条件，或上传 .pbeplugin 扩展包。"
+                    description="请切换分类、取消勾选「仅看已安装」，或拖入 / 上传 .pbeplugin 扩展包。"
                 />
             ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                     {filtered.map((plugin) => {
-                        const checked =
-                            mode === "local"
-                                ? selectedPluginIds.includes(plugin.id)
-                                : plugin.enabled;
                         const statusMeta = DEPLOY_STATUS_LABELS[plugin.status];
+                        const hasSongs = plugin.contents.songs > 0;
+                        const timbreId =
+                            plugin.timbreEntries?.[0]?.id ?? plugin.provides.timbres?.[0];
+                        const isTimbre = Boolean(timbreId);
+                        const isPlayingDemo =
+                            Boolean(timbreId) &&
+                            playerState.songId === `timbre-demo:${timbreId}` &&
+                            playerState.status === "playing";
+                        const canUseTimbre = Boolean(timbreId) && plugin.installed && plugin.enabled;
                         return (
                             <div
                                 key={plugin.id}
@@ -260,7 +379,13 @@ export function ExtensionsPage() {
                                         />
                                     ) : (
                                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md border border-ore-divider bg-ore-sunken text-ore-dim">
-                                            <Sparkles size={18} />
+                                            {isTimbre ? (
+                                                <AudioWaveform size={18} />
+                                            ) : hasSongs ? (
+                                                <Music2 size={18} />
+                                            ) : (
+                                                <Sparkles size={18} />
+                                            )}
                                         </div>
                                     )}
                                     <div className="min-w-0 flex-1">
@@ -268,20 +393,36 @@ export function ExtensionsPage() {
                                             <span className="text-[14px] font-semibold">{plugin.name}</span>
                                             <SongBadge>v{plugin.version}</SongBadge>
                                             <SongBadge>{SOURCE_LABELS[plugin.source]}</SongBadge>
-                                            {mode === "server" && (
-                                                <SongBadge tone={statusMeta.tone}>{statusMeta.label}</SongBadge>
+                                            {plugin.installed ? (
+                                                mode === "server" ? (
+                                                    <SongBadge tone={statusMeta.tone}>
+                                                        {statusMeta.label}
+                                                    </SongBadge>
+                                                ) : (
+                                                    <SongBadge tone={plugin.enabled ? "brand" : "default"}>
+                                                        {plugin.enabled ? "已启用" : "已停用"}
+                                                    </SongBadge>
+                                                )
+                                            ) : (
+                                                <SongBadge>未安装</SongBadge>
                                             )}
-                                            <SongBadge>
-                                                {plugin.visibility === "internal" ? (
+                                            {timbreId && canUseTimbre && previewTimbreId === timbreId && (
+                                                <SongBadge tone="brand">当前音色</SongBadge>
+                                            )}
+                                            {plugin.visibility === "internal" && (
+                                                <SongBadge>
                                                     <span className="inline-flex items-center gap-1">
                                                         <EyeOff size={10} /> 内部
                                                     </span>
-                                                ) : (
+                                                </SongBadge>
+                                            )}
+                                            {plugin.visibility === "public" && !hasSongs && !isTimbre && (
+                                                <SongBadge>
                                                     <span className="inline-flex items-center gap-1">
                                                         <Eye size={10} /> 公开
                                                     </span>
-                                                )}
-                                            </SongBadge>
+                                                </SongBadge>
+                                            )}
                                             {plugin.hasExecutableCode && (
                                                 <SongBadge>
                                                     <span className="inline-flex items-center gap-1">
@@ -300,16 +441,44 @@ export function ExtensionsPage() {
                                             </p>
                                         )}
                                         <div className="mt-2 text-[11px] text-ore-dimmer">
-                                            提供：{summarizePluginCapabilities(plugin)}
+                                            内容：{summarizePluginCapabilities(plugin)}
                                             {plugin.dependencies.length > 0 &&
                                                 ` · 依赖：${plugin.dependencies.map((d) => d.id).join("、")}`}
                                         </div>
                                     </div>
+                                    {timbreId && (
+                                        <RowPlayButton
+                                            playState={isPlayingDemo ? "playing" : "idle"}
+                                            label={
+                                                canUseTimbre
+                                                    ? `试听 ${plugin.name}`
+                                                    : `试听样音 ${plugin.name}（安装启用后可在播放器中切换）`
+                                            }
+                                            onPlay={() => {
+                                                if (isPlayingDemo) {
+                                                    studioPlayer.pause();
+                                                } else if (canUseTimbre) {
+                                                    void previewTimbreDemo(timbreId);
+                                                } else {
+                                                    void auditionTimbreSample(timbreId);
+                                                }
+                                            }}
+                                        />
+                                    )}
                                 </div>
 
                                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ore-divider pt-2.5">
-                                    <div className="flex items-center gap-2">
-                                        {!plugin.trusted ? (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {!plugin.installed ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                loading={installingId === plugin.id}
+                                                onClick={() => void handleInstall(plugin)}
+                                            >
+                                                <Download size={13} /> {hasSongs ? "整包安装" : "安装"}
+                                            </Button>
+                                        ) : !plugin.trusted ? (
                                             <Button
                                                 type="button"
                                                 size="sm"
@@ -321,23 +490,27 @@ export function ExtensionsPage() {
                                             <label className="inline-flex cursor-pointer items-center gap-2 text-[12px]">
                                                 <input
                                                     type="checkbox"
-                                                    checked={checked}
+                                                    checked={plugin.enabled}
                                                     onChange={() => void handleToggle(plugin)}
                                                     className="h-4 w-4 accent-[var(--pb-primary)]"
                                                 />
-                                                <span>
-                                                    {checked
-                                                        ? mode === "local"
-                                                            ? "参与附加包构建"
-                                                            : "已启用"
-                                                        : mode === "local"
-                                                          ? "暂不打包"
-                                                          : "已停用"}
-                                                </span>
+                                                <span>{plugin.enabled ? "已启用" : "已停用"}</span>
                                             </label>
                                         )}
+
+                                        {hasSongs && (
+                                            <Button
+                                                type="button"
+                                                color="secondary"
+                                                size="sm"
+                                                onClick={() => setBrowsePlugin(plugin)}
+                                            >
+                                                <ListMusic size={13} /> 浏览 / 挑单曲
+                                            </Button>
+                                        )}
                                     </div>
-                                    {plugin.source !== "builtin" ? (
+
+                                    {plugin.installed && (
                                         <Button
                                             type="button"
                                             color="ghost"
@@ -346,17 +519,6 @@ export function ExtensionsPage() {
                                         >
                                             <Trash2 size={13} /> 卸载
                                         </Button>
-                                    ) : (
-                                        mode === "server" && !plugin.trusted && (
-                                            <Button
-                                                type="button"
-                                                color="secondary"
-                                                size="sm"
-                                                onClick={() => void handleTrust(plugin)}
-                                            >
-                                                <Plus size={13} /> 启用
-                                            </Button>
-                                        )
                                     )}
                                 </div>
                             </div>
@@ -364,6 +526,17 @@ export function ExtensionsPage() {
                     })}
                 </div>
             )}
+
+            <PluginContentDialog
+                plugin={browsePlugin}
+                libraries={libraries}
+                existingSongIds={existingSongIds}
+                existingFingerprints={existingFingerprints}
+                onClose={() => setBrowsePlugin(null)}
+                onLoadArchive={loadPluginArchive}
+                onInstallPack={installBuiltinPlugin}
+                onImportSingle={importSingleSongFromPlugin}
+            />
 
             <TrustPluginsDialog
                 plugins={pendingTrustPlugins.map((item) => item.plugin)}
@@ -377,7 +550,7 @@ export function ExtensionsPage() {
                 danger
                 description={
                     uninstallTarget
-                        ? `确定要卸载「${uninstallTarget.name}」吗？属于此扩展独占的歌曲、演出与资源将被移除（玩家个人存储卡里的歌曲数据副本不受影响）。`
+                        ? `确定要卸载「${uninstallTarget.name}」吗？属于此扩展独占的歌曲、演出与资源将被移除（已添加到自己曲库的数据保留）。`
                         : ""
                 }
                 confirmLabel="确认卸载"

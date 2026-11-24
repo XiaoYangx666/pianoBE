@@ -6,12 +6,13 @@
     "license": "CC-BY-NC-4.0",
     "private": true,
     "scripts": {
-        "sync": "node scripts/sync.mjs",
-        "predev": "node scripts/sync.mjs",
+        "sync": "bun scripts/sync.mjs",
+        "predev": "bun scripts/sync.mjs",
         "dev": "vite",
-        "prebuild": "node scripts/sync.mjs",
+        "prebuild": "bun scripts/sync.mjs",
         "build": "vite build",
         "preview": "vite preview",
+        "test": "bun test",
         "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {

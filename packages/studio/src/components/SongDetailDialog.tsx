@@ -1,6 +1,8 @@
-import { Download, Music2, Sparkles, Trash2 } from "lucide-react";
+import { useRef } from "react";
+import { Download, FileUp, Music2, Sparkles, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { PLAIN_PERFORMANCE_ID, TIME_SCALE, type LibraryRecord } from "@piano/core";
-import { Button, Dialog, SongBadge } from "@piano/ui";
+import { Button, Dialog, SongBadge, notify } from "@piano/ui";
 import type { StudioPlugin, StudioSong } from "../adapters/types";
 
 function formatDuration(scaled: number): string {
@@ -12,8 +14,9 @@ export interface SongDetailDialogProps {
     song: StudioSong | null;
     libraries: readonly LibraryRecord[];
     plugins: readonly StudioPlugin[];
-    canDeletePerformance: boolean;
+    isServerMode: boolean;
     onClose: () => void;
+    onImportPerformance: (songId: string, file: File) => Promise<void>;
     onDeletePerformance: (songId: string, perfId: string) => void;
     onDownloadPbe3: (song: StudioSong) => void;
 }
@@ -22,16 +25,19 @@ export function SongDetailDialog({
     song,
     libraries,
     plugins,
-    canDeletePerformance,
+    isServerMode,
     onClose,
+    onImportPerformance,
     onDeletePerformance,
     onDownloadPbe3,
 }: SongDetailDialogProps) {
+    const perfInputRef = useRef<HTMLInputElement>(null);
+    const navigate = useNavigate();
     if (!song) return null;
 
     const availableEffects = new Set<string>();
     for (const plugin of plugins) {
-        if (!plugin.enabled) continue;
+        if (!plugin.installed || !plugin.enabled) continue;
         for (const eff of plugin.provides.effects ?? []) availableEffects.add(eff);
     }
 
@@ -62,7 +68,7 @@ export function SongDetailDialog({
                 </span>
             }
             footer={
-                <div className="flex w-full items-center justify-between">
+                <div className="flex w-full items-center justify-between gap-2">
                     <Button
                         type="button"
                         color="secondary"
@@ -78,6 +84,25 @@ export function SongDetailDialog({
             }
         >
             <div className="flex flex-col gap-4 text-[12.5px]">
+                <input
+                    ref={perfInputRef}
+                    type="file"
+                    accept=".json"
+                    hidden
+                    onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        void onImportPerformance(song.id, file).catch((err) =>
+                            notify({
+                                title: "导入演出失败",
+                                message: err instanceof Error ? err.message : String(err),
+                                color: "red",
+                            }),
+                        );
+                    }}
+                />
+
                 <div className="grid grid-cols-2 gap-2 rounded-lg border border-ore-divider bg-ore-raised p-3 sm:grid-cols-3">
                     <div>
                         <div className="text-[11px] text-ore-dimmer">曲目 ID</div>
@@ -114,15 +139,27 @@ export function SongDetailDialog({
                 </div>
 
                 <div>
-                    <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
-                        <Sparkles size={14} className="text-brand" />
-                        演出编排 ({performances.length})
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-[12px] font-semibold">
+                            <Sparkles size={14} className="text-brand" />
+                            独立演出编排 ({performances.length})
+                        </div>
+                        <Button
+                            type="button"
+                            color="secondary"
+                            size="sm"
+                            onClick={() => perfInputRef.current?.click()}
+                        >
+                            <FileUp size={13} /> 导入演出 JSON
+                        </Button>
                     </div>
                     <div className="flex flex-col gap-2">
                         {performances.map((perf) => {
                             const reqs = perf.requiredEffects ?? [];
                             const missing = reqs.filter((e) => !availableEffects.has(e));
                             const isPlain = perf.id === PLAIN_PERFORMANCE_ID;
+                            const canDelete =
+                                !isPlain && (isServerMode || perf.origin?.kind === "user");
                             return (
                                 <div
                                     key={perf.id}
@@ -131,12 +168,12 @@ export function SongDetailDialog({
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-1.5 font-medium">
                                             <span>{perf.name}</span>
-                                            <SongBadge>{isPlain ? "默认可用" : perf.id}</SongBadge>
+                                            <SongBadge>{isPlain ? "默认可用" : perf.origin?.name ?? perf.id}</SongBadge>
                                             {reqs.length > 0 && missing.length === 0 && (
                                                 <SongBadge tone="brand">特效就绪</SongBadge>
                                             )}
                                             {missing.length > 0 && (
-                                                <SongBadge>缺少特效 ({missing.length})</SongBadge>
+                                                <SongBadge tone="warning">缺少特效 ({missing.length})</SongBadge>
                                             )}
                                         </div>
                                         {perf.author && (
@@ -150,12 +187,22 @@ export function SongDetailDialog({
                                             </div>
                                         )}
                                         {missing.length > 0 && (
-                                            <div className="mt-0.5 text-[11px] text-[color:var(--pb-warning)]">
-                                                缺少：{missing.join("、")}（纯音乐演奏不受影响）
+                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--pb-warning)]">
+                                                <span>缺少：{missing.join("、")}（纯音乐演奏不受影响）</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onClose();
+                                                        navigate("/extensions");
+                                                    }}
+                                                    className="font-medium text-brand hover:underline"
+                                                >
+                                                    前往扩展中心安装 →
+                                                </button>
                                             </div>
                                         )}
                                     </div>
-                                    {canDeletePerformance && !isPlain && (
+                                    {canDelete && (
                                         <button
                                             type="button"
                                             title="删除此演出编排"

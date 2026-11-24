@@ -1,6 +1,9 @@
-import type { LibraryRecord } from "@piano/core";
+import type { LibraryRecord, PerformanceCue } from "@piano/core";
+import type { TimbreIndexEntry } from "@piano/assembly";
 import type {
     PerformanceDescriptor,
+    PluginContentCounts,
+    ServerScoreMeta,
     StudioDeploymentStatus,
     StudioPlugin,
     StudioSong,
@@ -135,6 +138,17 @@ export const serverApi = {
         );
     },
 
+    addSongPerformance(
+        songId: string,
+        body: { id?: string; name: string; author?: string; description?: string; cues: readonly PerformanceCue[] },
+    ) {
+        return req<PerformanceDescriptor>(`/api/songs/${encodeURIComponent(songId)}/performances`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+    },
+
     deletePerformance(perfId: string) {
         return req<void>(`/api/performances/${encodeURIComponent(perfId)}`, { method: "DELETE" });
     },
@@ -178,6 +192,12 @@ export const serverApi = {
         );
     },
 
+    clearLibrary(libraryId: string) {
+        return req<void>(`/api/libraries/${encodeURIComponent(libraryId)}/songs`, {
+            method: "DELETE",
+        });
+    },
+
     async exportLibraryPlugin(libraryId: string): Promise<Blob> {
         const token = getServerToken();
         const res = await fetch(`/api/libraries/${encodeURIComponent(libraryId)}/export-plugin`, {
@@ -189,6 +209,15 @@ export const serverApi = {
 
     listPlugins() {
         return req<{ items: ServerPluginRaw[]; deployment: ServerAddonStatusRaw }>("/api/plugins");
+    },
+
+    async fetchPluginArchive(id: string): Promise<Uint8Array> {
+        const token = getServerToken();
+        const res = await fetch(`/api/plugins/${encodeURIComponent(id)}/archive`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error(`获取扩展包失败 (${res.status})`);
+        return new Uint8Array(await res.arrayBuffer());
     },
 
     installBuiltinPlugin(builtinId: string) {
@@ -232,6 +261,7 @@ export const serverApi = {
         bdsWorld?: string;
         bdsBpName?: string;
         bdsRpName?: string;
+        enabledTimbres?: string[];
     }) {
         return req<{ bdsConfig: StudioDeploymentStatus["bdsConfig"]; status: ServerAddonStatusRaw }>(
             "/api/addon/config",
@@ -240,6 +270,31 @@ export const serverApi = {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(config),
             },
+        );
+    },
+
+    listServerScores() {
+        return req<{ items: ServerScoreMeta[] }>("/api/addon/scores");
+    },
+
+    addServerScore(input: {
+        id: string;
+        title: string;
+        pages: string[];
+        pageCount?: number;
+        assets: Record<string, string>;
+    }) {
+        return req<{ items: ServerScoreMeta[]; status: ServerAddonStatusRaw }>("/api/addon/scores", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(input),
+        });
+    },
+
+    deleteServerScore(id: string) {
+        return req<{ items: ServerScoreMeta[]; status: ServerAddonStatusRaw }>(
+            `/api/addon/scores/${encodeURIComponent(id)}`,
+            { method: "DELETE" },
         );
     },
 
@@ -352,54 +407,90 @@ export interface ServerPluginRaw {
     id: string;
     name: string;
     version: string;
-    author: string;
-    description: string;
+    manifest: {
+        id: string;
+        name: string;
+        version: string;
+        author: string;
+        license?: string;
+        visibility?: "public" | "internal";
+        dependencies?: string[];
+        provides?: Record<string, string[] | undefined>;
+        preview?: { description?: string };
+    };
+    size: number;
     source: "builtin" | "upload";
-    visibility: "public" | "internal";
+    installed: boolean;
     enabled: boolean;
     trusted: boolean;
+    compatible: boolean;
+    compatibilityReason?: string;
     hasExecutableCode: boolean;
-    dependencies: Array<{ id: string; range?: string }>;
-    provides: Record<string, string[] | undefined>;
+    requiresPackDeploy: boolean;
     status: "active" | "pending_deploy" | "pending_restart" | "unavailable";
-    sizeBytes?: number;
+    missingDependencies?: string[];
+    contents?: PluginContentCounts;
 }
 
 export interface ServerAddonStatusRaw {
     templateReady: boolean;
-    configHash: string;
-    deployedHash: string | null;
-    loadedHash: string | null;
-    lastDeployedAt: number | null;
-    lastLoadedAt: number | null;
-    pendingPlugins: string[];
+    targetConfigHash: string;
+    deployedConfigHash?: string;
+    loadedConfigHash?: string;
+    deployedAt?: number;
+    loadedAt?: number;
+    enabledPlugins: string[];
     deployedPlugins: string[];
     loadedPlugins: string[];
+    enabledTimbres?: string[];
+    availableTimbres?: TimbreIndexEntry[];
+    scores?: ServerScoreMeta[];
+    issues?: string[];
     status: "active" | "pending_deploy" | "pending_restart" | "unavailable";
     bdsConfig: {
-        bdsDir: string;
-        bdsWorld: string;
+        bdsDir?: string;
+        bdsWorld?: string;
         bdsBpName: string;
         bdsRpName: string;
     };
 }
 
 export function normalizeServerPlugin(raw: ServerPluginRaw): StudioPlugin {
+    const manifest = raw.manifest;
+    const provides = manifest?.provides ?? {};
+    const contents: PluginContentCounts = raw.contents ?? {
+        songs: provides.songs?.length ?? 0,
+        performances: provides.performances?.length ?? 0,
+        libraries: provides.libraries?.length ?? 0,
+        timbres: provides.timbres?.length ?? 0,
+        effects: provides.effects?.length ?? 0,
+        themes: provides.themes?.length ?? 0,
+        keyStyles: provides.keyStyles?.length ?? 0,
+        particles: provides.particles?.length ?? 0,
+        stageProps: 0,
+    };
+
     return {
         id: raw.id,
-        name: raw.name,
-        version: raw.version,
-        author: raw.author,
-        description: raw.description,
+        name: raw.name || manifest?.name || raw.id,
+        version: raw.version || manifest?.version || "1.0.0",
+        author: manifest?.author ?? "PianoBE",
+        description: manifest?.preview?.description ?? "",
+        license: manifest?.license,
         source: raw.source,
-        visibility: raw.visibility,
+        visibility: manifest?.visibility ?? "public",
+        installed: raw.installed,
         enabled: raw.enabled,
         trusted: raw.trusted,
         hasExecutableCode: raw.hasExecutableCode,
-        compatible: true,
-        sizeBytes: raw.sizeBytes ?? 0,
-        dependencies: raw.dependencies ?? [],
-        provides: raw.provides ?? {},
+        requiresPackDeploy: raw.requiresPackDeploy,
+        compatible: raw.compatible,
+        compatibilityNote: raw.compatibilityReason,
+        sizeBytes: raw.size ?? 0,
+        dependencies: (manifest?.dependencies ?? []).map((id) => ({ id })),
+        missingDependencies: raw.missingDependencies ?? [],
+        provides,
+        contents,
         status: raw.status,
     };
 }
@@ -407,6 +498,25 @@ export function normalizeServerPlugin(raw: ServerPluginRaw): StudioPlugin {
 export function normalizeServerDeployment(raw: ServerAddonStatusRaw): StudioDeploymentStatus {
     return {
         supported: true,
-        ...raw,
+        status: raw.status,
+        templateReady: raw.templateReady,
+        targetConfigHash: raw.targetConfigHash,
+        deployedConfigHash: raw.deployedConfigHash,
+        loadedConfigHash: raw.loadedConfigHash,
+        deployedAt: raw.deployedAt,
+        loadedAt: raw.loadedAt,
+        enabledPlugins: raw.enabledPlugins ?? [],
+        deployedPlugins: raw.deployedPlugins ?? [],
+        loadedPlugins: raw.loadedPlugins ?? [],
+        enabledTimbres: raw.enabledTimbres ?? ["piano"],
+        availableTimbres: raw.availableTimbres ?? [],
+        scores: raw.scores ?? [],
+        issues: raw.issues ?? [],
+        bdsConfig: {
+            bdsDir: raw.bdsConfig?.bdsDir ?? "",
+            bdsWorld: raw.bdsConfig?.bdsWorld ?? "",
+            bdsBpName: raw.bdsConfig?.bdsBpName ?? "pianoServerBP",
+            bdsRpName: raw.bdsConfig?.bdsRpName ?? "pianoServerRP",
+        },
     };
 }

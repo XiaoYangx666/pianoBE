@@ -9,11 +9,13 @@ export function ScorePreviewModal({
     score,
     template,
     opened,
+    onLoadPage,
     onClose,
 }: {
     score: ScoreEntry | null;
     template: TemplateInfo | null;
     opened: boolean;
+    onLoadPage?: (pagePath: string) => Promise<Blob | null>;
     onClose: () => void;
 }) {
     const [page, setPage] = useState(0);
@@ -34,7 +36,11 @@ export function ScorePreviewModal({
         let objectUrl: string | null = null;
         setLoading(true);
         setUrl(null);
-        readScorePageBlob(score, pagePath, template)
+        const load =
+            onLoadPage && !score.assets?.has(pagePath)
+                ? onLoadPage(pagePath)
+                : readScorePageBlob(score, pagePath, template);
+        load
             .then((blob) => {
                 if (cancelled) return;
                 if (!blob) {
@@ -52,7 +58,7 @@ export function ScorePreviewModal({
             cancelled = true;
             if (objectUrl) URL.revokeObjectURL(objectUrl);
         };
-    }, [opened, score, page, template]);
+    }, [opened, score, page, template, onLoadPage]);
 
     return (
         <Dialog

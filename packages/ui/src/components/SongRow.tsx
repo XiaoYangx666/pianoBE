@@ -46,6 +46,8 @@ export interface SongRowProps {
     actions?: ReactNode;
     /** 移动端收进「更多」菜单的操作 */
     menu?: MenuItem[];
+    /** 更多菜单显示时机：默认仅移动端，传 always 时桌面与移动端均显示 */
+    menuMode?: "mobile" | "always";
     /** 常驻在行末的主要操作（例如加入） */
     trailing?: ReactNode;
     onRemove?: () => void;
@@ -187,6 +189,7 @@ export function SongRow({
     onOpenCode,
     actions,
     menu,
+    menuMode = "mobile",
     trailing,
     onRemove,
     removeLabel = "移除",
@@ -328,20 +331,20 @@ export function SongRow({
             )}
 
             <div className={cx("flex shrink-0 items-center gap-0.5", layout === "table" && "justify-end")}>
-                {(actions || onOpenCode || onRename || onRemove) && (
+                {(actions || (menuMode === "mobile" && (onOpenCode || onRename || onRemove))) && (
                     <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 md:flex">
-                        {onOpenCode && (
+                        {menuMode === "mobile" && onOpenCode && (
                             <IconButton size="sm" aria-label={codeLabel} title={codeLabel} onClick={onOpenCode}>
                                 <span className="font-mono text-[10px]">{"</>"}</span>
                             </IconButton>
                         )}
                         {actions}
-                        {onRename && (
+                        {menuMode === "mobile" && onRename && (
                             <IconButton size="sm" aria-label={renameLabel} title={renameLabel} onClick={onRename}>
                                 <Pencil size={14} />
                             </IconButton>
                         )}
-                        {onRemove && (
+                        {menuMode === "mobile" && onRemove && (
                             <IconButton
                                 size="sm"
                                 aria-label={removeLabel}
@@ -358,7 +361,7 @@ export function SongRow({
                 )}
                 {trailing}
                 {menuItems.length > 0 && (
-                    <div className="md:hidden">
+                    <div className={menuMode === "always" ? undefined : "md:hidden"}>
                         <Menu
                             align="end"
                             minWidth={168}
