@@ -82,6 +82,10 @@ CREATE TABLE IF NOT EXISTS tokens (
 /** 打开数据库并确保表结构存在（幂等迁移） */
 export function openDb(path: string): Database {
     const db = new Database(path);
+    // WAL + 忙等：部署批量写库与 BDS 拉曲并发时，避免直接 SQLITE_BUSY
+    db.exec("PRAGMA journal_mode = WAL");
+    db.exec("PRAGMA busy_timeout = 5000");
+    db.exec("PRAGMA synchronous = NORMAL");
     db.exec(SCHEMA);
     migrateSongsColumns(db);
     seedDefaults(db);

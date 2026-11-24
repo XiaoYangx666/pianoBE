@@ -36,6 +36,8 @@ export interface ServerConfig {
     amtThreads: number;
     /** 使用 --eco 低负载模式（单线程 + 主动让出 CPU） */
     amtEco: boolean;
+    /** 同时运行的转录任务数（默认 1，避免多个 amt-cli 打满 CPU） */
+    amtConcurrency: number;
     /** 单次转录超时（默认 10 分钟） */
     amtTimeoutMs: number;
     /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
@@ -71,6 +73,7 @@ export function loadConfig(
         amtDecoder: env.AMT_DECODER === "ffmpeg" ? "ffmpeg" : "native",
         amtThreads: Math.max(1, Number(env.AMT_THREADS ?? 4) || 4),
         amtEco: env.AMT_ECO === "true",
+        amtConcurrency: Math.max(1, Number(env.AMT_CONCURRENCY ?? 1) || 1),
         amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
         biliSessdata: env.BILI_SESSDATA || undefined,
         logFile:

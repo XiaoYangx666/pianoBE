@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
-import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { writeFileAtomic } from "../atomic.js";
 import type {
     ContentOrigin,
     LibraryRecord,
@@ -174,7 +175,7 @@ export class SqliteSongPort implements SongPort {
             throw new SongConflictError(`歌曲 ID 冲突：${song.id} 已存在且音乐内容不同`);
         }
 
-        writeFileSync(this.midiPath(song.id), buffer);
+        writeFileAtomic(this.midiPath(song.id), buffer);
         this.cachePbe3(song.id, pbe3);
         this.upsertMeta(song.id, displayName, song.duration, countNotes(song), buffer.byteLength, {
             musicFingerprint: fp,
@@ -219,7 +220,7 @@ export class SqliteSongPort implements SongPort {
             }
         }
 
-        writeFileSync(this.pbe3Path(header.id), buffer);
+        writeFileAtomic(this.pbe3Path(header.id), buffer);
         this.cachePbe3(header.id, buffer);
         this.upsertMeta(header.id, displayName, header.duration, header.noteCount, buffer.byteLength, {
             musicFingerprint: fp,
@@ -236,7 +237,7 @@ export class SqliteSongPort implements SongPort {
 
     add(song: MidiSong): void {
         const data = JSON.stringify(song);
-        writeFileSync(this.jsonPath(song.id), data);
+        writeFileAtomic(this.jsonPath(song.id), data);
         this.pbe3Cache.delete(song.id);
         let fp: string | undefined;
         try {

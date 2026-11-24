@@ -99,11 +99,55 @@ function sanitizeName(raw: string): string {
     return value || "B站转录";
 }
 
+/**
+ * 简单的 FIFO 并发队列。转录会拉起 amt-cli 子进程（默认 4 线程、数百 MB 内存），
+ * 多个任务同时跑容易打满 CPU/内存，所以默认串行（AMT_CONCURRENCY=1）。
+ */
+export class TaskQueue {
+    private readonly pending: Array<() => Promise<void>> = [];
+    private running = 0;
+
+    constructor(private readonly concurrency: number) {}
+
+    add(task: () => Promise<void>): void {
+        this.pending.push(task);
+        this.pump();
+    }
+
+    get pendingCount(): number {
+        return this.pending.length;
+    }
+
+    get activeCount(): number {
+        return this.running;
+    }
+
+    private pump(): void {
+        while (this.running < this.concurrency && this.pending.length > 0) {
+            const task = this.pending.shift()!;
+            this.running++;
+            void (async () => {
+                try {
+                    await task();
+                } catch (error) {
+                    // 单个任务异常不能卡死队列
+                    console.error("转录队列任务异常", error);
+                } finally {
+                    this.running--;
+                    this.pump();
+                }
+            })();
+        }
+    }
+}
+
 export class TranscribeJobStore {
     private readonly jobs = new Map<string, TranscribeJob>();
     private readonly timer: ReturnType<typeof setInterval>;
+    private readonly queue: TaskQueue;
 
     constructor(private readonly deps: TranscribeJobDeps) {
+        this.queue = new TaskQueue(Math.max(1, deps.config.amtConcurrency || 1));
         this.timer = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS);
         // 不阻止进程退出（bun 的定时器句柄）
         (this.timer as unknown as { unref?: () => void }).unref?.();
@@ -154,9 +198,12 @@ export class TranscribeJobStore {
             percent: UPLOAD_BASE_PERCENT,
             audioReady: true,
         });
-        // Bun.spawn 在 Windows 上可能阻塞数秒（杀软扫描 CLI）：放到下一轮事件循环，
+        // Bun.spawn 在 Windows 上可能阻塞数秒（杀软扫描 CLI）：交给队列在下一轮事件循环执行，
         // 让创建任务的 HTTP 响应先返回，前端才能立即进入进度界面。
-        setTimeout(() => void this.transcribe(job, UPLOAD_BASE_PERCENT), 0);
+        this.queue.add(async () => {
+            if (!this.jobs.has(job.id)) return;
+            await this.transcribe(job, UPLOAD_BASE_PERCENT);
+        });
         return this.snapshot(job);
     }
 
@@ -177,11 +224,19 @@ export class TranscribeJobStore {
             input.name ?? "B站转录"
         );
         this.update(job, {
-            stage: "downloading",
-            message: "解析视频并下载音频…",
-            percent: 2,
+            stage: "queued",
+            message: "已加入队列，等待处理…",
+            percent: 0,
         });
-        setTimeout(() => void this.downloadAndTranscribe(job, input.url, input.page), 0);
+        this.queue.add(async () => {
+            if (!this.jobs.has(job.id)) return;
+            this.update(job, {
+                stage: "downloading",
+                message: "解析视频并下载音频…",
+                percent: 2,
+            });
+            await this.downloadAndTranscribe(job, input.url, input.page);
+        });
         return this.snapshot(job);
     }
 

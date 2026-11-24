@@ -8,6 +8,7 @@
  */
 
 import { writeFileSync } from "node:fs";
+import { fetchWithTimeout } from "./http.js";
 
 const API = "https://api.bilibili.com";
 const UA =
@@ -93,9 +94,11 @@ async function getBuvidCookie(): Promise<string> {
     sessionAt = Date.now();
     cookiePromise = (async () => {
         try {
-            const res = await fetch(`${API}/x/frontend/finger/spi`, {
-                headers: { "User-Agent": UA, Referer: REFERER },
-            });
+            const res = await fetchWithTimeout(
+                `${API}/x/frontend/finger/spi`,
+                { headers: { "User-Agent": UA, Referer: REFERER } },
+                10_000
+            );
             const json = (await res.json()) as {
                 code?: number;
                 data?: { b_3?: string; b_4?: string };
@@ -141,13 +144,17 @@ async function fetchJson<T>(
         let lastError: unknown;
         for (let i = 0; i < retries; i++) {
             try {
-                const res = await fetch(`${url}?${query}`, {
-                    headers: {
-                        "User-Agent": UA,
-                        Referer: REFERER,
-                        ...(cookie ? { Cookie: cookie } : {}),
+                const res = await fetchWithTimeout(
+                    `${url}?${query}`,
+                    {
+                        headers: {
+                            "User-Agent": UA,
+                            Referer: REFERER,
+                            ...(cookie ? { Cookie: cookie } : {}),
+                        },
                     },
-                });
+                    15_000
+                );
                 return (await res.json()) as T;
             } catch (error) {
                 lastError = error;
@@ -309,13 +316,17 @@ export async function downloadBiliAudio(
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
-            const res = await fetch(video.trackUrl, {
-                headers: {
-                    "User-Agent": UA,
-                    Referer: REFERER,
-                    ...(cookie ? { Cookie: cookie } : {}),
+            const res = await fetchWithTimeout(
+                video.trackUrl,
+                {
+                    headers: {
+                        "User-Agent": UA,
+                        Referer: REFERER,
+                        ...(cookie ? { Cookie: cookie } : {}),
+                    },
                 },
-            });
+                300_000
+            );
             if (!res.ok) {
                 throw new BiliError(`音频下载失败（HTTP ${res.status}）`, res.status);
             }
