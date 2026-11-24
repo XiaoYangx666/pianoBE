@@ -1,17 +1,35 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { posix } from "node:path";
-import { attachSongPerformance, decodePbe3, encodeSong, readSongHeader, TIME_SCALE } from "@piano/core";
+import {
+    attachSongPerformance,
+    computeMusicFingerprint,
+    decodePbe3,
+    encodeSong,
+    mergeSongCatalog,
+    readSongHeader,
+    TIME_SCALE,
+} from "@piano/core";
 import { unzipSync, zipSync } from "fflate";
 import { build } from "esbuild";
-import { pbe3ToEntry } from "../../packages/generator/src/music/convert.ts";
-import { mergeSongEntries } from "../../packages/generator/src/music/groupSongs.ts";
-import { generateAddonZip } from "../../packages/generator/src/addon/export.ts";
-import { loadTemplate } from "../../packages/generator/src/addon/template.ts";
+import { assembleAddonBlob, loadAddonTemplate } from "@piano/assembly";
 import {
-    readPbePluginArchive, validatePluginAssembly, writePbePluginArchive,
+    readPbePluginArchive, writePbePluginArchive, validatePluginAssembly,
     STAGE_PROP_BP_TREE, STAGE_PROP_RP_TREES, STAGE_PROP_REGISTRY_SCRIPT,
 } from "@piano/vfx/package";
+
+function pbe3ToEntry(data) {
+    const header = readSongHeader(data);
+    return {
+        id: header.id,
+        name: header.name,
+        duration: header.duration,
+        noteCount: header.noteCount,
+        bytes: data.length,
+        musicFingerprint: computeMusicFingerprint(data),
+        data,
+    };
+}
 
 const bare = new Uint8Array(await readFile("packages/addon/dist/template-bare.mcaddon"));
 const readPlugin = async id => readPbePluginArchive(new Uint8Array(await readFile(`build/plugins/${id}.pbeplugin`)));
@@ -26,7 +44,7 @@ const readSong = async id => pbe3ToEntry(new Uint8Array(await readFile(`midis/li
 async function readTemplate(input) {
     // Bun on Windows can exhaust worker threads while inflating a full pack.
     const bytes = input instanceof Uint8Array ? input : new Uint8Array(await input.arrayBuffer());
-    return loadTemplate(zipSync(unzipSync(bytes), { level: 0 }));
+    return loadAddonTemplate(zipSync(unzipSync(bytes), { level: 0 }));
 }
 
 async function loadExportedHost(addon) {
@@ -95,7 +113,7 @@ for (const [archive, songId, time] of [[sinner, "28a2cb50", 6], [chinese, "f3b8f
     assert.equal(template.addon.readTextSync(template.bpPath + STAGE_PROP_REGISTRY_SCRIPT).trim(),
         "export const STAGE_PROP_REGISTRATIONS = [];");
     const song = await readSong(songId);
-    const blob = await generateAddonZip(template, [song], { ...exportOptions, plugins: [archive] });
+    const blob = await assembleAddonBlob(template, [song], { ...exportOptions, plugins: [archive] });
     const { addon, bpPath, songs } = await readTemplate(blob);
     assert.deepEqual(songs[0].data, song.data);
     const managerPath = bpPath + "scripts/midiManager.js";
@@ -214,21 +232,21 @@ const firstCue = { op: "set", tick: 0, effect: "fixture_prop", color: "#FFFFFF",
 const secondCue = { ...firstCue, effect: "fixture_consumer" };
 const firstShow = attachSongPerformance(originalDifferentId, [firstCue]);
 const secondShow = attachSongPerformance(plain, [secondCue]);
-const { rows: grouped } = mergeSongEntries([], [plain, firstShow, secondShow, firstShow, different].map(data => pbe3ToEntry(data)));
+const { songs: grouped } = mergeSongCatalog([], [plain, firstShow, secondShow, firstShow, different].map(data => pbe3ToEntry(data)), { reidentifyOnIdConflict: true });
 assert.equal(grouped.length, 2);
 assert.equal(grouped[0].id, "aa");
 assert.deepEqual(grouped[0].data, plain);
-assert.equal(grouped[0].performances.length, 2);
+assert.equal(grouped[0].performanceEntries.length, 2);
 assert.notEqual(grouped[1].id, grouped[0].id);
 assert.equal(readSongHeader(grouped[1].data).id, grouped[1].id);
 assert.deepEqual(grouped.map(song => song.name), ["同名", "同名"]);
 
 const template = await readTemplate(bare);
-const combined = await generateAddonZip(template, grouped, { ...exportOptions, plugins: [sinner, chinese, legacy, consumer, fixture] });
+const combined = await assembleAddonBlob(template, grouped, { ...exportOptions, plugins: [sinner, chinese, legacy, consumer, fixture] });
 const { addon: combinedAddon, songs: roundTripSongs } = await readTemplate(combined);
 assert.equal(roundTripSongs.length, 2);
 assert.deepEqual(roundTripSongs[0].data, plain);
-assert.deepEqual(roundTripSongs[0].performances.map(cues => cues[0].effect), ["fixture_prop", "fixture_consumer"]);
+assert.deepEqual(roundTripSongs[0].performanceEntries.map(p => p.cues[0].effect), ["fixture_prop", "fixture_consumer"]);
 verifyResources(combinedAddon, fixture);
 const host = await loadExportedHost(combinedAddon);
 host.registerVfxPlugins();
@@ -248,7 +266,7 @@ assert.equal(host.hasAvailablePerformanceEffects([firstCue, secondCue]), false);
 
 // Re-import the actual export to exercise cleanup without in-memory bookkeeping.
 const previous = await readTemplate(combined);
-const empty = await generateAddonZip(previous, [], { ...exportOptions, plugins: [] });
+const empty = await assembleAddonBlob(previous, [], { ...exportOptions, plugins: [] });
 const result = await readTemplate(empty);
 assert.ok(!result.addon.entries().some(({ path }) => isPropFile(path, result.bpPath, result.rpPath)));
 assert.deepEqual((await loadExportedHost(result.addon)).STAGE_PROP_REGISTRATIONS, []);

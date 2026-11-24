@@ -13,7 +13,7 @@ RUN bun run --filter @piano/core build
 RUN bun run --filter @piano/vfx build
 RUN bun run --filter @piano/plugins build
 RUN bun run --filter @piano/assembly build
-RUN bun tools/plugins/pack-plugin.mjs --all
+RUN bun run pack:plugins
 RUN bun run --filter @piano/studio build
 
 # ---- 运行阶段 ----

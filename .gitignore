@@ -19,11 +19,6 @@ tools/audio-lab/
 packages/*/dist
 plugins/dist
 packages/*/data
-packages/generator/public/library
-packages/generator/public/timbres
-packages/generator/public/plugins
-# AMT 转录资源（模型/ORT 运行时/Rust CLI），由 npm run sync:amt 生成
-packages/generator/public/amt
 packages/studio/public
 packages/server/amt
 .env

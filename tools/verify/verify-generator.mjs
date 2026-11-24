@@ -14,6 +14,7 @@ import {
     metasToAddonIndex,
     pbe3ToAddonModule,
     planImportChunks,
+    songToNoteEvents,
     ImportAssembler,
 } from "@piano/core";
 import {
@@ -21,15 +22,16 @@ import {
     readPbePluginArchive,
     writePbePluginArchive,
 } from "@piano/vfx/package";
-import { TIMBRES_SCRIPT_PATH } from "../../packages/generator/src/addon/timbres.ts";
-import { SCORE_PACK_SCRIPT_PATH, scoreStandPath } from "../../packages/generator/src/scores/scores.ts";
-import { loadTemplate, parseExistingMidis, templateMidiTree } from "../../packages/generator/src/addon/template.ts";
-import { generateAddonZip } from "../../packages/generator/src/addon/export.ts";
 import {
-    archiveToPluginEntry,
-    matchSongPlugins,
-} from "../../packages/generator/src/addon/plugins.ts";
-import { songEntryToEvents } from "../../packages/generator/src/music/player.ts";
+    SCORE_PACK_SCRIPT_PATH,
+    TIMBRES_SCRIPT_PATH,
+    assembleAddonBlob,
+    loadAddonTemplate,
+    matchSongsToPlugins,
+    parseExistingMidis,
+    scoreStandPath,
+    templateMidiTree,
+} from "@piano/assembly";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const BARE_TEMPLATE = "packages/addon/dist/template-bare.mcaddon";
@@ -52,7 +54,7 @@ function assert(cond, msg) {
 }
 
 // 1. 默认模板：模板模式跳过 midi 拷贝，无内嵌曲目
-const templateInfo = await loadTemplate(await storedZip(readFileSync(TEMPLATE)));
+const templateInfo = await loadAddonTemplate(await storedZip(readFileSync(TEMPLATE)));
 assert(templateInfo.songs.length === 0, "默认模板无内嵌曲目（模板模式跳过 midi 拷贝）");
 assert(templateInfo.bpManifest.header?.name, "bp manifest 解析成功");
 
@@ -67,10 +69,10 @@ tplAddon.writeText(
     "bp/scripts/midis/index.js",
     metasToAddonIndex([{ id: songA.id, name: songA.name, duration: songA.duration }])
 );
-const embTemplate = await loadTemplate(await storedZip(await tplAddon.toBlob()));
+const embTemplate = await loadAddonTemplate(await storedZip(await tplAddon.toBlob()));
 assert(embTemplate.songs.length === 1, "内嵌模板解析出 1 首");
 assert(embTemplate.songs[0].id === songA.id && embTemplate.songs[0].isOriginal, "原曲目标记 isOriginal");
-const embEvents = songEntryToEvents(embTemplate.songs[0]);
+const embEvents = songToNoteEvents(embTemplate.songs[0].data);
 assert(embEvents.length > 0, `内嵌曲目可从 PBE3 转为试听事件：${embEvents.length} 个`);
 
 // 3. 添加新曲目 B，导出
@@ -89,7 +91,7 @@ const songs = [
 ];
 const oldB = embTemplate.bpManifest.header.uuid;
 const oldR = embTemplate.rpManifest.header.uuid;
-const blob = await generateAddonZip(embTemplate, songs, {
+const blob = await assembleAddonBlob(embTemplate, songs, {
     name: "测试钢琴包",
     desc: "e2e 描述",
     randomUuid: true,
@@ -152,7 +154,7 @@ assert(
 );
 
 // 9. 从曲库选曲导出闭环（模拟用户点"添加"）
-const libTpl = await loadTemplate(await storedZip(readFileSync(TEMPLATE)));
+const libTpl = await loadAddonTemplate(await storedZip(readFileSync(TEMPLATE)));
 const libEntry = {
     id: libSong.id,
     name: libSong.name,
@@ -162,7 +164,7 @@ const libEntry = {
     fromLibrary: true,
     data: libBytes,
 };
-const libBlob = await generateAddonZip(libTpl, [libEntry], {
+const libBlob = await assembleAddonBlob(libTpl, [libEntry], {
     name: "曲库测试",
     desc: "曲库导出验证",
     randomUuid: false,
@@ -200,7 +202,7 @@ async function inspectZip(blob) {
 }
 
 {
-    const zeroBlob = await generateAddonZip(libTpl, [libEntry], {
+    const zeroBlob = await assembleAddonBlob(libTpl, [libEntry], {
         name: "零插件测试",
         desc: "bare",
         randomUuid: false,
@@ -235,7 +237,7 @@ async function inspectZip(blob) {
         { tick: 80, op: "flash", effect: "unknown_custom_fx", color: "#FFFFFF", level: 70, scale: 100 },
     ]);
     const perfSong = { ...libEntry, id: "perf-b", name: "测试演出曲目", data: pbe3Perf };
-    const extracted = matchSongPlugins([perfSong], [], []).songEffects.get(perfSong.id) ?? [];
+    const extracted = matchSongsToPlugins([perfSong], [], []).songEffects.get(perfSong.id) ?? [];
     assert(
         JSON.stringify(extracted) === JSON.stringify(["key_notes", "starfield", "unknown_custom_fx"]),
         `PBE3 特效 ID 提取正确：${extracted.join(", ")}`
@@ -245,26 +247,26 @@ async function inspectZip(blob) {
     const archives = pluginFiles.map((file) =>
         readPbePluginArchive(new Uint8Array(readFileSync(`build/plugins/${file}`)))
     );
-    const entries = archives.map((archive) =>
-        archiveToPluginEntry(archive, "builtin", { trusted: true })
-    );
+    const entries = archives.map((archive) => ({
+        id: archive.manifest.id,
+        manifest: archive.manifest,
+        trusted: true,
+        compatible: true,
+        archive,
+    }));
 
-    const fullMatch = matchSongPlugins([perfSong], entries, entries.map((e) => e.id));
+    const fullMatch = matchSongsToPlugins([perfSong], entries, entries.map((e) => e.id));
     assert(
-        fullMatch.autoSelectedIds.includes("pianobe.atmosphere") &&
-            fullMatch.autoSelectedIds.includes("pianobe.keys"),
+        fullMatch.requiredPluginIds.includes("pianobe.atmosphere") &&
+            fullMatch.requiredPluginIds.includes("pianobe.keys"),
         "PBE3 特效匹配选中 pianobe.atmosphere 与 pianobe.keys"
-    );
-    assert(
-        fullMatch.reasons.get("pianobe.atmosphere")?.effects.includes("starfield") === true,
-        "匹配原因包含 starfield"
     );
     assert(
         fullMatch.missingEffects.some((m) => m.effect === "unknown_custom_fx"),
         "未知特效 unknown_custom_fx 报告为缺失特效"
     );
 
-    const deselectedMatch = matchSongPlugins(
+    const deselectedMatch = matchSongsToPlugins(
         [perfSong],
         entries,
         entries.map((e) => e.id).filter((id) => id !== "pianobe.keys")
@@ -278,7 +280,7 @@ async function inspectZip(blob) {
 }
 
 // 13. 多插件统一装配到基础模板（template-bare.mcaddon）
-const bareTpl = await loadTemplate(await storedZip(readFileSync(BARE_TEMPLATE)));
+const bareTpl = await loadAddonTemplate(await storedZip(readFileSync(BARE_TEMPLATE)));
 {
     const selectedArchives = [
         "pianobe.atmosphere.pbeplugin",
@@ -289,7 +291,7 @@ const bareTpl = await loadTemplate(await storedZip(readFileSync(BARE_TEMPLATE)))
         "pianobe.stage.pbeplugin",
     ].map((name) => readPbePluginArchive(new Uint8Array(readFileSync(`build/plugins/${name}`))));
 
-    const assembledBlob = await generateAddonZip(bareTpl, [libEntry], {
+    const assembledBlob = await assembleAddonBlob(bareTpl, [libEntry], {
         name: "插件装配测试",
         desc: "multi-plugin assembly",
         randomUuid: false,
@@ -381,7 +383,7 @@ const bareTpl = await loadTemplate(await storedZip(readFileSync(BARE_TEMPLATE)))
     const standPath = scoreStandPath("custom_score");
     const dummyPng = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
-    const comboBlob = await generateAddonZip(bareTpl, [libEntry], {
+    const comboBlob = await assembleAddonBlob(bareTpl, [libEntry], {
         name: "组合装配测试",
         desc: "third-party + timbre + score",
         randomUuid: false,
@@ -436,8 +438,8 @@ const bareTpl = await loadTemplate(await storedZip(readFileSync(BARE_TEMPLATE)))
         "第三方 VFX 插件与音色、曲谱组合装配共存完整"
     );
 
-    const imported = await loadTemplate(await storedZip(comboBlob));
-    const cleanupBlob = await generateAddonZip(imported, [libEntry], {
+    const imported = await loadAddonTemplate(await storedZip(comboBlob));
+    const cleanupBlob = await assembleAddonBlob(imported, [libEntry], {
         name: "二次清理测试",
         desc: "repeat export zero-plugin cleanup",
         randomUuid: false,

@@ -86,7 +86,7 @@ for (const rel of ownedAssets) {
 
 const { bytes } = await writeAddonFile(outputPath, addon, {
     level: 6,
-    storedExtensions: /$^/,
+    storedExtensions: /\.ogg$/i,
 });
 
 console.log(

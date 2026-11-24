@@ -8,9 +8,7 @@ packages/addon/*
 !packages/addon/rp
 packages/addon/rp/*
 !packages/addon/rp/sounds
-packages/generator
 packages/addon/dist
-packages/generator/dist
 packages/server/dist
 packages/server/data
 midis/files

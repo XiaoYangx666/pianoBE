@@ -59,14 +59,14 @@ const destination = capture(config, /join\(ctx\.paths\.scriptOutDir,\s*["']([^"'
 check(destination === "packages/addon/src/midis", "build hook copies to packages/addon/src/midis");
 check(config.includes('"../../tools/midi/sync-addon-library.mjs"'), "build hook generates scripts from the tracked PBE3 library");
 
-// --- 生成器音色开关必须指向 preserve-modules 输出中的 domain/piano/timbres.js ---
+// --- 装配器音色开关必须指向 preserve-modules 输出中的 domain/piano/timbres.js ---
 const timbresModule = "bp/scripts/packages/addon/src/domain/piano/timbres.js";
 const timbresSource = "scripts/packages/addon/src/domain/piano/timbres.js";
-const generatorTimbres = read(path.join(root, "packages/generator/src/addon/timbres.ts"));
-check(generatorTimbres.includes(`TIMBRES_SCRIPT_PATH = "${timbresSource}"`),
-    "generator timbres path matches preserve-modules output");
-const generatorExport = read(path.join(root, "packages/generator/src/addon/export.ts"));
-check(generatorExport.includes("TIMBRES_SCRIPT_PATH"), "generator export uses TIMBRES_SCRIPT_PATH");
+const assemblyTemplate = read(path.join(root, "packages/assembly/src/template.ts"));
+check(assemblyTemplate.includes(`TIMBRES_SCRIPT_PATH = "${timbresSource}"`),
+    "assembly timbres path matches preserve-modules output");
+const assemblyAssembler = read(path.join(root, "packages/assembly/src/assembler.ts"));
+check(assemblyAssembler.includes("TIMBRES_SCRIPT_PATH"), "assembly assembler uses TIMBRES_SCRIPT_PATH");
 check(read(path.join(root, "tools/build/strip-template-timbres.mjs")).includes(timbresSource),
     "template strip uses the domain timbres path");
 check(read(path.join(root, "tools/verify/verify-timbres.mjs")).includes(timbresModule),

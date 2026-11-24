@@ -4,9 +4,12 @@
  * 生成器会把用户勾选的音色包按需合并进导出包；开发构建（npm run build）
  * 仍然直接从 rp/sounds 打包全部音色，不经过这里。
  */
-import { dirname, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readAddonFile, writeAddonFile } from "@bepack/addon/node";
+import { AddonTemplate } from "@bepack/addon";
+import { writeAddonFile } from "@bepack/addon/node";
+import { unzipSync } from "fflate";
 import { pianoSoundLayers, PIANO_TIMBRES, pianoSoundId } from "@piano/core";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -21,7 +24,10 @@ const optionalDirs = new Set(
     )
 );
 
-const addon = await readAddonFile(templatePath);
+const rawFiles = Object.entries(unzipSync(readFileSync(templatePath)))
+    .filter(([path]) => !path.endsWith("/"))
+    .map(([path, bytes]) => ({ path, bytes }));
+const addon = new AddonTemplate(basename(templatePath), rawFiles);
 const bp = addon.packs.bp;
 const rp = addon.packs.rp;
 if (!bp || !rp) throw new Error("模板不完整：未找到 bp/rp manifest");
@@ -52,10 +58,10 @@ if (addon.has(timbresPath)) {
     addon.writeText(timbresPath, `export const ENABLED_PIANO_TIMBRES = ["piano"];\n`);
 }
 
-// 与旧实现一致：模板走 DEFLATE，包括已压缩的 .ogg。
+// .ogg 已是有损压缩格式，无需再次 DEFLATE，显著加快打包/解压速度。
 const { bytes } = await writeAddonFile(templatePath, addon, {
     level: 6,
-    storedExtensions: /$^/,
+    storedExtensions: /\.ogg$/i,
 });
 console.log(
     `[timbres] 基础模板已裁剪：移除 ${removedFiles} 个可选采样，` +
