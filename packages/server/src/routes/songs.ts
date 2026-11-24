@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { encodeBase64Url, PBE3_MAGIC, planImportChunks, type PerformanceCue } from "@piano/core";
+import { encodeBase64Url, PBE3_MAGIC, planImportChunks, readPbe3Header, type PerformanceCue } from "@piano/core";
 import type { AppDeps } from "../app.js";
 import { requireRole, type AppVariables } from "../auth.js";
 import { SongConflictError } from "../drivers/sqlitePorts.js";
@@ -137,7 +137,14 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
         try {
             if (isPbe3Bytes(bytes) || /\.pbe3$/i.test(fileName)) {
-                const name = fileName ? fileName.replace(/\.pbe3$/i, "") : undefined;
+                // .pbe3 自带曲名：文件名常常只是 crc32 id，优先用文件头里的 name
+                let headerName: string | undefined;
+                try {
+                    headerName = readPbe3Header(bytes).name;
+                } catch {
+                    headerName = undefined;
+                }
+                const name = headerName || (fileName ? fileName.replace(/\.pbe3$/i, "") : undefined);
                 const meta = deps.songPort.savePbe3File(bytes, {
                     name,
                     libraryId,
