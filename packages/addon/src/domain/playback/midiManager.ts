@@ -1,4 +1,4 @@
-import type { MidiSongMeta } from "@piano/core";
+import type { MidiSongMeta, PerformanceCue, PerformanceDescriptor } from "@piano/core";
 import { SongCache, worldRawId, type SongHandle } from "@piano/core";
 
 /**
@@ -12,6 +12,7 @@ export class MidiManager {
     private metas: MidiSongMeta[] = [];
     private readonly metaMap = new Map<string, MidiSongMeta>();
     private readonly publicSources: MidiSourceLike[] = [];
+    private cachedLibraries: readonly { id: string; name: string }[] = [];
     private readonly cache: SongCache;
 
     constructor(private source: MidiSourceLike, maxCacheBytes?: number) {
@@ -44,6 +45,11 @@ export class MidiManager {
     refreshPublicIndex(): void {
         this.reset(this.metas.slice());
         // 删除/替换后不要继续从旧缓存加载；活跃播放引用由 SongCache 保护。
+        this.cache.clearUnused();
+    }
+
+    /** 清理未被引用的缓存曲目（服务端目录变更后即时生效）。 */
+    invalidateCache(): void {
         this.cache.clearUnused();
     }
 
@@ -103,6 +109,77 @@ export class MidiManager {
             if (performances) return performances;
         }
         return [];
+    }
+
+    performanceEntries(id: string): readonly PerformanceDescriptor[] {
+        if (worldRawId(id) === undefined) {
+            const info = this.getInfo(id);
+            if (info?.performanceEntries?.length) return info.performanceEntries;
+            return (info?.performances ?? []).map((cues, index) => ({
+                id: `${id}:perf:${index + 1}`,
+                name: `附加演出 ${index + 1}`,
+                songId: id,
+                cues,
+            }));
+        }
+        for (const source of this.publicSources) {
+            const entries = source.performanceEntries?.(id);
+            if (entries?.length) return entries;
+            const perfs = source.performances?.(id);
+            if (perfs?.length) {
+                return perfs.map((cues, index) => ({
+                    id: `${id}:perf:${index + 1}`,
+                    name: `附加演出 ${index + 1}`,
+                    songId: id,
+                    cues,
+                }));
+            }
+        }
+        return [];
+    }
+
+    async resolvePerformanceCues(id: string, performanceId: string): Promise<readonly PerformanceCue[] | undefined> {
+        const local = this.performanceEntries(id).find((entry) => entry.id === performanceId);
+        if (local?.cues) return local.cues;
+        if (worldRawId(id) === undefined && this.source.getPerformance) {
+            const fetched = await this.source.getPerformance(performanceId);
+            if (fetched) return fetched;
+        }
+        for (const source of this.publicSources) {
+            if (!source.getPerformance) continue;
+            const fetched = await source.getPerformance(performanceId);
+            if (fetched) return fetched;
+        }
+        return undefined;
+    }
+
+    listLibrariesSync(): readonly { id: string; name: string }[] {
+        return this.cachedLibraries;
+    }
+
+    async listLibraries(): Promise<readonly { id: string; name: string }[]> {
+        const libs: { id: string; name: string }[] = [];
+        const seen = new Set<string>();
+        const collect = (list: readonly { id: string; name: string }[]) => {
+            for (const item of list) {
+                if (seen.has(item.id)) continue;
+                seen.add(item.id);
+                libs.push(item);
+            }
+        };
+        if (this.source.libraries) {
+            try {
+                collect(await this.source.libraries());
+            } catch { /* ignore */ }
+        }
+        for (const source of this.publicSources) {
+            if (!source.libraries) continue;
+            try {
+                collect(await source.libraries());
+            } catch { /* ignore */ }
+        }
+        this.cachedLibraries = libs;
+        return libs;
     }
 
     /**
@@ -188,7 +265,8 @@ export class MidiManager {
     async page(
         page: number,
         pageSize: number,
-        q?: string
+        q?: string,
+        libraryId?: string,
     ): Promise<{ items: MidiSongMeta[]; total: number }> {
         const current = Math.max(1, Math.floor(page));
         const size = Math.max(1, Math.floor(pageSize));
@@ -199,7 +277,7 @@ export class MidiManager {
         let total = 0;
 
         for (const source of sources) {
-            const slice = await this.sourceSlice(source, cursor, remaining, q);
+            const slice = await this.sourceSlice(source, cursor, remaining, q, libraryId);
             total += slice.total;
             if (remaining <= 0) continue;
             if (cursor >= slice.total) {
@@ -214,14 +292,14 @@ export class MidiManager {
     }
 
     /** 批量取全部（远程源后端过滤；本地源内存过滤），"一键添加"等批量操作用 */
-    async metaAll(q?: string): Promise<MidiSongMeta[]> {
+    async metaAll(q?: string, libraryId?: string): Promise<MidiSongMeta[]> {
         const all: MidiSongMeta[] = [];
         for (const source of [this.source, ...this.publicSources]) {
             if (source.metaAll) {
-                all.push(...await source.metaAll(q));
+                all.push(...await source.metaAll(q, libraryId));
                 continue;
             }
-            all.push(...this.filter(await source.list(), q));
+            all.push(...this.filter(await source.list(), q, libraryId));
         }
         return all;
     }
@@ -236,10 +314,11 @@ export class MidiManager {
         source: MidiSourceLike,
         start: number,
         count: number,
-        q?: string
+        q?: string,
+        libraryId?: string,
     ): Promise<{ items: MidiSongMeta[]; total: number }> {
         if (!source.page) {
-            const all = this.filter(await source.list(), q);
+            const all = this.filter(await source.list(), q, libraryId);
             const from = Math.max(0, start);
             return { items: all.slice(from, from + Math.max(0, count)), total: all.length };
         }
@@ -252,14 +331,14 @@ export class MidiManager {
         let need = Math.max(0, count);
         if (need === 0) {
             // 仍需要总数用于合并分页的总量统计。
-            const head = await source.page(1, 1, q);
+            const head = await source.page(1, 1, q, libraryId);
             return { items: [], total: head.total };
         }
 
         const items: MidiSongMeta[] = [];
         let total = 0;
         while (need > 0) {
-            const result = await source.page(page, chunk, q);
+            const result = await source.page(page, chunk, q, libraryId);
             if (page === firstPage) total = result.total;
             const available = result.items.slice(local);
             const take = available.slice(0, need);
@@ -272,9 +351,13 @@ export class MidiManager {
         return { items, total };
     }
 
-    private filter(list: MidiSongMeta[], q?: string): MidiSongMeta[] {
+    private filter(list: MidiSongMeta[], q?: string, libraryId?: string): MidiSongMeta[] {
         const keyword = q?.trim().toLowerCase();
-        return keyword ? list.filter(meta => meta.name.toLowerCase().includes(keyword)) : list;
+        return list.filter((meta) => {
+            if (libraryId && !meta.libraries?.includes(libraryId)) return false;
+            if (keyword && !meta.name.toLowerCase().includes(keyword)) return false;
+            return true;
+        });
     }
 }
 
@@ -282,11 +365,15 @@ export class MidiManager {
 export interface MidiSourceLike {
     list(): MidiSongMeta[] | Promise<MidiSongMeta[]>;
     get(id: string): Promise<Uint8Array | undefined>;
+    libraries?(): Promise<readonly { id: string; name: string }[]> | readonly { id: string; name: string }[];
     page?(
         page: number,
         pageSize: number,
-        q?: string
+        q?: string,
+        libraryId?: string,
     ): Promise<{ items: MidiSongMeta[]; total: number }>;
-    metaAll?(q?: string): Promise<MidiSongMeta[]>;
+    metaAll?(q?: string, libraryId?: string): Promise<MidiSongMeta[]>;
     performances?(id: string): MidiSongMeta["performances"];
+    performanceEntries?(id: string): readonly PerformanceDescriptor[] | undefined;
+    getPerformance?(perfId: string): Promise<readonly PerformanceCue[] | undefined>;
 }

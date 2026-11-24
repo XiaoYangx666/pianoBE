@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle, type PerformanceCue } from "@piano/core";
+import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle, type PerformanceCue, type PerformanceDescriptor } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -28,6 +28,8 @@ interface MidiOutput {
 export interface MidiLoader {
     acquire(ref: MusicRef): Promise<SongHandle | undefined>;
     performances?(ref: MusicRef): readonly (readonly PerformanceCue[])[];
+    performanceEntries?(ref: MusicRef): readonly PerformanceDescriptor[];
+    resolvePerformanceCues?(ref: MusicRef, performanceId: string): Promise<readonly PerformanceCue[] | undefined>;
 }
 
 export class MidiPlayer {
@@ -376,15 +378,31 @@ export class MidiPlayer {
 
             this.releaseSong();
             this.song = song;
-            const mode = info.performance ?? 0;
-            this.performanceCues = mode === 0 ? song.song.header.performance : undefined;
-            if (mode > 0) {
-                try {
-                    this.performanceCues = this.loader.performances?.(info)[mode - 1];
-                } catch (error) {
-                    console.warn(`读取附加编排失败，继续播放音乐：${info.name}`, error);
+            if (info.performanceId !== undefined) {
+                if (info.performanceId === "plain") {
+                    this.performanceCues = undefined;
+                } else if (info.performanceId === "default") {
+                    this.performanceCues = song.song.header.performance;
+                } else {
+                    try {
+                        this.performanceCues = await this.resolvePerformanceById(info, song, info.performanceId);
+                    } catch (error) {
+                        console.warn(`读取演出 ${info.performanceId} 失败，降级为普通演奏：${info.name}`, error);
+                        this.performanceCues = undefined;
+                    }
+                }
+            } else {
+                const mode = info.performance ?? 0;
+                this.performanceCues = mode === 0 ? song.song.header.performance : undefined;
+                if (mode > 0) {
+                    try {
+                        this.performanceCues = this.loader.performances?.(info)[mode - 1];
+                    } catch (error) {
+                        console.warn(`读取附加编排失败，继续播放音乐：${info.name}`, error);
+                    }
                 }
             }
+            if (generation !== this.generation) return;
             this.cursor = createSongCursor(song.song);
             this.totalNotes = song.song.noteCount;
             this.updateNormalizationGain();
@@ -396,6 +414,26 @@ export class MidiPlayer {
         }
 
         this.currentTime = 0;
+    }
+
+    private async resolvePerformanceById(
+        info: MusicRef,
+        song: SongHandle,
+        performanceId: string,
+    ): Promise<readonly PerformanceCue[] | undefined> {
+        if (performanceId === `embedded:${song.song.id}`) {
+            return song.song.header.performance;
+        }
+        const local = this.loader.performanceEntries?.(info).find((item) => item.id === performanceId);
+        if (local?.cues) return local.cues;
+        if (this.loader.resolvePerformanceCues) {
+            const fetched = await this.loader.resolvePerformanceCues(info, performanceId);
+            if (fetched) return fetched;
+        }
+        if (song.song.header.performance?.length && performanceId === `embedded:${info.id}`) {
+            return song.song.header.performance;
+        }
+        return undefined;
     }
 
     private releaseSong() {

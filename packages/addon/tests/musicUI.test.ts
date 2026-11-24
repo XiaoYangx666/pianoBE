@@ -439,15 +439,20 @@ describe("播放队列页面", () => {
 });
 
 describe("歌曲详情页面", () => {
-    test("演奏方式选择随曲目一起进入播放队列", () => {
-        const { piano, midi } = makePiano({ performances: () => [[{ effect: "starfield" }]] });
+    test("演奏方式选择以稳定 performanceId 随曲目进入播放队列", () => {
+        const { piano, midi } = makePiano({
+            performanceEntries: () => [
+                { id: "pianobe.chinese:rain_green", name: "雨过见青", cues: [{ tick: 0, op: "set", effect: "starfield", color: "#8EB8FF", level: 80, scale: 100, fade: 10 }] },
+            ],
+        });
         const ref = { id: "l1", name: "晴天", duration: 1200, source: "library" };
         const form = open(TrackActionsPage, { piano, ref });
+        // index 1 = 雨过见青, index 0 = 普通演奏
         dropdown(form).setData(1);
         form.click("＋ 加入播放队列");
-        dropdown(form).setData(-1);
+        dropdown(form).setData(0);
         form.click("＋ 加入播放队列");
-        expect(midi.queue.getRefs().map(item => item.performance)).toEqual([1, -1]);
+        expect(midi.queue.getRefs().map(item => item.performanceId)).toEqual(["pianobe.chinese:rain_green", "plain"]);
     });
     test("公共曲库且未插卡：只显示播放/加入队列，不显示复制或删除", () => {
         const { piano } = makePiano();

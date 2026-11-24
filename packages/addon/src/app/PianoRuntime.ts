@@ -170,6 +170,14 @@ export class PianoRuntime {
         return this.music.performances(ref);
     }
 
+    performanceEntries(ref: MusicRef) {
+        return this.music.performanceEntries(ref);
+    }
+
+    resolvePerformanceCues(ref: MusicRef, performanceId: string) {
+        return this.music.resolvePerformanceCues(ref, performanceId);
+    }
+
     refreshCardIndicator() {
         const entity = this.displayEntity;
         if (entity) setCardInserted(entity, readCardFromDisplay(entity) !== undefined);
@@ -273,7 +281,12 @@ export class PianoRuntime {
         if (this.disposed) throw new Error("Piano runtime disposed");
         if (!this.midi) {
             this.midi = new MidiPlayer(
-                { acquire: (ref: MusicRef) => this.music.acquire(ref), performances: ref => this.music.performances(ref) },
+                {
+                    acquire: (ref: MusicRef) => this.music.acquire(ref),
+                    performances: ref => this.music.performances(ref),
+                    performanceEntries: ref => this.music.performanceEntries(ref),
+                    resolvePerformanceCues: (ref, perfId) => this.music.resolvePerformanceCues(ref, perfId),
+                },
                 {
                     note: (note, soundDuration, velocity, gain, songTime, hasVelocity, keyDuration) => {
                         if (this.playNote(note, velocity, soundDuration, keyDuration, gain, false, songTime, hasVelocity)

@@ -1,4 +1,11 @@
-import type { MusicRef, PerformanceCue, StoredMusicEntry, StorageUsage } from "@piano/core";
+import type {
+    MusicRef,
+    PerformanceCue,
+    SavePerformanceMeta,
+    StoredMusicEntry,
+    StoredPerformanceEntry,
+    StorageUsage,
+} from "@piano/core";
 
 /**
  * 一份可写音乐存储。
@@ -13,7 +20,8 @@ export interface MusicStorage {
     has(id: string): boolean;
     get(id: string): Uint8Array | undefined;
     getPerformances?(id: string): readonly (readonly PerformanceCue[])[];
-    save(bytes: Uint8Array): StoredMusicEntry;
+    getPerformanceEntries?(id: string): readonly StoredPerformanceEntry[];
+    save(bytes: Uint8Array, name?: string, performanceMeta?: SavePerformanceMeta): StoredMusicEntry;
     remove(id: string): boolean;
     rename(id: string, name: string): StoredMusicEntry | undefined;
     /** 调整曲目在存储中的顺序（存储卡播放列表）。 */

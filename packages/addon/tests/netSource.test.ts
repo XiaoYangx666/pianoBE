@@ -172,4 +172,30 @@ describe("RemoteMidiSource", () => {
         expect(await src.get("a b")).toBeDefined();
         expect(log[0].url).toBe("http://test:3000/api/songs/a%20b");
     });
+
+    test("supports libraryId filtering, performance fetch, and catalogVersion change notification", async () => {
+        const versions: number[] = [];
+        const src = new RemoteMidiSource({
+            baseUrl: BASE,
+            fetch: makeFetch({
+                [`${BASE}/api/libraries`]: { status: 200, body: { items: [{ id: "lib1", name: "流行" }], catalogVersion: 1 } },
+                [`${BASE}/api/songs?pageSize=5&page=1&libraryId=lib1`]: {
+                    status: 200,
+                    body: { items: [{ ...SONG_META, libraries: ["lib1"] }], total: 1, catalogVersion: 2 },
+                },
+                [`${BASE}/api/performances/p1`]: {
+                    status: 200,
+                    body: { id: "p1", name: "星空", cues: [{ tick: 0, op: "flash", effect: "starfield", color: "#FFFFFF", level: 80, scale: 100 }] },
+                },
+            }),
+            onCatalogVersionChange: (v) => versions.push(v),
+        });
+        const libs = await src.libraries();
+        expect(libs).toHaveLength(1);
+        const page = await src.page(1, 5, undefined, "lib1");
+        expect(page.items[0].libraries).toEqual(["lib1"]);
+        expect(versions).toEqual([2]);
+        const cues = await src.getPerformance("p1");
+        expect(cues).toHaveLength(1);
+    });
 });

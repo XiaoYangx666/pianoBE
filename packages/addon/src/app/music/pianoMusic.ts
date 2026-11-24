@@ -1,8 +1,11 @@
 import {
     SongCache,
     crc32Hex,
+    defaultPerformanceId,
     musicRefKey,
     type MusicRef,
+    type PerformanceCue,
+    type PerformanceDescriptor,
     type SongHandle,
 } from "@piano/core";
 import type { MusicStorage } from "@domain/music/storage";
@@ -75,6 +78,46 @@ export class PianoMusic {
     performances(ref: MusicRef) {
         if (ref.source === "library") return midiManager.performances(ref.id);
         return this.cardMatches(ref) ? this.cardStorageProvider()?.getPerformances?.(ref.id) ?? [] : [];
+    }
+
+    performanceEntries(ref: MusicRef): readonly PerformanceDescriptor[] {
+        if (ref.source === "library") return midiManager.performanceEntries(ref.id);
+        if (!this.cardMatches(ref)) return [];
+        const entries = this.cardStorageProvider()?.getPerformanceEntries?.(ref.id);
+        if (entries) {
+            return entries.map((entry) => ({
+                id: entry.id,
+                name: entry.name,
+                ...(entry.author ? { author: entry.author } : {}),
+                songId: ref.id,
+                cues: entry.cues,
+            }));
+        }
+        return (this.cardStorageProvider()?.getPerformances?.(ref.id) ?? []).map((cues, index) => ({
+            id: `extra:${index + 1}`,
+            name: `附加演出 ${index + 1}`,
+            songId: ref.id,
+            cues,
+        }));
+    }
+
+    async resolvePerformanceCues(ref: MusicRef, performanceId: string): Promise<readonly PerformanceCue[] | undefined> {
+        if (performanceId === "plain") return undefined;
+        if (ref.source === "library") {
+            return midiManager.resolvePerformanceCues(ref.id, performanceId);
+        }
+        const entries = this.performanceEntries(ref);
+        const match = entries.find((item) => item.id === performanceId);
+        if (match?.cues) return match.cues;
+        if (performanceId === "default" || performanceId === defaultPerformanceId(ref.id)) {
+            const handle = await this.acquire(ref);
+            try {
+                return handle?.song.header.performance;
+            } finally {
+                handle?.release();
+            }
+        }
+        return undefined;
     }
 
     /** 队列 UI 用：这首歌现在还能不能读到。 */

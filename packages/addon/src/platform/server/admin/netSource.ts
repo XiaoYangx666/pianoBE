@@ -1,5 +1,5 @@
-import { decodeBase64Url, type MidiSongMeta } from "@piano/core";
-import type { HttpRequestMethod } from "@platform/server/net/httpMethod";
+import { decodeBase64Url, type MidiSongMeta, type PerformanceCue, type PerformanceDescriptor } from "@piano/core";
+import { HttpRequestMethod, type HttpRequestMethod as HttpRequestMethodType } from "@platform/server/net/httpMethod";
 
 /** 网络响应（适配 server-net HttpResponse / 测试 mock） */
 export interface NetResponse {
@@ -7,17 +7,10 @@ export interface NetResponse {
     json(): Promise<unknown>;
 }
 
-/**
- * 网络请求。headers 值可为普通字符串或 server-admin 的 SecretString
- * （脚本环境不可读，由底层 HttpHeader 在请求执行时解析）。
- * method 为 @minecraft/server-net 枚举类型（type-only 导入、运行时擦除，
- * bun 测试环境无需真实模块；脚本运行时的真实枚举成员由 serverNet 适配器归一化）。
- * body 为 JSON 字符串（POST/PUT/PATCH 用）。
- */
 export type NetFetch = (
     url: string,
     init: {
-        method?: HttpRequestMethod;
+        method?: HttpRequestMethodType;
         headers?: Record<string, unknown>;
         body?: string;
     }
@@ -28,57 +21,76 @@ export interface RemoteSourceOptions {
     fetch: NetFetch;
     /** 附加请求头构造器（值可为 SecretString，透传不读取） */
     extraHeaders?: () => Record<string, unknown>;
+    /** 服务端曲库版本号变化回调（用于动态清理未使用的 SongCache） */
+    onCatalogVersionChange?: (version: number) => void;
 }
 
-/** 后端单曲 PBE3 响应 */
 interface RemoteSongPayload {
     id?: string;
     name?: string;
     duration?: number;
+    performanceEntries?: PerformanceDescriptor[];
     /** Base64URL(PBE3) */
     data?: string;
 }
 
-/**
- * 远程曲库来源：通过 server-net 从后端 API 拉取 PBE3 曲目。
- * - 列表 UI：page() 服务端分页按需取页（q 走服务端搜索），不下载全量
- * - 批量操作（一键添加）：metaAll(q) 分页取全
- * - 单曲：get() 每次返回 PBE3 数据；缓存与淘汰统一由 SongCache 负责
- * - list()：远程源不提供全量列表，返回空数组
- * - 网络错误：列表返回空数组并告警；单曲返回 undefined
- */
+export interface RemoteLibraryMeta {
+    id: string;
+    name: string;
+    kind?: string;
+    songIds?: string[];
+}
+
 export class RemoteMidiSource {
     private readonly opts: RemoteSourceOptions;
+    private lastCatalogVersion?: number;
 
     constructor(options: RemoteSourceOptions) {
         this.opts = options;
     }
 
-    private headers(): Record<string, unknown> {
-        return this.opts.extraHeaders?.() ?? {};
+    private headers(extra?: Record<string, unknown>): Record<string, unknown> {
+        return { ...(this.opts.extraHeaders?.() ?? {}), ...(extra ?? {}) };
     }
 
     private base(path: string): string {
         return `${this.opts.baseUrl.replace(/\/+$/, "")}${path}`;
     }
 
-    /**
-     * 远程源不提供全量列表：返回空数组（不发起网络请求）。
-     * 需要列表走 page()（UI 分页）或 metaAll()（批量操作）。
-     */
+    private trackCatalogVersion(version: unknown): void {
+        if (typeof version !== "number" || !Number.isFinite(version)) return;
+        if (this.lastCatalogVersion !== undefined && version !== this.lastCatalogVersion) {
+            this.opts.onCatalogVersionChange?.(version);
+        }
+        this.lastCatalogVersion = version;
+    }
+
     async list(): Promise<MidiSongMeta[]> {
         return [];
     }
 
-    /** 服务端分页查询：只向后端要第 page 页（pageSize 条），q 为服务端名称搜索 */
+    async libraries(): Promise<RemoteLibraryMeta[]> {
+        try {
+            const res = await this.opts.fetch(this.base("/api/libraries"), { headers: this.headers() });
+            if (res.status !== 200) return [];
+            const data = (await res.json()) as { items?: RemoteLibraryMeta[]; catalogVersion?: number };
+            this.trackCatalogVersion(data.catalogVersion);
+            return Array.isArray(data.items) ? data.items : [];
+        } catch {
+            return [];
+        }
+    }
+
     async page(
         page: number,
         pageSize: number,
-        q?: string
+        q?: string,
+        libraryId?: string,
     ): Promise<{ items: MidiSongMeta[]; total: number }> {
         // 手拼 query：游戏脚本运行时没有 URLSearchParams（QuickJS 受限全局）
         const query = [`pageSize=${pageSize}`, `page=${page}`];
         if (q) query.push(`q=${encodeURIComponent(q)}`);
+        if (libraryId) query.push(`libraryId=${encodeURIComponent(libraryId)}`);
         const url = this.base(`/api/songs?${query.join("&")}`);
         console.log(`[netSource] 拉取曲目第 ${page} 页: GET ${url}`);
         const res = await this.opts.fetch(url, { headers: this.headers() });
@@ -87,7 +99,9 @@ export class RemoteMidiSource {
         const data = (await res.json()) as {
             items?: Array<MidiSongMeta & { dataSize?: number }>;
             total?: number;
+            catalogVersion?: number;
         };
+        this.trackCatalogVersion(data.catalogVersion);
         const items: MidiSongMeta[] = (data.items ?? []).map((item) => {
             const meta: MidiSongMeta = {
                 id: item.id,
@@ -97,6 +111,10 @@ export class RemoteMidiSource {
             if (typeof item.noteCount === "number") meta.noteCount = item.noteCount;
             const bytes = item.bytes ?? item.dataSize;
             if (typeof bytes === "number") meta.bytes = bytes;
+            if (Array.isArray(item.libraries) && item.libraries.length) meta.libraries = item.libraries;
+            if (Array.isArray(item.performanceEntries) && item.performanceEntries.length) {
+                meta.performanceEntries = item.performanceEntries;
+            }
             return meta;
         });
         const total = typeof data.total === "number" ? data.total : items.length;
@@ -104,24 +122,34 @@ export class RemoteMidiSource {
         return { items, total };
     }
 
-    /** 按 q 取全部元信息：循环分页合并（"一键添加"等批量操作用） */
-    async metaAll(q?: string): Promise<MidiSongMeta[]> {
+    async metaAll(q?: string, libraryId?: string): Promise<MidiSongMeta[]> {
         const pageSize = 100;
         const all: MidiSongMeta[] = [];
         let page = 1;
         for (;;) {
-            const { items, total } = await this.page(page, pageSize, q);
+            const { items, total } = await this.page(page, pageSize, q, libraryId);
             all.push(...items);
             if (all.length >= total) break;
-            if (items.length < pageSize) break; // 最后一页不足一页
-            if (page >= 20) break; // 安全上限
+            if (items.length < pageSize) break;
+            if (page >= 20) break;
             page++;
         }
         console.log(`[netSource] metaAll${q ? `(q=${q})` : ""} 共 ${all.length} 首`);
         return all;
     }
 
-    /** 获取 PBE3 数据；远程源不做单曲缓存，交给统一 SongCache */
+    async getPerformance(perfId: string): Promise<readonly PerformanceCue[] | undefined> {
+        try {
+            const url = this.base(`/api/performances/${encodeURIComponent(perfId)}`);
+            const res = await this.opts.fetch(url, { headers: this.headers() });
+            if (res.status !== 200) return undefined;
+            const payload = (await res.json()) as { cues?: PerformanceCue[] };
+            return Array.isArray(payload.cues) ? payload.cues : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
     async get(id: string): Promise<Uint8Array | undefined> {
         try {
             const url = this.base(`/api/songs/${encodeURIComponent(id)}`);
@@ -137,6 +165,19 @@ export class RemoteMidiSource {
         } catch (e) {
             console.warn(`[netSource] 单曲 ${id} 拉取失败: ${(e as Error)?.message ?? e}`);
             return undefined;
+        }
+    }
+
+    async reportLoaded(payload: { configHash: string; installedPlugins: readonly string[] }): Promise<boolean> {
+        try {
+            const res = await this.opts.fetch(this.base("/api/addon/loaded"), {
+                method: HttpRequestMethod.Post,
+                headers: this.headers({ "Content-Type": "application/json" }),
+                body: JSON.stringify(payload),
+            });
+            return res.status >= 200 && res.status < 300;
+        } catch {
+            return false;
         }
     }
 }

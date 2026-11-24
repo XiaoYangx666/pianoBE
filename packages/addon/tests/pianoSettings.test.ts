@@ -179,4 +179,13 @@ describe("piano stage choreography and theme settings", () => {
         expect(normalizePianoSettings({ stageTheme: "invalid" }).stageTheme).toBe("off");
         expect(normalizePianoSettings({ stageTheme: 3 }).stageTheme).toBe("off");
     });
+
+    test("玩家舞台主题与粒子样式下拉列表只包含公开资源，隐藏单曲内部资源", () => {
+        const themes = listPianoStageThemes().map(t => t.id);
+        expect(themes).toContain("galaxy");
+        expect(themes).toContain("chinese_misty_rain");
+        const styles = listPianoParticleStyles().map(s => s.style);
+        expect(styles).toContain("magic_trail");
+        expect(styles).not.toContain("floral_touch");
+    });
 });

@@ -51,10 +51,14 @@ export function formatLibrarySearch(query: string, page: number): string {
 
 /** 远程曲库条目可能带 dataSize，将它归一化为统一的 bytes 字段。 */
 function libraryRef(meta: MidiSongMeta & { dataSize?: number }): MusicRef {
-    return toMusicRef("library", {
+    const ref = toMusicRef("library", {
         ...meta,
         bytes: meta.bytes ?? meta.dataSize,
     });
+    if (meta.libraries?.length) ref.libraries = meta.libraries;
+    if (meta.performanceEntries?.length) ref.performanceEntries = meta.performanceEntries;
+    if (meta.performances?.length) ref.performances = meta.performances;
+    return ref;
 }
 
 /** 按来源取一页曲目引用（存储卡为同步，公共曲库为异步分页）。 */
@@ -62,7 +66,8 @@ export async function listTab(
     piano: PianoRuntime,
     tab: LibraryTab,
     page: number,
-    query: string
+    query: string,
+    libraryId?: string,
 ): Promise<TabPage> {
     if (tab === "card") {
         const storage = piano.cardStorage;
@@ -75,7 +80,7 @@ export async function listTab(
             total: entries.length,
         };
     }
-    const result = await midiManager.page(page, PAGE_SIZE, query || undefined);
+    const result = await midiManager.page(page, PAGE_SIZE, query || undefined, libraryId || undefined);
     return {
         refs: result.items.map(libraryRef),
         total: result.total,

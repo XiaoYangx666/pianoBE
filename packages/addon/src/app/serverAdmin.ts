@@ -1,4 +1,6 @@
 import { midiManager } from "@app/midi";
+import { INSTALLED_VFX_PLUGINS } from "@app/vfx";
+import { DEPLOYMENT_INFO } from "@app/vfx/deploymentInfo";
 import { getNetFetch } from "@platform/server/net";
 import { RemoteMidiSource } from "@platform/server/admin/netSource";
 import { world } from "@minecraft/server";
@@ -9,18 +11,16 @@ export const KEY_BACKEND_URL = "pianoBackendUrl";
 /** secrets.json 键名：Bearer 令牌（SecretString，整体透传 HttpHeader） */
 export const KEY_BACKEND_TOKEN = "pianoBackendToken";
 
-/** 旧版远程曲目缓存的世界动态属性键前缀（现已改为纯内存缓存） */
 const LEGACY_CACHE_PREFIX = "midi_remote.";
 
 let initialized = false;
 
-/** 清除旧版遗留的动态属性曲目缓存键（midi_remote.*），避免永久占用世界存档 */
 function clearLegacyRemoteCache(): number {
     const ids = world
         .getDynamicPropertyIds()
         .filter((id) => id.startsWith(LEGACY_CACHE_PREFIX));
     for (const id of ids) {
-        world.setDynamicProperty(id); // 置 undefined 即删除
+        world.setDynamicProperty(id);
     }
     if (ids.length > 0) {
         console.log(`[serverAdmin] 已清除旧版动态属性曲目缓存 ${ids.length} 条（${LEGACY_CACHE_PREFIX}*）`);
@@ -28,22 +28,9 @@ function clearLegacyRemoteCache(): number {
     return ids.length;
 }
 
-/**
- * 初始化远程曲库（server-admin 读配置 → server-net 拉取）。
- * 任一环节不可用（未配置）→ 保持内嵌曲库，返回 false。
- * 本模块整体仅在 server 构建中被引用（client 构建被 compile.define 常量
- * 折叠 + 死代码消除裁剪，故静态导入 @minecraft/server-admin 无副作用）。
- *
- * BDS 配置文件示例：
- *   config/default/variables.json  → { "pianoBackendUrl": "http://192.168.1.10:3000" }
- *   config/default/secrets.json    → { "pianoBackendToken": "Bearer xxxxx" }
- * （token 为 SecretString，脚本环境读不到值，请求时由 HttpHeader 解析；
- *   因无法拼接前缀，secrets 中需保存完整的 "Bearer <token>"）
- */
 export async function initServerAdmin(): Promise<boolean> {
     if (initialized) return true;
 
-    // 旧版曾往世界动态属性写曲目缓存，现改为纯内存缓存：启动即清理遗留键
     clearLegacyRemoteCache();
 
     const url = variables.get(KEY_BACKEND_URL);
@@ -63,7 +50,6 @@ export async function initServerAdmin(): Promise<boolean> {
     }
     console.log("[serverAdmin] @minecraft/server-net 适配器就绪");
 
-    // SecretString 仅透传（作为 HttpHeader 值执行时解析），绝不读取/打印
     const token = secrets.get(KEY_BACKEND_TOKEN);
     console.log(
         token
@@ -73,13 +59,19 @@ export async function initServerAdmin(): Promise<boolean> {
     const extraHeaders = token ? () => ({ Authorization: token }) : undefined;
 
     console.log(`[serverAdmin] step4 切换到远程曲库: ${url}`);
-    midiManager.setSource(
-        new RemoteMidiSource({
-            baseUrl: url,
-            fetch,
-            extraHeaders,
-        })
-    );
+    const remote = new RemoteMidiSource({
+        baseUrl: url,
+        fetch,
+        extraHeaders,
+        onCatalogVersionChange: () => {
+            midiManager.invalidateCache();
+        },
+    });
+    midiManager.setSource(remote);
+    void remote.reportLoaded({
+        configHash: DEPLOYMENT_INFO.configHash,
+        installedPlugins: INSTALLED_VFX_PLUGINS,
+    }).catch(() => {});
     console.log(`[serverAdmin] 远程曲库已启用: ${url}`);
     initialized = true;
     return true;

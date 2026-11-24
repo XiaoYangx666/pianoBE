@@ -33,7 +33,7 @@ export interface PianoStageThemeOption {
 export function listPianoStageThemes(): PianoStageThemeOption[] {
     return [
         { value: 0, id: "off", label: "关闭（仅曲目自带编排）" },
-        ...listVfxThemes().map(({ id, theme }, index) => ({
+        ...listVfxThemes(undefined, { includeInternal: false }).map(({ id, theme }, index) => ({
             value: index + 1,
             id,
             label: theme.label ?? id,

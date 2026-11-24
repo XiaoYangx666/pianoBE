@@ -12,10 +12,12 @@ export class EmbeddedMidiSource {
     private readonly map = new Map<string, MidiInfo>();
 
     constructor(infos: MidiInfo[]) {
-        this.metas = infos.map(({ id, name, duration, noteCount, bytes, performances }) => {
+        this.metas = infos.map(({ id, name, duration, noteCount, bytes, libraries, performanceEntries, performances }) => {
             const meta: MidiSongMeta = { id, name, duration };
             if (noteCount !== undefined) meta.noteCount = noteCount;
             if (bytes !== undefined) meta.bytes = bytes;
+            if (libraries?.length) meta.libraries = libraries;
+            if (performanceEntries?.length) meta.performanceEntries = performanceEntries;
             if (performances?.length) meta.performances = performances;
             return meta;
         });

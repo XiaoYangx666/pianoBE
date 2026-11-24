@@ -1,5 +1,6 @@
 import { DDUI } from "sapi-pro";
 import { formatBytes, type MusicRef } from "@piano/core";
+import { midiManager } from "@app/midi";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { TrackActionsPage } from "./trackActions";
 import {
@@ -20,6 +21,8 @@ export interface LibraryArgs {
     piano: PianoRuntime;
     /** 打开时聚焦的来源 */
     tab?: LibraryTab;
+    /** 公共曲库筛选的逻辑曲库 ID（空表示全部曲库） */
+    libraryId?: string;
     /** 打开时带入的搜索关键词（不含页码指令） */
     query?: string;
     /** 打开时所在页（从歌曲详情返回时保持） */
@@ -34,8 +37,8 @@ const SEARCH_DEBOUNCE_TICKS = 4;
 /**
  * 统一音乐曲库：公共曲库 / 当前存储卡。
  *
- * 管理模式点击进入歌曲详情；添加模式点击直接加入播放队列并留在当前页。
- * 来源、搜索词与页码写回 args，进入歌曲详情再返回时状态不丢。
+ * 保留「公共曲库 / 当前存储卡」两个顶层来源；进入公共曲库后提供逻辑曲库筛选，
+ * 不把所有曲库直接堆叠在一级菜单。
  */
 export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args) => {
     const piano = args.piano;
@@ -43,8 +46,11 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
     ui.subscribe(piano.disposedSignal, () => ui.close());
 
     const mode: LibraryMode = args.mode ?? "manage";
+    const cachedLibs = midiManager.listLibrariesSync?.() ?? [];
     const state = {
         tab: (args.tab === "card" || args.tab === "library" ? args.tab : "library") as LibraryTab,
+        libraryId: args.libraryId ?? "",
+        libraries: [...cachedLibs] as Array<{ id: string; name: string }>,
         page: Math.max(1, args.page ?? 1),
         query: args.query ?? "",
         request: 0,
@@ -52,15 +58,20 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         total: 0,
         maxPage: 1,
     };
-    /** 把当前浏览状态写回页面上下文，返回时按原状态重建。 */
     const persist = () => {
         args.tab = state.tab;
+        args.libraryId = state.libraryId;
         args.query = state.query;
         args.page = state.page;
     };
     persist();
 
     const source = ui.number(TAB_ORDER.indexOf(state.tab));
+    const selectedLibIndex = state.libraryId
+        ? Math.max(0, state.libraries.findIndex((item) => item.id === state.libraryId) + 1)
+        : 0;
+    const libraryIndex = ui.number(selectedLibIndex);
+    const showLibraries = ui.boolean(state.tab === "library" && state.libraries.length > 0, { clientWritable: false });
     const search = ui.string(formatLibrarySearch(state.query, state.page));
     const status = ui.string("§7正在读取…");
     const notice = ui.string("");
@@ -74,6 +85,12 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
 
     const syncSearch = () => ui.set(search, formatLibrarySearch(state.query, state.page));
 
+    const perfSuffix = (ref: MusicRef): string => {
+        const count = ref.performanceEntries?.length ?? ref.performances?.length ?? 0;
+        if (count <= 0) return "";
+        return count === 1 ? " · 演出" : ` · ${count}演出`;
+    };
+
     const renderLabels = () => {
         if (!piano.isAlive() || ui.closed) return;
         const queue = piano.getMidiPlayer().queue;
@@ -86,7 +103,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
             }
             const added = mode === "add" && queue.indexOf(ref) >= 0;
             // 按钮文本不支持格式化符号，只放纯文本。
-            labels[index].setData(`${added ? "✓ " : ""}${sourceMark(ref)} ${ref.name}`);
+            labels[index].setData(`${added ? "✓ " : ""}${sourceMark(ref)} ${ref.name}${perfSuffix(ref)}`);
         }
     };
 
@@ -98,36 +115,37 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         const request = ++state.request;
         const page = state.page;
         status.setData("§7正在读取…");
-        void listTab(piano, state.tab, page, state.query).then((result) => {
-            if (request !== state.request || ui.closed || !player.isValid) return;
-            state.total = result.total;
-            state.maxPage = pageCount(result.total);
-            // 数据源收缩（删除/换卡/筛选变化）时回到有效页并重新取。
-            if (page > state.maxPage) {
-                state.page = state.maxPage;
-                persist();
-                syncSearch();
-                refresh();
-                return;
-            }
-            state.refs = result.refs;
-            renderLabels();
-            const note = result.note ? `\n${result.note}` : "";
-            status.setData(
-                result.note
-                    ? result.note
-                    : result.total
-                        ? `§7共 §f${result.total} §7首`
-                        : "§7这个来源还没有歌曲"
-            );
-            pageText.setData(`§7第 §f${state.page}§7 / §f${state.maxPage} §7页${note}`);
-            prevVisible.setData(state.page > 1);
-            nextVisible.setData(state.page < state.maxPage);
-            syncUsage();
-        }).catch((error) => {
-            if (request !== state.request) return;
-            status.setData(`§c读取失败：${(error as Error)?.message ?? error}`);
-        });
+        void listTab(piano, state.tab, page, state.query, state.tab === "library" ? state.libraryId : undefined)
+            .then((result) => {
+                if (request !== state.request || ui.closed || !player.isValid) return;
+                state.total = result.total;
+                state.maxPage = pageCount(result.total);
+                if (page > state.maxPage) {
+                    state.page = state.maxPage;
+                    persist();
+                    syncSearch();
+                    refresh();
+                    return;
+                }
+                state.refs = result.refs;
+                renderLabels();
+                const note = result.note ? `\n${result.note}` : "";
+                status.setData(
+                    result.note
+                        ? result.note
+                        : result.total
+                          ? `§7共 §f${result.total} §7首`
+                          : "§7这个来源还没有歌曲",
+                );
+                pageText.setData(`§7第 §f${state.page}§7 / §f${state.maxPage} §7页${note}`);
+                prevVisible.setData(state.page > 1);
+                nextVisible.setData(state.page < state.maxPage);
+                syncUsage();
+            })
+            .catch((error) => {
+                if (request !== state.request) return;
+                status.setData(`§c读取失败：${(error as Error)?.message ?? error}`);
+            });
     };
 
     const syncUsage = () => {
@@ -143,7 +161,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         const stat = storage.usage();
         const over = stat.usedBytes > stat.limitBytes ? " §c（已超出上限，仅可读取/删除）" : "";
         usage.setData(
-            `§7${storage.label}：§f${stat.songs} §7首 · §f${formatBytes(stat.usedBytes)}§7 / §f${formatBytes(stat.limitBytes)}${over}`
+            `§7${storage.label}：§f${stat.songs} §7首 · §f${formatBytes(stat.usedBytes)}§7 / §f${formatBytes(stat.limitBytes)}${over}`,
         );
     };
 
@@ -163,18 +181,46 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
     ui.onChange(source, (index) => {
         state.tab = TAB_ORDER[index] ?? "library";
         state.page = 1;
+        showLibraries.setData(state.tab === "library" && state.libraries.length > 0);
         persist();
         syncSearch();
         notice.setData("");
         refresh();
     });
 
-    ui.dropdown("来源", source, TAB_ORDER.map(tab => ({ label: TAB_LABELS[tab], value: TAB_ORDER.indexOf(tab) })));
+    ui.dropdown("来源", source, TAB_ORDER.map((tab) => ({ label: TAB_LABELS[tab], value: TAB_ORDER.indexOf(tab) })));
+    ui.dropdown(
+        "曲库",
+        libraryIndex,
+        [
+            { label: "全部曲库", value: 0 },
+            ...state.libraries.map((lib, idx) => ({ label: lib.name, value: idx + 1 })),
+        ],
+        { visible: showLibraries },
+    );
+
+    void midiManager.listLibraries?.().then((libs) => {
+        if (ui.closed || !player.isValid || !libs?.length) return;
+        const prevKey = state.libraries.map((l) => `${l.id}:${l.name}`).join("|");
+        const nextKey = libs.map((l) => `${l.id}:${l.name}`).join("|");
+        if (prevKey === nextKey) return;
+        ui.reopen();
+    }).catch(() => {});
+
+    ui.onChange(libraryIndex, (idx) => {
+        const chosenLib = idx > 0 ? state.libraries[idx - 1] : undefined;
+        state.libraryId = chosenLib?.id ?? "";
+        state.page = 1;
+        persist();
+        syncSearch();
+        notice.setData("");
+        refresh();
+    });
+
     ui.textField("搜索 / 跳页（如 周杰伦 p5）", search);
     ui.label(status).label(usage).label(notice);
     ui.label(pageText);
 
-    // 监听搜索框内容变化，自动更新结果；末尾 p数字 作为页码指令。
     ui.onChange(search, (value) => {
         const parsed = parseLibrarySearch(value);
         state.query = parsed.query;
@@ -187,33 +233,45 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
     ui.label(mode === "add" ? "§7添加模式：点击歌曲直接加入播放队列，可连续添加" : "§7管理模式：点击歌曲查看详情与单曲操作");
 
     for (let index = 0; index < PAGE_SIZE; index++) {
-        ui.button(labels[index], () => {
-            const ref = state.refs[index];
-            if (!ref || !piano.isAlive()) return;
-            if (mode === "add") {
-                const result = piano.getMidiPlayer().addToQueue(ref);
-                notice.setData(result === "added" ? `§a已加入队列：§f${ref.name}` : `§e队列中已有：§f${ref.name}`);
-                renderLabels();
-                return;
-            }
-            ui.push(TrackActionsPage, { piano, ref });
-        }, { visible: visible[index] });
+        ui.button(
+            labels[index],
+            () => {
+                const ref = state.refs[index];
+                if (!ref || !piano.isAlive()) return;
+                if (mode === "add") {
+                    const result = piano.getMidiPlayer().addToQueue(ref);
+                    notice.setData(result === "added" ? `§a已加入队列：§f${ref.name}` : `§e队列中已有：§f${ref.name}`);
+                    renderLabels();
+                    return;
+                }
+                ui.push(TrackActionsPage, { piano, ref });
+            },
+            { visible: visible[index] },
+        );
     }
 
-    ui.button("◀ 上一页", () => {
-        if (state.page <= 1) return;
-        state.page--;
-        persist();
-        syncSearch();
-        refresh();
-    }, { visible: prevVisible });
-    ui.button("下一页 ▶", () => {
-        if (state.page >= state.maxPage) return;
-        state.page++;
-        persist();
-        syncSearch();
-        refresh();
-    }, { visible: nextVisible });
+    ui.button(
+        "◀ 上一页",
+        () => {
+            if (state.page <= 1) return;
+            state.page--;
+            persist();
+            syncSearch();
+            refresh();
+        },
+        { visible: prevVisible },
+    );
+    ui.button(
+        "下一页 ▶",
+        () => {
+            if (state.page >= state.maxPage) return;
+            state.page++;
+            persist();
+            syncSearch();
+            refresh();
+        },
+        { visible: nextVisible },
+    );
     ui.closeButton();
 
     refresh();

@@ -1,5 +1,14 @@
 import { DDUI } from "sapi-pro";
-import { attachSongPerformance, formatBytes, musicSourceLabel, readSongHeader, type MusicRef } from "@piano/core";
+import {
+    attachSongPerformance,
+    defaultPerformanceId,
+    formatBytes,
+    musicSourceLabel,
+    readSongHeader,
+    type MusicRef,
+    type PerformanceDescriptor,
+} from "@piano/core";
+import { vfxRegistry } from "@piano/vfx";
 import type { PianoRuntime } from "@app/PianoRuntime";
 
 export interface TrackActionArgs {
@@ -12,7 +21,22 @@ function formatDuration(duration: number): string {
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** 歌曲详情：展示元信息，并按来源动态提供有效操作。 */
+interface PerformanceOption {
+    id: string;
+    name: string;
+    author?: string;
+    available: boolean;
+    cues?: PerformanceDescriptor["cues"];
+    legacyNumber: number;
+}
+
+function isPerformanceAvailable(desc: PerformanceDescriptor): boolean {
+    const effects = desc.requiredEffects ?? (desc.cues ? [...new Set(desc.cues.map((c) => c.effect))] : []);
+    if (!effects.length) return true;
+    return effects.every((id) => vfxRegistry.hasEffect(id));
+}
+
+/** 歌曲详情：展示元信息，使用稳定演出标识选择演奏方式。 */
 export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, args) => {
     const { piano, ref } = args;
     const player = ui.player;
@@ -24,14 +48,73 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
 
     const canCopy = ui.boolean(ref.source === "library" && Boolean(piano.cardAccess), { clientWritable: false });
     const canDelete = ui.boolean(ref.source === "card", { clientWritable: false });
-    const extra = piano.performances(ref);
-    const mode = ui.number(ref.performance ?? 0);
-    const showModes = ui.boolean(extra.length > 0, { clientWritable: false });
-    const chosen = (): MusicRef => ({ ...ref, performance: mode.getData() });
-    if (!extra.length) {
-        void Promise.resolve(piano.readBytes(ref)).then(bytes => {
-            if (bytes && alive() && !ui.closed) showModes.setData(Boolean(readSongHeader(bytes).performance?.length));
-        }).catch(() => {});
+
+    const descriptorSource: PerformanceDescriptor[] = (() => {
+        const entries = piano.performanceEntries?.(ref) ?? ref.performanceEntries ?? [];
+        if (entries.length > 0) return [...entries];
+        const legacy = piano.performances?.(ref) ?? ref.performances ?? [];
+        return legacy.map((cues, index) => ({
+            id: `${ref.id}:perf:${index + 1}`,
+            name: `附加演出 ${index + 1}`,
+            songId: ref.id,
+            cues,
+        }));
+    })();
+
+    const options: PerformanceOption[] = [
+        { id: "plain", name: "普通演奏", available: true, legacyNumber: -1 },
+        ...descriptorSource.map((entry, index) => ({
+            id: entry.id,
+            name: entry.name,
+            author: entry.author,
+            available: isPerformanceAvailable(entry),
+            cues: entry.cues,
+            legacyNumber: entry.id === defaultPerformanceId(ref.id) ? 0 : index + 1,
+        })),
+    ];
+
+    const initialIndex = (() => {
+        if (ref.performanceId) {
+            const idx = options.findIndex((o) => o.id === ref.performanceId);
+            if (idx >= 0) return idx;
+        }
+        if (ref.performance === -1) return 0;
+        if (typeof ref.performance === "number" && ref.performance > 0 && options[ref.performance]) {
+            return ref.performance;
+        }
+        return options.length > 1 ? 1 : 0;
+    })();
+
+    const mode = ui.number(initialIndex);
+    const showModes = ui.boolean(options.length > 1, { clientWritable: false });
+    const selectedOption = (): PerformanceOption => options[mode.getData()] ?? options[0];
+
+    const chosen = (): MusicRef => {
+        const opt = selectedOption();
+        return {
+            ...ref,
+            performanceId: opt.id,
+            performance: opt.legacyNumber,
+        };
+    };
+
+    if (descriptorSource.length === 0) {
+        void Promise.resolve(piano.readBytes(ref))
+            .then((bytes) => {
+                if (!bytes || !alive() || ui.closed) return;
+                const embedded = readSongHeader(bytes).performance;
+                if (embedded?.length) {
+                    options.push({
+                        id: defaultPerformanceId(ref.id),
+                        name: "曲目默认演出",
+                        available: isPerformanceAvailable({ id: defaultPerformanceId(ref.id), name: "曲目默认演出", cues: embedded }),
+                        cues: embedded,
+                        legacyNumber: 0,
+                    });
+                    showModes.setData(true);
+                }
+            })
+            .catch(() => {});
     }
 
     ui.label(`§b${ref.name}`);
@@ -40,15 +123,21 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
     ui.label(`§7音符：§f${ref.noteCount !== undefined ? ref.noteCount : "未知"}`);
     ui.label(`§7大小：§f${ref.bytes !== undefined ? formatBytes(ref.bytes) : "未知"}`);
     ui.label(status);
-    ui.dropdown("演奏方式", mode, [
-        { label: "曲目默认", value: 0 },
-        { label: "普通演奏", value: -1 },
-        ...extra.map((_, index) => ({ label: `附加演出 ${index + 1}`, value: index + 1 })),
-    ], { visible: showModes });
+    ui.dropdown(
+        "演奏方式",
+        mode,
+        options.map((opt, index) => ({
+            label: opt.available ? opt.name : `${opt.name} (缺少插件)`,
+            value: index,
+        })),
+        { visible: showModes },
+    );
 
     ui.button("▶ 立即播放", () => {
         if (!alive()) return ui.close();
-        void piano.getMidiPlayer().playNow(chosen())
+        void piano
+            .getMidiPlayer()
+            .playNow(chosen())
             .then(() => status.setData("§a开始播放"))
             .catch(fail);
     });
@@ -59,29 +148,53 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
         status.setData(result === "added" ? "§a已加入播放队列" : "§e队列中已有这首歌");
     });
 
-    ui.button("复制到存储卡", () => {
-        if (!alive()) return ui.close();
-        const card = piano.cardAccess;
-        if (!card) {
-            status.setData("§c卡槽为空，先插入一张音乐存储卡");
-            return;
-        }
-        const selection = chosen().performance ?? 0;
-        void Promise.resolve(piano.readBytes(ref)).then(bytes => {
-            if (!bytes) throw new Error("源曲目已不可用");
-            const storage = card.storage();
-            const selected = selection === 0 ? bytes
-                : attachSongPerformance(bytes, selection < 0 ? [] : extra[selection - 1] ?? []);
-            const entry = storage.save(selected);
-            card.refreshLore();
-            status.setData(`§a已复制到存储卡：${entry.name}`);
-        }).catch(fail);
-    }, { visible: canCopy });
+    ui.button(
+        "复制到存储卡",
+        () => {
+            if (!alive()) return ui.close();
+            const card = piano.cardAccess;
+            if (!card) {
+                status.setData("§c卡槽为空，先插入一张音乐存储卡");
+                return;
+            }
+            const opt = selectedOption();
+            void Promise.all([
+                Promise.resolve(piano.readBytes(ref)),
+                opt.id === "plain"
+                    ? Promise.resolve(undefined)
+                    : opt.cues
+                      ? Promise.resolve(opt.cues)
+                      : piano.resolvePerformanceCues?.(ref, opt.id) ?? Promise.resolve(undefined),
+            ])
+                .then(([bytes, cues]) => {
+                    if (!bytes) throw new Error("源曲目已不可用");
+                    const storage = card.storage();
+                    const selected = opt.id === "plain"
+                        ? attachSongPerformance(bytes, [])
+                        : cues
+                          ? attachSongPerformance(bytes, cues)
+                          : bytes;
+                    const entry = storage.save(selected, ref.name, {
+                        id: opt.id,
+                        name: opt.name,
+                        author: opt.author,
+                    });
+                    card.refreshLore();
+                    status.setData(`§a已复制到存储卡：${entry.name}`);
+                })
+                .catch(fail);
+        },
+        { visible: canCopy },
+    );
 
-    ui.button("删除歌曲", () => {
-        if (!alive()) return ui.close();
-        ui.push(ConfirmDeletePage, { piano, ref });
-    }, { visible: canDelete });
+    ui.button(
+        "删除歌曲",
+        () => {
+            if (!alive()) return ui.close();
+            ui.push(ConfirmDeletePage, { piano, ref });
+        },
+        { visible: canDelete },
+    );
 
     ui.closeButton();
 });

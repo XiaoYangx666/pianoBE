@@ -211,6 +211,10 @@ export class WorldMusicLibrary {
             const id = worldRawId(publicId);
             return id === undefined ? undefined : this.collection.getPerformances(id);
         },
+        performanceEntries: (publicId: string) => {
+            const id = worldRawId(publicId);
+            return id === undefined ? undefined : this.collection.getPerformanceEntries(id);
+        },
         page: async (page: number, pageSize: number, query?: string) => {
             const result = this.pageSync(page, pageSize, query);
             return { total: result.total, items: result.items.map(meta => ({ ...meta, id: worldPublicId(meta.id) })) };

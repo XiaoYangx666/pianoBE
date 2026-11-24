@@ -2,6 +2,7 @@ import {
     MusicCollection,
     normalizeStorageLimit,
     type MusicStorageKv,
+    type SavePerformanceMeta,
     type StoredMusicEntry,
     type StorageUsage,
 } from "@piano/core";
@@ -98,8 +99,12 @@ export class DynamicMusicStorage implements MusicStorage {
         return this.collection.getPerformances(id);
     }
 
-    save(pbe3: Uint8Array): StoredMusicEntry {
-        const entry = this.collection.save(pbe3);
+    getPerformanceEntries(id: string) {
+        return this.collection.getPerformanceEntries(id);
+    }
+
+    save(pbe3: Uint8Array, name?: string, performanceMeta?: SavePerformanceMeta): StoredMusicEntry {
+        const entry = this.collection.save(pbe3, name, performanceMeta);
         this.syncOrder();
         return entry;
     }

@@ -84,21 +84,24 @@ export function registerVfxCommands() {
             }
 
             if (action === "list") {
-                const category = args.trim() as VfxCategory | "";
+                const rawArg = args.trim();
+                const includeInternal = rawArg === "all";
+                const category = (includeInternal ? "" : rawArg) as VfxCategory | "";
                 const validCategories: readonly string[] = ["", "atmosphere", "curve", "stage", "keys", "accent", "control"];
                 if (!validCategories.includes(category)) {
-                    throw new Error("分类需为 atmosphere / curve / stage / keys / accent / control");
+                    throw new Error("分类需为 atmosphere / curve / stage / keys / accent / control / all");
                 }
-                const entries = listVfxEffects(category || undefined);
+                const entries = listVfxEffects(category || undefined, undefined, { includeInternal });
                 for (const def of entries) {
                     const brushText = def.defaultBrush ? ` · 画笔 ${def.defaultBrush}` : "";
                     const variantText = def.variants?.length ? ` · 变体 ${def.variants.join("/")}` : "";
                     const paramNames = def.parameters ? Object.keys(def.parameters) : [];
                     const paramText = paramNames.length ? ` · 参数 ${paramNames.join("/")}` : "";
-                    say(`${def.category} / ${def.id} (${def.label}) · ${def.trigger}${brushText}${variantText}${paramText}`);
+                    const scopeTag = def.visibility === "internal" ? " [内部]" : "";
+                    say(`${def.category} / ${def.id} (${def.label})${scopeTag} · ${def.trigger}${brushText}${variantText}${paramText}`);
                 }
                 if (!category) {
-                    const builtinThemes = getVfxThemeIds().join(", ") || "无";
+                    const builtinThemes = getVfxThemeIds(undefined, { includeInternal }).join(", ") || "无";
                     say(`内置主题 ${builtinThemes} · 自定义 ${[...loadVfxThemes().keys()].join(", ") || "无"}`);
                 }
                 return;
