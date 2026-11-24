@@ -14,7 +14,9 @@
         "sync:amt": "node scripts/sync-amt.mjs"
     },
     "dependencies": {
+        "@piano/assembly": "file:../assembly",
         "@piano/core": "file:../core",
+        "@piano/vfx": "file:../vfx",
         "hono": "^4.6.0"
     },
     "devDependencies": {

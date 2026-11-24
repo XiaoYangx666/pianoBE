@@ -2,8 +2,22 @@ export interface ServerConfig {
     port: number;
     /** sqlite 文件路径（":memory:" 用于测试） */
     dbPath: string;
-    /** 曲目内容目录（存 {id}.mid 源文件） */
+    /** 曲目内容目录（存 {id}.mid / {id}.pbe3 源文件） */
     midisDir: string;
+    /** 插件存储目录（存 {id}.pbeplugin 归档） */
+    pluginsDir: string;
+    /** 内置插件目录（可选，默认尝试 ../../build/plugins） */
+    builtinPluginsDir?: string;
+    /** 服务器基础模板 .mcaddon 路径 */
+    serverTemplatePath?: string;
+    /** 托管的 BDS 服务器根目录 */
+    bdsDir?: string;
+    /** BDS 目标世界目录名 */
+    bdsWorld?: string;
+    /** BDS 行为包目录名 */
+    bdsBpName: string;
+    /** BDS 资源包目录名 */
+    bdsRpName: string;
     /** 管理员引导令牌；未设置时首次启动自动生成并打印 */
     bootstrapToken?: string;
     /** 为 true 时公开读接口（曲目列表/曲目内容）无需令牌 */
@@ -37,6 +51,13 @@ export function loadConfig(
         port: Number(env.PORT ?? 3000),
         dbPath: env.DB_PATH ?? "./data/piano.db",
         midisDir: env.MIDIS_DIR ?? "./data/midis",
+        pluginsDir: env.PLUGINS_DIR ?? "./data/plugins",
+        builtinPluginsDir: env.BUILTIN_PLUGINS_DIR || undefined,
+        serverTemplatePath: env.SERVER_TEMPLATE_PATH || undefined,
+        bdsDir: env.BDS_DIR || undefined,
+        bdsWorld: env.BDS_WORLD || undefined,
+        bdsBpName: env.BDS_BP_NAME || "pianoServerBP",
+        bdsRpName: env.BDS_RP_NAME || "pianoServerRP",
         bootstrapToken: env.BOOTSTRAP_TOKEN || undefined,
         allowPublicRead: env.ALLOW_PUBLIC_READ === "true",
         webRoot: env.WEB_ROOT || undefined,
