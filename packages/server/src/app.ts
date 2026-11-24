@@ -72,6 +72,14 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     api.get("/health", (c) => c.json({ ok: true, name: "pianobe-server", studio: true }));
     app.route("/api", api);
 
+    // 未匹配的 /api 路由必须返回 JSON 404，不能被 SPA 回退成 index.html
+    app.notFound((c) => {
+        if (c.req.path === "/api" || c.req.path.startsWith("/api/")) {
+            return c.json({ error: "接口不存在" }, 404);
+        }
+        return c.text("Not Found", 404);
+    });
+
     // 静态托管 Studio / Web 构建产物（SPA fallback 到 index.html）
     if (deps.config.webRoot && existsSync(deps.config.webRoot)) {
         app.use(
@@ -82,6 +90,9 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
             }),
         );
         app.get("*", async (c) => {
+            if (c.req.path === "/api" || c.req.path.startsWith("/api/")) {
+                return c.json({ error: "接口不存在" }, 404);
+            }
             const file = Bun.file(`${deps.config.webRoot}/index.html`);
             if (await file.exists()) {
                 return new Response(await file.text(), {

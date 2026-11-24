@@ -42,8 +42,9 @@ export function metasToAddonIndex(
             `},`;
     }
     content += "];";
-    if (libraries && libraries.length > 0) {
-        content += `export const libraries=${JSON.stringify(libraries.map((l) => ({ id: l.id, name: l.name })))};`;
-    }
+    // 始终导出 libraries：服务端构建不带内嵌曲库时也必须存在该导出，
+    // 否则 midiManager 的 `midiIndex.libraries` 在模块链接阶段会抛 SyntaxError。
+    const libraryList = (libraries ?? []).map((l) => ({ id: l.id, name: l.name }));
+    content += `export const libraries=${JSON.stringify(libraryList)};`;
     return content;
 }

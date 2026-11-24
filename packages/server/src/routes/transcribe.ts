@@ -111,7 +111,9 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
 
     // POST /api/transcribe/jobs —— 上传音频，返回任务（不写入曲目库）
     app.post("/jobs", requireRole("write"), async (c) => {
-        if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
+        if (!deps.amt?.status().available) {
+            return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
+        }
 
         const length = Number(c.req.header("Content-Length") ?? 0);
         if (length > MAX_AUDIO_BYTES) {
@@ -144,7 +146,9 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
 
     // POST /api/transcribe/jobs/bilibili —— { input, page?, name? }
     app.post("/jobs/bilibili", requireRole("write"), async (c) => {
-        if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
+        if (!deps.amt?.status().available) {
+            return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
+        }
         const body = (await c.req.json().catch(() => null)) as
             | { input?: unknown; page?: unknown; name?: unknown }
             | null;

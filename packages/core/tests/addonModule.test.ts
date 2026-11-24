@@ -31,8 +31,8 @@ describe("addonModule", () => {
         expect(decoded.length).toBe(pbe3.length);
     });
 
-    it("生成索引文本", () => {
-        expect(metasToAddonIndex([])).toBe("export const midis=[];");
+    it("生成索引文本（空曲库也要导出 libraries）", () => {
+        expect(metasToAddonIndex([])).toBe("export const midis=[];export const libraries=[];");
     });
 
     it("index 文本仍保持模块懒加载结构", () => {
@@ -44,7 +44,7 @@ describe("addonModule", () => {
             "export const midis=[" +
                 '{id:"aaa",name:"A",duration:100,value:async()=> (await import("./aaa.js")).default},' +
                 '{id:"bbb",name:"B",duration:200,value:async()=> (await import("./bbb.js")).default},' +
-                "];"
+                "];export const libraries=[];"
         );
     });
 
@@ -55,12 +55,12 @@ describe("addonModule", () => {
         expect(text).toBe(
             "export const midis=[" +
                 '{id:"ccc",name:"C",duration:300,noteCount:42,bytes:1024,value:async()=> (await import("./ccc.js")).default},' +
-                "];"
+                "];export const libraries=[];"
         );
     });
 
-    it("传入 libraries 时导出曲库列表，空数组时不额外输出", () => {
-        expect(metasToAddonIndex([], [])).toBe("export const midis=[];");
+    it("传入 libraries 时导出曲库列表，空数组输出空导出", () => {
+        expect(metasToAddonIndex([], [])).toBe("export const midis=[];export const libraries=[];");
         const withLibs = metasToAddonIndex(
             [{ id: "ccc", name: "C", duration: 300, libraries: ["lib_1"] }],
             [{ id: "lib_1", name: "精选曲库" }],

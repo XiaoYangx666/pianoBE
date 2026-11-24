@@ -1,5 +1,5 @@
 import { defineConfig, sapiPro } from "@bepack/cli";
-import { copyFile } from "fs/promises";
+import { copyFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { platform } from "process";
 
@@ -92,7 +92,15 @@ export default defineConfig({
                     join(ctx.paths.scriptOutDir, "vfx/stagePropCatalog.js"));
                 await copyFile("../../build/stage-props/scripts/vfx/core.js", join(ctx.paths.scriptOutDir, "vfx/core.js"));
             }
-            // 服务器专用包不带内嵌曲库（纯远程拉取）
+            // 服务器专用包不带内嵌曲库（纯远程拉取）。
+            // 但 index.js 必须同时导出 midis 与 libraries：打包器会 tree-shake 掉空的
+            // libraries 导出，而 midiManager 通过命名空间访问它，模块链接阶段会报
+            // "Could not find export 'libraries'"。
+            if (ctx.paths.scriptOutDir) {
+                const midiDir = join(ctx.paths.scriptOutDir, "packages/addon/src/midis");
+                await mkdir(midiDir, { recursive: true });
+                await writeFile(join(midiDir, "index.js"), "export const midis=[];export const libraries=[];\n", "utf8");
+            }
             return "server build: skipped midi copy";
         },
     },

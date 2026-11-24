@@ -229,7 +229,9 @@ export function assembleAddonTemplate(
             ),
         );
     } else {
-        addon.writeText(`${midisDir}index.js`, "export const midis=[];\n");
+        // 不带内嵌曲库时也必须导出 libraries，否则模块链接阶段会报
+        // "Could not find export 'libraries'"（midiManager 通过命名空间访问）。
+        addon.writeText(`${midisDir}index.js`, "export const midis=[];export const libraries=[];\n");
     }
 
     if (opts.timbres) {
