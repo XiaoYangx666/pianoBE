@@ -20,21 +20,25 @@ const TIMBRE_PLUGIN_META = {
         name: "经典三角钢琴",
         author: "PianoBE (VCSL Steinway B)",
         license: "CC0-1.0",
+        icon: { text: "B", color: "#8b5cf6" },
     },
     bright_grand: {
         name: "明亮三角钢琴",
         author: "PianoBE (Salamander Grand V3)",
         license: "CC-BY-3.0",
+        icon: { text: "C5", color: "#0ea5e9" },
     },
     upright: {
         name: "原声立式钢琴",
         author: "PianoBE (FreePats Kawai Upright)",
         license: "CC0-1.0",
+        icon: { text: "立", color: "#d97706" },
     },
     electric_piano: {
         name: "复古电钢",
         author: "PianoBE (FreePats FM #1)",
         license: "CC0-1.0",
+        icon: { text: "DX", color: "#ec4899" },
     },
 };
 
@@ -91,6 +95,7 @@ export function packOfficialTimbres() {
             visibility: "public",
             author: meta.author,
             license: meta.license,
+            ...(meta.icon ? { icon: meta.icon } : {}),
             provides: {
                 timbres: [timbre.id],
             },

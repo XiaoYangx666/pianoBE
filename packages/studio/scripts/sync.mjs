@@ -33,6 +33,21 @@ fs.mkdirSync(pubDir, { recursive: true });
     }
 }
 
+const PREVIEW_MIME = {
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".svg": "image/svg+xml",
+};
+
+function previewBytesToDataUrl(filePath, bytes) {
+    if (!filePath || !bytes?.length) return undefined;
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = PREVIEW_MIME[ext] ?? "image/png";
+    return `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
+}
+
 // 2. built-in .pbeplugin packages (from build/plugins)
 {
     const srcDir = path.join(repoRoot, "build/plugins");
@@ -48,6 +63,14 @@ fs.mkdirSync(pubDir, { recursive: true });
         const bytes = new Uint8Array(fs.readFileSync(srcPath));
         const archive = readPbePluginArchive(bytes);
         const { manifest } = archive;
+        const iconPath =
+            (typeof manifest.icon === "string" ? manifest.icon : undefined) ??
+            manifest.preview?.thumbnail;
+        const previewEntry =
+            (iconPath && archive.previews.has(iconPath)
+                ? [iconPath, archive.previews.get(iconPath)]
+                : undefined) ?? [...archive.previews.entries()][0];
+        const previewDataUrl = previewEntry ? previewBytesToDataUrl(previewEntry[0], previewEntry[1]) : undefined;
         fs.copyFileSync(srcPath, path.join(dstDir, file));
         index.push({
             id: manifest.id,
@@ -56,6 +79,7 @@ fs.mkdirSync(pubDir, { recursive: true });
             file,
             source: "builtin",
             hasExecutableCode: archive.hasExecutableCode,
+            ...(previewDataUrl ? { previewDataUrl } : {}),
             contents: {
                 songs: archive.songs.size,
                 performances: archive.performances.length,

@@ -8,6 +8,7 @@
     "visibility": "internal",
     "author": "PianoBE",
     "license": "CC-BY-NC-4.0",
+    "icon": { "text": "裁", "color": "#3b82f6" },
     "provides": {
         "effects": ["sinner_sword", "sinner_spotlight", "sinner_bubbles", "sinner_upwelling", "sinner_impact", "sinner_authority", "sinner_authority_release"],
         "particles": ["sinner_pool", "sinner_cone", "sinner_bubble", "sinner_spot_pool", "sinner_spot_beam"]

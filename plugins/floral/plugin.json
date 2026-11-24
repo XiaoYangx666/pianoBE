@@ -8,6 +8,7 @@
     "visibility": "internal",
     "author": "PianoBE",
     "license": "CC-BY-NC-4.0",
+    "icon": { "text": "花", "color": "#ec4899" },
     "provides": {
         "effects": ["floral_meadow", "floral_tide", "floral_petal_phrase", "floral_key_style"],
         "keyStyles": ["floral_touch"],

@@ -275,4 +275,39 @@ describe(".pbeplugin archive codec and validation", () => {
         });
         expect(() => validatePluginAssembly([parsed, readPbePluginArchive(dupBytes)])).toThrow(/插件资源冲突/);
     });
+
+    test("validates manifest icon as preview image path or text badge", () => {
+        const textIconBytes = writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest({ icon: { text: "烟", color: "#f97316" } })),
+            "vfx/index.js": VALID_VFX_JS,
+        });
+        expect(readPbePluginArchive(textIconBytes).manifest.icon).toEqual({ text: "烟", color: "#f97316" });
+
+        const imgIconBytes = writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest({ icon: "preview/badge.svg" })),
+            "vfx/index.js": VALID_VFX_JS,
+            "preview/badge.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+        });
+        expect(readPbePluginArchive(imgIconBytes).manifest.icon).toBe("preview/badge.svg");
+
+        expect(() => readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest({ icon: "preview/missing.png" })),
+            "vfx/index.js": VALID_VFX_JS,
+        }))).toThrow(/icon 不存在/);
+
+        expect(() => readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest({ icon: "textures/wrong.png" })),
+            "vfx/index.js": VALID_VFX_JS,
+        }))).toThrow(/icon 路径/);
+
+        expect(() => readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest({ icon: { text: "TOO_LONG", color: "#fff" } as never })),
+            "vfx/index.js": VALID_VFX_JS,
+        }))).toThrow(/icon\.text/);
+
+        expect(() => readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest({ icon: { text: "音", color: "red" } })),
+            "vfx/index.js": VALID_VFX_JS,
+        }))).toThrow(/icon\.color/);
+    });
 });

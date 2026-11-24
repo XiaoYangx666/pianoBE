@@ -584,6 +584,10 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
         );
     }
 
+    if (typeof manifest.icon === "string" && !previews.has(manifest.icon)) {
+        throw new Error(`插件 ${manifest.id} 清单声明的 icon 不存在：${manifest.icon}`);
+    }
+
     const hasExecutableCode = pluginHasExecutableCode({ manifest, vfxEntryJs, files });
 
     return {

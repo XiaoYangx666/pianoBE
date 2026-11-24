@@ -8,6 +8,7 @@
     "visibility": "internal",
     "author": "PianoBE",
     "license": "CC-BY-NC-4.0",
+    "icon": { "text": "瓷", "color": "#0ea5e9" },
     "provides": {
         "effects": [
             "chinese_brush",

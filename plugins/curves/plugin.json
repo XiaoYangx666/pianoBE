@@ -7,6 +7,7 @@
     "capabilities": ["vfx"],
     "author": "PianoBE",
     "license": "CC-BY-NC-4.0",
+    "icon": { "text": "弦", "color": "#8b5cf6" },
     "provides": {
         "effects": [
             "wing_ribbons",

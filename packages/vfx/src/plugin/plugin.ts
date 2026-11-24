@@ -35,6 +35,13 @@ export interface VfxPluginLimits {
     maxActiveParticles?: number;
 }
 
+export interface VfxPluginIconText {
+    text: string;
+    color?: string;
+}
+
+export type VfxPluginIcon = string | VfxPluginIconText;
+
 export interface VfxPluginPreview {
     thumbnail?: string;
     screenshots?: readonly string[];
@@ -64,6 +71,7 @@ export interface VfxPluginManifest {
     provides: VfxPluginProvides;
     dependencies?: readonly string[];
     limits?: VfxPluginLimits;
+    icon?: VfxPluginIcon;
     preview?: VfxPluginPreview;
     stageProps?: readonly VfxStagePropDeclaration[];
 }
@@ -102,7 +110,30 @@ const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9._-]{1,63}$/;
 const ITEM_ID_PATTERN = /^[a-z][a-z0-9._-]{0,63}$/;
 const CONTENT_ID_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,95}$/i;
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+const ICON_PATH_PATTERN = /^preview\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.(?:png|webp|jpg|jpeg|svg)$/i;
 const CAPABILITY_SET = new Set<string>(VFX_PLUGIN_CAPABILITIES);
+
+function validatePluginIcon(raw: unknown): VfxPluginIcon {
+    if (typeof raw === "string") {
+        const path = raw.trim();
+        if (!ICON_PATH_PATTERN.test(path)) {
+            throw new Error(`插件清单字段 icon 路径必须是 preview/ 下的 .png/.webp/.jpg/.jpeg/.svg 文件：${raw}`);
+        }
+        return path;
+    }
+    const obj = asRecord(raw, "icon");
+    const text = nonEmptyString(obj.text, "icon.text");
+    if ([...text].length > 4) {
+        throw new Error(`插件清单字段 icon.text 长度不能超过 4 个字符：${text}`);
+    }
+    if (obj.color === undefined) return { text };
+    const color = nonEmptyString(obj.color, "icon.color");
+    if (!HEX_COLOR_PATTERN.test(color)) {
+        throw new Error(`插件清单字段 icon.color 需要是 #RRGGBB 十六进制颜色：${color}`);
+    }
+    return { text, color };
+}
 const PROVIDES_KEYS = ["effects", "themes", "layouts", "keyStyles", "particles", "timbres", "songs", "performances", "libraries"] as const;
 const CONTENT_PROVIDES_KEYS = new Set<string>(["songs", "performances", "libraries"]);
 
@@ -292,6 +323,8 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
         }
     }
 
+    const icon = record.icon !== undefined ? validatePluginIcon(record.icon) : undefined;
+
     let preview: VfxPluginPreview | undefined;
     if (record.preview !== undefined) {
         const rawPreview = asRecord(record.preview, "preview");
@@ -323,6 +356,7 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
         provides,
         ...(dependencies?.length ? { dependencies } : {}),
         ...(limits ? { limits } : {}),
+        ...(icon !== undefined ? { icon } : {}),
         ...(preview ? { preview } : {}),
         ...(stageProps ? { stageProps } : {}),
     };

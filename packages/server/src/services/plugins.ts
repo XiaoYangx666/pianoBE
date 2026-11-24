@@ -48,6 +48,28 @@ export interface ServerPluginRecord {
         particles: number;
         stageProps: number;
     };
+    previewDataUrl?: string;
+}
+
+function archivePreviewDataUrl(archive: PbePluginArchive): string | undefined {
+    const preferred =
+        (typeof archive.manifest.icon === "string" ? archive.manifest.icon : undefined) ??
+        archive.manifest.preview?.thumbnail;
+    const entry =
+        (preferred && archive.previews.has(preferred)
+            ? ([preferred, archive.previews.get(preferred)] as const)
+            : undefined) ?? [...archive.previews.entries()][0];
+    if (!entry?.[1]) return undefined;
+    const [filePath, bytes] = entry;
+    const lower = filePath.toLowerCase();
+    const mime = lower.endsWith(".svg")
+        ? "image/svg+xml"
+        : lower.endsWith(".webp")
+          ? "image/webp"
+          : lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+            ? "image/jpeg"
+            : "image/png";
+    return `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
 }
 
 function archiveRequiresPackDeploy(archive: PbePluginArchive): boolean {
@@ -342,6 +364,7 @@ export class PluginService {
                 dependents: [],
                 missingDependencies: [],
                 contents: summarizeArchiveContents(archive),
+                ...(archivePreviewDataUrl(archive) ? { previewDataUrl: archivePreviewDataUrl(archive) } : {}),
             });
         }
 
@@ -401,6 +424,8 @@ export class PluginService {
             pluginId: row.id,
         });
 
+        const previewDataUrl = archive ? archivePreviewDataUrl(archive) : undefined;
+
         return {
             id: row.id,
             name: row.name,
@@ -421,6 +446,7 @@ export class PluginService {
             installedAt: row.installed_at,
             updatedAt: row.updated_at,
             contents: archive ? summarizeArchiveContents(archive) : summarizeManifestContents(manifest),
+            ...(previewDataUrl ? { previewDataUrl } : {}),
         };
     }
 }
