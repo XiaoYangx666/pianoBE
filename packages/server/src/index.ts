@@ -44,6 +44,9 @@ if (generated) {
 }
 
 const songPort = new SqliteSongPort(db, config.midisDir);
+if (songPort.legacyImported > 0) {
+    log.info(`已把 ${songPort.legacyImported} 个旧版曲目文件导入 SQLite（原文件已删除）`);
+}
 const pluginService = new PluginService(songPort, config);
 const deploymentService = new DeploymentService(songPort, pluginService, config);
 const amt = new AmtService(config);

@@ -2,7 +2,7 @@ export interface ServerConfig {
     port: number;
     /** sqlite 文件路径（":memory:" 用于测试） */
     dbPath: string;
-    /** 曲目内容目录（存 {id}.mid / {id}.pbe3 源文件） */
+    /** 曲目内容目录；旧版文件在这里，启动时会导入 SQLite 并清空 */
     midisDir: string;
     /** 插件存储目录（存 {id}.pbeplugin 归档） */
     pluginsDir: string;

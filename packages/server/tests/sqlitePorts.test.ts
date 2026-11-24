@@ -38,7 +38,7 @@ describe("SQLite 驱动专有行为", () => {
         rmSync(dir, { recursive: true, force: true });
     });
 
-    test("saveMidiFile 写 .mid 文件，getRaw 读回，getSong 按需转换", () => {
+    test("saveMidiFile 写库，getRaw 读回，getSong 按需转换", () => {
         const { port, cleanup } = makeSongPort();
         // 最小 SMF：format 0、1 轨道、division 96，含一个 C4 音符
         const bytes = new Uint8Array([

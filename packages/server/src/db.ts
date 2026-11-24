@@ -69,6 +69,14 @@ CREATE TABLE IF NOT EXISTS server_state (
     updated_at INTEGER NOT NULL
 );
 
+-- 曲目原始内容（mid/pbe3/json）。与 songs 元数据分开存，列表查询不碰大字段。
+CREATE TABLE IF NOT EXISTS song_files (
+    song_id TEXT NOT NULL,
+    kind    TEXT NOT NULL,       -- mid | pbe3 | json
+    bytes   BLOB NOT NULL,
+    PRIMARY KEY (song_id, kind)
+);
+
 CREATE TABLE IF NOT EXISTS tokens (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     label      TEXT NOT NULL UNIQUE,  -- 身份名（如 bootstrap / my-uploader）

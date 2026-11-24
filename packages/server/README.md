@@ -41,18 +41,20 @@ docker compose -f docker-compose.dev.yml up
 
 ## 数据存储
 
-- **SQLite**（`DB_PATH`）：仅存曲目 **meta**（id/name/duration/noteCount/dataSize）与令牌
-- **文件**（`MIDIS_DIR`，默认 `./data/midis/`）：曲目完整内容存为 `{id}.mid` 原始源文件
-- 游戏播放器需要曲目时从 `.mid` 按需编码为 **PBE3**（Raw DEFLATE，内存 LRU 最近 32 首）；管理页前端直接拉 `.mid` 字节解析播放
+- **SQLite**（`DB_PATH`）：曲目 meta（id/name/duration/noteCount/dataSize）、完整曲目内容（`song_files` 表的 mid/pbe3/json BLOB）与令牌
+- 游戏播放器需要曲目时直接读 `song_files.pbe3`；缺少 pbe3 时从 mid 按需编码（内存 LRU 最近 32 首）
+- 管理页前端直接拉 `/raw` 字节解析播放
 - 曲目 `id = crc32(.mid 内容)` 内容寻址，重复上传幂等
+- 旧版 `MIDIS_DIR` 下的 `{id}.mid/.pbe3/.json` 会在启动时自动导入数据库并删除原文件；之后备份只需 `piano.db`（WAL 模式下用 `.backup` 或连 `-wal` 一起拷）
+- 删除曲目会立即释放数据库记录，磁盘空间通过 `VACUUM` 回收
 
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `PORT` | `3000` | 监听端口 |
-| `DB_PATH` | `./data/piano.db` | SQLite 文件路径（曲目 meta/令牌） |
-| `MIDIS_DIR` | `./data/midis` | 曲目内容目录（存 `{id}.mid` 源文件） |
+| `DB_PATH` | `./data/piano.db` | SQLite 文件路径（曲目 meta/内容/令牌） |
+| `MIDIS_DIR` | `./data/midis` | 旧版曲目文件目录（仅启动时迁移用） |
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
 | `WEB_ROOT` | 无 | 前端构建产物目录（不存在则不托管） |
@@ -60,6 +62,7 @@ docker compose -f docker-compose.dev.yml up
 | `AMT_MODEL` | `./amt/run4_int8.onnx` | ONNX 模型路径（找不到 int8 时回退 `run4_best.onnx`） |
 | `AMT_DECODER` | `native` | `native` 内置解码（mp3/m4a/flac/wav/ogg）；`ffmpeg` 外部解码 |
 | `AMT_THREADS` | `4` | 转录线程数 |
+| `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
 | `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
 | `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
 | `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |
@@ -79,9 +82,9 @@ GET    /api/songs?q=&page=&pageSize=  曲目列表（meta）
 GET    /api/songs/:id/raw             原始 .mid 字节（前端解析播放）
 GET    /api/songs/:id/code            游戏内导入码（PBE3 分段）
 GET    /api/songs/:id                 游戏播放数据（PBE3，Base64URL 字段 data）
-POST   /api/songs                     上传 .mid（原始字节存 data/midis/，X-File-Name 头给文件名）
+POST   /api/songs                     上传 .mid（内容写入 SQLite，X-File-Name 头给文件名）
 PATCH  /api/songs/:id                 改曲名 { name }
-DELETE /api/songs/:id                 删除曲目（含 .mid 文件）
+DELETE /api/songs/:id                 删除曲目
 GET    /api/tokens                    令牌列表（admin）
 POST   /api/tokens                    { label, role } 创建，返回明文一次（admin）
 DELETE /api/tokens/:id                吊销（admin）
