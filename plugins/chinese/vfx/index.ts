@@ -276,6 +276,7 @@ export const chinesePlugin: VfxPluginModule = {
         for (const effect of EFFECTS) api.registerEffect(effect);
         api.registerTheme("chinese_misty_rain", {
             label: "烟雨",
+            visibility: "public",
             layers: [
                 { effect: "chinese_mist", color: CELADON, color2: WHITE, level: { input: "activity", from: 25, to: 65 } },
                 { effect: "chinese_rain", color: CELADON, color2: BLUE, variant: "wings", level: { input: "sustain", from: 13, to: 37 } },

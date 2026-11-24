@@ -5,7 +5,7 @@ import {
     validateSchemaParams,
 } from "../plugin/parameters";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
-import type { VfxCategory, VfxEffectDefinition } from "../types";
+import type { ListVisibilityOptions, VfxCategory, VfxEffectDefinition } from "../types";
 
 export type VfxEffectId = string;
 
@@ -17,15 +17,19 @@ export function getVfxEffect(id: string, registry: VfxRegistry = vfxRegistry): V
     return registry.getEffect(id);
 }
 
-export function getVfxEffectIds(registry: VfxRegistry = vfxRegistry): VfxEffectId[] {
-    return registry.getEffectIds();
+export function getVfxEffectIds(
+    registry: VfxRegistry = vfxRegistry,
+    options?: ListVisibilityOptions,
+): VfxEffectId[] {
+    return registry.getEffectIds(options);
 }
 
 export function listVfxEffects(
     category?: VfxCategory,
     registry: VfxRegistry = vfxRegistry,
+    options?: ListVisibilityOptions,
 ): VfxEffectDefinition[] {
-    return registry.listEffects(category);
+    return registry.listEffects(category, options);
 }
 
 export function defaultEffectCustomParams(

@@ -3,7 +3,7 @@ import { POINT_BRUSH_INDEX, type PointBrushId } from "../spatial/brushes";
 import { blendHex, colorVars, hexToUnitRgb } from "../spatial/color";
 import type { Point3 } from "../spatial/geometry";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
-import type { PianoParticleOverride, VfxEffectParams, VfxParticle } from "../types";
+import type { ListVisibilityOptions, PianoParticleOverride, VfxEffectParams, VfxParticle, VfxResourceVisibility } from "../types";
 
 export interface KeyParticlePalette {
     value: number;
@@ -64,6 +64,8 @@ export interface KeyParticleDraw {
 
 export interface KeyParticleRenderStyle {
     label: string;
+    /** 公开或内部展示属性（内部样式不出现在玩家设置下拉中，仍可被演出/主题显式引用） */
+    visibility?: VfxResourceVisibility;
     /** Stable numeric value persisted in piano settings; undefined for cue-only styles. */
     value?: number;
     render: "point" | "stream" | "drift";
@@ -133,16 +135,18 @@ function activeKeyStyle(id: string, registry: VfxRegistry): KeyParticleRenderSty
 
 export function listKeyParticleStyles(
     registry: VfxRegistry = vfxRegistry,
+    options?: ListVisibilityOptions,
 ): { id: string; style: KeyParticleRenderStyle }[] {
-    return registry.listKeyStyles();
+    return registry.listKeyStyles(options);
 }
 
 /** Styles exposed in the piano settings dropdown, in their registration order. */
 export function listPianoParticleStyles(
     registry: VfxRegistry = vfxRegistry,
+    options: ListVisibilityOptions = { includeInternal: false },
 ): { value: number; label: string; style: KeyParticleStyleId }[] {
     const result: { value: number; label: string; style: KeyParticleStyleId }[] = [];
-    for (const { id, style } of registry.listKeyStyles()) {
+    for (const { id, style } of registry.listKeyStyles(options)) {
         if (style.value !== undefined) {
             result.push({ value: style.value, label: style.label, style: id });
         }

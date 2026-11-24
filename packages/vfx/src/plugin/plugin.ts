@@ -1,7 +1,7 @@
 import type { KeyParticleRenderStyle } from "../domain/keyParticles";
 import type { LightAnchor, StageVeilAnchor } from "../spatial/stage";
 import type { VfxTheme } from "../domain/themes";
-import type { VfxEffectDefinition } from "../types";
+import type { VfxEffectDefinition, VfxResourceVisibility } from "../types";
 
 export const VFX_API_VERSION = "1.0.0";
 
@@ -12,6 +12,8 @@ export const VFX_PLUGIN_CAPABILITIES = [
     "audio.sfx",
     "scores",
     "songs",
+    "performances",
+    "libraries",
 ] as const;
 
 export type VfxPluginCapability = (typeof VFX_PLUGIN_CAPABILITIES)[number];
@@ -22,6 +24,9 @@ export interface VfxPluginProvides {
     layouts?: readonly string[];
     keyStyles?: readonly string[];
     particles?: readonly string[];
+    songs?: readonly string[];
+    performances?: readonly string[];
+    libraries?: readonly string[];
 }
 
 export interface VfxPluginLimits {
@@ -51,6 +56,8 @@ export interface VfxPluginManifest {
     apiVersion: string;
     minPianoBeVersion: string;
     capabilities: readonly VfxPluginCapability[];
+    /** 默认资源展示意图：public = 公开选择器可见，internal = 仅供演出/插件内部引用 */
+    visibility?: VfxResourceVisibility;
     author: string;
     license: string;
     provides: VfxPluginProvides;
@@ -58,6 +65,23 @@ export interface VfxPluginManifest {
     limits?: VfxPluginLimits;
     preview?: VfxPluginPreview;
     stageProps?: readonly VfxStagePropDeclaration[];
+}
+
+export function pluginHasExecutableCode(plugin: {
+    manifest?: Pick<VfxPluginManifest, "capabilities">;
+    capabilities?: readonly string[];
+    vfxEntryJs?: string;
+    files?: ReadonlyMap<string, unknown>;
+}): boolean {
+    const caps = plugin.manifest?.capabilities ?? plugin.capabilities ?? [];
+    if (caps.includes("vfx")) return true;
+    if (plugin.vfxEntryJs && plugin.vfxEntryJs.trim().length > 0) return true;
+    if (plugin.files) {
+        for (const path of plugin.files.keys()) {
+            if (path.startsWith("vfx/") && path.endsWith(".js")) return true;
+        }
+    }
+    return false;
 }
 
 export interface VfxPluginRegistrar {
@@ -77,7 +101,7 @@ const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9._-]{1,63}$/;
 const ITEM_ID_PATTERN = /^[a-z][a-z0-9._-]{0,63}$/;
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const CAPABILITY_SET = new Set<string>(VFX_PLUGIN_CAPABILITIES);
-const PROVIDES_KEYS = ["effects", "themes", "layouts", "keyStyles", "particles"] as const;
+const PROVIDES_KEYS = ["effects", "themes", "layouts", "keyStyles", "particles", "songs", "performances", "libraries"] as const;
 
 export function stagePropId(pluginId: string, localId: string): string {
     return `${pluginId}:${localId}`;
@@ -229,11 +253,19 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
     }
     const stageProps = hasStageProps ? validateStageProps(record.stageProps) : undefined;
 
-    const rawProvides = asRecord(record.provides, "provides");
+    const rawProvides = record.provides === undefined ? {} : asRecord(record.provides, "provides");
     const provides: VfxPluginProvides = {};
     for (const key of PROVIDES_KEYS) {
         const parsed = validateIdList(rawProvides[key], `provides.${key}`);
         if (parsed !== undefined) provides[key] = parsed;
+    }
+
+    let visibility: VfxResourceVisibility | undefined;
+    if (record.visibility !== undefined) {
+        if (record.visibility !== "public" && record.visibility !== "internal") {
+            throw new Error(`插件清单字段 visibility 必须为 public 或 internal（收到 ${String(record.visibility)}）`);
+        }
+        visibility = record.visibility;
     }
 
     let limits: VfxPluginLimits | undefined;
@@ -281,6 +313,7 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
         apiVersion,
         minPianoBeVersion,
         capabilities,
+        ...(visibility ? { visibility } : {}),
         author,
         license,
         provides,

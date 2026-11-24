@@ -9,7 +9,7 @@ import {
 import type { KeyParticleRenderStyle } from "../domain/keyParticles";
 import type { LightAnchor, StageVeilAnchor } from "../spatial/stage";
 import type { VfxTheme } from "../domain/themes";
-import type { VfxCategory, VfxEffectDefinition } from "../types";
+import type { ListVisibilityOptions, VfxCategory, VfxEffectDefinition, VfxResourceVisibility } from "../types";
 
 export const VFX_PLUGIN_MAX_CONSECUTIVE_ERRORS = 5;
 const MAX_RECENT_PLUGIN_ERRORS = 20;
@@ -65,6 +65,7 @@ interface MutableDiagnostic {
 
 interface OwnedEntry<T> {
     owner: string;
+    visibility: VfxResourceVisibility;
     value: T;
 }
 
@@ -209,20 +210,21 @@ export class VfxRegistry {
         // Any failure during register() leaves all registry maps untouched.
         plugin.register(registrar);
 
+        const defaultVisibility: VfxResourceVisibility = manifest.visibility ?? "public";
         for (const [id, def] of stagedEffects) {
-            this.effects.set(id, { owner: manifest.id, value: def });
+            this.effects.set(id, { owner: manifest.id, visibility: def.visibility ?? defaultVisibility, value: def });
         }
         for (const [id, theme] of stagedThemes) {
-            this.themes.set(id, { owner: manifest.id, value: theme });
+            this.themes.set(id, { owner: manifest.id, visibility: theme.visibility ?? defaultVisibility, value: theme });
         }
         for (const [id, anchors] of stagedLightLayouts) {
-            this.lightLayouts.set(id, { owner: manifest.id, value: anchors });
+            this.lightLayouts.set(id, { owner: manifest.id, visibility: defaultVisibility, value: anchors });
         }
         for (const [id, veils] of stagedVeilLayouts) {
-            this.veilLayouts.set(id, { owner: manifest.id, value: veils });
+            this.veilLayouts.set(id, { owner: manifest.id, visibility: defaultVisibility, value: veils });
         }
         for (const [id, style] of stagedKeyStyles) {
-            this.keyStyles.set(id, { owner: manifest.id, value: style });
+            this.keyStyles.set(id, { owner: manifest.id, visibility: style.visibility ?? defaultVisibility, value: style });
         }
 
         const record: MutablePluginRecord = {
@@ -314,8 +316,16 @@ export class VfxRegistry {
         return [...this.plugins.values()].map(record => this.snapshotRecord(record));
     }
 
+    private isVisible<T>(entry: OwnedEntry<T>, options?: ListVisibilityOptions): boolean {
+        return options?.includeInternal !== false || entry.visibility === "public";
+    }
+
     hasEffect(id: string): boolean {
         return this.effects.has(id);
+    }
+
+    isEffectPublic(id: string): boolean {
+        return this.effects.get(id)?.visibility === "public";
     }
 
     getEffect(id: string): VfxEffectDefinition | undefined {
@@ -326,17 +336,25 @@ export class VfxRegistry {
         return this.effects.get(id)?.owner;
     }
 
-    getEffectIds(): string[] {
-        return [...this.effects.keys()];
+    getEffectIds(options?: ListVisibilityOptions): string[] {
+        return [...this.effects.entries()]
+            .filter(([, entry]) => this.isVisible(entry, options))
+            .map(([id]) => id);
     }
 
-    listEffects(category?: VfxCategory): VfxEffectDefinition[] {
-        const all = [...this.effects.values()].map(entry => entry.value);
+    listEffects(category?: VfxCategory, options?: ListVisibilityOptions): VfxEffectDefinition[] {
+        const all = [...this.effects.values()]
+            .filter(entry => this.isVisible(entry, options))
+            .map(entry => entry.value);
         return category ? all.filter(effect => effect.category === category) : all;
     }
 
     hasTheme(id: string): boolean {
         return this.themes.has(id);
+    }
+
+    isThemePublic(id: string): boolean {
+        return this.themes.get(id)?.visibility === "public";
     }
 
     getTheme(id: string): VfxTheme | undefined {
@@ -347,12 +365,16 @@ export class VfxRegistry {
         return this.themes.get(id)?.owner;
     }
 
-    getThemeIds(): string[] {
-        return [...this.themes.keys()];
+    getThemeIds(options?: ListVisibilityOptions): string[] {
+        return [...this.themes.entries()]
+            .filter(([, entry]) => this.isVisible(entry, options))
+            .map(([id]) => id);
     }
 
-    listThemes(): { id: string; theme: VfxTheme }[] {
-        return [...this.themes.entries()].map(([id, entry]) => ({ id, theme: entry.value }));
+    listThemes(options?: ListVisibilityOptions): { id: string; theme: VfxTheme }[] {
+        return [...this.themes.entries()]
+            .filter(([, entry]) => this.isVisible(entry, options))
+            .map(([id, entry]) => ({ id, theme: entry.value }));
     }
 
     getLightLayout(id: string): readonly LightAnchor[] | undefined {
@@ -375,6 +397,10 @@ export class VfxRegistry {
         return this.keyStyles.has(id);
     }
 
+    isKeyStylePublic(id: string): boolean {
+        return this.keyStyles.get(id)?.visibility === "public";
+    }
+
     getKeyStyle(id: string): KeyParticleRenderStyle | undefined {
         return this.keyStyles.get(id)?.value;
     }
@@ -383,12 +409,16 @@ export class VfxRegistry {
         return this.keyStyles.get(id)?.owner;
     }
 
-    getKeyStyleIds(): string[] {
-        return [...this.keyStyles.keys()];
+    getKeyStyleIds(options?: ListVisibilityOptions): string[] {
+        return [...this.keyStyles.entries()]
+            .filter(([, entry]) => this.isVisible(entry, options))
+            .map(([id]) => id);
     }
 
-    listKeyStyles(): { id: string; style: KeyParticleRenderStyle }[] {
-        return [...this.keyStyles.entries()].map(([id, entry]) => ({ id, style: entry.value }));
+    listKeyStyles(options?: ListVisibilityOptions): { id: string; style: KeyParticleRenderStyle }[] {
+        return [...this.keyStyles.entries()]
+            .filter(([, entry]) => this.isVisible(entry, options))
+            .map(([id, entry]) => ({ id, style: entry.value }));
     }
 
     recordPluginError(

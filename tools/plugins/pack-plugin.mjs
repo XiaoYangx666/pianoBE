@@ -6,7 +6,7 @@ import { validatePluginManifest } from "@piano/vfx";
 import { readPbePluginArchive, writePbePluginArchive } from "@piano/vfx/package";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const ASSET_TREES = ["particles", "textures", "preview", "stage_props"];
+const ASSET_TREES = ["particles", "textures", "preview", "stage_props", "songs", "performances", "libraries"];
 
 function collectDirFiles(baseDir, relPrefix, out) {
     const dir = join(baseDir, relPrefix);

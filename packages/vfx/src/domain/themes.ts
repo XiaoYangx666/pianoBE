@@ -7,7 +7,7 @@ import { isVfxEffect, validateEffectCustomParams } from "./effects";
 import { validateKeyParticleOverride } from "./keyParticles";
 import { quietFeatures, type MusicFeatures } from "../runtime/music";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
-import type { PianoParticleOverride } from "../types";
+import type { ListVisibilityOptions, PianoParticleOverride, VfxResourceVisibility } from "../types";
 
 export interface VfxThemeLevelMapping {
     input: keyof MusicFeatures;
@@ -42,6 +42,7 @@ export interface VfxThemeLayer {
 
 export interface VfxTheme {
     label?: string;
+    visibility?: VfxResourceVisibility;
     keyParticle?: PianoParticleOverride;
     layers: readonly VfxThemeLayer[];
     seconds?: number;
@@ -59,12 +60,18 @@ export function getVfxTheme(id: string, registry: VfxRegistry = vfxRegistry): Vf
     return registry.getTheme(id);
 }
 
-export function getVfxThemeIds(registry: VfxRegistry = vfxRegistry): VfxThemeId[] {
-    return registry.getThemeIds();
+export function getVfxThemeIds(
+    registry: VfxRegistry = vfxRegistry,
+    options?: ListVisibilityOptions,
+): VfxThemeId[] {
+    return registry.getThemeIds(options);
 }
 
-export function listVfxThemes(registry: VfxRegistry = vfxRegistry): { id: VfxThemeId; theme: VfxTheme }[] {
-    return registry.listThemes();
+export function listVfxThemes(
+    registry: VfxRegistry = vfxRegistry,
+    options?: ListVisibilityOptions,
+): { id: VfxThemeId; theme: VfxTheme }[] {
+    return registry.listThemes(options);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

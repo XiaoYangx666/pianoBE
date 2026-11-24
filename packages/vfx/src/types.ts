@@ -143,6 +143,13 @@ export interface VfxStageProp {
     animation?: string;
 }
 
+export type VfxResourceVisibility = "public" | "internal";
+
+export interface ListVisibilityOptions {
+    /** 是否包含内部（歌曲/演出专属）资源，默认为 true */
+    includeInternal?: boolean;
+}
+
 export interface VfxEffectDefinition<TState = any> {
     id: string;
     label: string;
@@ -150,6 +157,7 @@ export interface VfxEffectDefinition<TState = any> {
     trigger: VfxTrigger;
     interval: number;
     priority: number;
+    visibility?: VfxResourceVisibility;
     defaultBrush?: PointBrushId;
     defaultStroke?: StrokeBrushId;
     variants?: readonly string[];

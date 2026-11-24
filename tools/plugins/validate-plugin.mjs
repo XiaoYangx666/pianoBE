@@ -253,8 +253,19 @@ async function main() {
             `${archive.manifest.provides.keyStyles?.length ?? 0} keyStyles`,
             `${archive.manifest.provides.particles?.length ?? 0} particles`,
             `${archive.stageProps.length} stage props`,
+            `${archive.songs.size} songs`,
+            `${archive.performances.length} performances`,
+            `${archive.libraries.length} libraries`,
         ].join(", ");
         console.log(`[validate-plugin] OK  ${archive.manifest.id} v${archive.manifest.version} (${counts})`);
+    }
+    for (const archive of archives) {
+        for (const perf of archive.performances) {
+            const missing = missingPerformanceResources(perf.cues, sharedRegistry);
+            if (missing.length) {
+                throw new Error(`插件 ${archive.manifest.id} 演出 ${perf.id} 引用无效：${missing.join(", ")}`);
+            }
+        }
     }
     if (validateAll) {
         const library = join(root, "midis/library");

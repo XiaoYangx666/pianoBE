@@ -1,8 +1,27 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { isApiVersionCompatible, orderVfxPlugins, validatePluginManifest, VFX_API_VERSION, type VfxPluginManifest } from "./plugin";
+import {
+    compilePerformanceSource,
+    computeMusicFingerprint,
+    extractCueEffects,
+    readSongHeader,
+    sameSongMusic,
+    validateSong,
+    type PerformanceCue,
+} from "@piano/core";
+import {
+    isApiVersionCompatible,
+    orderVfxPlugins,
+    pluginHasExecutableCode,
+    validatePluginManifest,
+    VFX_API_VERSION,
+    type VfxPluginManifest,
+} from "./plugin";
 import { readStagePropAssets, STAGE_PROP_RP_TREES, type StagePropAssets } from "./stagePropAssets";
 
 export * from "./stagePropAssets";
+
+export const MAX_PLUGIN_ARCHIVE_BYTES = 64 * 1024 * 1024;
+export const MAX_PLUGIN_ARCHIVE_FILES = 2000;
 
 export const HOST_PARTICLE_IDS: readonly string[] = [
     "field",
@@ -26,10 +45,43 @@ export const HOST_PARTICLE_IDS: readonly string[] = [
 
 export const HOST_TEXTURES: readonly string[] = ["textures/particle/vfx_lab"];
 
+export interface PluginSongEntry {
+    id: string;
+    name: string;
+    duration: number;
+    noteCount: number;
+    musicFingerprint: string;
+    bytes: Uint8Array;
+    path: string;
+}
+
+export interface PluginPerformanceEntry {
+    id: string;
+    name: string;
+    author?: string;
+    description?: string;
+    songId: string;
+    musicFingerprint?: string;
+    cues: readonly PerformanceCue[];
+    requiredEffects: readonly string[];
+    requiredPlugins?: readonly string[];
+    path: string;
+}
+
+export interface PluginLibraryEntry {
+    id: string;
+    name: string;
+    description?: string;
+    author?: string;
+    songs: readonly string[];
+    path: string;
+}
+
 export interface PbePluginArchive {
     manifest: VfxPluginManifest;
     bytes: Uint8Array;
     size: number;
+    hasExecutableCode: boolean;
     vfxEntryJs?: string;
     particles: Map<string, Uint8Array>;
     textures: Map<string, Uint8Array>;
@@ -37,6 +89,9 @@ export interface PbePluginArchive {
     files: Map<string, Uint8Array>;
     stageProps: readonly StagePropAssets[];
     externalParticleTextures: readonly string[];
+    songs: Map<string, PluginSongEntry>;
+    performances: readonly PluginPerformanceEntry[];
+    libraries: readonly PluginLibraryEntry[];
 }
 
 const HOST_TEXTURE_SET = new Set<string>(HOST_TEXTURES);
@@ -165,14 +220,24 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
     if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
         throw new Error("无效插件包：文件为空");
     }
+    if (bytes.byteLength > MAX_PLUGIN_ARCHIVE_BYTES) {
+        throw new Error(`插件包过大（超过 ${Math.floor(MAX_PLUGIN_ARCHIVE_BYTES / 1024 / 1024)} MB 限制）`);
+    }
     const rawEntries = unzipSync(bytes);
     const files = new Map<string, Uint8Array>();
     const particles = new Map<string, Uint8Array>();
     const textures = new Map<string, Uint8Array>();
     const previews = new Map<string, Uint8Array>();
+    const songFiles = new Map<string, Uint8Array>();
+    const performanceFiles = new Map<string, Uint8Array>();
+    const libraryFiles = new Map<string, Uint8Array>();
 
+    let entryCount = 0;
     for (const [rawPath, data] of Object.entries(rawEntries)) {
         if (rawPath.endsWith("/") && data.byteLength === 0) continue;
+        if (++entryCount > MAX_PLUGIN_ARCHIVE_FILES) {
+            throw new Error(`插件包内文件数量超过上限（${MAX_PLUGIN_ARCHIVE_FILES}）`);
+        }
         const path = normalizeArchivePath(rawPath);
         if (STAGE_PROP_RP_TREES.some(tree => path.toLowerCase().startsWith(tree))) {
             throw new Error(`插件包路径 ${path} 由舞台道具装配器管理，请将道具资源放在 stage_props/`);
@@ -189,6 +254,9 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
             textures.set(path, data);
         }
         else if (path.startsWith("preview/")) previews.set(path, data);
+        else if (path.startsWith("songs/")) songFiles.set(path, data);
+        else if (path.startsWith("performances/")) performanceFiles.set(path, data);
+        else if (path.startsWith("libraries/")) libraryFiles.set(path, data);
     }
 
     const manifestBytes = files.get("plugin.json");
@@ -289,10 +357,133 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
         );
     }
 
+    const songs = new Map<string, PluginSongEntry>();
+    for (const [path, data] of songFiles) {
+        if (!path.endsWith(".pbe3")) {
+            throw new Error(`songs/ 目录只支持 .pbe3 文件：${path}`);
+        }
+        validateSong(data);
+        const header = readSongHeader(data);
+        if (songs.has(header.id)) {
+            throw new Error(`插件 ${manifest.id} 包含重复歌曲 ID：${header.id}`);
+        }
+        songs.set(header.id, {
+            id: header.id,
+            name: header.name,
+            duration: header.duration,
+            noteCount: header.noteCount,
+            musicFingerprint: computeMusicFingerprint(data),
+            bytes: data,
+            path,
+        });
+    }
+
+    const performances: PluginPerformanceEntry[] = [];
+    const seenPerfIds = new Set<string>();
+    for (const [path, data] of performanceFiles) {
+        if (!path.endsWith(".json")) {
+            throw new Error(`performances/ 目录只支持 .json 文件：${path}`);
+        }
+        let raw: Record<string, unknown>;
+        try {
+            raw = JSON.parse(strFromU8(data)) as Record<string, unknown>;
+        } catch (error) {
+            throw new Error(`演出文件 ${path} JSON 无效：${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+            throw new Error(`演出文件 ${path} 必须是 JSON 对象`);
+        }
+        const stem = path.slice("performances/".length, -".json".length);
+        const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : `${manifest.id}:${stem}`;
+        if (seenPerfIds.has(id)) {
+            throw new Error(`插件 ${manifest.id} 包含重复演出 ID：${id}`);
+        }
+        seenPerfIds.add(id);
+        const songId = typeof raw.songId === "string" && raw.songId.trim()
+            ? raw.songId.trim()
+            : typeof raw.song === "string" && raw.song.trim()
+              ? raw.song.trim()
+              : "";
+        if (!songId) {
+            throw new Error(`演出文件 ${path} 缺少 songId 或 song 字段`);
+        }
+        const name = typeof raw.name === "string" && raw.name.trim()
+            ? raw.name.trim()
+            : typeof raw.title === "string" && raw.title.trim()
+              ? raw.title.trim()
+              : stem;
+
+        let cues: readonly PerformanceCue[];
+        const firstCue = Array.isArray(raw.cues) ? (raw.cues[0] as Record<string, unknown> | undefined) : undefined;
+        if (Array.isArray(raw.cues) && raw.cues.length > 0 && typeof firstCue?.tick === "number") {
+            cues = raw.cues as PerformanceCue[];
+        } else {
+            cues = compilePerformanceSource({ ...raw, song: songId });
+        }
+
+        performances.push({
+            id,
+            name,
+            ...(typeof raw.author === "string" && raw.author.trim() ? { author: raw.author.trim() } : {}),
+            ...(typeof raw.description === "string" && raw.description.trim() ? { description: raw.description.trim() } : {}),
+            songId,
+            ...(typeof raw.musicFingerprint === "string" && raw.musicFingerprint.trim()
+                ? { musicFingerprint: raw.musicFingerprint.trim() }
+                : songs.get(songId)?.musicFingerprint
+                  ? { musicFingerprint: songs.get(songId)!.musicFingerprint }
+                  : {}),
+            cues,
+            requiredEffects: extractCueEffects(cues),
+            ...(Array.isArray(raw.requiredPlugins)
+                ? { requiredPlugins: raw.requiredPlugins.filter((item): item is string => typeof item === "string" && item.trim().length > 0) }
+                : {}),
+            path,
+        });
+    }
+
+    const libraries: PluginLibraryEntry[] = [];
+    const seenLibIds = new Set<string>();
+    for (const [path, data] of libraryFiles) {
+        if (!path.endsWith(".json")) {
+            throw new Error(`libraries/ 目录只支持 .json 文件：${path}`);
+        }
+        let raw: Record<string, unknown>;
+        try {
+            raw = JSON.parse(strFromU8(data)) as Record<string, unknown>;
+        } catch (error) {
+            throw new Error(`曲库文件 ${path} JSON 无效：${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+            throw new Error(`曲库文件 ${path} 必须是 JSON 对象`);
+        }
+        const stem = path.slice("libraries/".length, -".json".length);
+        const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : `${manifest.id}:${stem}`;
+        if (seenLibIds.has(id)) {
+            throw new Error(`插件 ${manifest.id} 包含重复曲库 ID：${id}`);
+        }
+        seenLibIds.add(id);
+        const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : stem;
+        if (!Array.isArray(raw.songs)) {
+            throw new Error(`曲库文件 ${path} 缺少 songs 数组`);
+        }
+        const songIds = raw.songs.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+        libraries.push({
+            id,
+            name,
+            ...(typeof raw.description === "string" && raw.description.trim() ? { description: raw.description.trim() } : {}),
+            ...(typeof raw.author === "string" && raw.author.trim() ? { author: raw.author.trim() } : {}),
+            songs: songIds,
+            path,
+        });
+    }
+
+    const hasExecutableCode = pluginHasExecutableCode({ manifest, vfxEntryJs, files });
+
     return {
         manifest,
         bytes,
         size: bytes.byteLength,
+        hasExecutableCode,
         ...(vfxEntryJs !== undefined ? { vfxEntryJs } : {}),
         particles,
         textures,
@@ -300,12 +491,16 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
         files,
         stageProps,
         externalParticleTextures: [...externalParticleTextures],
+        songs,
+        performances,
+        libraries,
     };
 }
 
 export function validatePluginAssembly(plugins: readonly PbePluginArchive[]): PbePluginArchive[] {
     const ordered = orderVfxPlugins(plugins);
     const owners = new Map<string, string>();
+    const songOwners = new Map<string, { pluginId: string; song: PluginSongEntry }>();
     const byId = new Map(ordered.map(archive => [archive.manifest.id, archive]));
     function claim(key: string, id: string) {
         const owner = owners.get(key);
@@ -317,7 +512,22 @@ export function validatePluginAssembly(plugins: readonly PbePluginArchive[]): Pb
         const { id, provides, dependencies } = archive.manifest;
         claim(`脚本路径/${pluginSlug(id)}`, id);
         for (const [kind, ids] of Object.entries(provides)) {
+            if (kind === "songs" || kind === "performances" || kind === "libraries") continue;
             for (const resource of ids) claim(`${kind}/${resource}`, id);
+        }
+        for (const [songId, song] of archive.songs) {
+            const existing = songOwners.get(songId);
+            if (!existing) {
+                songOwners.set(songId, { pluginId: id, song });
+            } else if (!sameSongMusic(existing.song.bytes, song.bytes)) {
+                throw new Error(`插件歌曲 ID 冲突：${songId} 在 ${existing.pluginId} 与 ${id} 中音乐内容不同`);
+            }
+        }
+        for (const perf of archive.performances) {
+            claim(`performances/${perf.id}`, id);
+        }
+        for (const lib of archive.libraries) {
+            claim(`libraries/${lib.id}`, id);
         }
         for (const path of [...archive.particles.keys(), ...archive.textures.keys()]) {
             const normalized = path.toLowerCase();

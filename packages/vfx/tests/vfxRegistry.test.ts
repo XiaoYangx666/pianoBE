@@ -15,8 +15,10 @@ import {
     isPointBrush,
     isStrokeBrush,
     isValidBrush,
+    listPianoParticleStyles,
     listVfxEffects,
     listVfxPlugins,
+    listVfxThemes,
     POINT_BRUSH_IDS,
     POINT_BRUSH_INDEX,
     STROKE_BRUSH_IDS,
@@ -164,4 +166,21 @@ test("built-in plugin manifests accurately declare every registered effect, them
             : [];
         expect([...(record.manifest.provides.particles ?? [])].sort()).toEqual(diskParticles);
     }
+});
+
+test("visibility filtering hides internal dedicated effects and key styles while keeping public themes visible", () => {
+    const publicEffects = new Set(listVfxEffects(undefined, undefined, { includeInternal: false }).map(e => e.id));
+    const allEffects = new Set(listVfxEffects(undefined, undefined, { includeInternal: true }).map(e => e.id));
+    expect(allEffects.has("sinner_sword")).toBe(true);
+    expect(publicEffects.has("sinner_sword")).toBe(false);
+    expect(publicEffects.has("floral_meadow")).toBe(false);
+    expect(publicEffects.has("starfield")).toBe(true);
+
+    const publicThemes = new Set(listVfxThemes(undefined, { includeInternal: false }).map(t => t.id));
+    expect(publicThemes.has("galaxy")).toBe(true);
+    expect(publicThemes.has("chinese_misty_rain")).toBe(true);
+
+    const playerKeyStyles = new Set(listPianoParticleStyles().map(s => s.style));
+    expect(playerKeyStyles.has("magic_trail")).toBe(true);
+    expect(playerKeyStyles.has("floral_touch")).toBe(false);
 });

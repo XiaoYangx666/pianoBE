@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { strToU8, zipSync } from "fflate";
+import { encodeSong } from "@piano/core";
 import {
     HOST_PARTICLE_IDS,
     HOST_TEXTURES,
     pluginSlug,
     readPbePluginArchive,
     rewritePluginJsForAddon,
+    validatePluginAssembly,
     writePbePluginArchive,
 } from "../src/plugin/pluginPackage";
 import type { VfxPluginManifest } from "../src";
@@ -143,5 +145,76 @@ describe(".pbeplugin archive codec and validation", () => {
             "particles/pbe_vfx_wrong_name.particle.json": validParticleDoc("acme_spark_pt", HOST_TEXTURES[0]),
         });
         expect(() => readPbePluginArchive(wrongFilename)).toThrow();
+    });
+
+    test("supports pure-song, library, and performance .pbeplugin packages without vfx/index.js", () => {
+        const songBytes = encodeSong({
+            id: "abcd1234",
+            name: "测试曲目",
+            duration: 160,
+            tracks: [{ instrument: { family: "piano", number: 0, name: "Piano" }, notes: [60, 0, 40, 100] }],
+        });
+        const pureDataArchive = writePbePluginArchive({
+            "plugin.json": JSON.stringify({
+                id: "community.pop_pack",
+                name: "流行精选曲库",
+                version: "1.0.0",
+                apiVersion: "1.0.0",
+                minPianoBeVersion: "1.3.0",
+                capabilities: ["songs", "libraries", "performances"],
+                author: "Community",
+                license: "CC-BY-NC-4.0",
+                provides: {
+                    songs: ["abcd1234"],
+                    libraries: ["pop_hits"],
+                    performances: ["starry_live"],
+                },
+            }),
+            "songs/abcd1234.pbe3": songBytes,
+            "libraries/pop_hits.json": JSON.stringify({
+                id: "pop_hits",
+                name: "流行精选",
+                songs: ["abcd1234"],
+            }),
+            "performances/starry_live.json": JSON.stringify({
+                id: "starry_live",
+                name: "星空现场",
+                song: "abcd1234",
+                cues: [{ at: 0, op: "set", effect: "starfield", color: "moon", level: 80, fade: 0.5 }],
+            }),
+        });
+
+        const parsed = readPbePluginArchive(pureDataArchive);
+        expect(parsed.hasExecutableCode).toBe(false);
+        expect(parsed.songs.size).toBe(1);
+        expect(parsed.songs.get("abcd1234")?.name).toBe("测试曲目");
+        expect(parsed.libraries).toHaveLength(1);
+        expect(parsed.libraries[0].songs).toEqual(["abcd1234"]);
+        expect(parsed.performances).toHaveLength(1);
+        expect(parsed.performances[0].name).toBe("星空现场");
+        expect(parsed.performances[0].requiredEffects).toEqual(["starfield"]);
+
+        // Two plugins sharing identical song music merge cleanly in validatePluginAssembly
+        const secondPerfPlugin = readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify({
+                id: "community.alt_perf",
+                name: "另一套演出",
+                version: "1.0.0",
+                apiVersion: "1.0.0",
+                minPianoBeVersion: "1.3.0",
+                capabilities: ["songs", "performances"],
+                author: "Alt",
+                license: "MIT",
+                provides: { songs: ["abcd1234"], performances: ["alt_show"] },
+            }),
+            "songs/abcd1234.pbe3": songBytes,
+            "performances/alt_show.json": JSON.stringify({
+                id: "alt_show",
+                name: "极光夜",
+                song: "abcd1234",
+                cues: [{ at: 0, op: "flash", effect: "aurora_veil", color: "ice", level: 90 }],
+            }),
+        }));
+        expect(validatePluginAssembly([parsed, secondPerfPlugin])).toHaveLength(2);
     });
 });

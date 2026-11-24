@@ -5,6 +5,7 @@
     "apiVersion": "1.0.0",
     "minPianoBeVersion": "1.3.0",
     "capabilities": ["vfx", "vfx.stageProps"],
+    "visibility": "internal",
     "author": "PianoBE",
     "license": "CC-BY-NC-4.0",
     "provides": {
