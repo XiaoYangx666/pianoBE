@@ -129,12 +129,49 @@ export function extractSongEffectRequirements(song: StudioSong): string[] {
     return [...set];
 }
 
+export function getPluginTimbreIds(plugin: StudioPlugin): string[] {
+    return plugin.timbreEntries?.map((t) => t.id) ?? plugin.provides.timbres ?? [];
+}
+
+function isPureTimbrePlugin(plugin: StudioPlugin): boolean {
+    const c = plugin.contents;
+    return (
+        getPluginTimbreIds(plugin).length > 0 &&
+        !plugin.hasExecutableCode &&
+        !c.songs &&
+        !c.libraries &&
+        !c.performances &&
+        !c.effects &&
+        !c.themes &&
+        !c.keyStyles &&
+        !c.particles &&
+        !c.stageProps
+    );
+}
+
+export function computeSelectedPluginIds(
+    plugins: readonly StudioPlugin[],
+    selectedTimbreIds: readonly string[],
+): string[] {
+    const selectedTimbreSet = new Set(selectedTimbreIds);
+    return plugins
+        .filter((p) => {
+            if (!p.installed || !p.enabled || !p.trusted) return false;
+            if (isPureTimbrePlugin(p)) {
+                return getPluginTimbreIds(p).some((id) => selectedTimbreSet.has(id));
+            }
+            return true;
+        })
+        .map((p) => p.id);
+}
+
 export function deriveLocalSnapshot(
     local: { songs: StudioSong[]; libraries: LibraryRecord[]; plugins: StudioPlugin[] },
     currentPlan: LocalAddonPlan,
     currentPreviewTimbreId: string,
 ): {
     timbreIndex: TimbreIndexEntry[];
+    installedTimbreIds: string[];
     selectedTimbreIds: string[];
     previewTimbreId: string;
     previewResetToPiano: boolean;
@@ -143,15 +180,23 @@ export function deriveLocalSnapshot(
     selectedPluginIds: string[];
 } {
     const timbreIndex = buildTimbreIndexFromPlugins(local.plugins);
-    const enabledPluginTimbres = local.plugins
-        .filter((p) => p.installed && p.enabled && p.trusted)
-        .flatMap((p) => p.timbreEntries?.map((t) => t.id) ?? p.provides.timbres ?? []);
+    const installedPluginTimbres = local.plugins
+        .filter((p) => p.installed && p.trusted)
+        .flatMap(getPluginTimbreIds);
+    const installedTimbreIds = [
+        "piano",
+        ...new Set(installedPluginTimbres.filter((id) => id !== "piano")),
+    ];
+    const installedTimbreSet = new Set(installedTimbreIds);
     const selectedTimbreIds = [
         "piano",
-        ...new Set(enabledPluginTimbres.filter((id) => id !== "piano")),
+        ...new Set(
+            (currentPlan.selectedTimbreIds ?? []).filter(
+                (id) => id !== "piano" && installedTimbreSet.has(id),
+            ),
+        ),
     ];
-    const allowedLocalTimbres = new Set(selectedTimbreIds);
-    const previewTimbreId = allowedLocalTimbres.has(currentPreviewTimbreId)
+    const previewTimbreId = installedTimbreSet.has(currentPreviewTimbreId)
         ? currentPreviewTimbreId
         : "piano";
 
@@ -165,12 +210,11 @@ export function deriveLocalSnapshot(
         selectedTimbreIds,
     };
     const selectedSongIds = computeAddonSongIds(local.songs, local.libraries, cleanedPlan);
-    const selectedPluginIds = local.plugins
-        .filter((p) => p.installed && p.enabled && p.trusted)
-        .map((p) => p.id);
+    const selectedPluginIds = computeSelectedPluginIds(local.plugins, selectedTimbreIds);
 
     return {
         timbreIndex,
+        installedTimbreIds,
         selectedTimbreIds,
         previewTimbreId,
         previewResetToPiano: previewTimbreId !== currentPreviewTimbreId,
@@ -192,6 +236,7 @@ export function deriveServerSnapshot(
     plugins: StudioPlugin[];
     deploymentStatus: StudioDeploymentStatus;
     timbreIndex: TimbreIndexEntry[];
+    installedTimbreIds: string[];
     selectedTimbreIds: string[];
     previewTimbreId: string;
     previewResetToPiano: boolean;
@@ -201,7 +246,14 @@ export function deriveServerSnapshot(
     for (const item of deployment.availableTimbres) {
         if (!timbreIndex.some((t) => t.id === item.id)) timbreIndex.push(item);
     }
-    const allowed = new Set(["piano", ...deployment.enabledTimbres]);
+    const installedPluginTimbres = plugins
+        .filter((p) => p.installed && p.trusted)
+        .flatMap(getPluginTimbreIds);
+    const installedTimbreIds = [
+        "piano",
+        ...new Set([...installedPluginTimbres, ...deployment.enabledTimbres].filter((id) => id !== "piano")),
+    ];
+    const allowed = new Set(installedTimbreIds);
     const previewTimbreId = allowed.has(currentPreviewTimbreId)
         ? currentPreviewTimbreId
         : "piano";
@@ -211,6 +263,7 @@ export function deriveServerSnapshot(
         plugins,
         deploymentStatus: deployment,
         timbreIndex,
+        installedTimbreIds,
         selectedTimbreIds: deployment.enabledTimbres,
         previewTimbreId,
         previewResetToPiano: previewTimbreId !== currentPreviewTimbreId,

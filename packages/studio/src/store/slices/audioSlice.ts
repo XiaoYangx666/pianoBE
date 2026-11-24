@@ -18,15 +18,11 @@ export function createAudioSlice(set: StudioSet, get: StudioGet): AudioSlice {
         normalizeLoudness: readStoredNormalizeLoudness(),
 
         async setPreviewTimbre(id) {
-            const { mode, deploymentStatus, selectedTimbreIds, timbreIndex } = get();
-            const allowed =
-                mode === "server"
-                    ? (deploymentStatus?.enabledTimbres ?? ["piano"])
-                    : selectedTimbreIds;
-            if (id !== "piano" && !allowed.includes(id)) {
+            const { installedTimbreIds, timbreIndex } = get();
+            if (id !== "piano" && !(installedTimbreIds ?? ["piano"]).includes(id)) {
                 notify({
-                    title: "该音色尚未安装或未启用",
-                    message: "请先前往「扩展中心 → 钢琴音色」安装并启用后再切换使用。",
+                    title: "该音色尚未安装",
+                    message: "请先前往「扩展中心 → 钢琴音色」安装后再切换使用。",
                     color: "yellow",
                 });
                 return;

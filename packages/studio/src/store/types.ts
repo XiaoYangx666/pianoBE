@@ -84,6 +84,7 @@ export interface AddonSlice {
     addonDesc: string;
     randomUuid: boolean;
     timbreIndex: TimbreIndexEntry[];
+    installedTimbreIds: string[];
     selectedTimbreIds: string[];
     scores: ScoreEntry[];
     addonSelectedLibraryIds: string[];

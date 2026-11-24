@@ -66,17 +66,25 @@ export function createLibrarySlice(
                                 } else {
                                     await installLocalPluginBytes(bytes, "local", true);
                                     pluginsInstalled++;
-                                    if (archive.libraries.length > 0) {
+                                    if (archive.libraries.length > 0 || archive.timbres.length > 0) {
                                         const newLibIds = archive.libraries.map((l) => l.id);
+                                        const newTimbreIds = archive.timbres.map((t) => t.id);
                                         set((s) => {
                                             const nextLibs = [
                                                 ...new Set([...s.addonSelectedLibraryIds, ...newLibIds]),
                                             ];
+                                            const nextTimbres = [
+                                                ...new Set([...s.selectedTimbreIds, ...newTimbreIds]),
+                                            ];
                                             persistAddonPlan({
                                                 ...snapshotPlan(s),
                                                 selectedLibraryIds: nextLibs,
+                                                selectedTimbreIds: nextTimbres,
                                             });
-                                            return { addonSelectedLibraryIds: nextLibs };
+                                            return {
+                                                addonSelectedLibraryIds: nextLibs,
+                                                selectedTimbreIds: nextTimbres,
+                                            };
                                         });
                                     }
                                 }

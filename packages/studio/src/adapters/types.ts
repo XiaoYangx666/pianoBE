@@ -5,6 +5,7 @@ import type {
     ResourceDeployStatus,
 } from "@piano/core";
 import type { TimbreIndexEntry } from "@piano/assembly";
+import type { VfxPluginIcon } from "@piano/vfx";
 import type { PbePluginArchive } from "@piano/vfx/package";
 
 export type { PerformanceDescriptor } from "@piano/core";
@@ -79,6 +80,7 @@ export interface StudioPlugin {
     compatibilityNote?: string;
     sizeBytes: number;
     file?: string;
+    icon?: VfxPluginIcon;
     previewDataUrl?: string;
     dependencies: Array<{ id: string; range?: string }>;
     missingDependencies: string[];

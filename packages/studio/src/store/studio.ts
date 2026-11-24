@@ -192,6 +192,7 @@ export const useStudio = create<StudioState>((set, get) => ({
                 plugins: snap.plugins,
                 deploymentStatus: snap.deploymentStatus,
                 timbreIndex: snap.timbreIndex,
+                installedTimbreIds: snap.installedTimbreIds,
                 selectedTimbreIds: snap.selectedTimbreIds,
                 previewTimbreId: snap.previewTimbreId,
             });
@@ -216,6 +217,7 @@ export const useStudio = create<StudioState>((set, get) => ({
             plugins: local.plugins,
             deploymentStatus: null,
             timbreIndex: snap.timbreIndex,
+            installedTimbreIds: snap.installedTimbreIds,
             selectedTimbreIds: snap.selectedTimbreIds,
             previewTimbreId: snap.previewTimbreId,
             addonSelectedLibraryIds: snap.cleanedPlan.selectedLibraryIds,

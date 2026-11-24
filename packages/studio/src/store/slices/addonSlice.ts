@@ -6,6 +6,7 @@ import { studioPlayer } from "../../audio/player";
 import type { ScoreEntry } from "../../scores/scores";
 import {
     computeAddonSongIds,
+    computeSelectedPluginIds,
     findTimbrePlugin,
     persistAddonPlan,
     readStoredAddonPlan,
@@ -35,6 +36,7 @@ export function createAddonSlice(
         addonDesc: initialPlan.addonDesc,
         randomUuid: initialPlan.randomUuid,
         timbreIndex: [],
+        installedTimbreIds: ["piano"],
         selectedTimbreIds: initialPlan.selectedTimbreIds,
         scores: [],
         addonSelectedLibraryIds: initialPlan.selectedLibraryIds,
@@ -169,7 +171,35 @@ export function createAddonSlice(
             const meta = get().timbreIndex.find((t) => t.id === id);
             if (meta?.required || id === "piano") return;
 
+            const { mode } = get();
             const plugin = findTimbrePlugin(get().plugins, id);
+            if (mode === "local") {
+                if (plugin && !plugin.installed) {
+                    await get().installBuiltinPlugin(plugin.id);
+                    return;
+                }
+                set((s) => {
+                    const has = s.selectedTimbreIds.includes(id);
+                    const nextTimbres = has
+                        ? s.selectedTimbreIds.filter((x) => x !== id)
+                        : [...s.selectedTimbreIds, id];
+                    const normalized: string[] = [
+                        "piano",
+                        ...nextTimbres.filter((x) => x !== "piano"),
+                    ];
+                    const nextPlan: LocalAddonPlan = {
+                        ...snapshotPlan(s),
+                        selectedTimbreIds: normalized,
+                    };
+                    persistAddonPlan(nextPlan);
+                    return {
+                        selectedTimbreIds: normalized,
+                        selectedPluginIds: computeSelectedPluginIds(s.plugins, normalized),
+                    };
+                });
+                return;
+            }
+
             if (plugin) {
                 if (!plugin.installed) {
                     await get().installBuiltinPlugin(plugin.id);
@@ -179,16 +209,14 @@ export function createAddonSlice(
                 return;
             }
 
-            if (get().mode === "server") {
-                await runtime.queue.enqueue(async () => {
-                    const current = get().deploymentStatus?.enabledTimbres ?? ["piano"];
-                    const next = current.includes(id)
-                        ? current.filter((x) => x !== id)
-                        : [...current, id];
-                    const res = await serverApi.updateAddonConfig({ enabledTimbres: next });
-                    set({ deploymentStatus: normalizeServerDeployment(res.status) });
-                });
-            }
+            await runtime.queue.enqueue(async () => {
+                const current = get().deploymentStatus?.enabledTimbres ?? ["piano"];
+                const next = current.includes(id)
+                    ? current.filter((x) => x !== id)
+                    : [...current, id];
+                const res = await serverApi.updateAddonConfig({ enabledTimbres: next });
+                set({ deploymentStatus: normalizeServerDeployment(res.status) });
+            });
         },
 
         addScores(entries) {
@@ -257,6 +285,7 @@ export function createAddonSlice(
                 selectedSongIds,
                 plugins,
                 selectedPluginIds,
+                selectedTimbreIds,
                 scores,
                 addonName,
                 addonDesc,
@@ -272,6 +301,7 @@ export function createAddonSlice(
                     libraries,
                     plugins,
                     selectedPluginIds,
+                    selectedTimbreIds,
                     scores,
                     name: addonName,
                     desc: addonDesc,

@@ -95,7 +95,7 @@ describe("Studio store concurrency & derived state", () => {
         expect(tracker.isLatest(req2)).toBe(true);
     });
 
-    test("deriveLocalSnapshot enforces installed timbres and single-source library plans", () => {
+    test("deriveLocalSnapshot keeps installed timbres auditionable independently of addon export", () => {
         const enabledTimbre = makePlugin({ installed: true, enabled: true });
         const songA = makeSong("s1", ["user-default"]);
         const songB = makeSong("s2", ["user-default"]);
@@ -107,6 +107,7 @@ describe("Studio store concurrency & derived state", () => {
             selectedLibraryIds: ["user-default", "deleted-lib"],
             extraSongIds: ["s2", "ghost-song"],
             excludedSongIds: ["s1", "ghost-excluded"],
+            selectedTimbreIds: ["piano", "classic_grand"],
         };
 
         const activeSnap = deriveLocalSnapshot(
@@ -116,28 +117,67 @@ describe("Studio store concurrency & derived state", () => {
         );
         expect(activeSnap.previewTimbreId).toBe("classic_grand");
         expect(activeSnap.previewResetToPiano).toBe(false);
+        expect(activeSnap.installedTimbreIds).toEqual(["piano", "classic_grand"]);
         expect(activeSnap.selectedTimbreIds).toEqual(["piano", "classic_grand"]);
+        expect(activeSnap.selectedPluginIds).toEqual(["pianobe.timbre.classic_grand"]);
         expect(activeSnap.cleanedPlan.selectedLibraryIds).toEqual(["user-default"]);
         expect(activeSnap.cleanedPlan.extraSongIds).toEqual(["s2"]);
         expect(activeSnap.cleanedPlan.excludedSongIds).toEqual(["s1"]);
         expect(activeSnap.selectedSongIds).toEqual(["s2"]);
 
-        // Disabling the timbre plugin automatically falls previewTimbreId back to "piano"
-        const disabledSnap = deriveLocalSnapshot(
+        // Excluding the timbre from addon export keeps it installed & auditionable in the web player
+        const excludedFromExportSnap = deriveLocalSnapshot(
+            { songs: [songA, songB], libraries: libs, plugins: [enabledTimbre] },
+            { ...plan, selectedTimbreIds: ["piano"] },
+            "classic_grand",
+        );
+        expect(excludedFromExportSnap.installedTimbreIds).toEqual(["piano", "classic_grand"]);
+        expect(excludedFromExportSnap.selectedTimbreIds).toEqual(["piano"]);
+        expect(excludedFromExportSnap.selectedPluginIds).toEqual([]);
+        expect(excludedFromExportSnap.previewTimbreId).toBe("classic_grand");
+        expect(excludedFromExportSnap.previewResetToPiano).toBe(false);
+
+        // Uninstalling the timbre plugin falls previewTimbreId back to "piano"
+        const uninstalledSnap = deriveLocalSnapshot(
             {
                 songs: [songA, songB],
                 libraries: libs,
-                plugins: [makePlugin({ installed: true, enabled: false })],
+                plugins: [makePlugin({ installed: false, enabled: false })],
             },
             plan,
             "classic_grand",
         );
-        expect(disabledSnap.previewTimbreId).toBe("piano");
-        expect(disabledSnap.previewResetToPiano).toBe(true);
-        expect(disabledSnap.selectedTimbreIds).toEqual(["piano"]);
+        expect(uninstalledSnap.previewTimbreId).toBe("piano");
+        expect(uninstalledSnap.previewResetToPiano).toBe(true);
+        expect(uninstalledSnap.installedTimbreIds).toEqual(["piano"]);
+        expect(uninstalledSnap.selectedTimbreIds).toEqual(["piano"]);
     });
 
-    test("deriveServerSnapshot clamps disabled server timbres to piano", () => {
+    test("deriveServerSnapshot keeps installed timbre auditionable when excluded from BDS deployment", () => {
+        const installedServerSnap = deriveServerSnapshot(
+            [],
+            [],
+            [makePlugin({ installed: true, enabled: false })],
+            {
+                supported: true,
+                status: "active",
+                templateReady: true,
+                targetConfigHash: "00000001",
+                enabledPlugins: [],
+                deployedPlugins: [],
+                loadedPlugins: [],
+                enabledTimbres: ["piano"],
+                availableTimbres: [],
+                scores: [],
+                issues: [],
+                bdsConfig: { bdsDir: "", bdsWorld: "", bdsBpName: "bp", bdsRpName: "rp" },
+            },
+            "classic_grand",
+        );
+        expect(installedServerSnap.installedTimbreIds).toEqual(["piano", "classic_grand"]);
+        expect(installedServerSnap.previewTimbreId).toBe("classic_grand");
+        expect(installedServerSnap.previewResetToPiano).toBe(false);
+
         const snap = deriveServerSnapshot(
             [],
             [],

@@ -1,5 +1,6 @@
 import type { LibraryRecord, PerformanceCue } from "@piano/core";
 import type { TimbreIndexEntry } from "@piano/assembly";
+import type { VfxPluginIcon } from "@piano/vfx";
 import type {
     PerformanceDescriptor,
     PluginContentCounts,
@@ -416,7 +417,8 @@ export interface ServerPluginRaw {
         visibility?: "public" | "internal";
         dependencies?: string[];
         provides?: Record<string, string[] | undefined>;
-        preview?: { description?: string };
+        icon?: VfxPluginIcon;
+        preview?: { thumbnail?: string; description?: string };
     };
     size: number;
     source: "builtin" | "upload";
@@ -429,6 +431,7 @@ export interface ServerPluginRaw {
     requiresPackDeploy: boolean;
     status: "active" | "pending_deploy" | "pending_restart" | "unavailable";
     missingDependencies?: string[];
+    previewDataUrl?: string;
     contents?: PluginContentCounts;
 }
 
@@ -487,6 +490,8 @@ export function normalizeServerPlugin(raw: ServerPluginRaw): StudioPlugin {
         compatible: raw.compatible,
         compatibilityNote: raw.compatibilityReason,
         sizeBytes: raw.size ?? 0,
+        ...(manifest?.icon !== undefined ? { icon: manifest.icon } : {}),
+        ...(raw.previewDataUrl ? { previewDataUrl: raw.previewDataUrl } : {}),
         dependencies: (manifest?.dependencies ?? []).map((id) => ({ id })),
         missingDependencies: raw.missingDependencies ?? [],
         provides,

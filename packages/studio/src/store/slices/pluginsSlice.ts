@@ -134,20 +134,24 @@ export function createPluginsSlice(
                     // 官方随应用分发的扩展默认可信，自动启用（含曲库包会在音乐库立即可用）
                     await installLocalPluginBytes(bytes, "builtin", true);
                     const archive = readPbePluginArchive(bytes);
-                    if (archive.libraries.length > 0) {
+                    if (archive.libraries.length > 0 || archive.timbres.length > 0) {
                         const newLibIds = archive.libraries.map((l) => l.id);
                         const newSongIds = new Set(archive.libraries.flatMap((l) => l.songs));
+                        const newTimbreIds = archive.timbres.map((t) => t.id);
                         set((s) => {
                             const nextLibs = [...new Set([...s.addonSelectedLibraryIds, ...newLibIds])];
                             const nextExcluded = s.addonExcludedSongIds.filter((sid) => !newSongIds.has(sid));
+                            const nextTimbres = [...new Set([...s.selectedTimbreIds, ...newTimbreIds])];
                             persistAddonPlan({
                                 ...snapshotPlan(s),
                                 selectedLibraryIds: nextLibs,
                                 excludedSongIds: nextExcluded,
+                                selectedTimbreIds: nextTimbres,
                             });
                             return {
                                 addonSelectedLibraryIds: nextLibs,
                                 addonExcludedSongIds: nextExcluded,
+                                selectedTimbreIds: nextTimbres,
                             };
                         });
                     }

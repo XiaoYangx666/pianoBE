@@ -76,6 +76,7 @@ export interface BuiltinPluginIndexItem {
     source: "builtin";
     hasExecutableCode: boolean;
     manifest: VfxPluginManifest;
+    previewDataUrl?: string;
     contents: PluginContentCounts;
     timbreEntries?: PluginTimbreMeta[];
 }
@@ -272,18 +273,23 @@ export async function migrateLegacyGeneratorIfNeeded(): Promise<void> {
 }
 
 function previewToDataUrl(archive: PbePluginArchive): string | undefined {
-    const thumb = archive.manifest.preview?.thumbnail;
+    const preferred =
+        (typeof archive.manifest.icon === "string" ? archive.manifest.icon : undefined) ??
+        archive.manifest.preview?.thumbnail;
     const entry =
-        (thumb ? ([thumb, archive.previews.get(thumb)] as const) : undefined) ??
-        [...archive.previews.entries()][0];
+        (preferred && archive.previews.has(preferred)
+            ? ([preferred, archive.previews.get(preferred)] as const)
+            : undefined) ?? [...archive.previews.entries()][0];
     if (!entry?.[1]) return undefined;
     const [filePath, bytes] = entry;
     const lower = filePath.toLowerCase();
-    const mime = lower.endsWith(".webp")
-        ? "image/webp"
-        : lower.endsWith(".jpg") || lower.endsWith(".jpeg")
-          ? "image/jpeg"
-          : "image/png";
+    const mime = lower.endsWith(".svg")
+        ? "image/svg+xml"
+        : lower.endsWith(".webp")
+          ? "image/webp"
+          : lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+            ? "image/jpeg"
+            : "image/png";
     let bin = "";
     for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
     return `data:${mime};base64,${btoa(bin)}`;
@@ -354,6 +360,7 @@ export function archiveToStudioPlugin(
         ...(!compatible ? { compatibilityNote: `需要 API ${archive.manifest.apiVersion}` } : {}),
         sizeBytes: opts.bytes?.byteLength ?? archive.size,
         ...(opts.file ? { file: opts.file } : {}),
+        ...(archive.manifest.icon !== undefined ? { icon: archive.manifest.icon } : {}),
         previewDataUrl: previewToDataUrl(archive),
         dependencies: (archive.manifest.dependencies ?? []).map((id) => ({ id })),
         missingDependencies: [],
@@ -401,6 +408,8 @@ function indexItemToUninstalledPlugin(item: BuiltinPluginIndexItem): StudioPlugi
         ...(!compatible ? { compatibilityNote: `需要 API ${m.apiVersion}` } : {}),
         sizeBytes: item.size,
         file: item.file,
+        ...(m.icon !== undefined ? { icon: m.icon } : {}),
+        ...(item.previewDataUrl ? { previewDataUrl: item.previewDataUrl } : {}),
         dependencies: (m.dependencies ?? []).map((id) => ({ id })),
         missingDependencies: [],
         provides: p as Record<string, string[] | undefined>,
@@ -1140,6 +1149,7 @@ export async function exportLocalAddon(params: {
     libraries: LibraryRecord[];
     plugins: StudioPlugin[];
     selectedPluginIds: string[];
+    selectedTimbreIds?: string[];
     scores: ScoreEntry[];
     name: string;
     desc: string;
@@ -1162,9 +1172,20 @@ export async function exportLocalAddon(params: {
     if (depRes.untrustedDependencies.length > 0) {
         throw new Error(`依赖插件尚未信任：${depRes.untrustedDependencies.map((d) => d.dependencyId).join("、")}`);
     }
+    const allowedTimbres = params.selectedTimbreIds ? new Set(params.selectedTimbreIds) : null;
     const archives = depRes.resolvedIds
         .map((id) => params.plugins.find((p) => p.id === id)?.archive)
-        .filter((a): a is PbePluginArchive => Boolean(a));
+        .filter((a): a is PbePluginArchive => {
+            if (!a) return false;
+            if (
+                allowedTimbres &&
+                a.timbres.length > 0 &&
+                !a.timbres.some((t) => allowedTimbres.has(t.id))
+            ) {
+                return false;
+            }
+            return true;
+        });
 
     const assemblySongs: AssemblySongEntry[] = params.songs
         .filter((s) => s.data)
