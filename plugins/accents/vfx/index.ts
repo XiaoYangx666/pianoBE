@@ -8,6 +8,7 @@ import {
     drawShards,
     drawShock,
     drawStrokeSegments,
+    keyOriginFor,
     mix,
     motionFactors,
     resolvePointBrush,
@@ -67,6 +68,22 @@ const HANABI_SHELL_PARAMS = {
     xOffset: { label: "横向方位", default: 0, min: -2.6, max: 2.6, step: 0.1 },
     height: { label: "绽放高度", default: 3.15, min: 1.6, max: 4.8, step: 0.1 },
     burstRadius: { label: "绽放半径", default: 1.75, min: 0.8, max: 3.2, step: 0.1 },
+} as const satisfies VfxParameterSchema;
+
+const BRUSH_STROKE_PARAMS = {
+    width: { label: "笔触宽度", default: 0.19, min: 0.06, max: 0.42, step: 0.01 },
+    reach: { label: "笔迹长度", default: 1.0, min: 0.3, max: 1.5, step: 0.05 },
+    lift: { label: "起落高度", default: 1.0, min: 0.3, max: 2.0, step: 0.1 },
+} as const satisfies VfxParameterSchema;
+
+const WATER_RIPPLE_PARAMS = {
+    linger: { label: "水纹时长", default: 2.4, min: 1.0, max: 5.0, step: 0.1 },
+    radius: { label: "扩散半径", default: 2.4, min: 1.0, max: 4.2, step: 0.1 },
+} as const satisfies VfxParameterSchema;
+
+const PETAL_BURST_PARAMS = {
+    count: { label: "花瓣数量", default: 6, min: 2, max: 12, step: 1 },
+    lift: { label: "扬起力度", default: 1.0, min: 0.3, max: 2.0, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
 const ACCENT_EFFECTS: readonly VfxEffectDefinition[] = [
@@ -735,6 +752,174 @@ const ACCENT_EFFECTS: readonly VfxEffectDefinition[] = [
             }));
 
             return { priority: 8, emitters };
+        },
+    } satisfies VfxEffectDefinition,
+
+    {
+        id: "brush_stroke",
+        label: "流光落笔",
+        category: "accent",
+        trigger: "instant",
+        interval: 18,
+        priority: 6,
+        defaultBrush: "mote",
+        defaultStroke: "calligraphy",
+        variants: ["sweep", "arc", "double"],
+        parameters: BRUSH_STROKE_PARAMS,
+        emit({ params }) {
+            const { color, color2, intensity, scale, brush, variant, zone, motion } = params;
+            const c = resolveSchemaParams(BRUSH_STROKE_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const yBase = zoneBaseY(zone, 0.95, 0.35);
+            const strokeBrush = resolveStrokeBrush(brush, "calligraphy");
+            const makeCurve = (side: 1 | -1): Point3[] => {
+                const raw: Point3[] = variant === "arc"
+                    ? [
+                        [-1.6 * c.reach * side, yBase + 0.15, -0.35],
+                        [-0.7 * c.reach * side, yBase + 1.35 * c.lift, 0.35],
+                        [0.5 * c.reach * side, yBase + 1.65 * c.lift, 1.05],
+                        [1.65 * c.reach * side, yBase + 0.55 * c.lift, 1.55],
+                    ]
+                    : [
+                        [-1.15 * c.reach * side, yBase + 0.05, -0.75],
+                        [-0.35 * c.reach * side, yBase + 0.52 * c.lift, -0.15],
+                        [0.55 * c.reach * side, yBase + 1.05 * c.lift, 0.55],
+                        [0.95 * c.reach * side, yBase + 1.24 * c.lift, 1.35],
+                        [0.15 * c.reach * side, yBase + 0.88 * c.lift, 2.05],
+                    ];
+                return catmullRom(m.dir < 0 ? [...raw].reverse() : raw, 7);
+            };
+            const sides: readonly (1 | -1)[] = variant === "double" ? [-1, 1] : [1];
+            return {
+                priority: 6,
+                emitters: sides.flatMap(side => drawStrokeSegments(makeCurve(side), {
+                    count: variant === "double" ? 12 : 16,
+                    life: 2.1,
+                    brush: strokeBrush,
+                    color,
+                    color2,
+                    opacity: Math.min(1, (0.52 + 0.44 * intensity)),
+                    width: c.width,
+                    scale,
+                    travel: 0.08 * m.speed * m.dir,
+                    taperEnds: true,
+                    fadeIn: 0.14,
+                    fadeOut: 0.65,
+                })),
+            };
+        },
+    } satisfies VfxEffectDefinition,
+
+    {
+        id: "water_ripple",
+        label: "水纹涟漪",
+        category: "accent",
+        trigger: "instant",
+        interval: 24,
+        priority: 5,
+        variants: ["single", "sides", "front"],
+        parameters: WATER_RIPPLE_PARAMS,
+        emit({ params }) {
+            const { color, color2, intensity, scale, variant, zone } = params;
+            const c = resolveSchemaParams(WATER_RIPPLE_PARAMS, params.custom);
+            const yBase = zone === "mid" ? 0.32 : zone === "high" ? 0.72 : 0.08;
+            const centers = variant === "sides" ? [-2.25, 2.25] : [0];
+            return {
+                priority: 5,
+                emitters: centers.map((x, i) => drawGroundRing({
+                    color,
+                    color2,
+                    opacity: Math.min(1, (0.42 + 0.50 * intensity)),
+                    scale,
+                    offset: [x, yBase + i * 0.014, (variant === "front" ? -1.75 : 0.65) + i * 0.6],
+                    life: c.linger + i * 0.24,
+                    radiusStart: 0.08,
+                    radiusEnd: (c.radius - i * 0.42),
+                    fadeOut: c.linger * 0.55,
+                    curve: 0.72,
+                })),
+            };
+        },
+    } satisfies VfxEffectDefinition,
+
+    {
+        id: "petal_burst",
+        label: "花瓣翻飞",
+        category: "accent",
+        trigger: "instant",
+        interval: 20,
+        priority: 7,
+        defaultBrush: "petal",
+        variants: ["left", "right", "crown", "farewell"],
+        parameters: PETAL_BURST_PARAMS,
+        emit({ params, instrument }) {
+            const { color, color2, intensity, scale, brush, variant, motion } = params;
+            const c = resolveSchemaParams(PETAL_BURST_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const resolvedBrush = resolvePointBrush(brush, "petal");
+            if (variant === "farewell") {
+                const origin = keyOriginFor(64, instrument) ?? [0, 1.05, -0.55];
+                return {
+                    priority: 7,
+                    emitters: [drawPoints({
+                        count: 1,
+                        life: 5.2,
+                        lifeJitter: 0,
+                        brush: resolvedBrush,
+                        color,
+                        color2,
+                        opacity: Math.min(1, 0.92 * intensity),
+                        transform: { x: origin[0], y: origin[1] + 0.07, z: origin[2], scale },
+                        size: 0.105,
+                        sizeEnd: 0.06,
+                        sizeJitter: 0,
+                        aspect: 1.22,
+                        velocity: [0.17 * m.dir, 0.22 * c.lift, 0.18],
+                        accel: [0, -0.078, 0],
+                        flutter: 0.085,
+                        spin: -15,
+                        spinRate: 40 * m.dir,
+                        fadeIn: 0.26,
+                        fadeOut: 2.2,
+                    })],
+                };
+            }
+            const crown = variant === "crown";
+            const sides = crown ? [-1, 1] : [variant === "right" ? 1 : -1];
+            return {
+                priority: 7,
+                emitters: sides.flatMap(side => [0, 1, 2].map(lane => {
+                    const origin: Point3 = [side * (2.65 + lane * 0.72), 0.45 + lane * 0.12, 0.68 + lane * 0.62];
+                    const lift = ((crown ? 2.45 : 1.25) - lane * 0.18) * c.lift * m.energy;
+                    return drawPoints({
+                        count: crown ? Math.max(3, Math.round(c.count)) : Math.max(2, Math.round(c.count * 0.8)),
+                        life: crown ? 2.55 : 1.75,
+                        lifeJitter: 0.12,
+                        brush: resolvedBrush,
+                        color,
+                        color2,
+                        colorRandom: 0.88,
+                        opacity: Math.min(1, intensity * 0.88),
+                        offset: origin,
+                        scale,
+                        size: crown ? 0.138 : 0.108,
+                        sizeEnd: 0.062,
+                        sizeJitter: 0.42,
+                        spread: [0.38, 0.15, 0.56],
+                        aspect: 1.25,
+                        velocity: [(0.38 + lane * 0.2) * m.dir, lift, -0.45 - lane * 0.12],
+                        accel: [0, crown ? -1.58 : -1.12, 0],
+                        flutter: 0.18,
+                        radius: 0.08,
+                        radiusEnd: crown ? 0.5 : 0.3,
+                        omega: 72 * m.dir,
+                        spinJitter: 150,
+                        spinRate: (82 + lane * 16) * m.dir,
+                        fadeIn: 0.18,
+                        fadeOut: 0.68,
+                    });
+                })),
+            };
         },
     } satisfies VfxEffectDefinition,
 ];

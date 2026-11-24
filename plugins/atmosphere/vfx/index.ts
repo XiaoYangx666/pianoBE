@@ -56,6 +56,16 @@ const METEOR_SHOWER_PARAMS = {
     speed: { label: "划落速度", default: 2.65, min: 1.0, max: 5.0, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
+const RAIN_CURTAIN_PARAMS = {
+    density: { label: "雨丝密度", default: 1.0, min: 0.3, max: 1.6, step: 0.1 },
+    slant: { label: "斜风倾角", default: 0.42, min: -1.2, max: 1.2, step: 0.06 },
+} as const satisfies VfxParameterSchema;
+
+const BUBBLE_RISE_PARAMS = {
+    rise: { label: "上浮高度", default: 2.2, min: 0.8, max: 4.0, step: 0.1 },
+    size: { label: "气泡大小", default: 0.085, min: 0.03, max: 0.18, step: 0.005 },
+} as const satisfies VfxParameterSchema;
+
 const ATMOSPHERE_EFFECTS: readonly VfxEffectDefinition[] = [
     {
         id: "starfield",
@@ -487,6 +497,113 @@ const ATMOSPHERE_EFFECTS: readonly VfxEffectDefinition[] = [
                 }));
             }
             return { priority: 2, emitters };
+        },
+    } satisfies VfxEffectDefinition,
+
+    {
+        id: "rain_curtain",
+        label: "疏雨幕",
+        category: "atmosphere",
+        trigger: "continuous",
+        interval: 13,
+        priority: 2,
+        defaultBrush: "mote",
+        variants: ["back", "wings"],
+        parameters: RAIN_CURTAIN_PARAMS,
+        emit({ params, music, phase }) {
+            const { color, color2, intensity, scale, brush, variant, motion } = params;
+            const c = resolveSchemaParams(RAIN_CURTAIN_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const wings = variant === "wings";
+            const count = Math.max(2, Math.round(7 * c.density * (0.45 + 0.55 * intensity)));
+            return {
+                priority: 2,
+                emitters: [-1, 1].map(side => drawPoints({
+                    count,
+                    life: 1.4,
+                    lifeJitter: 0.18,
+                    group: "curtain",
+                    brush: resolvePointBrush(brush, "mote"),
+                    color,
+                    color2,
+                    colorRandom: 1,
+                    opacity: Math.min(1, 0.85 * intensity),
+                    scale,
+                    size: 0.06,
+                    sizeEnd: 0.04,
+                    aspect: 6.5,
+                    offset: [side * (wings ? 3.6 : 1.9), 3.85 + 0.32 * music.sustain, 3.55],
+                    spread: [wings ? 0.85 : 1.55, 1.0, 0.85],
+                    spin: -13 * c.slant * m.dir,
+                    spinJitter: 2.4,
+                    velocity: [c.slant * m.dir, -1.94 * m.speed, 0.12 * Math.sin(phase * Math.PI / 180)],
+                    fadeIn: 0.17,
+                    fadeOut: 0.35,
+                })),
+            };
+        },
+    } satisfies VfxEffectDefinition,
+
+    {
+        id: "bubble_rise",
+        label: "浮光气泡",
+        category: "atmosphere",
+        trigger: "continuous",
+        interval: 14,
+        priority: 2,
+        defaultBrush: "ring",
+        variants: ["ambient", "surround"],
+        parameters: BUBBLE_RISE_PARAMS,
+        emit({ params, music }) {
+            const { color, color2, intensity, scale, brush, variant, zone, motion } = params;
+            const c = resolveSchemaParams(BUBBLE_RISE_PARAMS, params.custom);
+            const m = motionFactors(motion);
+            const yBase = zoneBaseY(zone, 0.35, 0.25);
+            const spreadX = variant === "surround" ? 3.4 * m.spread : 2.5 * m.spread;
+            const riseVel = (c.rise / 2.2) * (0.72 + 0.28 * music.sustain) * m.speed * m.dir;
+            return {
+                priority: 2,
+                emitters: [
+                    drawPoints({
+                        count: 10,
+                        life: 2.25,
+                        lifeJitter: 0.3,
+                        brush: resolvePointBrush(brush, "ring"),
+                        color,
+                        color2,
+                        colorRandom: 0.75,
+                        opacity: Math.min(1, 0.32 + 0.56 * intensity),
+                        scale,
+                        offset: [0, yBase, 0.45],
+                        size: c.size,
+                        sizeEnd: c.size * 1.18,
+                        sizeJitter: 0.45,
+                        spread: [spreadX, 0.45, 2.2 * m.spread],
+                        velocity: [0, riseVel, 0],
+                        flutter: 0.08 * m.energy,
+                        fadeIn: 0.35,
+                        fadeOut: 0.65,
+                    }),
+                    drawPoints({
+                        count: 5,
+                        life: 1.9,
+                        lifeJitter: 0.25,
+                        brush: resolvePointBrush("mote", "mote"),
+                        color: color2,
+                        color2: color,
+                        opacity: Math.min(1, 0.24 + 0.44 * intensity),
+                        scale,
+                        offset: [0, yBase + 0.15, 0.45],
+                        size: c.size * 0.45,
+                        sizeEnd: c.size * 0.22,
+                        spread: [spreadX * 0.9, 0.4, 2.0 * m.spread],
+                        velocity: [0, riseVel * 1.08, 0],
+                        twinkle: 0.55,
+                        fadeIn: 0.28,
+                        fadeOut: 0.55,
+                    }),
+                ],
+            };
         },
     } satisfies VfxEffectDefinition,
 ];

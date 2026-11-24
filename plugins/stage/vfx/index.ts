@@ -14,6 +14,8 @@ import {
     resolveStrokeBrush,
     sampleArch,
     sampleStarPolygon,
+    vfxPerformerDepth,
+    vfxStageFrame,
     zoneBaseY,
     ZONE_Y_OFFSET,
     type LightAnchor,
@@ -49,12 +51,6 @@ const STAGE_LIGHT_LAYOUTS: Readonly<Record<string, readonly LightAnchor[]>> = {
         { origin: { x: side * 2.12, y: 0.14, z: 0.92 }, direction: { x: side * 0.69, y: 1, z: 0.10 }, length: 2.26, width: 1.38, gain: 0.86 },
         { origin: { x: side * 2.43, y: 0.13, z: 0.55 }, direction: { x: side * 1.2, y: 1, z: -0.18 }, length: 1.88, width: 1.24, gain: 0.72 },
     ]),
-    truss: [-1, 1].flatMap(side => [
-        { origin: { x: side * 3.19, y: 0.12, z: 1.24 }, direction: { x: 0, y: 1, z: 0 }, length: 1.81, width: 0.70, gain: 0.89 },
-        { origin: { x: side * 3.19, y: 3.51, z: 1.24 }, direction: { x: -side, y: 0, z: 0 }, length: 0.93, width: 0.64, gain: 0.76 },
-        { origin: { x: side * 3.19, y: 0.12, z: 1.24 }, direction: { x: 0, y: 0, z: -1 }, length: 1.80, width: 0.54, gain: 0.55 },
-        { origin: { x: side * 3.19, y: 0.53, z: 1.24 }, direction: { x: 0, y: 0, z: -1 }, length: 0.42, width: 0.74, gain: 0.66 },
-    ]),
 };
 
 const STAGE_VEIL_LAYOUTS: Readonly<Record<string, readonly StageVeilAnchor[]>> = {
@@ -81,9 +77,10 @@ const CROWN_FAN_PARAMS = {
     spread: { label: "横向展开", default: 1.0, min: 0.5, max: 1.6, step: 0.05 },
 } as const satisfies VfxParameterSchema;
 
-const STAGE_TRUSS_PARAMS = {
-    length: { label: "光束长度", default: 1.20, min: 0.5, max: 2.4, step: 0.1 },
-    width: { label: "光束宽度", default: 0.20, min: 0.08, max: 0.5, step: 0.01 },
+const STAGE_SPOTLIGHT_PARAMS = {
+    width: { label: "光池宽度", default: 2.2, min: 0.8, max: 4.0, step: 0.1 },
+    cone: { label: "空气光束", default: 0.65, min: 0, max: 1, step: 0.05 },
+    side: { label: "两侧补光", default: 0.35, min: 0, max: 1, step: 0.05 },
 } as const satisfies VfxParameterSchema;
 
 const MAGIC_CIRCLE_PARAMS = {
@@ -274,38 +271,88 @@ const STAGE_EFFECTS: readonly VfxEffectDefinition[] = [
     } satisfies VfxEffectDefinition<{ previousLength?: number }>,
 
     {
-        id: "stage_truss",
-        label: "舞台门架光框",
+        id: "stage_spotlight",
+        label: "舞台追光",
         category: "stage",
         trigger: "continuous",
-        interval: 20,
-        priority: 4,
+        interval: 12,
+        priority: 7,
         defaultBrush: "mote",
-        parameters: STAGE_TRUSS_PARAMS,
-        createState: () => ({ previousLength: undefined as number | undefined }),
-        emit({ params, music, state }) {
-            const { color, intensity, scale, zone, motion } = params;
-            const c = resolveSchemaParams(STAGE_TRUSS_PARAMS, params.custom);
-            const m = motionFactors(motion);
-            const length = Math.min(2.4, (c.length + 0.90 * music.density + 0.30 * music.activity) * m.energy);
-            const previousLength = state.previousLength ?? length;
-            state.previousLength = length;
-            return {
-                priority: 4,
-                emitters: drawShaft({
-                    layout: "truss",
+        variants: ["center", "stage"],
+        parameters: STAGE_SPOTLIGHT_PARAMS,
+        emit({ params, instrument }) {
+            const { color, color2, intensity, scale, brush, variant, zone } = params;
+            const c = resolveSchemaParams(STAGE_SPOTLIGHT_PARAMS, params.custom);
+            const stage = vfxStageFrame(instrument);
+            const centerZ = variant === "stage"
+                ? 0.25
+                : (vfxPerformerDepth(instrument) * 0.48 - stage.centerZ) / stage.depth;
+            const yFloor = zone === "mid" ? 0.28 : zone === "high" ? 0.65 : 0.06;
+            const reach = c.width * scale;
+            const emitters: VfxEmitter[] = [
+                drawGroundRing({
+                    group: "spotlight",
                     color,
-                    opacity: intensity,
-                    length,
-                    previousLength,
-                    width: c.width,
-                    range: 1.02 * m.spread,
-                    yOffset: ZONE_Y_OFFSET[zone] * 0.5,
+                    color2,
+                    opacity: 0.48 * intensity,
+                    offset: [0, yFloor, centerZ],
                     scale,
+                    life: 1.25,
+                    radiusStart: reach * 0.72,
+                    radiusEnd: reach * 0.84,
+                    curve: 0.5,
+                    fadeIn: 0.22,
+                    fadeOut: 0.45,
                 }),
-            };
+                drawPoints({
+                    group: "spotlight",
+                    count: 6,
+                    life: 1.4,
+                    lifeJitter: 0.2,
+                    brush: resolvePointBrush(brush, "mote"),
+                    color,
+                    color2,
+                    opacity: 0.34 * intensity,
+                    scale,
+                    offset: [0, yFloor + 1.15, centerZ],
+                    size: 0.055,
+                    sizeEnd: 0.03,
+                    spread: [reach * 0.36, 0.95, reach * 0.36],
+                    velocity: [0, 0.14, 0],
+                    twinkle: 0.45,
+                    fadeIn: 0.25,
+                    fadeOut: 0.5,
+                }),
+            ];
+            if (c.cone > 0.02) {
+                emitters.push(buildWindowShaft(
+                    0, 4.15, centerZ,
+                    0, -1, 0,
+                    color,
+                    0.46 * c.cone * intensity,
+                    2.05,
+                    2.05,
+                    c.width * 0.48,
+                    scale,
+                ));
+            }
+            if (c.side > 0.02) {
+                for (const sign of [-1, 1] as const) {
+                    emitters.push(buildWindowShaft(
+                        sign * 2.25, 3.85, centerZ + 0.35,
+                        -sign * 0.32, -1, -0.08,
+                        color2,
+                        0.32 * c.side * intensity,
+                        1.85,
+                        1.85,
+                        c.width * 0.32,
+                        scale,
+                    ));
+                }
+            }
+            return { priority: 7, emitters };
         },
-    } satisfies VfxEffectDefinition<{ previousLength?: number }>,
+    } satisfies VfxEffectDefinition,
 
     {
         id: "magic_circle",

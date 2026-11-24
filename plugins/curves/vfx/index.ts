@@ -10,7 +10,6 @@ import {
     resolvePointBrush,
     resolveSchemaParams,
     resolveStrokeBrush,
-    sampleLissajous,
     sampleWingPair,
     zoneBaseY,
     ZONE_Y_OFFSET,
@@ -56,17 +55,9 @@ const WAVE_RIBBON_PARAMS = {
     speed: { label: "律动速度", default: 1.0, min: 0.3, max: 2.5, step: 0.1 },
 } as const satisfies VfxParameterSchema;
 
-const VORTEX_COLUMN_PARAMS = {
-    radius: { label: "底部半径", default: 2.55, min: 0.5, max: 4.0, step: 0.1 },
-    topRadius: { label: "顶部半径", default: 0.95, min: 0.3, max: 4.0, step: 0.1 },
-    height: { label: "旋涡高度", default: 2.1, min: 0.5, max: 4.5, step: 0.1 },
-    angularSpeed: { label: "旋转角速度", default: 210, min: -360, max: 360, step: 10 },
-} as const satisfies VfxParameterSchema;
-
-const LISSAJOUS_WEAVE_PARAMS = {
-    radius: { label: "水平半径", default: 2.35, min: 0.8, max: 3.8, step: 0.1 },
-    height: { label: "垂直幅度", default: 0.68, min: 0.2, max: 2.2, step: 0.05 },
-    width: { label: "笔触宽度", default: 0.13, min: 0.05, max: 0.32, step: 0.01 },
+const INK_TRACE_PARAMS = {
+    reach: { label: "笔迹长度", default: 1.0, min: 0.2, max: 1.0, step: 0.05 },
+    width: { label: "笔触宽度", default: 0.14, min: 0.05, max: 0.32, step: 0.01 },
 } as const satisfies VfxParameterSchema;
 
 const MUSUBI_BRAID_PARAMS = {
@@ -393,120 +384,44 @@ const CURVE_EFFECTS: readonly VfxEffectDefinition[] = [
     } satisfies VfxEffectDefinition<{ previousAmplitude?: number }>,
 
     {
-        id: "vortex_column",
-        label: "时空旋涡柱",
+        id: "ink_trace",
+        label: "流光笔迹",
         category: "curve",
         trigger: "continuous",
-        interval: 16,
-        priority: 3,
-        defaultBrush: "star",
-        parameters: VORTEX_COLUMN_PARAMS,
-        emit({ params, music, phase }) {
-            const { color, color2, intensity, scale, brush, zone, motion } = params;
-            const c = resolveSchemaParams(VORTEX_COLUMN_PARAMS, params.custom);
-            const m = motionFactors(motion);
-            const reverse = motion === "reverse";
-            const y = zoneBaseY(zone, reverse ? 2.45 : 0.22, 0.15);
-            const resolvedBrush = resolvePointBrush(brush, "star");
-            const omega = (c.angularSpeed + Math.sign(c.angularSpeed) * 90 * music.activity) * (reverse ? -1 : 1) * m.speed;
-            const secondaryHeight = c.height * (1.85 / 2.1);
-            return {
-                priority: 3,
-                emitters: [
-                    drawPoints({
-                        count: 8,
-                        life: 1.55,
-                        lifeJitter: 0.15,
-                        brush: resolvedBrush,
-                        color,
-                        color2,
-                        opacity: 0.42 + 0.52 * intensity,
-                        scale,
-                        offset: [0, y, 0],
-                        size: 0.072 + 0.024 * intensity,
-                        sizeEnd: 0.04,
-                        phase: phase * 5,
-                        phaseSpread: 360,
-                        omega,
-                        radius: (reverse ? c.topRadius : c.radius) * m.spread,
-                        radiusEnd: (reverse ? c.radius : c.topRadius) * m.spread,
-                        curve: 0.85,
-                        depthRatio: 0.88,
-                        rise: (reverse ? -c.height : c.height) * m.energy,
-                        fadeIn: 0.18,
-                        fadeOut: 0.36,
-                    }),
-                    drawPoints({
-                        count: 6,
-                        life: 1.40,
-                        lifeJitter: 0.15,
-                        brush: resolvedBrush,
-                        color: color2,
-                        color2: color,
-                        opacity: 0.30 + 0.45 * intensity,
-                        scale,
-                        offset: [0, y + 0.15, 0],
-                        size: 0.056,
-                        sizeEnd: 0.035,
-                        phase: phase * 5 + 90,
-                        phaseSpread: 360,
-                        omega: omega * 1.15,
-                        radius: (reverse ? c.topRadius + 0.40 : c.radius + 0.40) * m.spread,
-                        radiusEnd: (reverse ? c.radius + 0.40 : c.topRadius + 0.40) * m.spread,
-                        curve: 0.85,
-                        depthRatio: 0.88,
-                        rise: (reverse ? -secondaryHeight : secondaryHeight) * m.energy,
-                        twinkle: 0.6,
-                        fadeIn: 0.18,
-                        fadeOut: 0.36,
-                    }),
-                ],
-            };
-        },
-    } satisfies VfxEffectDefinition,
-
-    {
-        id: "lissajous_weave",
-        label: "利萨如织光",
-        category: "curve",
-        trigger: "continuous",
-        interval: 22,
+        interval: 24,
         priority: 3,
         defaultBrush: "mote",
         defaultStroke: "calligraphy",
-        parameters: LISSAJOUS_WEAVE_PARAMS,
-        emit({ params, music, phase }) {
+        parameters: INK_TRACE_PARAMS,
+        emit({ params, music }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
-            const c = resolveSchemaParams(LISSAJOUS_WEAVE_PARAMS, params.custom);
+            const c = resolveSchemaParams(INK_TRACE_PARAMS, params.custom);
             const m = motionFactors(motion);
-            const yCenter = zoneBaseY(zone, 1.55, 0.75);
-            const raw = sampleLissajous(
-                (c.radius + 0.35 * music.sustain) * m.spread,
-                (c.height + 0.35 * music.activity) * m.energy,
-                ((c.radius / 2.35) * 1.85 + 0.30 * music.sustain) * m.spread,
-                yCenter,
-                2,
-                3,
-                2,
-                phase * 2.5 * m.dir,
-                36,
-            );
-            const points = catmullRom(raw, 4);
+            const yBase = zoneBaseY(zone, 1.0, 0.35);
+            const raw: Point3[] = [
+                [-1.85 * m.spread, yBase, -0.55],
+                [-0.85 * m.spread, yBase + 0.48, 0.22],
+                [0.15 * m.spread, yBase + 0.96, 0.88],
+                [1.05 * m.spread, yBase + 1.12, 1.55],
+                [0.45 * m.spread, yBase + 0.88, 2.12],
+                [-0.35 * m.spread, yBase + 0.64, 2.52],
+            ];
+            const path = catmullRom(m.dir < 0 ? [...raw].reverse() : raw, 8);
+            const count = Math.max(3, Math.ceil(c.reach * 14));
             return {
                 priority: 3,
-                emitters: drawStrokeSegments(points, {
-                    count: 18,
-                    life: 1.35,
+                emitters: drawStrokeSegments(path.slice(0, Math.max(2, Math.ceil(path.length * c.reach))), {
+                    count,
+                    life: 1.85,
                     brush: resolveStrokeBrush(brush, "calligraphy"),
                     color,
                     color2,
-                    opacity: 0.36 + 0.54 * intensity,
-                    width: c.width + 0.04 * intensity,
+                    opacity: (0.48 + 0.36 * music.sustain) * intensity,
+                    width: c.width + music.sustain * 0.045,
                     scale,
-                    travel: 0.16 * m.speed * m.dir,
-                    taperEnds: false,
-                    fadeIn: 0.18,
-                    fadeOut: 0.36,
+                    travel: 0.08 * m.speed * m.dir,
+                    fadeIn: 0.28,
+                    fadeOut: 0.46,
                 }),
             };
         },

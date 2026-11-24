@@ -15,10 +15,13 @@
             "firework_bloom",
             "hanabi_launch",
             "comet_split",
-            "hanabi_shell"
+            "hanabi_shell",
+            "brush_stroke",
+            "water_ripple",
+            "petal_burst"
         ]
     },
     "preview": {
-        "description": "瞬时强调与烟花特效插件：地面扫光弧、重拍冲击波、棱晶回卷、烟花盛放、龙势升空、彗星分裂与大玉花火。"
+        "description": "瞬时强调与烟花特效插件：地面扫光弧、重拍冲击波、棱晶回卷、烟花盛放、龙势升空、彗星分裂、大玉花火、流光落笔、水纹涟漪与花瓣翻飞。"
     }
 }

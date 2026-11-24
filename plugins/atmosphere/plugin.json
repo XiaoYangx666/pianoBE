@@ -16,10 +16,12 @@
             "wing_curtain",
             "dandelion_drift",
             "meteor_shower",
-            "twilight_mist"
+            "twilight_mist",
+            "rain_curtain",
+            "bubble_rise"
         ]
     },
     "preview": {
-        "description": "氛围与环境特效插件：星尘雾海、落樱雪舞、流萤、极光天幕、双翼光幕、夏风白絮、流星雨与黄昏云海。"
+        "description": "氛围与环境特效插件：星尘雾海、落樱雪舞、流萤、极光天幕、双翼光幕、夏风白絮、流星雨、黄昏云海、疏雨幕与浮光气泡。"
     }
 }

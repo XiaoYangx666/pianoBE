@@ -11,7 +11,7 @@
         "effects": [
             "light_pillars",
             "crown_fan",
-            "stage_truss",
+            "stage_spotlight",
             "magic_circle",
             "portal_arch",
             "horizon_glow",
@@ -26,12 +26,11 @@
             "rails",
             "backline",
             "fan",
-            "truss",
             "aurora",
             "wings"
         ]
     },
     "preview": {
-        "description": "舞台灯光与空间锚点插件：灯柱阵、扇束冠冕、舞台门架、星辰法阵、时空光拱门、表盘与海面波光。"
+        "description": "舞台灯光与空间锚点插件：灯柱阵、扇束冠冕、星辰法阵、时空光拱门、表盘、海面波光与舞台追光。"
     }
 }

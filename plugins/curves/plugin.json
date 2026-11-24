@@ -14,13 +14,12 @@
             "orbit_halo",
             "silk_streams",
             "wave_ribbon",
-            "vortex_column",
-            "lissajous_weave",
+            "ink_trace",
             "musubi_braid",
             "time_warp"
         ]
     },
     "preview": {
-        "description": "曲线与轨迹特效插件：丝带、双螺旋、星芒环、音浪、时空旋涡、利萨如织光、组纽与时空裂隙。"
+        "description": "曲线与轨迹特效插件：丝带、双螺旋、星芒环、音浪、组纽、时空裂隙与流光笔迹。"
     }
 }
