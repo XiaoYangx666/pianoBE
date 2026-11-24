@@ -422,6 +422,36 @@ function indexItemToUninstalledPlugin(item: BuiltinPluginIndexItem): StudioPlugi
 let builtinIndexCache: Promise<BuiltinPluginIndexItem[]> | null = null;
 const builtinArchiveCache = new Map<string, Promise<Uint8Array>>();
 
+/**
+ * 已解析插件包的缓存：本地模式下每次 refresh 都会从 IndexedDB 读出所有已安装插件的字节，
+ * 之前每个都重新解压一遍；这里按「字节长度 + FNV-1a 校验和」缓存解析结果，
+ * 内容变化（重新安装/更新）时键自然失效。
+ */
+const parsedArchiveCache = new Map<string, PbePluginArchive>();
+const PARSED_ARCHIVE_CACHE_LIMIT = 64;
+
+function archiveCacheKey(bytes: Uint8Array): string {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < bytes.length; i++) {
+        hash ^= bytes[i]!;
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return `${bytes.byteLength}:${hash >>> 0}`;
+}
+
+function parseArchiveCached(bytes: Uint8Array): PbePluginArchive {
+    const key = archiveCacheKey(bytes);
+    const cached = parsedArchiveCache.get(key);
+    if (cached) return cached;
+    const archive = readPbePluginArchive(bytes);
+    if (parsedArchiveCache.size >= PARSED_ARCHIVE_CACHE_LIMIT) {
+        const oldest = parsedArchiveCache.keys().next().value;
+        if (oldest !== undefined) parsedArchiveCache.delete(oldest);
+    }
+    parsedArchiveCache.set(key, archive);
+    return archive;
+}
+
 export function loadBuiltinPluginIndex(): Promise<BuiltinPluginIndexItem[]> {
     builtinIndexCache ??= (async () => {
         try {
@@ -499,7 +529,7 @@ export async function loadLocalState(): Promise<{
 
     for (const sp of storedPlugins) {
         try {
-            const archive = readPbePluginArchive(sp.bytes);
+            const archive = parseArchiveCached(sp.bytes);
             const builtinMeta = builtinById.get(archive.manifest.id);
             const p = archiveToStudioPlugin(archive, {
                 source: builtinMeta ? "builtin" : sp.source,
@@ -1068,7 +1098,7 @@ export async function installLocalPluginBytes(
     trusted: boolean,
     songSourceName?: string,
 ): Promise<StudioPlugin> {
-    const archive = readPbePluginArchive(bytes);
+    const archive = parseArchiveCached(bytes);
     await idbPut<StoredLocalPlugin>(STORE_PLUGINS, {
         id: archive.manifest.id,
         bytes,

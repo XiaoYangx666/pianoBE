@@ -1,15 +1,22 @@
-import { useEffect, useMemo } from "react";
+import { Suspense, lazy, useEffect, useMemo } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AudioWaveform, Boxes, HardDrive, LogOut, Music2, PackageCheck, Server } from "lucide-react";
 import { PIANO_TIMBRES } from "@piano/core";
 import { AppLayout, PianoMark, Spinner, ThemeToggle, type AppNavItem } from "@piano/ui";
 import { studioPlayer } from "./audio/player";
 import { LoginView } from "./components/LoginView";
-import { AddonPage } from "./pages/AddonPage";
-import { ExtensionsPage } from "./pages/ExtensionsPage";
-import { LibraryPage } from "./pages/LibraryPage";
-import { ToolsPage } from "./pages/ToolsPage";
 import { useStudio } from "./store/studio";
+
+// 路由级懒加载：四个工作台页面各自成 chunk，首屏不再一次性加载
+// 音乐库 / 扩展中心 / 音乐工具 / 附加包里的大依赖（pdf、onnx 等）。
+const LibraryPage = lazy(() =>
+    import("./pages/LibraryPage").then((m) => ({ default: m.LibraryPage })),
+);
+const ExtensionsPage = lazy(() =>
+    import("./pages/ExtensionsPage").then((m) => ({ default: m.ExtensionsPage })),
+);
+const ToolsPage = lazy(() => import("./pages/ToolsPage").then((m) => ({ default: m.ToolsPage })));
+const AddonPage = lazy(() => import("./pages/AddonPage").then((m) => ({ default: m.AddonPage })));
 
 export default function App() {
     const initialized = useStudio((s) => s.initialized);
@@ -165,13 +172,24 @@ export default function App() {
                 </div>
             }
         >
-            <Routes>
-                <Route path="/" element={<LibraryPage />} />
-                <Route path="/extensions" element={<ExtensionsPage />} />
-                <Route path="/tools" element={<ToolsPage />} />
-                <Route path="/addon" element={<AddonPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <Suspense
+                fallback={
+                    <div className="grid min-h-[45vh] place-items-center text-ore-dim">
+                        <div className="flex flex-col items-center gap-3">
+                            <Spinner size={22} />
+                            <span className="text-[12.5px]">正在加载页面…</span>
+                        </div>
+                    </div>
+                }
+            >
+                <Routes>
+                    <Route path="/" element={<LibraryPage />} />
+                    <Route path="/extensions" element={<ExtensionsPage />} />
+                    <Route path="/tools" element={<ToolsPage />} />
+                    <Route path="/addon" element={<AddonPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Suspense>
         </AppLayout>
     );
 }

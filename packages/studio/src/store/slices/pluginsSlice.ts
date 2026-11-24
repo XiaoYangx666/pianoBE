@@ -1,4 +1,4 @@
-import { readPbePluginArchive } from "@piano/vfx/package";
+import { readPbePluginArchive, type PbePluginArchive } from "@piano/vfx/package";
 import { resolvePluginDependencies, type PluginCatalogEntry } from "@piano/assembly";
 import { notify } from "@piano/ui";
 import {
@@ -20,6 +20,16 @@ import {
 } from "../derived";
 import type { PluginsSlice, StoreRuntime, StudioGet, StudioSet } from "../types";
 
+/**
+ * 同一插件包只下载/解压一次。服务端模式下 `plugin.archive` 始终为空，
+ * 没有这层缓存时每次打开「浏览/挑单曲」或切换音色都会重新请求 /archive 并解包。
+ */
+const archiveLoadCache = new Map<string, Promise<PbePluginArchive>>();
+
+function archiveLoadKey(plugin: { id: string; version: string; sizeBytes: number }): string {
+    return `${plugin.id}@${plugin.version}@${plugin.sizeBytes}`;
+}
+
 export function createPluginsSlice(
     set: StudioSet,
     get: StudioGet,
@@ -31,13 +41,21 @@ export function createPluginsSlice(
 
         async loadPluginArchive(plugin) {
             if (plugin.archive) return plugin.archive;
-            if (get().mode === "server") {
-                const bytes = await serverApi.fetchPluginArchive(plugin.id);
+            const key = archiveLoadKey(plugin);
+            const cached = archiveLoadCache.get(key);
+            if (cached) return cached;
+            const pending = (async () => {
+                if (get().mode === "server") {
+                    const bytes = await serverApi.fetchPluginArchive(plugin.id);
+                    return readPbePluginArchive(bytes);
+                }
+                if (!plugin.file) throw new Error("找不到扩展包文件");
+                const bytes = await fetchBuiltinPluginBytes(plugin.file);
                 return readPbePluginArchive(bytes);
-            }
-            if (!plugin.file) throw new Error("找不到扩展包文件");
-            const bytes = await fetchBuiltinPluginBytes(plugin.file);
-            return readPbePluginArchive(bytes);
+            })();
+            archiveLoadCache.set(key, pending);
+            pending.catch(() => archiveLoadCache.delete(key));
+            return pending;
         },
 
         importSingleSongFromPlugin(archive, songId, opts) {
