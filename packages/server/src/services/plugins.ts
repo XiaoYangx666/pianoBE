@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
     checkPluginUninstall,
@@ -41,6 +41,7 @@ export interface ServerPluginRecord {
         songs: number;
         performances: number;
         libraries: number;
+        timbres: number;
         effects: number;
         themes: number;
         keyStyles: number;
@@ -54,7 +55,9 @@ function archiveRequiresPackDeploy(archive: PbePluginArchive): boolean {
         archive.hasExecutableCode ||
         archive.particles.size > 0 ||
         archive.textures.size > 0 ||
-        archive.stageProps.length > 0
+        archive.stageProps.length > 0 ||
+        archive.timbres.length > 0 ||
+        archive.sounds.size > 0
     );
 }
 
@@ -67,6 +70,8 @@ function resolveBuiltinDir(config: ServerConfig): string | undefined {
 }
 
 export class PluginService {
+    private readonly builtinCache = new Map<string, { mtimeMs: number; size: number; archive: PbePluginArchive }>();
+
     constructor(
         private readonly songPort: SqliteSongPort,
         private readonly config: ServerConfig,
@@ -87,6 +92,13 @@ export class PluginService {
         return readPbePluginArchive(new Uint8Array(readFileSync(file)));
     }
 
+    readArchiveBytes(id: string): Uint8Array | undefined {
+        const file = this.archivePath(id);
+        if (existsSync(file)) return new Uint8Array(readFileSync(file));
+        const builtin = this.listBuiltinArchives().find((item) => item.archive.manifest.id === id);
+        return builtin?.archive.bytes;
+    }
+
     listBuiltinArchives(): { file: string; archive: PbePluginArchive }[] {
         const dir = resolveBuiltinDir(this.config);
         if (!dir) return [];
@@ -95,9 +107,18 @@ export class PluginService {
             .sort();
         const out: { file: string; archive: PbePluginArchive }[] = [];
         for (const file of files) {
+            const fullPath = join(dir, file);
             try {
-                const bytes = new Uint8Array(readFileSync(join(dir, file)));
-                out.push({ file, archive: readPbePluginArchive(bytes) });
+                const stat = statSync(fullPath);
+                const cached = this.builtinCache.get(fullPath);
+                if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+                    out.push({ file, archive: cached.archive });
+                    continue;
+                }
+                const bytes = new Uint8Array(readFileSync(fullPath));
+                const archive = readPbePluginArchive(bytes);
+                this.builtinCache.set(fullPath, { mtimeMs: stat.mtimeMs, size: stat.size, archive });
+                out.push({ file, archive });
             } catch { /* skip broken builtin */ }
         }
         return out;
@@ -181,12 +202,14 @@ export class PluginService {
     private syncPluginDynamicData(archive: PbePluginArchive): void {
         const pluginId = archive.manifest.id;
         const origin = { kind: "plugin" as const, id: pluginId, name: archive.manifest.name };
+        const songIdMap = new Map<string, string>();
 
         for (const song of archive.songs.values()) {
-            this.songPort.savePbe3File(song.bytes, {
+            const saved = this.songPort.savePbe3File(song.bytes, {
                 name: song.name,
                 origin,
             });
+            songIdMap.set(song.id, saved.id);
         }
 
         for (const lib of archive.libraries) {
@@ -196,17 +219,18 @@ export class PluginService {
                 description: lib.description,
                 kind: "plugin",
                 pluginId,
-                songIds: lib.songs,
+                songIds: lib.songs.map((id) => songIdMap.get(id) ?? id),
             });
         }
 
         for (const perf of archive.performances) {
-            if (!this.songPort.has(perf.songId)) {
+            const targetSongId = songIdMap.get(perf.songId) ?? perf.songId;
+            if (!this.songPort.has(targetSongId)) {
                 throw new SongConflictError(`演出 ${perf.name} 引用的歌曲 ${perf.songId} 不存在`);
             }
             this.songPort.savePerformance({
                 id: perf.id,
-                songId: perf.songId,
+                songId: targetSongId,
                 musicFingerprint: perf.musicFingerprint,
                 name: perf.name,
                 author: perf.author,
@@ -406,6 +430,7 @@ function summarizeArchiveContents(archive: PbePluginArchive) {
         songs: archive.songs.size,
         performances: archive.performances.length,
         libraries: archive.libraries.length,
+        timbres: archive.timbres.length,
         effects: archive.manifest.provides.effects?.length ?? 0,
         themes: archive.manifest.provides.themes?.length ?? 0,
         keyStyles: archive.manifest.provides.keyStyles?.length ?? 0,
@@ -419,6 +444,7 @@ function summarizeManifestContents(manifest: VfxPluginManifest) {
         songs: manifest.provides.songs?.length ?? 0,
         performances: manifest.provides.performances?.length ?? 0,
         libraries: manifest.provides.libraries?.length ?? 0,
+        timbres: manifest.provides.timbres?.length ?? 0,
         effects: manifest.provides.effects?.length ?? 0,
         themes: manifest.provides.themes?.length ?? 0,
         keyStyles: manifest.provides.keyStyles?.length ?? 0,

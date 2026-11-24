@@ -82,6 +82,15 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         return c.body(null, 204);
     });
 
+    app.delete("/:id/songs", writeRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        const existing = deps.songPort.getLibrary(id);
+        if (!existing) return c.json({ error: "曲库不存在" }, 404);
+        if (existing.readonly) return c.json({ error: "插件曲库只读，不可清空曲库" }, 403);
+        deps.songPort.clearLibrary(id);
+        return c.body(null, 204);
+    });
+
     app.get("/:id/export-plugin", readRole(), (c) => {
         const id = c.req.param("id") ?? "";
         const lib = deps.songPort.getLibrary(id);

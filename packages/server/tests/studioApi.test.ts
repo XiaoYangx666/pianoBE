@@ -142,6 +142,16 @@ describe("PianoBE Server Studio API：PBE3、曲库、插件与 BDS 部署", () 
         expect(archive.hasExecutableCode).toBe(false);
         expect(archive.songs.has("aa112233")).toBe(true);
         expect(archive.libraries).toHaveLength(1);
+
+        const clearRes = await req(`/api/libraries/${lib.id}/songs`, {
+            token: writerToken,
+            method: "DELETE",
+        });
+        expect(clearRes.status).toBe(204);
+        const listAfterClear = await req("/api/libraries", { token: writerToken });
+        expect(listAfterClear.status).toBe(200);
+        const libsJson = (await listAfterClear.json()) as { items: Array<{ id: string; songIds: string[] }> };
+        expect(libsJson.items.find((item) => item.id === lib.id)?.songIds).toEqual([]);
     });
 
     test("纯数据插件免脚本信任直接生效，含脚本插件需信任且卸载受依赖保护", async () => {
@@ -243,6 +253,57 @@ describe("PianoBE Server Studio API：PBE3、曲库、插件与 BDS 部署", () 
         });
         expect((await req("/api/plugins/community.pure_songs", { token: ADMIN, method: "DELETE" })).status).toBe(204);
         expect((await req("/api/songs/cc778899", { token: writerToken })).status).toBe(200);
+
+        // 5. 支持下载插件归档（/api/plugins/:id/archive），且重叠曲目的两个曲库插件可按指纹共存合并
+        const sharedSong = encodeSong(makeSong("dd112233", "共有歌曲", 9));
+        const { bytes: packA } = packLibraryAsPlugin({
+            pluginId: "official.pack_a",
+            libraryId: "official:a",
+            name: "合集 A",
+            songs: [{ id: "dd112233", name: "共有歌曲", bytes: sharedSong }],
+        });
+        const { bytes: packB } = packLibraryAsPlugin({
+            pluginId: "official.pack_b",
+            libraryId: "official:b",
+            name: "合集 B",
+            songs: [
+                {
+                    id: "ee445566",
+                    name: "共有歌曲（别名）",
+                    bytes: reidentifySong(sharedSong, "ee445566"),
+                    performances: [{ id: "official.pack_b:show", name: "独立演出", cues: CUE_STAR }],
+                },
+            ],
+        });
+        expect((await req("/api/plugins", { token: ADMIN, method: "POST", body: packA })).status).toBe(201);
+        expect((await req("/api/plugins", { token: ADMIN, method: "POST", body: packB })).status).toBe(201);
+        const archiveRes = await req("/api/plugins/official.pack_b/archive", { token: writerToken });
+        expect(archiveRes.status).toBe(200);
+        const fetchedArchive = readPbePluginArchive(new Uint8Array(await archiveRes.arrayBuffer()));
+        expect(fetchedArchive.manifest.id).toBe("official.pack_b");
+        const perfsRes = await req("/api/songs/dd112233/performances", { token: writerToken });
+        expect(perfsRes.status).toBe(200);
+        const perfsJson = (await perfsRes.json()) as { items: Array<{ id: string }> };
+        expect(perfsJson.items.some((p) => p.id === "official.pack_b:show")).toBe(true);
+    });
+
+    test("服务端支持音色配置持久化", async () => {
+        const cfgRes = await req("/api/addon/config", {
+            token: ADMIN,
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ enabledTimbres: ["classic_grand"] }),
+        });
+        expect(cfgRes.status).toBe(200);
+        const body = (await cfgRes.json()) as { status: { enabledTimbres: string[] } };
+        expect(body.status.enabledTimbres).toEqual(["piano", "classic_grand"]);
+        // 还原默认音色以便后续 BDS 测试匹配
+        await req("/api/addon/config", {
+            token: ADMIN,
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ enabledTimbres: ["piano"] }),
+        });
     });
 
     test("BDS 部署：重新装配 BP/RP、写入世界配置并维护 pending_deploy -> pending_restart -> active", async () => {

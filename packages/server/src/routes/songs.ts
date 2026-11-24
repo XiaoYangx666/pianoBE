@@ -25,7 +25,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         const q = c.req.query("q")?.trim() ?? "";
         const libraryId = c.req.query("libraryId")?.trim() || undefined;
         const page = Math.max(1, Number(c.req.query("page") ?? 1) || 1);
-        const pageSize = Math.min(100, Math.max(1, Number(c.req.query("pageSize") ?? 50) || 50));
+        const pageSize = Math.min(2000, Math.max(1, Number(c.req.query("pageSize") ?? 50) || 50));
 
         const metas = deps.songPort.listMetasWithStats({ libraryId, q });
         const total = metas.length;

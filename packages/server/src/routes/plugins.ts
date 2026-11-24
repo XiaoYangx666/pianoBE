@@ -57,6 +57,24 @@ export function pluginsRoutes(
         }
     });
 
+    app.get("/:id/archive", readRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        try {
+            const bytes = pluginService.readArchiveBytes(id);
+            if (!bytes) return c.json({ error: "插件不存在" }, 404);
+            const fileName = encodeURIComponent(`${id}.pbeplugin`);
+            return new Response(Uint8Array.from(bytes), {
+                status: 200,
+                headers: {
+                    "content-type": "application/octet-stream",
+                    "content-disposition": `attachment; filename*=UTF-8''${fileName}`,
+                },
+            });
+        } catch (error) {
+            return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+        }
+    });
+
     app.post("/:id/trust", adminRole(), (c) => {
         try {
             const record = pluginService.trustPlugin(c.req.param("id") ?? "");

@@ -648,6 +648,15 @@ export class SqliteSongPort implements SongPort {
         return res.changes > 0;
     }
 
+    clearLibrary(libraryId: string): number {
+        const res = this.db.query(`DELETE FROM library_songs WHERE library_id=?`).run(libraryId);
+        if (res.changes > 0) {
+            this.db.query(`UPDATE libraries SET updated_at=? WHERE id=?`).run(Date.now(), libraryId);
+            this.bumpCatalogVersion();
+        }
+        return res.changes;
+    }
+
     /* ================== Performances ================== */
 
     listSongPerformances(songId: string, includeCues = true): PerformanceDescriptor[] {

@@ -8,6 +8,8 @@ export interface ServerConfig {
     pluginsDir: string;
     /** 内置插件目录（可选，默认尝试 ../../build/plugins） */
     builtinPluginsDir?: string;
+    /** 可选钢琴音色包目录（默认尝试 webRoot/timbres 或 studio/public/timbres） */
+    timbresDir?: string;
     /** 服务器基础模板 .mcaddon 路径 */
     serverTemplatePath?: string;
     /** 托管的 BDS 服务器根目录 */
@@ -53,6 +55,7 @@ export function loadConfig(
         midisDir: env.MIDIS_DIR ?? "./data/midis",
         pluginsDir: env.PLUGINS_DIR ?? "./data/plugins",
         builtinPluginsDir: env.BUILTIN_PLUGINS_DIR || undefined,
+        timbresDir: env.TIMBRES_DIR || undefined,
         serverTemplatePath: env.SERVER_TEMPLATE_PATH || undefined,
         bdsDir: env.BDS_DIR || undefined,
         bdsWorld: env.BDS_WORLD || undefined,
