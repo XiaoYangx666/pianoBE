@@ -6,7 +6,6 @@ packages/web/public/replay
 packages/web/public/piano
 # Blockbench 切块工程是本地生成物（tools/model/*-cut 可重建），不入库
 assets/*/cut/*.bbmodel
-/scripts
 output.zip
 /dist
 bp/scripts
@@ -37,9 +36,6 @@ packages/addon/rp/textures/ui/piano_score/
 packages/addon/rp/textures/entity/piano_score/*.png
 !packages/addon/rp/textures/entity/piano_score/blank.png
 *.dev.log
-build/loudness-ab/
-build/audio-lab/
-tools/audio_lab_source/
 
 # VFX particle documents and textures are generated into packages/vfx/assets and synced into the RP
 packages/addon/rp/particles/

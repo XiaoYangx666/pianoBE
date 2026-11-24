@@ -45,7 +45,6 @@
 |---|---|---|
 | `verify-addon-build.mjs` | 校验 client/server 构建产物与 MIDI 路径 | `npm run verify:addon-build` |
 | `verify-timbres.mjs` | 校验音色包结构 | `npm run verify:timbres` |
-| `verify-core.mjs` | 核心编解码/存储冒烟验证 | — |
 | `verify-generator.mjs` | 生成器端到端验证（bun） | — |
 
 ## `vendor/` — 私有依赖打包

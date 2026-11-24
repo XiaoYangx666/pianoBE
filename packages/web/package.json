@@ -24,8 +24,7 @@
         "react-dom": "^19.3.1",
         "react-router-dom": "^7.18.5",
         "three": "^0.134.0",
-        "wintersky": "^1.4.0",
-        "zustand": "^5.1.0"
+        "wintersky": "^1.4.0"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.3.5",
