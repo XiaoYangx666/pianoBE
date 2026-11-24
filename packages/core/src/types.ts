@@ -1,3 +1,5 @@
+import type { ContentOrigin, PerformanceDescriptor } from "./music/domain.js";
+
 /** 曲目元信息（列表/注册表用，不含音符数据） */
 export interface MidiSongMeta {
     id: string;
@@ -8,6 +10,18 @@ export interface MidiSongMeta {
     noteCount?: number;
     /** PBE3 原始字节数（来源提供时用于歌曲详情展示与内容校验） */
     bytes?: number;
+    /** 规范化音乐内容指纹（独立于曲名、ID、编码压缩和演出） */
+    musicFingerprint?: string;
+    /** 同一音乐本体合并后保留的别名 */
+    aliases?: readonly string[];
+    /** 所属逻辑曲库 ID 列表 */
+    libraries?: readonly string[];
+    /** 主要来源 */
+    origin?: ContentOrigin;
+    /** 全部来源（多来源合并同一音乐本体时保留） */
+    origins?: readonly ContentOrigin[];
+    /** 具有稳定 ID 与名称的独立演出列表 */
+    performanceEntries?: readonly PerformanceDescriptor[];
     /** 额外演出与 PBE3 内的默认演出共用音符数据。 */
     performances?: readonly (readonly import("./pbe3/performance.js").PerformanceCue[])[];
 }

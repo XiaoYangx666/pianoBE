@@ -18,7 +18,7 @@ import type { Pbe3Header, Pbe3Note, Pbe3NoteEvent } from "./pbe3/format.js";
 import { validateMusic, type ValidatedMusic } from "./music/validate.js";
 import type { MusicStorageLimits } from "./music/limits.js";
 import { pbe3ToAddonModule } from "./midi/addonModule.js";
-import { crc32Hex } from "./midi/crc32.js";
+import { crc32, crc32Hex } from "./midi/crc32.js";
 import { encodeUtf8 } from "./binary/utf8.js";
 
 /**
@@ -71,6 +71,36 @@ export function readSongHeader(bytes: Uint8Array): SongHeader {
 /** 读取并解压事件流 */
 export function readSongEvents(bytes: Uint8Array) {
     return readPbe3Events(bytes);
+}
+
+/**
+ * 基于规范化音乐本体计算内容指纹（16 位小写十六进制）。
+ * 只依赖时长、音符数以及每个音符的 (time, midi, soundDuration, keyDuration, velocity)，
+ * 与曲名、歌曲 ID、PBE3 压缩策略及演出区块完全无关。
+ */
+export function computeMusicFingerprint(bytes: Uint8Array): string {
+    const header = readPbe3Header(bytes);
+    const notes = readAllSongNotes(bytes);
+    const buf = new Uint8Array(8 + notes.length * 14);
+    const view = new DataView(buf.buffer);
+    view.setUint32(0, header.duration >>> 0, true);
+    view.setUint32(4, notes.length >>> 0, true);
+    let offset = 8;
+    for (const note of notes) {
+        view.setUint32(offset, note.time >>> 0, true);
+        view.setUint32(offset + 4, note.soundDuration >>> 0, true);
+        view.setUint32(offset + 8, note.keyDuration >>> 0, true);
+        buf[offset + 12] = note.midi & 0x7f;
+        buf[offset + 13] = note.velocity & 0x7f;
+        offset += 14;
+    }
+    const c = crc32(buf);
+    let fnv = 0x811c9dc5;
+    for (let i = 0; i < buf.length; i++) {
+        fnv ^= buf[i];
+        fnv = Math.imul(fnv, 0x01000193) >>> 0;
+    }
+    return `${c.toString(16).padStart(8, "0")}${fnv.toString(16).padStart(8, "0")}`;
 }
 
 /** 只在比对候选曲目时解码音符。压缩方式、曲名、原始 MIDI ID 和演出均不参与比较。 */

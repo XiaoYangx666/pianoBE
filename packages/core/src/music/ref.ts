@@ -10,7 +10,9 @@ export type MusicSource = "card" | "library";
 
 export interface MusicRef extends MidiSongMeta {
     source: MusicSource;
-    /** -1 普通演奏，0 或缺省为文件内编排，1 起为附加编排。 */
+    /** 稳定演出标识："plain" 普通演奏，"default" 默认演出，或独立演出 ID。 */
+    performanceId?: string;
+    /** -1 普通演奏，0 或缺省为文件内编排，1 起为附加编排（兼容旧引用）。 */
     performance?: number;
     /** 整份 PBE3 的 CRC32（16 进制，来源提供时用于内容校验） */
     checksum?: string;
@@ -21,6 +23,16 @@ export interface MusicRef extends MidiSongMeta {
      * 被误认为同一张卡上的曲目。
      */
     cardUid?: string;
+}
+
+function performanceSelectorKey(ref: Pick<MusicRef, "performance" | "performanceId">): string {
+    if (typeof ref.performanceId === "string" && ref.performanceId.length > 0) {
+        if (ref.performanceId === "plain" || ref.performanceId === "default") return ref.performanceId;
+        return `id:${ref.performanceId}`;
+    }
+    if (ref.performance === -1) return "plain";
+    if (typeof ref.performance === "number" && ref.performance > 0) return `idx:${ref.performance}`;
+    return "default";
 }
 
 /** 世界公共曲库在索引和队列中使用独立 ID，PBE3 文件头仍使用原始 ID。 */
@@ -37,11 +49,11 @@ export function musicRefKey(ref: Pick<MusicRef, "source" | "id" | "checksum" | "
 
 /** 卡片歌曲还必须属于同一张实体卡。 */
 export function sameMusicRef(
-    a: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance">,
-    b: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance">
+    a: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance" | "performanceId">,
+    b: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance" | "performanceId">
 ): boolean {
     return a.id === b.id && a.source === b.source && (a.checksum ?? "") === (b.checksum ?? "")
-        && (a.performance ?? 0) === (b.performance ?? 0)
+        && performanceSelectorKey(a) === performanceSelectorKey(b)
         && (a.source !== "card" || (a.cardUid ?? "") === (b.cardUid ?? ""));
 }
 
@@ -78,6 +90,9 @@ export function normalizeMusicRef(value: unknown): MusicRef | undefined {
     if (typeof raw.noteCount === "number" && Number.isFinite(raw.noteCount)) ref.noteCount = raw.noteCount;
     if (typeof raw.bytes === "number" && Number.isFinite(raw.bytes) && raw.bytes > 0) ref.bytes = raw.bytes;
     if (typeof raw.checksum === "string" && /^[0-9a-f]{1,8}$/i.test(raw.checksum)) ref.checksum = raw.checksum;
+    if (typeof raw.performanceId === "string" && raw.performanceId.trim() && raw.performanceId.length <= 128) {
+        ref.performanceId = raw.performanceId.trim();
+    }
     if (typeof raw.performance === "number" && Number.isSafeInteger(raw.performance) && raw.performance >= -1) {
         ref.performance = raw.performance;
     }

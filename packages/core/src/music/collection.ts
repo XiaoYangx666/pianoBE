@@ -39,6 +39,19 @@ export interface MusicCollectionOptions {
     random?: () => string;
 }
 
+export interface StoredPerformanceEntry {
+    id: string;
+    name: string;
+    author?: string;
+    cues: readonly PerformanceCue[];
+}
+
+export interface SavePerformanceMeta {
+    id?: string;
+    name?: string;
+    author?: string;
+}
+
 export interface ImportResult {
     songs: number;
     bytes: number;
@@ -150,16 +163,49 @@ export class MusicCollection {
         }
     }
 
-    getPerformances(id: string): readonly (readonly PerformanceCue[])[] {
+    getPerformanceEntries(id: string): readonly StoredPerformanceEntry[] {
         const entry = this.entry(id);
         if (!entry?.performanceChars) return [];
         try {
             const encoded = this.readEncoded(entry);
             const start = base64UrlLength(entry.bytes);
             if (!encoded || encoded.length !== start + entry.performanceChars) return [];
-            const cues: unknown = JSON.parse(decodeUtf8(decodeBase64Url(encoded.slice(start))));
-            return Array.isArray(cues) ? cues.filter(Array.isArray) : [];
-        } catch { return []; }
+            const raw: unknown = JSON.parse(decodeUtf8(decodeBase64Url(encoded.slice(start))));
+            if (!Array.isArray(raw)) return [];
+            const out: StoredPerformanceEntry[] = [];
+            raw.forEach((item, index) => {
+                if (Array.isArray(item)) {
+                    out.push({
+                        id: `extra:${index + 1}`,
+                        name: `附加演出 ${index + 1}`,
+                        cues: item as readonly PerformanceCue[],
+                    });
+                    return;
+                }
+                if (
+                    item &&
+                    typeof item === "object" &&
+                    typeof (item as { id?: unknown }).id === "string" &&
+                    typeof (item as { name?: unknown }).name === "string" &&
+                    Array.isArray((item as { cues?: unknown }).cues)
+                ) {
+                    const obj = item as StoredPerformanceEntry;
+                    out.push({
+                        id: obj.id,
+                        name: obj.name,
+                        ...(typeof obj.author === "string" && obj.author ? { author: obj.author } : {}),
+                        cues: obj.cues,
+                    });
+                }
+            });
+            return out;
+        } catch {
+            return [];
+        }
+    }
+
+    getPerformances(id: string): readonly (readonly PerformanceCue[])[] {
+        return this.getPerformanceEntries(id).map((entry) => entry.cues);
     }
 
     private readEncoded(entry: StoredMusicEntry, limit = Infinity): string | undefined {
@@ -185,7 +231,7 @@ export class MusicCollection {
     /* ================== 写入 ================== */
 
     /** 校验并写入 PBE3；失败抛错，调用方可直接展示 message。 */
-    save(pbe3: Uint8Array, name?: string): StoredMusicEntry {
+    save(pbe3: Uint8Array, name?: string, performanceMeta?: SavePerformanceMeta): StoredMusicEntry {
         const { header, checksum } = validateMusic(pbe3, this.limits);
         const entries = this.entries();
         const previous = entries.find(item => item.id === header.id);
@@ -198,11 +244,30 @@ export class MusicCollection {
             }
             const incoming = header.performance;
             const originalPerformance = readPbe3Header(original).performance;
-            const alternate = this.getPerformances(previous.id);
-            const known = originalPerformance ? [originalPerformance, ...alternate] : alternate;
-            if (!incoming || known.some(cues => sameSongPerformance(original, cues, incoming))) return previous;
+            const alternate = [...this.getPerformanceEntries(previous.id)];
+            const knownCues = originalPerformance ? [originalPerformance, ...alternate.map(e => e.cues)] : alternate.map(e => e.cues);
+            if (!incoming) return previous;
+            const existingIdx = performanceMeta?.id ? alternate.findIndex(e => e.id === performanceMeta.id) : -1;
+            if (existingIdx >= 0) {
+                if (sameSongPerformance(original, alternate[existingIdx].cues, incoming)) return previous;
+                alternate[existingIdx] = {
+                    id: performanceMeta!.id!,
+                    name: performanceMeta?.name || alternate[existingIdx].name,
+                    ...(performanceMeta?.author ? { author: performanceMeta.author } : {}),
+                    cues: incoming,
+                };
+            } else {
+                if (knownCues.some(cues => sameSongPerformance(original, cues, incoming))) return previous;
+                const nextIndex = alternate.length + 1;
+                alternate.push({
+                    id: performanceMeta?.id || `extra:${nextIndex}`,
+                    name: performanceMeta?.name || `附加演出 ${nextIndex}`,
+                    ...(performanceMeta?.author ? { author: performanceMeta.author } : {}),
+                    cues: incoming,
+                });
+            }
             base = original;
-            performanceIndex = encodeBase64Url(encodeUtf8(JSON.stringify([...alternate, incoming])));
+            performanceIndex = encodeBase64Url(encodeUtf8(JSON.stringify(alternate)));
         }
         const encoded = encodeBase64Url(base) + performanceIndex;
         const shards = Math.max(1, Math.ceil(encoded.length / this.shardChars));

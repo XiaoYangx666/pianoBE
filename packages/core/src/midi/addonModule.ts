@@ -13,6 +13,13 @@ export function pbe3ToAddonModule(pbe3: Uint8Array): string {
 export function metasToAddonIndex(metas: MidiSongMeta[]): string {
     let content = "export const midis=[";
     for (const item of metas) {
+        const compactEntries = item.performanceEntries?.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            ...(entry.author ? { author: entry.author } : {}),
+            ...(entry.cues ? { cues: entry.cues } : {}),
+            ...(entry.requiredEffects?.length ? { requiredEffects: entry.requiredEffects } : {}),
+        }));
         content +=
             `{` +
             `id:${JSON.stringify(item.id)},` +
@@ -20,6 +27,8 @@ export function metasToAddonIndex(metas: MidiSongMeta[]): string {
             `duration:${item.duration},` +
             (item.noteCount !== undefined ? `noteCount:${item.noteCount},` : "") +
             (item.bytes !== undefined ? `bytes:${item.bytes},` : "") +
+            (item.libraries?.length ? `libraries:${JSON.stringify(item.libraries)},` : "") +
+            (compactEntries?.length ? `performanceEntries:${JSON.stringify(compactEntries)},` : "") +
             (item.performances?.length ? `performances:${JSON.stringify(item.performances)},` : "") +
             `value:async()=> (await import("./${item.id}.js")).default` +
             `},`;
