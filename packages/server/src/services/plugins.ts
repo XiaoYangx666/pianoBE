@@ -346,6 +346,7 @@ export class PluginService {
             if (installedById.has(archive.manifest.id)) continue;
             const manifest = archive.manifest;
             const compatible = isApiVersionCompatible(manifest.apiVersion, VFX_API_VERSION);
+            const previewDataUrl = archivePreviewDataUrl(archive);
             records.push({
                 id: manifest.id,
                 name: manifest.name,
@@ -355,7 +356,8 @@ export class PluginService {
                 source: "builtin",
                 installed: false,
                 enabled: false,
-                trusted: !archive.hasExecutableCode || true,
+                // 内置扩展随应用分发，安装后无需再次授权；含脚本的第三方上传包才需要管理员信任
+                trusted: true,
                 compatible,
                 ...(!compatible ? { compatibilityReason: `需要 API ${manifest.apiVersion}` } : {}),
                 hasExecutableCode: archive.hasExecutableCode,
@@ -364,7 +366,7 @@ export class PluginService {
                 dependents: [],
                 missingDependencies: [],
                 contents: summarizeArchiveContents(archive),
-                ...(archivePreviewDataUrl(archive) ? { previewDataUrl: archivePreviewDataUrl(archive) } : {}),
+                ...(previewDataUrl ? { previewDataUrl } : {}),
             });
         }
 
