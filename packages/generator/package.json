@@ -16,6 +16,7 @@
     },
     "dependencies": {
         "@bepack/addon": "^0.1.0-beta.9",
+        "@piano/assembly": "file:../assembly",
         "@piano/core": "file:../core",
         "@piano/ui": "file:../ui",
         "@piano/vfx": "file:../vfx",
