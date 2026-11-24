@@ -114,6 +114,9 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         if (!deps.amt?.status().available) {
             return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
         }
+        if (jobs.isQueueFull) {
+            return c.json({ error: "转录队列已满，请稍后再试" }, 429);
+        }
 
         const length = Number(c.req.header("Content-Length") ?? 0);
         if (length > MAX_AUDIO_BYTES) {
@@ -148,6 +151,9 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     app.post("/jobs/bilibili", requireRole("write"), async (c) => {
         if (!deps.amt?.status().available) {
             return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
+        }
+        if (jobs.isQueueFull) {
+            return c.json({ error: "转录队列已满，请稍后再试" }, 429);
         }
         const body = (await c.req.json().catch(() => null)) as
             | { input?: unknown; page?: unknown; name?: unknown }

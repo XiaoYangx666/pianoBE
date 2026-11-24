@@ -38,6 +38,8 @@ export interface ServerConfig {
     amtEco: boolean;
     /** 同时运行的转录任务数（默认 1，避免多个 amt-cli 打满 CPU） */
     amtConcurrency: number;
+    /** 最多允许排队的转录任务数（默认 10，防止大量上传占满临时空间） */
+    amtMaxQueue: number;
     /** 单次转录超时（默认 10 分钟） */
     amtTimeoutMs: number;
     /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
@@ -74,6 +76,7 @@ export function loadConfig(
         amtThreads: Math.max(1, Number(env.AMT_THREADS ?? 4) || 4),
         amtEco: env.AMT_ECO === "true",
         amtConcurrency: Math.max(1, Number(env.AMT_CONCURRENCY ?? 1) || 1),
+        amtMaxQueue: Math.max(1, Number(env.AMT_MAX_QUEUE ?? 10) || 10),
         amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
         biliSessdata: env.BILI_SESSDATA || undefined,
         logFile:

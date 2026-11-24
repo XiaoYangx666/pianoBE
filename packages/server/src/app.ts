@@ -38,6 +38,10 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         await next();
         // 上传的曲目/插件归档都走同源下载，禁止浏览器按内容嗅探成 HTML
         c.header("X-Content-Type-Options", "nosniff");
+        // 入口 HTML 每次回源，避免部署后仍拿旧页面
+        if ((c.res.headers.get("content-type") ?? "").startsWith("text/html")) {
+            c.header("Cache-Control", "no-cache");
+        }
         log.http(c.req.method, c.req.path, c.res.status, Date.now() - start);
     });
 
@@ -80,7 +84,14 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         });
     });
 
-    api.get("/health", (c) => c.json({ ok: true, name: "pianobe-server", studio: true }));
+    api.get("/health", (c) => {
+        try {
+            deps.db.query("SELECT 1").get();
+        } catch {
+            return c.json({ ok: false, name: "pianobe-server", error: "数据库不可用" }, 503);
+        }
+        return c.json({ ok: true, name: "pianobe-server", studio: true });
+    });
     app.route("/api", api);
 
     // 未捕获的请求异常：记录堆栈后返回 JSON，而不是裸 500 文本
@@ -99,6 +110,19 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
     // 静态托管 Studio / Web 构建产物（SPA fallback 到 index.html）
     if (deps.config.webRoot && existsSync(deps.config.webRoot)) {
+        // Vite 产物文件名带内容哈希，可以长期缓存；采样文件按天缓存
+        app.use("/assets/*", async (c, next) => {
+            await next();
+            if (c.res.status === 200) {
+                c.header("Cache-Control", "public, max-age=31536000, immutable");
+            }
+        });
+        app.use("/piano/*", async (c, next) => {
+            await next();
+            if (c.res.status === 200) {
+                c.header("Cache-Control", "public, max-age=86400");
+            }
+        });
         app.use(
             "*",
             serveStatic({
@@ -113,7 +137,10 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
             const file = Bun.file(`${deps.config.webRoot}/index.html`);
             if (await file.exists()) {
                 return new Response(await file.text(), {
-                    headers: { "content-type": "text/html; charset=utf-8" },
+                    headers: {
+                        "content-type": "text/html; charset=utf-8",
+                        "cache-control": "no-cache",
+                    },
                 });
             }
             return c.text("PianoBE", 404);

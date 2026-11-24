@@ -47,6 +47,9 @@ export function pluginsRoutes(
         if (!buf || buf.byteLength === 0) {
             return c.json({ error: "插件文件为空" }, 400);
         }
+        if (buf.byteLength > MAX_PLUGIN_BYTES) {
+            return c.json({ error: "插件包超过大小限制" }, 413);
+        }
         try {
             const record = pluginService.installPluginBytes(new Uint8Array(buf), "upload");
             return c.json(record, 201);
