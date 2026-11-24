@@ -426,6 +426,8 @@ export class SqliteSongPort implements SongPort {
             SongRow,
             "id" | "name" | "duration" | "note_count" | "music_fingerprint" | "aliases_json" | "origin_kind" | "origin_id"
         >,
+        libraries?: Map<string, string[]>,
+        performances?: Map<string, PerformanceDescriptor[]>,
     ): MidiSongMeta {
         const meta: MidiSongMeta = {
             id: r.id,
@@ -444,13 +446,48 @@ export class SqliteSongPort implements SongPort {
             kind: (r.origin_kind as ContentOrigin["kind"]) || "user",
             ...(r.origin_id ? { id: r.origin_id } : {}),
         };
-        const libRows = this.db
-            .query(`SELECT library_id FROM library_songs WHERE song_id=? ORDER BY added_at`)
-            .all(r.id) as { library_id: string }[];
-        if (libRows.length) meta.libraries = libRows.map((row) => row.library_id);
-        const perfs = this.listSongPerformances(r.id, false);
+        const libs = libraries
+            ? (libraries.get(r.id) ?? [])
+            : (
+                  this.db
+                      .query(`SELECT library_id FROM library_songs WHERE song_id=? ORDER BY added_at`)
+                      .all(r.id) as { library_id: string }[]
+              ).map((row) => row.library_id);
+        if (libs.length) meta.libraries = libs;
+        const perfs = performances
+            ? (performances.get(r.id) ?? [])
+            : this.listSongPerformances(r.id, false);
         if (perfs.length) meta.performanceEntries = perfs;
         return meta;
+    }
+
+    /** 列表页一次性取全部曲库归属，避免每首一次查询 */
+    private loadLibraryMemberships(): Map<string, string[]> {
+        const rows = this.db
+            .query(`SELECT song_id, library_id FROM library_songs ORDER BY added_at`)
+            .all() as { song_id: string; library_id: string }[];
+        const map = new Map<string, string[]>();
+        for (const row of rows) {
+            const list = map.get(row.song_id);
+            if (list) list.push(row.library_id);
+            else map.set(row.song_id, [row.library_id]);
+        }
+        return map;
+    }
+
+    /** 列表页一次性取演奏摘要，避免每首一次查询 */
+    private loadPerformanceSummaries(): Map<string, PerformanceDescriptor[]> {
+        const rows = this.db
+            .query(`SELECT * FROM performances ORDER BY created_at, rowid`)
+            .all() as PerformanceRow[];
+        const map = new Map<string, PerformanceDescriptor[]>();
+        for (const row of rows) {
+            const descriptor = this.rowToPerformance(row, false);
+            const list = map.get(row.song_id);
+            if (list) list.push(descriptor);
+            else map.set(row.song_id, [descriptor]);
+        }
+        return map;
     }
 
     rename(id: string, name: string): MidiSongMeta | undefined {
@@ -501,6 +538,12 @@ export class SqliteSongPort implements SongPort {
         try {
             const pbe3 = encodeSong(song);
             this.cachePbe3(id, pbe3);
+            // 旧版只有 mid 的曲目：编码结果顺手存库，下次不用再解码
+            try {
+                this.putFileBlob(id, "pbe3", pbe3);
+            } catch {
+                // 读路径写库失败不影响本次返回
+            }
             return pbe3;
         } catch {
             return undefined;
@@ -590,8 +633,10 @@ export class SqliteSongPort implements SongPort {
               )
             : rows;
 
+        const libraryMap = this.loadLibraryMemberships();
+        const performanceMap = this.loadPerformanceSummaries();
         return filtered.map((r) => ({
-            ...this.hydrateMeta(r),
+            ...this.hydrateMeta(r, libraryMap, performanceMap),
             noteCount: r.note_count,
             dataSize: r.data_size,
             format: r.format,
