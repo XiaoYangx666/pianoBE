@@ -1,0 +1,35 @@
+{
+    "name": "@piano/assembly",
+    "version": "0.1.0",
+    "description": "PianoBE shared plugin parsing, dependency resolution, library packaging, and BP/RP addon assembler",
+    "type": "module",
+    "license": "CC-BY-NC-4.0",
+    "private": true,
+    "sideEffects": false,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "bun": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./src/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "@bepack/addon": "^0.1.0-beta.9",
+        "@piano/core": "file:../core",
+        "@piano/vfx": "file:../vfx",
+        "fflate": "^0.8.2"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.1.0",
+        "typescript": "^5.5.0"
+    }
+}
