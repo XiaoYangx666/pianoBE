@@ -156,6 +156,9 @@ export class SqliteSongPort implements SongPort {
     saveMidiFile(buffer: Uint8Array, name: string, options: SaveSongOptions = {}): MidiSongMeta {
         const song = midiBufferToSong(buffer, name);
         const pbe3 = encodeSong(song);
+        // MIDI 转换结果也走一遍 PBE3 校验：音符数/时长/解压长度超限的文件不能入库，
+        // 否则会绕过上传时的结构上限，拖慢编码或让游戏端卡死
+        validateSong(pbe3);
         const fp = computeMusicFingerprint(pbe3);
         const displayName = (options.name ?? name).trim() || song.id;
         const origin = options.origin ?? { kind: "user" };

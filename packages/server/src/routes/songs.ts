@@ -42,10 +42,21 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     // GET /api/songs/:id/raw —— 原始 .mid 或 .pbe3 字节
     app.get("/:id/raw", readRole(), (c) => {
         const id = c.req.param("id") ?? "";
+        const safeId = id.replace(/[^0-9A-Za-z_-]/g, "_");
         const raw = deps.songPort.getRaw(id);
-        if (raw) return c.body(raw, 200, { "content-type": "audio/midi" });
+        if (raw) {
+            return c.body(raw, 200, {
+                "content-type": "audio/midi",
+                "content-disposition": `attachment; filename="${safeId}.mid"`,
+            });
+        }
         const pbe3 = deps.songPort.getPbe3(id);
-        if (pbe3) return c.body(Uint8Array.from(pbe3), 200, { "content-type": "application/octet-stream" });
+        if (pbe3) {
+            return c.body(Uint8Array.from(pbe3), 200, {
+                "content-type": "application/octet-stream",
+                "content-disposition": `attachment; filename="${safeId}.pbe3"`,
+            });
+        }
         return c.json({ error: "曲目内容不存在" }, 404);
     });
 
@@ -126,6 +137,9 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         const buffer = await c.req.arrayBuffer();
         if (!buffer || buffer.byteLength === 0) {
             return c.json({ error: "空文件" }, 400);
+        }
+        if (buffer.byteLength > MAX_UPLOAD_BYTES) {
+            return c.json({ error: "文件超过大小限制" }, 413);
         }
 
         let fileName = c.req.header("X-File-Name") ?? "";

@@ -36,6 +36,8 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     app.use("*", async (c, next) => {
         const start = Date.now();
         await next();
+        // 上传的曲目/插件归档都走同源下载，禁止浏览器按内容嗅探成 HTML
+        c.header("X-Content-Type-Options", "nosniff");
         log.http(c.req.method, c.req.path, c.res.status, Date.now() - start);
     });
 

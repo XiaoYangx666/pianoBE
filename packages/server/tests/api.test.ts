@@ -115,6 +115,13 @@ describe("曲库 API", () => {
         expect(list.total).toBe(1);
     });
 
+    test("原始文件下载带 nosniff 与 attachment", async () => {
+        const res = await req(`/api/songs/${songId}/raw`, { token: readerToken });
+        expect(res.status).toBe(200);
+        expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+        expect(res.headers.get("content-disposition")).toContain("attachment");
+    });
+
     test("无文件名时 name 回退为 id", async () => {
         const res = await req("/api/songs", {
             token: writerToken,
