@@ -96,6 +96,15 @@ export class MidiManager {
         return this.metaMap.get(id);
     }
 
+    performances(id: string) {
+        if (worldRawId(id) === undefined) return this.getInfo(id)?.performances ?? [];
+        for (const source of this.publicSources) {
+            const performances = source.performances?.(id);
+            if (performances) return performances;
+        }
+        return [];
+    }
+
     /**
      * 按需解析单曲元信息：内存已登记直接返回；未命中时经来源加载 PBE3
      * 并读取文件头，供播放列表按 id 显示歌名等场景。
@@ -279,4 +288,5 @@ export interface MidiSourceLike {
         q?: string
     ): Promise<{ items: MidiSongMeta[]; total: number }>;
     metaAll?(q?: string): Promise<MidiSongMeta[]>;
+    performances?(id: string): MidiSongMeta["performances"];
 }

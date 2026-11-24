@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle } from "@piano/core";
+import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle, type PerformanceCue } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -27,11 +27,13 @@ interface MidiOutput {
 /** 播放器只需要“按引用获取共享曲目”，缓存策略由存储层/SongCache 统一负责。 */
 export interface MidiLoader {
     acquire(ref: MusicRef): Promise<SongHandle | undefined>;
+    performances?(ref: MusicRef): readonly (readonly PerformanceCue[])[];
 }
 
 export class MidiPlayer {
     /** 当前曲目引用（持有期间 SongCache 不会淘汰事件流） */
     private song?: SongHandle;
+    private performanceCues?: readonly PerformanceCue[];
     private cursor?: ReturnType<typeof createSongCursor>;
     private totalNotes = 0;
     private currentTime = 0;
@@ -374,6 +376,15 @@ export class MidiPlayer {
 
             this.releaseSong();
             this.song = song;
+            const mode = info.performance ?? 0;
+            this.performanceCues = mode === 0 ? song.song.header.performance : undefined;
+            if (mode > 0) {
+                try {
+                    this.performanceCues = this.loader.performances?.(info)[mode - 1];
+                } catch (error) {
+                    console.warn(`读取附加编排失败，继续播放音乐：${info.name}`, error);
+                }
+            }
             this.cursor = createSongCursor(song.song);
             this.totalNotes = song.song.noteCount;
             this.updateNormalizationGain();
@@ -391,6 +402,7 @@ export class MidiPlayer {
         this.cursor = undefined;
         const song = this.song;
         this.song = undefined;
+        this.performanceCues = undefined;
         song?.release();
         this.updateNormalizationGain();
     }
@@ -413,7 +425,7 @@ export class MidiPlayer {
 
     get performance() {
         const song = this.song?.song;
-        const cues = song?.header.performance;
+        const cues = this.performanceCues;
         if (!song || !cues) return;
         return { cues, duration: song.duration / TIME_SCALE };
     }

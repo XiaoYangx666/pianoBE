@@ -23,7 +23,7 @@
 
 | 来源 | 启用条件 | 说明 |
 |---|---|---|
-| 内嵌曲库 | 客户端构建（`npm run build` / 模板包） | 构建时把 `midis/js/` 拷进 `scripts/packages/addon/src/midis/`，懒加载播放 |
+| 内嵌曲库 | 客户端构建（`npm run build`） | 构建时把公共曲库 PBE3 转成模块，写进 `scripts/packages/addon/src/midis/`，懒加载播放 |
 | 远程曲库 | BDS + 服务器专用构建（`npm run build:server`）+ 配置文件 | manifest 声明 `@minecraft/server-net` / `@minecraft/server-admin`，启动时动态加载 `serverAdmin` 读配置并拉取 PBE3 曲目 |
 
 远程分支只在 `__PIANO_TARGET__ === "server"` 时被 `import()`；`serverAdmin.ts` 与 `platform/server/net` 内部是**静态导入**，两个原生模块的依赖由 `bepack.server.config.ts` 写入服务器包 manifest（版本 `beta`）。客户端构建通过常量折叠 + 死代码消除裁掉整个分支，产物不含这些模块，因此普通世界不需要 server-net，也没有远程能力。

@@ -3,7 +3,7 @@ import {
     MusicCollection,
     MusicValidationError,
     StorageBudget,
-    validateMusic,
+    readSongHeader,
     worldPublicId,
     worldRawId,
     type MidiSongMeta,
@@ -171,17 +171,12 @@ export class WorldMusicLibrary {
     /**
      * 保存全局歌曲。
      *
-     * 同 id 且内容一致视为幂等重复；同 id 不同内容视为冲突并拒绝覆盖。
+     * 同 ID 的相同音乐可追加编排，原值与原保存时间保留。
      */
     save(pbe3: Uint8Array): StoredMusicEntry {
         this.ensureLoaded();
-        const { header, checksum } = validateMusic(pbe3);
-        const existing = this.entry(header.id);
-        if (existing) {
-            if (existing.checksum === checksum && existing.bytes === pbe3.length) return existing;
-            throw new MusicValidationError(`歌曲 ID 冲突：${header.id} 已存在且内容不同`);
-        }
-        if (this.entriesCache.length >= WORLD_LIBRARY_MAX_SONGS) {
+        const header = readSongHeader(pbe3);
+        if (!this.entry(header.id) && this.entriesCache.length >= WORLD_LIBRARY_MAX_SONGS) {
             throw new MusicValidationError(`全局曲库歌曲数量已达上限 ${WORLD_LIBRARY_MAX_SONGS}`);
         }
         const entry = this.collection.save(pbe3);
@@ -211,6 +206,10 @@ export class WorldMusicLibrary {
         get: (publicId: string): Promise<Uint8Array | undefined> => {
             const id = worldRawId(publicId);
             return id === undefined ? Promise.resolve(undefined) : this.get(id);
+        },
+        performances: (publicId: string) => {
+            const id = worldRawId(publicId);
+            return id === undefined ? undefined : this.collection.getPerformances(id);
         },
         page: async (page: number, pageSize: number, query?: string) => {
             const result = this.pageSync(page, pageSize, query);

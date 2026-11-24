@@ -35,7 +35,7 @@ const hostDocuments = import.meta.glob<Definition>("../../../vfx/assets/particle
 const pluginDocuments = import.meta.glob<Definition>("../../../../plugins/*/particles/*.particle.json", {
     eager: true, import: "default",
 });
-const pluginTextures = import.meta.glob<string>("../../../../plugins/*/textures/particle/*.png", {
+const pluginTextures = import.meta.glob<string>("../../../../plugins/*/textures/**/*.png", {
     eager: true, import: "default", query: "?url",
 });
 const documents = { ...hostDocuments, ...pluginDocuments };
@@ -47,15 +47,24 @@ export async function loadParticles() {
     const loader = new TextureLoader();
     const textureUrls = new Map([["textures/particle/vfx_lab", atlasUrl]]);
     for (const [path, url] of Object.entries(pluginTextures)) {
-        const name = path.slice(path.lastIndexOf("/") + 1, -4);
-        textureUrls.set(`textures/particle/${name}`, url);
+        const id = path.slice(path.indexOf("/textures/") + 1, -4);
+        if (textureUrls.has(id)) {
+            console.warn(`[piano-vfx] 粒子贴图路径冲突：${id}`);
+            continue;
+        }
+        textureUrls.set(id, url);
     }
-    const textures = new Map(await Promise.all([...textureUrls].map(async ([id, url]) => {
-        const loaded = await loader.loadAsync(url);
-        loaded.magFilter = LinearFilter;
-        loaded.minFilter = LinearFilter;
-        return [id, loaded] as const;
-    })));
+    const textures = new Map<string, Awaited<ReturnType<TextureLoader["loadAsync"]>>>();
+    await Promise.all([...textureUrls].map(async ([id, url]) => {
+        try {
+            const loaded = await loader.loadAsync(url);
+            loaded.magFilter = LinearFilter;
+            loaded.minFilter = LinearFilter;
+            textures.set(id, loaded);
+        } catch (error) {
+            console.warn(`[piano-vfx] 无法读取贴图 ${id}`, error);
+        }
+    }));
     const scene = new Wintersky.Scene();
     scene.global_options.tick_rate = stepRate;
     scene.global_options.ground_collision = false;
@@ -64,8 +73,16 @@ export async function loadParticles() {
     for (const doc of Object.values(documents)) {
         const identifier = doc.particle_effect.description.identifier;
         if (!identifier.startsWith("pbe:vfx_")) continue;
-        const texture = textures.get(doc.particle_effect.description.basic_render_parameters.texture);
-        if (!texture) throw new Error(`${identifier} 缺少 VFX 粒子贴图`);
+        const particle = identifier.slice("pbe:vfx_".length);
+        if (configs.has(particle)) {
+            console.warn(`[piano-vfx] 粒子 ID 冲突：${identifier}`);
+            continue;
+        }
+        const texture = textures.get(doc.particle_effect.description.basic_render_parameters.texture.replace(/\.png$/i, ""));
+        if (!texture) {
+            console.warn(`[piano-vfx] ${identifier} 缺少可预览的粒子贴图`);
+            continue;
+        }
         const config = new Wintersky.Config(scene, doc);
         config.texture.dispose();
 
@@ -75,7 +92,6 @@ export async function loadParticles() {
             config.particle_motion_linear_speed = `math.sqrt(${initial.map(expr =>
                 `((${expr}) * (${expr}))`).join(" + ")})`;
         }
-        const particle = identifier.slice("pbe:vfx_".length) as VfxParticle;
         config.texture = texture;
         // The built-in steady scheduler rounds 1/rate to whole ticks. Integrate the authored rate here.
         if (config.emitter_rate_mode === "steady") {

@@ -7,6 +7,7 @@ import {
     SongCache,
     type MidiSongMeta,
     type SongHandle,
+    type PerformanceCue,
 } from "@piano/core";
 import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
 import type { PianoTransportEvent } from "../src/domain/playback/visualEvent";
@@ -48,6 +49,35 @@ function handleFor(
 
 const loader = { acquire: async () => handleFor(song) };
 const { MidiPlayer } = await import("../src/domain/playback/player");
+
+test("the same musical data can be queued as ordinary and arranged playback without sharing selection", async () => {
+    const trace: PianoTransportEvent[] = [];
+    const notes: number[] = [];
+    const alternate: PerformanceCue = { op: "flash", tick: 0, effect: "burst", color: "#ABCDEF", level: 90, scale: 100 };
+    const midi = new MidiPlayer({ ...loader, performances: () => [[alternate]] }, {
+        note: info => notes.push(info.midi), playing() {}, stopNotes() {}, transport: event => trace.push(event),
+    });
+    const ordinary = { ...song, source: "library" as const, performance: -1 };
+    const special = { ...ordinary, performance: 1 };
+    const missing = { ...ordinary, performance: 2 };
+    expect(midi.addToQueue(ordinary)).toBe("added");
+    expect(midi.addToQueue(special)).toBe("added");
+    expect(midi.addToQueue(special)).toBe("exists");
+    await midi.playNow(special);
+    expect(midi.performance?.cues).toEqual([alternate]);
+    midi.pause();
+    midi.seek(2);
+    midi.resume();
+    await midi.playNow(ordinary);
+    expect(midi.performance).toBeUndefined();
+    midi.tick(Date.now() + 25);
+    await midi.playNow(missing);
+    expect(midi.performance).toBeUndefined();
+    midi.tick(Date.now() + 25);
+    midi.end();
+    expect(notes).toEqual([60, 60]);
+    expect(trace.filter(event => event.type === "track")).toHaveLength(3);
+});
 
 const record = readPlaybackRecord(JSON.stringify({
     version: 1, songs: [song, song], index: 1, mode: "loop", state: "playing", seconds: 2,

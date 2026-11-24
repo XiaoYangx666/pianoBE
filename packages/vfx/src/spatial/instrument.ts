@@ -49,6 +49,11 @@ export function vfxStageFrame(instrument: VfxInstrument = "upright") {
     };
 }
 
+/** Head position along the instrument's depth axis in the default seated pose. */
+export function vfxPerformerDepth(instrument: VfxInstrument) {
+    return instrument === "grand" ? -0.875 : -0.703125;
+}
+
 /** Key origin used by VFX emitters, relative to the instrument center and stage frame. */
 export function keyOriginFor(midi: number, instrument: VfxInstrument = "upright"): Point3 | undefined {
     const center = KEY_CENTERS[instrument].get(midi);

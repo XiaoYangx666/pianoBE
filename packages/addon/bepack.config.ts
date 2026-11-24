@@ -1,5 +1,6 @@
 import { defineConfig, sapiPro } from "@bepack/cli";
-import { cp } from "fs/promises";
+import { copyFile } from "fs/promises";
+import { execFileSync } from "node:child_process";
 import { join } from "path";
 import { platform } from "process";
 
@@ -82,18 +83,19 @@ export default defineConfig({
     },
     hooks: {
         afterBuild: async (ctx) => {
-            if (ctx.mode == "template") return "skipped midi copy";
-            if (!ctx.paths.scriptOutDir) {
+            const scriptOutDir = ctx.paths.scriptOutDir;
+            if (!scriptOutDir) {
                 ctx.logger.error("scripts目录不存在");
                 return;
             }
-            // Generated MIDI modules are emitted under the preserved source path.
-            // Keep this in sync with src/app/midiManager.ts -> ../midis/index.js.
-            await cp("../../midis/js/", join(ctx.paths.scriptOutDir, "packages/addon/src/midis"), {
-                recursive: true,
-                force: true,
-            });
-            return "midi copy success";
+            await copyFile("../../build/stage-props/scripts/vfx/stagePropCatalog.js",
+                join(scriptOutDir, "vfx/stagePropCatalog.js"));
+            await copyFile("../../build/stage-props/scripts/vfx/core.js", join(scriptOutDir, "vfx/core.js"));
+            if (ctx.mode == "template") return "skipped midi copy";
+            execFileSync(process.execPath, [
+                "../../tools/midi/sync-addon-library.mjs", join(ctx.paths.scriptOutDir, "packages/addon/src/midis"),
+            ], { stdio: "inherit" });
+            return "embedded library generated";
         },
     },
     plugins: [sapiPro()],

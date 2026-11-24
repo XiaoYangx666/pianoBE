@@ -1,0 +1,84 @@
+{
+    "song": "28a2cb50",
+    "title": "水神之舞 · 罪人的终幕",
+    "sections": [
+        {
+            "at": 0,
+            "label": "序幕 · 追光与悬剑",
+            "cues": [
+                { "at": 0, "op": "set", "effect": "sinner_sword", "color": "#388DEE", "color2": "#D9FAFF", "level": 100, "fade": 0, "params": { "height": 3.5, "turn": -18 } },
+                { "at": 0, "op": "set", "effect": "sinner_spotlight", "color": "#FFDBAC", "color2": "#506BAF", "level": 83, "fade": 0, "params": { "width": 2.48, "side": 0.21, "cone": 0.72, "key": 1 } },
+                { "at": 18, "op": "set", "effect": "sinner_sword", "level": 100, "fade": 13, "params": { "height": 3.75, "turn": 9 } }
+            ]
+        },
+        {
+            "at": 33,
+            "label": "旋舞 · 环绕琴台",
+            "cues": [
+                { "at": 33, "op": "set", "effect": "sinner_spotlight", "color": "#FFEBCD", "color2": "#6D8EC4", "level": 90, "fade": 6, "params": { "width": 2.78, "side": 0.40, "cone": 0.59, "key": 0.58 } },
+                { "at": 37.25, "op": "set", "effect": "sea_reflection", "color": "#274792", "color2": "#9ADDFF", "level": 21, "fade": 6.4, "params": { "width": 4.3, "depth": 2.5, "shimmer": 0.25 } },
+                { "at": 40.4, "op": "set", "effect": "sinner_sword", "level": 100, "fade": 18, "params": { "height": 3.52, "turn": -27 } },
+                { "at": 54.1, "op": "set", "effect": "sea_reflection", "color": "#5275B9", "color2": "#B2DAED", "level": 41, "fade": 7.1, "params": { "shimmer": 0.37 } },
+                { "at": 58.4, "op": "set", "effect": "sinner_spotlight", "color": "#F7E5D3", "color2": "#426BAF", "level": 72, "fade": 7.8, "params": { "width": 2.40, "side": 0.28, "cone": 0.68 } },
+                { "at": 60, "op": "set", "effect": "sinner_sword", "level": 100, "fade": 8.6, "params": { "height": 4, "turn": -10 } },
+                { "at": 68.8, "op": "set", "effect": "sea_reflection", "level": 0, "fade": 0.85 },
+                { "at": 68.8, "op": "set", "effect": "sinner_spotlight", "color": "#FFE5B7", "level": 14, "fade": 0.85, "params": { "width": 1.34, "side": 0.03, "cone": 0.45, "key": 0 } }
+            ]
+        },
+        {
+            "at": 70,
+            "label": "断幕 · 落剑",
+            "cues": [
+                { "at": 70, "op": "set", "effect": "sinner_sword", "level": 100, "fade": 0.425, "params": { "fall": 1 } },
+                { "at": 70.425, "op": "flash", "effect": "sinner_impact", "color": "#398CFF", "color2": "#E4FFFF", "level": 100 },
+                { "at": 70.425, "op": "set", "effect": "sinner_spotlight", "color": "#D3F3FF", "color2": "#388AF9", "level": 100, "fade": 0, "params": { "width": 3.57, "side": 0.94, "cone": 0.35 } },
+                { "at": 70.775, "op": "set", "effect": "sinner_sword", "level": 0, "fade": 1.1 },
+                { "at": 71.15, "op": "set", "effect": "sinner_spotlight", "color": "#557FBC", "color2": "#458FC9", "level": 33, "fade": 1.9, "params": { "width": 3.02, "side": 0.55, "cone": 0.13 } },
+                { "at": 71.25, "op": "set", "effect": "sinner_bubbles", "color": "#75BAFF", "color2": "#C8F9FF", "level": 23, "scale": 96, "fade": 2.8 },
+                { "at": 72.25, "op": "set", "effect": "sinner_upwelling", "color": "#397CCD", "color2": "#A9E7F9", "level": 51, "fade": 1.6, "params": { "reach": 3.17, "radius": 3.12 } },
+                { "at": 78.2, "op": "set", "effect": "sinner_upwelling", "level": 0, "fade": 4.8, "params": { "reach": 2.2 } },
+                { "at": 80, "op": "set", "effect": "sinner_bubbles", "level": 43, "scale": 110, "fade": 5.4 }
+            ]
+        },
+        {
+            "at": 85,
+            "label": "沉静 · 水下余音",
+            "cues": [
+                { "at": 85, "op": "set", "effect": "sinner_bubbles", "color": "#5A94EE", "color2": "#D4EFFF", "level": 49, "scale": 113, "fade": 7.3 },
+                { "at": 87.3, "op": "set", "effect": "sinner_spotlight", "color": "#456CA8", "color2": "#76BAD4", "level": 40, "fade": 9, "params": { "width": 2.77, "side": 0.65, "cone": 0.23 } },
+                { "at": 91.2, "op": "set", "effect": "sea_reflection", "color": "#2A4B9D", "color2": "#80C6F7", "level": 36, "fade": 7, "params": { "shimmer": 0.33, "tideSpeed": 0.26 } },
+                { "at": 108.5, "op": "set", "effect": "sinner_upwelling", "color": "#416CE2", "color2": "#A2DEFF", "level": 29, "scale": 85, "fade": 9, "params": { "reach": 3.08, "radius": 3.25 } },
+                { "at": 116.5, "op": "set", "effect": "sinner_bubbles", "level": 77, "scale": 138, "fade": 5 }
+            ]
+        },
+        {
+            "at": 121,
+            "label": "归潮 · 万水回天",
+            "cues": [
+                { "at": 121, "op": "set", "effect": "sinner_spotlight", "color": "#74C8FF", "color2": "#657AF5", "level": 93, "fade": 5.5, "params": { "width": 3.96, "side": 0.97, "cone": 0.61 } },
+                { "at": 121, "op": "set", "effect": "sinner_upwelling", "color": "#3091ED", "color2": "#B1F7FF", "level": 93, "scale": 104, "fade": 5, "params": { "reach": 5.45, "radius": 3.8 } },
+                { "at": 128.875, "op": "set", "effect": "sinner_authority", "color": "#3D8DF5", "color2": "#BFEFFF", "level": 44, "fade": 2.475, "params": { "aperture": 0.23, "height": 4.1 } },
+                { "at": 126.375, "op": "set", "effect": "sinner_upwelling", "color": "#436DE7", "color2": "#E2F8FF", "level": 0, "fade": 2.5, "params": { "reach": 5.15, "radius": 3.62 } },
+                { "at": 130, "op": "set", "effect": "sinner_bubbles", "color": "#488FF1", "color2": "#D0F9FF", "level": 100, "scale": 143, "fade": 3 },
+                { "at": 131.35, "op": "set", "effect": "sinner_authority", "color": "#368BEA", "color2": "#D8F8FF", "level": 74, "fade": 3.4, "params": { "aperture": 0.56, "height": 4.6 } },
+                { "at": 133.2, "op": "set", "effect": "sinner_spotlight", "color": "#578DF4", "color2": "#456FEA", "level": 57, "fade": 1.55, "params": { "side": 0.85, "cone": 0.34 } },
+                { "at": 134.75, "op": "flash", "effect": "sinner_authority_release", "color": "#4FBFFF", "color2": "#F1FFFF", "level": 100 },
+                { "at": 134.75, "op": "set", "effect": "sinner_authority", "color": "#43A5FC", "color2": "#E3FCFF", "level": 100, "fade": 1.05, "params": { "aperture": 1, "height": 4.6 } },
+                { "at": 134.75, "op": "set", "effect": "sinner_spotlight", "color": "#A8E3FF", "color2": "#537CFF", "level": 97, "fade": 0.45, "params": { "width": 4.32, "side": 1, "cone": 0.52 } },
+                { "at": 138.3, "op": "set", "effect": "sinner_authority", "color": "#487AF2", "color2": "#C5ECFF", "level": 47, "fade": 3.4, "params": { "aperture": 1, "height": 5.22 } },
+                { "at": 142.25, "op": "set", "effect": "sinner_authority", "level": 0, "fade": 4.25 },
+                { "at": 142.3, "op": "set", "effect": "sinner_spotlight", "color": "#E1EBFE", "color2": "#426FE1", "level": 46, "fade": 9, "params": { "width": 2.46, "side": 0.36, "cone": 0.28 } },
+                { "at": 149.5, "op": "set", "effect": "sinner_bubbles", "color": "#719BE4", "color2": "#DBF5FF", "level": 24, "scale": 89, "fade": 7 },
+                { "at": 156, "op": "set", "effect": "sinner_bubbles", "level": 0, "fade": 4.6 }
+            ]
+        },
+        {
+            "at": 160,
+            "label": "散场 · 最后一束光",
+            "cues": [
+                { "at": 160, "op": "set", "effect": "sinner_spotlight", "color": "#FFE0B7", "color2": "#5D87D9", "level": 30, "fade": 2.6, "params": { "width": 1.71, "side": 0.07, "cone": 0.42 } },
+                { "at": 162.625, "op": "blackout", "fade": 4.25 }
+            ]
+        }
+    ]
+}

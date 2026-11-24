@@ -1,0 +1,68 @@
+{
+    "format_version": "1.10.0",
+    "particle_effect": {
+        "description": {
+            "identifier": "pbe:vfx_sinner_bubble",
+            "basic_render_parameters": {
+                "material": "particles_add",
+                "texture": "textures/particle/pbe_sinner_bubble"
+            }
+        },
+        "components": {
+            "minecraft:emitter_rate_instant": {
+                "num_particles": 1
+            },
+            "minecraft:emitter_lifetime_once": {
+                "active_time": 0.05
+            },
+            "minecraft:emitter_shape_point": {
+                "offset": [
+                    0,
+                    0,
+                    0
+                ]
+            },
+            "minecraft:particle_lifetime_expression": {
+                "max_lifetime": "(variable.vfx_life ?? 1.08)"
+            },
+            "minecraft:particle_appearance_billboard": {
+                "facing_camera_mode": "lookat_xyz",
+                "size": [
+                    "(variable.vfx_size ?? 0.22)",
+                    "(variable.vfx_size ?? 0.22)"
+                ],
+                "uv": {
+                    "texture_width": 128,
+                    "texture_height": 128,
+                    "uv": [
+                        0,
+                        0
+                    ],
+                    "uv_size": [
+                        128,
+                        128
+                    ]
+                }
+            },
+            "minecraft:particle_appearance_tinting": {
+                "color": [
+                    "(variable.vfx_red ?? 1)",
+                    "(variable.vfx_green ?? 1)",
+                    "(variable.vfx_blue ?? 1)",
+                    "(variable.vfx_opacity ?? 0.7) * math.clamp(variable.particle_age / 0.43, 0, 1) * math.clamp((variable.particle_lifetime - variable.particle_age) / 0.97, 0, 1)"
+                ]
+            },
+            "minecraft:emitter_local_space": {
+                "position": true,
+                "rotation": true
+            },
+            "minecraft:particle_motion_parametric": {
+                "relative_position": [
+                    "0.18 * (math.sin((variable.vfx_phase ?? 0) + 94 * variable.particle_age) - math.sin(variable.vfx_phase ?? 0))",
+                    "(variable.vfx_speed ?? 0.7) * variable.particle_age + 0.09 * variable.particle_age * variable.particle_age",
+                    "0.21 * (math.cos((variable.vfx_phase ?? 0) + 71 * variable.particle_age) - math.cos(variable.vfx_phase ?? 0))"
+                ]
+            }
+        }
+    }
+}

@@ -6,8 +6,8 @@
     "license": "UNLICENSED",
     "private": true,
     "scripts": {
-        "pack": "npm run sync:assets && bepack pack",
-        "sync:assets": "npm run build -w @piano/vfx && npm run build -w @piano/plugins && node ../../tools/assets/sync-vfx-assets.mjs",
+        "pack": "npm run sync:assets && bepack build --skip-copy --pack",
+        "sync:assets": "npm run build -w @piano/core && npm run build -w @piano/vfx && npm run build -w @piano/plugins && node ../../tools/assets/sync-vfx-assets.mjs && bun ../../tools/assets/sync-stage-props.mjs",
         "dev": "npm run sync:assets && bepack dev",
         "build": "npm run sync:assets && bepack build",
         "copy": "npm run sync:assets && bepack copy",

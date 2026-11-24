@@ -14,6 +14,77 @@ mock.module("@minecraft/server", () => ({
 }));
 const { grandDefinition, pianoDefinition } = await import("../src/domain/instrument/definition");
 const { inspectInstrument, placeInstrument, destroyInstrument, resolveInstrument } = await import("../src/platform/assembly");
+const { VfxPropRenderer } = await import("../src/platform/vfxProp");
+
+test("stage props move, restart on a seek, switch and clear without leaving an active entity", () => {
+    const first = { id: "fixture.stage:lantern", entityId: "pbe:fixture_lantern", animations: ["flicker"] };
+    const second = { id: "fixture.stage:arch", entityId: "pbe:fixture_arch", animations: [] };
+    const registrations = new Map([first, second].map(prop => [prop.id, prop]));
+    let loaded = true;
+    let failSpawn = false;
+    function entity(typeId: string, position: { x: number; y: number; z: number }) {
+        const properties = new Map<string, number>();
+        return {
+            typeId, isValid: true, position, properties,
+            teleport(next: typeof position) { this.position = next; },
+            setProperty(name: string, value: number) { properties.set(name, value); },
+            remove() { this.isValid = false; },
+        };
+    }
+    const spawned: ReturnType<typeof entity>[] = [];
+    const dimension = {
+        isChunkLoaded: (position: { x: number }) => loaded && position.x < 16,
+        spawnEntity(id: string, position: { x: number; y: number; z: number }) {
+            if (failSpawn) throw new Error("fixture spawn failure");
+            const next = entity(id, position);
+            spawned.push(next);
+            return next;
+        },
+    };
+    const renderer = new VfxPropRenderer({
+        dimension: dimension as unknown as Parameters<typeof inspectInstrument>[0]["dimension"],
+        pos: { x: 0, y: 0, z: 0 }, direction: "south", definition: grandDefinition,
+    }, registrations);
+    const prop = { id: first.id, offset: { x: 0, y: 1, z: 1 }, size: 1.2, turn: 45, animation: "flicker" };
+    expect(renderer.render(prop, 0)).toBe(true);
+    expect(spawned[0].properties).toEqual(new Map([
+        ["pbe:vfx_animation", 1], ["pbe:vfx_size", 1.2], ["pbe:vfx_turn", 45],
+    ]));
+    expect(renderer.render({ ...prop, offset: { x: 1, y: 2, z: 2 } }, 1)).toBe(true);
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0].position).toMatchObject({ x: 1.5, y: 2 });
+
+    renderer.clear();
+    expect(renderer.render(prop, 2)).toBe(true);
+    expect(spawned[0].isValid).toBe(false);
+    expect(spawned).toHaveLength(2);
+    expect(renderer.render({ ...prop, id: second.id, animation: undefined }, 3)).toBe(true);
+    expect(spawned[1].isValid).toBe(false);
+    expect(spawned[2].typeId).toBe(second.entityId);
+    expect(renderer.render({ ...prop, animation: "missing" }, 4)).toBe(false);
+    expect(spawned[2].isValid).toBe(false);
+
+    expect(renderer.render(prop, 5)).toBe(true);
+    expect(renderer.render({ ...prop, offset: { ...prop.offset, x: 17 } }, 6)).toBe(false);
+    expect(spawned[3].isValid).toBe(false);
+    expect(renderer.render(prop, 7)).toBe(true);
+    loaded = false;
+    expect(renderer.render(prop, 8)).toBe(false);
+    expect(spawned.every(item => !item.isValid)).toBe(true);
+    loaded = true;
+    expect(renderer.render(prop, 9)).toBe(true);
+    expect(renderer.render(undefined, 10)).toBe(false);
+    expect(spawned.every(item => !item.isValid)).toBe(true);
+
+    failSpawn = true;
+    expect(renderer.render(prop, 11)).toBe(false);
+    failSpawn = false;
+    expect(renderer.render({ ...prop, id: second.id, animation: undefined }, 12)).toBe(true);
+    expect(renderer.render(prop, 13)).toBe(false);
+    expect(spawned.every(item => !item.isValid)).toBe(true);
+    expect(renderer.render(prop, 51)).toBe(true);
+    renderer.clear();
+});
 
 function fixture() {
     const cells = new Map<string, any>();

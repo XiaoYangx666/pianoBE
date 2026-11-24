@@ -1,41 +1,60 @@
 import type { Entity } from "@minecraft/server";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { vfxInstrumentFor } from "@domain/instrument/definition";
-import { placeVfxStageProp, vfxStageFrame, type VfxStageProp } from "@piano/vfx";
+import { placeVfxStageProp, vfxStageFrame, type Vec3, type VfxStageProp } from "@piano/vfx";
+import type { StagePropRegistration } from "@piano/vfx/package";
 import { instrumentCenter } from "@platform/assembly";
 import type { InstrumentLocation } from "@platform/instrumentLocation";
-
-const ENTITY_IDS = { porcelain_vase: "pbe:vfx_porcelain_vase" } as const;
 
 /** One transient native prop belongs to the current performance on an instrument. */
 export class VfxPropRenderer {
     private entity?: Entity;
     private size?: number;
     private turn?: number;
+    private position?: Vec3;
+    private animation = 0;
     private retryAt = 0;
+    private failedId?: string;
 
-    constructor(private readonly location: InstrumentLocation) {}
+    constructor(
+        private readonly location: InstrumentLocation,
+        private readonly registrations: ReadonlyMap<string, StagePropRegistration>,
+    ) {}
 
     render(prop: VfxStageProp | undefined, tick: number): boolean {
-        if (!prop) {
+        const registration = prop && this.registrations.get(prop.id);
+        const animation = prop?.animation === undefined ? 0 : (registration?.animations.indexOf(prop.animation) ?? -1) + 1;
+        if (!prop || !registration || (prop.animation !== undefined && animation === 0)
+            || ![prop.offset?.x, prop.offset?.y, prop.offset?.z, prop.size, prop.turn].every(Number.isFinite)) {
             this.clear();
             return false;
         }
-        if (tick < this.retryAt) return false;
-        const { x, y, z } = prop.offset;
-        if (![x, y, z, prop.size, prop.turn].every(Number.isFinite)) return false;
-        const identifier = ENTITY_IDS[prop.model];
-        if (!identifier) return false;
+        if (registration.id === this.failedId && tick < this.retryAt) {
+            this.clear();
+            return false;
+        }
+        const { entityId } = registration;
+        const { dimension, direction, definition, pos } = this.location;
         try {
+            const { position, yaw } = placeVfxStageProp(
+                instrumentCenter(this.location), RightOffsets[direction], vfxStageFrame(vfxInstrumentFor(definition)), prop,
+            );
+            if (!dimension.isChunkLoaded(pos) || !dimension.isChunkLoaded(position)) {
+                this.clear();
+                return false;
+            }
+            if (this.entity?.isValid && (this.entity.typeId !== entityId || this.animation !== animation)) this.clear();
             if (!this.entity?.isValid) {
-                const { dimension, direction, definition } = this.location;
-                const { position, yaw } = placeVfxStageProp(
-                    instrumentCenter(this.location), RightOffsets[direction], vfxStageFrame(vfxInstrumentFor(definition)), prop,
-                );
-                if (!dimension.isChunkLoaded(position)) return false;
-                this.entity = dimension.spawnEntity(identifier, position, { initialRotation: yaw });
+                this.entity = dimension.spawnEntity(entityId, position, { initialRotation: yaw });
                 this.size = undefined;
                 this.turn = undefined;
+                this.position = position;
+                this.animation = animation;
+                if (animation) this.entity.setProperty("pbe:vfx_animation", animation);
+            } else if (this.position && Math.hypot(position.x - this.position.x, position.y - this.position.y,
+                position.z - this.position.z) >= 0.006) {
+                this.entity.teleport(position, { rotation: { x: 0, y: yaw } });
+                this.position = position;
             }
 
             const size = Math.max(0.05, Math.min(2, Math.round(prop.size * 100) / 100));
@@ -52,6 +71,7 @@ export class VfxPropRenderer {
         } catch {
             // Old templates and unloaded chunks can still render the particle version.
             this.clear();
+            this.failedId = registration.id;
             this.retryAt = tick + 40;
             return false;
         }

@@ -29,6 +29,8 @@ export interface StoredMusicEntry {
     checksum: string;
     /** Base64URL 分片数量 */
     shards: number;
+    /** 可选编排索引的 Base64URL 字符数，紧接在 PBE3 正文之后。 */
+    performanceChars?: number;
     /** 数据世代；提交新版本时生成，旧世代分片随后删除 */
     gen: string;
     createdAt: number;
@@ -65,16 +67,11 @@ export function metaJson(entry: StoredMusicEntry): string {
 
 /** 一条曲目在存储中实际占用的字节数（键 + 值，UTF-8）。 */
 export function entryStoredBytes(prefix: string, entry: StoredMusicEntry): number {
-    const encodedLength = base64UrlLength(entry.bytes);
+    const encodedLength = base64UrlLength(entry.bytes) + (entry.performanceChars ?? 0);
     const shards = Math.max(1, entry.shards);
     let total = utf8ByteLength(metaKey(prefix, entry.id)) + utf8ByteLength(metaJson(entry));
-    for (let index = 0; index < shards; index++) {
-        const chars = index === shards - 1
-            ? encodedLength - MUSIC_SHARD_CHARS * (shards - 1)
-            : MUSIC_SHARD_CHARS;
-        total += utf8ByteLength(dataKey(prefix, entry.id, entry.gen, index)) + Math.max(0, chars);
-    }
-    return total;
+    for (let index = 0; index < shards; index++) total += utf8ByteLength(dataKey(prefix, entry.id, entry.gen, index));
+    return total + encodedLength;
 }
 
 export interface StorageUsage {

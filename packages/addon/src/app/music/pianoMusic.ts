@@ -72,6 +72,11 @@ export class PianoMusic {
         return midiManager.read(id);
     }
 
+    performances(ref: MusicRef) {
+        if (ref.source === "library") return midiManager.performances(ref.id);
+        return this.cardMatches(ref) ? this.cardStorageProvider()?.getPerformances?.(ref.id) ?? [] : [];
+    }
+
     /** 队列 UI 用：这首歌现在还能不能读到。 */
     availability(ref: MusicRef): TrackAvailability {
         if (ref.source === "library") return midiManager.getInfo(ref.id) ? "ok" : "unknown";

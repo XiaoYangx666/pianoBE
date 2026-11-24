@@ -1,11 +1,7 @@
-import { TIME_SCALE } from "@piano/core";
+import { TIME_SCALE, type MidiSongMeta } from "@piano/core";
 
 /** 生成器列表条目：模板已有曲目（保留模块原文）或新导入曲目（PBE3） */
-export interface SongEntry {
-    id: string;
-    name: string;
-    /** 已按 TIME_SCALE 缩放 */
-    duration: number;
+export interface SongEntry extends MidiSongMeta {
     noteCount: number;
     isOriginal: boolean;
     /** 来自内置曲库（仅作标签展示，导出逻辑不变） */

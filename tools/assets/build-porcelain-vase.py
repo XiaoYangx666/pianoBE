@@ -18,7 +18,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter
 
 
-RP = Path(__file__).resolve().parents[2] / "packages/addon/rp"
+PROPS = Path(__file__).resolve().parents[2] / "plugins/chinese/stage_props"
 # Art and UV coordinates are authored against this edge, then scaled to SIZE.
 AUTHORED = 1024
 SIZE = 512
@@ -80,7 +80,7 @@ def model():
         "visible_bounds_width": 6, "visible_bounds_height": 8, "visible_bounds_offset": [0, 3, 0],
     }
     geometry = {"description": description, "bones": [{"name": "vase", "pivot": [0, 0, 0]}, *faces]}
-    target = RP / "models/entity/vfx_porcelain_vase.geo.json"
+    target = PROPS / "porcelain_vase.geo.json"
     target.write_text(json.dumps({"format_version": "1.16.0", "minecraft:geometry": [geometry]}, separators=(",", ":")) + "\n")
 
 
@@ -159,19 +159,8 @@ def textures():
             # makes the map uncompressible (40 KB vs 6 KB), so it stays in color only.
             mer.putpixel((x, y), (0, round(8 * (1 - pigment) ** 2), round(42 + pigment * 25)))
 
-    target = RP / "textures/entity"
-    color.quantize(colors=256, dither=Image.FLOYDSTEINBERG).save(target / "pbe_vfx_porcelain.png", optimize=True)
-    mer.quantize(colors=64, dither=Image.NONE).save(target / "pbe_vfx_porcelain_mer.png", optimize=True)
-    stale = target / "pbe_vfx_porcelain_height.png"
-    if stale.exists():
-        stale.unlink()
-    (target / "pbe_vfx_porcelain.texture_set.json").write_text(json.dumps({
-        "format_version": "1.21.30",
-        "minecraft:texture_set": {
-            "color": "pbe_vfx_porcelain",
-            "metalness_emissive_roughness": "pbe_vfx_porcelain_mer",
-        },
-    }, indent=4) + "\n")
+    color.quantize(colors=256, dither=Image.FLOYDSTEINBERG).save(PROPS / "porcelain.png", optimize=True)
+    mer.quantize(colors=64, dither=Image.NONE).save(PROPS / "porcelain_mer.png", optimize=True)
 
 
 if __name__ == "__main__":

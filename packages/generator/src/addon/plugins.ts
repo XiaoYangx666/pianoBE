@@ -1,12 +1,14 @@
 import { readAddonArchive } from "@bepack/addon";
-import { decodeSong, estimateSongVoiceLoad, readSongHeader } from "@piano/core";
+import { decodeSong, estimateSongVoiceLoad, type PerformanceCue } from "@piano/core";
 import {
     VFX_API_VERSION,
     isApiVersionCompatible,
+    isValidBrush,
     type VfxPluginManifest,
 } from "@piano/vfx";
 import { readPbePluginArchive, type PbePluginArchive } from "@piano/vfx/package";
 import { pbe3ToEntry } from "../music/convert";
+import { songPerformances } from "../music/groupSongs";
 import type { StoredPlugin } from "./localPlugins";
 import type { SongEntry } from "../types";
 
@@ -220,23 +222,8 @@ export function loadPluginArchive(entry: GeneratorPluginEntry): Promise<PbePlugi
     return pending;
 }
 
-/** 从 PBE3 二进制头部提取曲目演出中引用的全部唯一 Effect ID。 */
-export function extractSongEffectIds(data?: Uint8Array): string[] {
-    if (!data || data.length === 0) return [];
-    try {
-        const header = readSongHeader(data);
-        const cues = header.performance;
-        if (!cues || cues.length === 0) return [];
-        const ids = new Set<string>();
-        for (const cue of cues) {
-            if (typeof cue.effect === "string" && cue.effect.trim()) {
-                ids.add(cue.effect.trim());
-            }
-        }
-        return [...ids].sort();
-    } catch {
-        return [];
-    }
+function effectIds(cues: readonly PerformanceCue[]): string[] {
+    return [...new Set(cues.map(cue => cue.effect))].sort();
 }
 
 function chooseProvider(
@@ -264,10 +251,14 @@ export function matchSongPlugins(
     const selectedSet = new Set(selectedPluginIds);
     const songEffects = new Map<string, string[]>();
     const effectToSongs = new Map<string, Set<string>>();
+    const missingEffects: MissingEffectDemand[] = [];
 
     for (const song of songs) {
-        const effects = extractSongEffectIds(song.data);
+        const cues = songPerformances(song).flat();
+        const effects = effectIds(cues);
         songEffects.set(song.id, effects);
+        const invalidBrushes = new Set(cues.flatMap(cue => cue.brush && !isValidBrush(cue.brush) ? [cue.brush] : []));
+        for (const brush of invalidBrushes) missingEffects.push({ effect: `画笔 ${brush}`, songs: [song.name] });
         for (const effect of effects) {
             let names = effectToSongs.get(effect);
             if (!names) {
@@ -292,7 +283,6 @@ export function matchSongPlugins(
 
     const reasons = new Map<string, { effects: Set<string>; songs: Set<string> }>();
     const autoSelectedSet = new Set<string>();
-    const missingEffects: MissingEffectDemand[] = [];
     const disabledRequiredEffects: DisabledRequiredEffectDemand[] = [];
 
     for (const [effect, songSet] of effectToSongs) {
@@ -344,22 +334,30 @@ export function matchSongPlugins(
 
     return {
         songEffects,
-        autoSelectedIds: [...autoSelectedSet],
+        autoSelectedIds: withPluginDependencies([...autoSelectedSet], plugins),
         reasons: normalizedReasons,
         missingEffects,
         disabledRequiredEffects,
     };
 }
 
+export function withPluginDependencies(ids: readonly string[], plugins: readonly GeneratorPluginEntry[]): string[] {
+    const available = new Map(plugins.filter(plugin => plugin.compatible && plugin.trusted).map(plugin => [plugin.id, plugin]));
+    const selected = new Set<string>();
+    function include(id: string) {
+        const entry = available.get(id);
+        if (!entry || selected.has(id)) return;
+        selected.add(id);
+        for (const dependency of entry.manifest.dependencies ?? []) include(dependency);
+    }
+    ids.forEach(include);
+    return [...selected];
+}
+
 function pbe3ToSongWithPeak(bytes: Uint8Array): SongEntry {
     const entry = pbe3ToEntry(bytes);
-    try {
-        const song = decodeSong(bytes);
-        const voiceLoad = estimateSongVoiceLoad(song);
-        return { ...entry, voicePeak: voiceLoad.peakVoices };
-    } catch {
-        return entry;
-    }
+    const song = decodeSong(bytes);
+    return { ...entry, voicePeak: estimateSongVoiceLoad(song).peakVoices };
 }
 
 /**
@@ -388,17 +386,13 @@ export async function unpackSongBundles(files: readonly File[]): Promise<Unpacke
                 let found = 0;
                 for (const item of entries) {
                     const entryLower = item.path.toLowerCase();
-                    if (entryLower.endsWith(".pbe3")) {
-                        songs.push(pbe3ToSongWithPeak(item.bytes));
-                        found++;
-                    } else if (entryLower.endsWith(".pbeplugin")) {
-                        plugins.push(
-                            parsePbePluginBytes(item.bytes, "song", {
-                                trusted: false,
-                                songSourceName: file.name,
-                            }),
-                        );
-                        found++;
+                    if (!entryLower.endsWith(".pbe3") && !entryLower.endsWith(".pbeplugin")) continue;
+                    found++;
+                    try {
+                        if (entryLower.endsWith(".pbe3")) songs.push(pbe3ToSongWithPeak(item.bytes));
+                        else plugins.push(parsePbePluginBytes(item.bytes, "song", { trusted: false, songSourceName: file.name }));
+                    } catch (error) {
+                        errors.push(`${file.name} / ${item.path}：${error instanceof Error ? error.message : String(error)}`);
                     }
                 }
                 if (found === 0) {
@@ -426,6 +420,8 @@ export function summarizePluginProvides(
     if (p.layouts?.length) parts.push(`${p.layouts.length} 舞台布局`);
     if (p.keyStyles?.length) parts.push(`${p.keyStyles.length} 键粒样式`);
     if (p.particles?.length) parts.push(`${p.particles.length} 粒子`);
+    const props = plugin.manifest.stageProps?.length;
+    if (props) parts.push(`${props} 舞台道具`);
     return parts.join(" · ") || emptyLabel;
 }
 

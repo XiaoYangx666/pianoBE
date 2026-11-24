@@ -1,9 +1,13 @@
 import { crc32Hex } from "../midi/crc32.js";
-import { decodeBase64Url } from "../binary/base64url.js";
+import { decodeBase64Url, encodeBase64Url } from "../binary/base64url.js";
+import { decodeUtf8, encodeUtf8 } from "../binary/utf8.js";
 import { readPbe3Header } from "../pbe3/codec.js";
+import type { PerformanceCue } from "../pbe3/performance.js";
+import { sameSongMusic, sameSongPerformance } from "../songCodec.js";
 import {
     MUSIC_SHARD_CHARS,
     StorageBudget,
+    base64UrlLength,
     dataKey,
     entryStoredBytes,
     formatCapacityError,
@@ -52,6 +56,8 @@ function isEntryValid(value: unknown, expectId?: string, limits = DEFAULT_MUSIC_
         Number.isInteger(entry.bytes) && entry.bytes > 0 && entry.bytes <= limits.maxSongBytes &&
         typeof entry.checksum === "string" && /^[0-9a-f]{1,8}$/i.test(entry.checksum) &&
         Number.isInteger(entry.shards) && entry.shards >= 1 && entry.shards <= 512 &&
+        (entry.performanceChars === undefined || (Number.isSafeInteger(entry.performanceChars)
+            && entry.performanceChars > 0 && entry.performanceChars <= entry.shards * MUSIC_SHARD_CHARS)) &&
         typeof entry.gen === "string" && /^[0-9a-z]{1,24}$/.test(entry.gen) &&
         typeof entry.createdAt === "number" && Number.isFinite(entry.createdAt);
 }
@@ -127,13 +133,9 @@ export class MusicCollection {
         const entry = this.entry(id);
         if (!entry) return undefined;
         try {
-            const shards: string[] = [];
-            for (let index = 0; index < entry.shards; index++) {
-                const part = this.kv.get(dataKey(this.prefix, entry.id, entry.gen, index));
-                if (typeof part !== "string") return undefined;
-                shards.push(part);
-            }
-            const bytes = decodeBase64Url(shards.join(""));
+            const encoded = this.readEncoded(entry, base64UrlLength(entry.bytes));
+            if (encoded === undefined) return undefined;
+            const bytes = decodeBase64Url(encoded.slice(0, base64UrlLength(entry.bytes)));
             if (bytes.length !== entry.bytes) return undefined;
             if (crc32Hex(bytes) !== entry.checksum) return undefined;
             // 旧 PBE2 数据不再被运行时支持：给出明确提示，避免静默失败。
@@ -148,6 +150,30 @@ export class MusicCollection {
         }
     }
 
+    getPerformances(id: string): readonly (readonly PerformanceCue[])[] {
+        const entry = this.entry(id);
+        if (!entry?.performanceChars) return [];
+        try {
+            const encoded = this.readEncoded(entry);
+            const start = base64UrlLength(entry.bytes);
+            if (!encoded || encoded.length !== start + entry.performanceChars) return [];
+            const cues: unknown = JSON.parse(decodeUtf8(decodeBase64Url(encoded.slice(start))));
+            return Array.isArray(cues) ? cues.filter(Array.isArray) : [];
+        } catch { return []; }
+    }
+
+    private readEncoded(entry: StoredMusicEntry, limit = Infinity): string | undefined {
+        const shards: string[] = [];
+        let chars = 0;
+        for (let index = 0; index < entry.shards && chars < limit; index++) {
+            const part = this.kv.get(dataKey(this.prefix, entry.id, entry.gen, index));
+            if (typeof part !== "string") return undefined;
+            shards.push(part);
+            chars += part.length;
+        }
+        return shards.join("");
+    }
+
     usage(): StorageUsage {
         return StorageBudget.usage(this.prefix, this.entries(), this.limit());
     }
@@ -160,20 +186,37 @@ export class MusicCollection {
 
     /** 校验并写入 PBE3；失败抛错，调用方可直接展示 message。 */
     save(pbe3: Uint8Array, name?: string): StoredMusicEntry {
-        const { header, checksum, encoded } = validateMusic(pbe3, this.limits);
+        const { header, checksum } = validateMusic(pbe3, this.limits);
         const entries = this.entries();
         const previous = entries.find(item => item.id === header.id);
+        let base = pbe3;
+        let performanceIndex = "";
+        if (previous) {
+            const original = this.get(previous.id);
+            if (!original || !sameSongMusic(original, pbe3)) {
+                throw new MusicValidationError(`歌曲 ID 冲突：${header.id} 已存在且音乐数据不同`);
+            }
+            const incoming = header.performance;
+            const originalPerformance = readPbe3Header(original).performance;
+            const alternate = this.getPerformances(previous.id);
+            const known = originalPerformance ? [originalPerformance, ...alternate] : alternate;
+            if (!incoming || known.some(cues => sameSongPerformance(original, cues, incoming))) return previous;
+            base = original;
+            performanceIndex = encodeBase64Url(encodeUtf8(JSON.stringify([...alternate, incoming])));
+        }
+        const encoded = encodeBase64Url(base) + performanceIndex;
         const shards = Math.max(1, Math.ceil(encoded.length / this.shardChars));
         const gen = this.nextGeneration(header.id, previous?.gen);
         const entry: StoredMusicEntry = {
             v: 1,
             id: header.id,
-            name: (name ?? header.name).slice(0, 120) || header.id,
+            name: previous?.name ?? ((name ?? header.name).slice(0, 120) || header.id),
             duration: header.duration,
             noteCount: header.noteCount,
-            bytes: pbe3.length,
-            checksum,
+            bytes: base.length,
+            checksum: previous?.checksum ?? checksum,
             shards,
+            ...(performanceIndex ? { performanceChars: performanceIndex.length } : {}),
             gen,
             createdAt: previous?.createdAt ?? this.now(),
         };

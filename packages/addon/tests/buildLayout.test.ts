@@ -6,14 +6,12 @@ import path from "node:path";
  * 内嵌 MIDI 的构建布局约束。
  *
  * 生成入口在源码里是空 stub，真正的曲目由 bepack afterBuild 从仓库根目录
- * `midis/js/` 拷贝到 preserve-modules 输出。这里同时校验：
- * 1. 运行时相对导入与构建钩子目标目录一致；
- * 2. 如果本地已有构建产物，实际相对导入能解析到生成入口；client 产物还必须非空。
+ * `midis/library/` 生成到 preserve-modules 输出。这里校验源码契约。
+ * 产物由 verify-addon-build 在每次构建后检查。
  */
 
 const addonRoot = path.resolve(import.meta.dir, "..");
 const srcRoot = path.join(addonRoot, "src");
-const scriptsRoot = path.join(addonRoot, "bp", "scripts");
 const midiEntrySource = path.join(srcRoot, "midis", "index.ts");
 const midiManagerSource = path.join(srcRoot, "app", "midiManager.ts");
 const bepackConfigPath = path.join(addonRoot, "bepack.config.ts");
@@ -44,7 +42,7 @@ describe("embedded MIDI build layout", () => {
             "MIDI copy destination"
         );
         expect(destination).toBe("packages/addon/src/midis");
-        expect(config).toContain('"../../midis/js/"');
+        expect(config).toContain('"../../tools/midi/sync-addon-library.mjs"');
     });
 
     test("client and server configs share the app entry", () => {
@@ -73,30 +71,4 @@ describe("embedded MIDI build layout", () => {
             .toContain(`bp/${timbresModule}`);
     });
 
-    test.skipIf(!fs.existsSync(scriptsRoot))("built output resolves the MIDI entry", () => {
-        const builtManager = path.join(scriptsRoot, "midiManager.js");
-        expect(fs.existsSync(builtManager)).toBe(true);
-
-        const built = fs.readFileSync(builtManager, "utf8");
-        const specifier = capture(built, /from\s+["']([^"']*midis\/index\.js)["']/, "built MIDI import");
-        const entry = path.resolve(path.dirname(builtManager), specifier);
-        expect(fs.existsSync(entry)).toBe(true);
-
-        const config = fs.readFileSync(bepackConfigPath, "utf8");
-        const destination = capture(config, /join\(ctx\.paths\.scriptOutDir,\s*["']([^"']+)["']\)/, "destination");
-        expect(entry).toBe(path.join(scriptsRoot, destination, "index.js"));
-
-        const serverBuild = fs.existsSync(path.join(scriptsRoot, "serverAdmin.js"));
-        if (serverBuild) {
-            expect(fs.existsSync(path.join(scriptsRoot, "packages/addon/src/platform/server"))).toBe(true);
-            return;
-        }
-
-        // client 构建必须带真实曲库；template 构建有意保留空 stub（曲库由生成器注入）。
-        const files = fs.readdirSync(path.dirname(entry));
-        if (files.length > 1) {
-            expect(fs.readFileSync(entry, "utf8")).toContain('id:"');
-        }
-        expect(fs.existsSync(path.join(scriptsRoot, "serverAdmin.js"))).toBe(false);
-    });
 });

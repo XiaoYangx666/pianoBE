@@ -1,5 +1,5 @@
 import { BUILTIN_PLUGINS } from "@piano/plugins";
-import { registerVfxPlugin, vfxRegistry } from "./host";
+import { orderVfxPlugins, registerVfxPlugin, vfxRegistry } from "./host";
 
 export const INSTALLED_VFX_PLUGINS: readonly string[] = BUILTIN_PLUGINS.map(plugin => plugin.manifest.id);
 
@@ -9,7 +9,7 @@ let registered = false;
 export function registerVfxPlugins() {
     if (registered) return;
     registered = true;
-    for (const plugin of BUILTIN_PLUGINS) {
+    for (const plugin of orderVfxPlugins(BUILTIN_PLUGINS)) {
         if (vfxRegistry.hasPlugin(plugin.manifest.id)) continue;
         try {
             registerVfxPlugin(plugin, vfxRegistry);

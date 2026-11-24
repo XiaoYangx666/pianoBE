@@ -4,7 +4,7 @@
  * 转换真实 .mid → 生成最终 mcaddon → 解包断言（含 PBE3 回读闭环）。
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { unzipSync } from "fflate";
+import { unzipSync, zipSync } from "fflate";
 import { readAddon } from "@bepack/addon";
 import { midiBufferToSong } from "@piano/core/convert";
 import {
@@ -23,11 +23,10 @@ import {
 } from "@piano/vfx/package";
 import { TIMBRES_SCRIPT_PATH } from "../../packages/generator/src/addon/timbres.ts";
 import { SCORE_PACK_SCRIPT_PATH, scoreStandPath } from "../../packages/generator/src/scores/scores.ts";
-import { loadTemplate, parseExistingMidis } from "../../packages/generator/src/addon/template.ts";
+import { loadTemplate, parseExistingMidis, templateMidiTree } from "../../packages/generator/src/addon/template.ts";
 import { generateAddonZip } from "../../packages/generator/src/addon/export.ts";
 import {
     archiveToPluginEntry,
-    extractSongEffectIds,
     matchSongPlugins,
 } from "../../packages/generator/src/addon/plugins.ts";
 import { songEntryToEvents } from "../../packages/generator/src/music/player.ts";
@@ -38,6 +37,12 @@ const MIDI_A = "midis/files/Beyond - 海阔天空.mid";
 const MIDI_B = "midis/files/ChiliChill - 让风告诉你.mid";
 
 let failed = 0;
+async function storedZip(input) {
+    // Avoid the Windows Bun worker burst when reading hundreds of compressed files.
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(await input.arrayBuffer());
+    return zipSync(unzipSync(bytes), { level: 0 });
+}
+
 function assert(cond, msg) {
     if (cond) console.log(`✅ ${msg}`);
     else {
@@ -47,7 +52,7 @@ function assert(cond, msg) {
 }
 
 // 1. 默认模板：模板模式跳过 midi 拷贝，无内嵌曲目
-const templateInfo = await loadTemplate(new Uint8Array(readFileSync(TEMPLATE)));
+const templateInfo = await loadTemplate(await storedZip(readFileSync(TEMPLATE)));
 assert(templateInfo.songs.length === 0, "默认模板无内嵌曲目（模板模式跳过 midi 拷贝）");
 assert(templateInfo.bpManifest.header?.name, "bp manifest 解析成功");
 
@@ -62,7 +67,7 @@ tplAddon.writeText(
     "bp/scripts/midis/index.js",
     metasToAddonIndex([{ id: songA.id, name: songA.name, duration: songA.duration }])
 );
-const embTemplate = await loadTemplate(await tplAddon.toBlob());
+const embTemplate = await loadTemplate(await storedZip(await tplAddon.toBlob()));
 assert(embTemplate.songs.length === 1, "内嵌模板解析出 1 首");
 assert(embTemplate.songs[0].id === songA.id && embTemplate.songs[0].isOriginal, "原曲目标记 isOriginal");
 const embEvents = songEntryToEvents(embTemplate.songs[0]);
@@ -92,7 +97,7 @@ const blob = await generateAddonZip(embTemplate, songs, {
 assert(blob.size > 0, `导出 zip 生成 (${(blob.size / 1024).toFixed(0)} KB)`);
 
 // 4. manifest 断言
-const outAddon = await readAddon(blob);
+const outAddon = await readAddon(await storedZip(blob));
 const bpPath = outAddon.packs.bp.root;
 const rpPath = outAddon.packs.rp.root;
 const bpManifest = outAddon.packs.bp.manifest;
@@ -106,7 +111,7 @@ assert(
 );
 
 // 5. 曲目内容断言
-const midisDir = bpPath + "scripts/midis/";
+const midisDir = templateMidiTree(outAddon, bpPath);
 const indexText = outAddon.readTextSync(midisDir + "index.js");
 assert(indexText.startsWith("export const midis=["), "index.js 格式正确");
 assert(indexText.includes(`id:"${songA.id}"`) && indexText.includes(`id:"${songB.id}"`), "index.js 含两首曲目");
@@ -147,7 +152,7 @@ assert(
 );
 
 // 9. 从曲库选曲导出闭环（模拟用户点"添加"）
-const libTpl = await loadTemplate(new Uint8Array(readFileSync(TEMPLATE)));
+const libTpl = await loadTemplate(await storedZip(readFileSync(TEMPLATE)));
 const libEntry = {
     id: libSong.id,
     name: libSong.name,
@@ -162,10 +167,11 @@ const libBlob = await generateAddonZip(libTpl, [libEntry], {
     desc: "曲库导出验证",
     randomUuid: false,
 });
-const libAddon = await readAddon(libBlob);
-const libIndexText = libAddon.readTextSync("bp/scripts/midis/index.js");
+const libAddon = await readAddon(await storedZip(libBlob));
+const libMidiDir = templateMidiTree(libAddon, libAddon.packs.bp.root);
+const libIndexText = libAddon.readTextSync(libMidiDir + "index.js");
 assert(libIndexText.includes(`id:"${libMeta.id}"`), "曲库曲目已写入导出 index.js");
-const libModule = libAddon.readTextSync(`bp/scripts/midis/${libMeta.id}.js`);
+const libModule = libAddon.readTextSync(`${libMidiDir}${libMeta.id}.js`);
 assert(libModule === pbe3ToAddonModule(libBytes), "曲库曲目导出模块与 PBE3 输出一致");
 
 // 10. 游戏内导入码：分段 → 装配 → 完整 PBE3
@@ -228,7 +234,8 @@ async function inspectZip(blob) {
         { tick: 40, op: "flash", effect: "key_notes", color: "#FFE29A", level: 90, scale: 100 },
         { tick: 80, op: "flash", effect: "unknown_custom_fx", color: "#FFFFFF", level: 70, scale: 100 },
     ]);
-    const extracted = extractSongEffectIds(pbe3Perf);
+    const perfSong = { ...libEntry, id: "perf-b", name: "测试演出曲目", data: pbe3Perf };
+    const extracted = matchSongPlugins([perfSong], [], []).songEffects.get(perfSong.id) ?? [];
     assert(
         JSON.stringify(extracted) === JSON.stringify(["key_notes", "starfield", "unknown_custom_fx"]),
         `PBE3 特效 ID 提取正确：${extracted.join(", ")}`
@@ -241,7 +248,6 @@ async function inspectZip(blob) {
     const entries = archives.map((archive) =>
         archiveToPluginEntry(archive, "builtin", { trusted: true })
     );
-    const perfSong = { ...libEntry, id: "perf-b", name: "测试演出曲目", data: pbe3Perf };
 
     const fullMatch = matchSongPlugins([perfSong], entries, entries.map((e) => e.id));
     assert(
@@ -272,12 +278,15 @@ async function inspectZip(blob) {
 }
 
 // 13. 多插件统一装配到基础模板（template-bare.mcaddon）
-const bareTpl = await loadTemplate(new Uint8Array(readFileSync(BARE_TEMPLATE)));
+const bareTpl = await loadTemplate(await storedZip(readFileSync(BARE_TEMPLATE)));
 {
     const selectedArchives = [
         "pianobe.atmosphere.pbeplugin",
         "pianobe.keys.pbeplugin",
         "pianobe.themes.pbeplugin",
+        "pianobe.accents.pbeplugin",
+        "pianobe.curves.pbeplugin",
+        "pianobe.stage.pbeplugin",
     ].map((name) => readPbePluginArchive(new Uint8Array(readFileSync(`build/plugins/${name}`))));
 
     const assembledBlob = await generateAddonZip(bareTpl, [libEntry], {
@@ -427,8 +436,8 @@ const bareTpl = await loadTemplate(new Uint8Array(readFileSync(BARE_TEMPLATE)));
         "第三方 VFX 插件与音色、曲谱组合装配共存完整"
     );
 
-    // 同一 TemplateInfo 实例第二次切换为零插件模式导出，断言上一次插件脚本/粒子/纹理零残留
-    const cleanupBlob = await generateAddonZip(bareTpl, [libEntry], {
+    const imported = await loadTemplate(await storedZip(comboBlob));
+    const cleanupBlob = await generateAddonZip(imported, [libEntry], {
         name: "二次清理测试",
         desc: "repeat export zero-plugin cleanup",
         randomUuid: false,

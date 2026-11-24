@@ -11,7 +11,7 @@
    - 需要跨帧平滑衔接（如前一帧长度/高度）或切换状态时声明 `createState: () => ({ ... })`，避免在播放器中维护全局字段。
    - 如需动态调整间隔或与其他特效互相让步，可选声明 `nextInterval`、`tags` 与 `yields: { tag, ticks }`。
    - 在 `emit(context)` 中调用 `@piano/vfx` 提供的 `drawPoints`、`drawStrokeSegments`、`drawGroundRing` 等原语返回 `{ priority, emitters }`。
-   - 插件脚本仅允许导入 `@piano/vfx`、`@piano/core` 与相对路径模块，禁止依赖 `@minecraft/*` 或其它插件。
+   - 插件脚本可导入 `@piano/vfx`、`@piano/core` 和同一包内的模块。其他插件的内容通过资源 ID 引用，并在 `dependencies` 声明提供方。
 2. 所有已注册的特效及其 `parameters` 会自动出现在 Web VFX Lab「单特效」、主题图层选择器、`/pbe:vfx list` 与 `.pbe3` 参数编解码中；无需修改 `@piano/core` 或任何开关表。
 3. 执行 `npm run pack:plugins && npm run validate:plugins && npm run test:vfx`，会自动校验 `plugin.json` 声明一致性、打包产物安全规范、变量完备性、参数范围声明、有限性与生命周期上限。
 
@@ -82,15 +82,52 @@ my_style: {
      }
    }
    ```
-2. 执行导出命令将其打包进 `midis/library/<songId>.pbe3`（带曲目内部符号表与颜色表）：
+2. 执行导出命令生成 `build/performances/<songId>-performance.pbe3`。可在曲目 ID 后传入另一份编排 JSON 路径，输出文件名会使用该 JSON 的文件名。公共曲库原 PBE3 不会被替换。
    ```sh
-   npm run export:performance
+   npm run export:performance -- <songId>
    ```
-3. 直接打开 `/vfx-lab` 导入 `.pbe3` 文件即可 1:1 实时试看。
+3. 在 `/vfx-lab` 导入演出 PBE3 预览。普通歌曲可直接分发 PBE3。需要随曲分发专属资源时，可用现有 `.pbesong` 或 ZIP 放入一个或多个 PBE3 和所需的 `.pbeplugin`。生成器会单独询问是否信任随包插件。
 
-## 6. 发布前回归检查项
+### 曲目归并与播放
 
-- [ ] `npm run check`（`node tools/verify/check-all.mjs`）12 项全量校验通过（涵盖 `@piano/core` / `@piano/vfx` / `@piano/plugins` 构建、`@piano/web` & `@piano/generator` 类型检查、资产校验、`.pbeplugin` 打包校验、全部单元测试与 Client/Server Addon 构建验证）
+- 生成器按音符时间、音高、力度、键长、声长和总时长判断音乐是否相同。曲名、源 ID、压缩方式和演出提示不参与比较。已有音乐正文和默认编排继续有效，新增编排附在同一条目。重复编排只保留一份，同名不同音乐可以并存。
+- 附加包曲库保存一份 PBE3 音符数据，额外编排写入曲库索引。世界公共曲库和存储卡按既有 ID 追加编排，沿用同一分片提交和容量检查。对同 ID 的不同音乐拒绝写入，对已有不同 ID 保留来源引用。生成器导入这类冲突时会给不同音乐分配新 ID。
+- 在游戏的「歌曲详情」选择「普通演奏」「曲目默认」或「附加演出」。队列保存播放方式，所有编排共用同一份音符。缺失的特效提示会跳过，缺失的画笔使用特效默认画笔。整首都没有可用的演出特效时，舞台回到该琴的默认设置，音乐继续播放。
+- PBE3 线格式和旧默认编排都兼容。旧 PBE2 仍需从源 MIDI 重新导入。带附加编排的导出包需要新版模板。
+
+### 插件依赖与引用
+
+- `dependencies` 是直接依赖的插件 ID 数组。例如 `"dependencies": ["pianobe.stage"]`。装配按依赖顺序进行，缺失依赖和循环依赖都会报错。
+- 特效、主题、布局、琴键样式和粒子继续使用稳定的已发布 ID。不同插件不能注册相同类型的同一 ID 或写入同一个资源路径。舞台道具使用 `插件 ID:道具 ID`，画笔使用宿主图集定义。
+- 插件可以引用自己的内容、宿主资源或直接声明的依赖资源。粒子文档可引用直接依赖的贴图，特效可引用直接依赖的舞台道具。曲目以特效 ID 关联插件，生成器会同时匹配默认编排和附加编排，并选入其依赖。
+- `npm run validate:plugins` 校验内置注册、资源路径、声明依赖和公共曲库的演出引用。测试第三方插件时把它和直接、间接依赖一起传给 `bun tools/plugins/validate-plugin.mjs`。
+
+## 6. 让插件自带 3D 舞台道具
+
+在 `plugin.json` 保留 `vfx`，加入 `vfx.stageProps` 能力和 `stageProps` 数组。例如插件 `my.stage` 可以声明以下道具。
+
+```json
+{
+    "capabilities": ["vfx", "vfx.stageProps"],
+    "stageProps": [{
+        "id": "lantern",
+        "geometry": "stage_props/lantern.geo.json",
+        "texture": "stage_props/lantern.png",
+        "merTexture": "stage_props/lantern_mer.png",
+        "animations": "stage_props/lantern.animation.json"
+    }]
+}
+```
+
+- `geometry` 是单个 Bedrock `minecraft:geometry` 模型，支持立方体和 `poly_mesh`。PNG 贴图尺寸需与模型声明一致。可选的 `merTexture` 使用 Bedrock MER 通道，绿色通道控制发光。
+- 可选的 `animations` 使用 Bedrock 动画 JSON。第一版支持绑定到模型骨骼的数值位移、旋转和缩放，以及线性关键帧。可声明循环或停在最后一帧。例如 `animation.sway` 通过 `animation: "sway"` 选择。
+- 从特效的 `resolveStageProp(params, instrument)` 返回 `{ id: "my.stage:lantern", offset: { x: 0, y: 2, z: 0 }, turn: 45, size: 1, animation: "sway" }`。位置相对钢琴舞台坐标，`turn` 是偏航角度，`size` 是统一缩放。返回 `undefined` 时让出道具位置。
+- 每架琴只显示一个道具。可在 `emit({ nativeStageProp })` 中控制粒子轮廓回退。宿主成功显示该通道的道具时，`nativeStageProp` 才为真。
+- 封包后在生成器中选择该插件，从当前版本零插件模板导出。Web VFX Lab 会自动发现仓库 `plugins/*` 下的插件源码和道具资源。可选的道具级 `preview` 支持 `tall`、`fillLight` 和 `fullGlow`，分别用于高景别、补光和以颜色贴图模拟全表面发光。
+
+## 7. 发布前回归检查项
+
+- [ ] `npm run check` 通过，包含客户端和服务器 Addon 构建、零插件模板、道具导出和 BP/RP 引用闭环验证
 - [ ] `npm run check:vfx` 9 项 VFX 专项检查通过
 - [ ] `npm run build:web` 与 `npm run build:generator` 成功
-- [ ] 需要验证生成器端到端装配时，生成 `npm run build:template && npm run build:template:bare` 后执行 `bun tools/verify/verify-generator.mjs` 通过
+- [ ] 需要验证生成器的曲谱、音色和曲库组合装配时，执行 `npm run build:template:bare` 和 `bun tools/verify/verify-generator.mjs`

@@ -57,7 +57,7 @@ check(fs.existsSync(path.join(src, "midis/index.ts")), "source MIDI entry exists
 const config = read(path.join(addon, "bepack.config.ts"));
 const destination = capture(config, /join\(ctx\.paths\.scriptOutDir,\s*["']([^"']+)["']\)/, "MIDI copy destination");
 check(destination === "packages/addon/src/midis", "build hook copies to packages/addon/src/midis");
-check(config.includes('"../../midis/js/"'), "build hook reads repository midis/js");
+check(config.includes('"../../tools/midi/sync-addon-library.mjs"'), "build hook generates scripts from the tracked PBE3 library");
 
 // --- 生成器音色开关必须指向 preserve-modules 输出中的 domain/piano/timbres.js ---
 const timbresModule = "bp/scripts/packages/addon/src/domain/piano/timbres.js";
@@ -73,9 +73,10 @@ check(read(path.join(root, "tools/verify/verify-timbres.mjs")).includes(timbresM
     "timbres verifier uses the domain timbres path");
 
 const templatePath = path.join(addon, "dist/template.mcaddon");
-const vaseEntityPath = "bp/entities/vfx_porcelain_vase.json";
+const propRoot = "bp/entities/pbe_stage_props";
+const propCatalog = "bp/scripts/vfx/stagePropCatalog.js";
 
-function hasFloatingVaseSizeRange(source) {
+function hasFloatingPropSizeRange(source) {
     if (!source) return false;
     const size = JSON.parse(source)["minecraft:entity"]?.description?.properties?.["pbe:vfx_size"];
     // Bedrock distinguishes integer and float JSON tokens. Non-integer bounds survive reserialization.
@@ -85,15 +86,22 @@ function hasFloatingVaseSizeRange(source) {
         && size.range.every(value => Number.isFinite(value) && !Number.isInteger(value));
 }
 
-check(hasFloatingVaseSizeRange(read(path.join(addon, vaseEntityPath))), "porcelain size range uses float bounds");
+const propFiles = walk(path.join(addon, propRoot));
+check(propFiles.length >= 2 && propFiles.every(file => hasFloatingPropSizeRange(read(file))),
+    "built-in stage props use float scale bounds");
 if (fs.existsSync(templatePath)) {
     const template = await readAddonFile(templatePath);
     check(template.has(timbresModule), `template includes ${timbresModule}`);
-    check(hasFloatingVaseSizeRange(template.readTextSync(vaseEntityPath)), "template preserves porcelain float bounds");
 }
 
 // --- 实际产物 ---
 check(fs.existsSync(scripts), "bp/scripts exists (run a build first)");
+const catalogSource = read(path.join(addon, propCatalog));
+check(propFiles.every(file => catalogSource.includes(JSON.parse(read(file))["minecraft:entity"].description.identifier)),
+    "built-in catalog registers every generated stage prop entity");
+const runtimePath = path.join(scripts, "vfx/runtime.js");
+check(read(runtimePath).includes('from "./stagePropCatalog.js"'),
+    "VFX runtime imports the assembled stage prop catalog");
 
 const seat = JSON.parse(read(path.join(addon, "bp/entities/piano_bench_seat.json")))["minecraft:entity"];
 const rideHeight = seat.components["minecraft:rideable"]?.seats?.[0]?.position?.[1];

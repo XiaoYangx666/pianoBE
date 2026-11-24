@@ -4,7 +4,7 @@
     "version": "1.1.3",
     "apiVersion": "1.0.0",
     "minPianoBeVersion": "1.3.0",
-    "capabilities": ["vfx"],
+    "capabilities": ["vfx", "vfx.stageProps"],
     "author": "PianoBE",
     "license": "CC-BY-NC-4.0",
     "provides": {
@@ -26,6 +26,17 @@
         "themes": ["chinese_misty_rain"],
         "particles": ["chinese_ink", "chinese_glow", "chinese_porcelain_wash"]
     },
+    "stageProps": [
+        {
+            "id": "porcelain_vase",
+            "geometry": "stage_props/porcelain_vase.geo.json",
+            "texture": "stage_props/porcelain.png",
+            "merTexture": "stage_props/porcelain_mer.png",
+            "preview": {
+                "fillLight": true
+            }
+        }
+    ],
     "preview": {
         "description": "青花梅瓶、缠枝莲、烟雨远山、月洞门和水上莲开。首支演出《青花瓷 · 雨过见青》。"
     }

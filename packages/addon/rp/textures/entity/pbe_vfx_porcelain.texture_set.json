@@ -1,7 +1,0 @@
-{
-    "format_version": "1.21.30",
-    "minecraft:texture_set": {
-        "color": "pbe_vfx_porcelain",
-        "metalness_emissive_roughness": "pbe_vfx_porcelain_mer"
-    }
-}

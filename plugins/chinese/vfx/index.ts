@@ -104,7 +104,7 @@ const EFFECTS: readonly VfxEffectDefinition[] = [
             const { solid, wash, turn } = resolveSchemaParams(VASE, params.custom);
             if (!solid || wash < 0.11) return undefined;
             return {
-                model: "porcelain_vase",
+                id: "pianobe.chinese:porcelain_vase",
                 offset: PORCELAIN_PROP_OFFSET,
                 size: porcelainStageSize(params.scale, wash),
                 turn,

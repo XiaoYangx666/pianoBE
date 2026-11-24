@@ -1,4 +1,6 @@
 import { defineConfig, sapiPro } from "@bepack/cli";
+import { copyFile } from "fs/promises";
+import { join } from "path";
 import { platform } from "process";
 
 const resourcePackUuid = "d891a694-3ffd-4773-b629-21698dcb6884";
@@ -85,6 +87,11 @@ export default defineConfig({
     },
     hooks: {
         afterBuild: async (ctx) => {
+            if (ctx.paths.scriptOutDir) {
+                await copyFile("../../build/stage-props/scripts/vfx/stagePropCatalog.js",
+                    join(ctx.paths.scriptOutDir, "vfx/stagePropCatalog.js"));
+                await copyFile("../../build/stage-props/scripts/vfx/core.js", join(ctx.paths.scriptOutDir, "vfx/core.js"));
+            }
             // 服务器专用包不带内嵌曲库（纯远程拉取）
             return "server build: skipped midi copy";
         },

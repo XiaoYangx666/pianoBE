@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { vfxPerformerDepth } from "@piano/vfx";
 import grand from "../../../../assets/grand/grand_full.bbmodel?raw";
 import p88 from "../../../../assets/piano/piano_full.bbmodel?raw";
 import grandTexture from "../../../addon/rp/textures/blocks/grand.png";
@@ -68,7 +69,8 @@ function performer(kind: PianoModel, film = false) {
     const group = new THREE.Group();
     const seatY = kind === "grand" ? 0.49 : 0.40625;
     const keyY = kind === "grand" ? 0.96 : 0.93;
-    const seatZ = kind === "grand" ? 0.96 : 0.79;
+    const headZ = -vfxPerformerDepth(kind === "grand" ? "grand" : "upright");
+    const seatZ = headZ + 0.085;
 
     function material(color: number) {
         const albedo = new THREE.Color(color);
@@ -95,7 +97,7 @@ function performer(kind: PianoModel, film = false) {
     }
     box([0.47, 0.59, 0.235], [0, seatY + 0.30, seatZ - 0.04], cloth);
     const head = new THREE.Group();
-    head.position.set(0, seatY + 0.83, seatZ - 0.085);
+    head.position.set(0, seatY + 0.83, headZ);
     group.add(head);
     box([0.42, 0.40, 0.405], [0, 0, 0], skin, head);
     box([0.438, 0.126, 0.421], [0, 0.16, 0], hair, head);

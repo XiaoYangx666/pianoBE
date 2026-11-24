@@ -150,6 +150,7 @@ function makePiano(overrides: Record<string, unknown> = {}) {
         cardAccess: undefined,
         cardUid: undefined,
         readBytes: () => undefined,
+        performances: () => [],
         refreshCardIndicator: () => {},
         ...overrides,
     };
@@ -438,6 +439,16 @@ describe("播放队列页面", () => {
 });
 
 describe("歌曲详情页面", () => {
+    test("演奏方式选择随曲目一起进入播放队列", () => {
+        const { piano, midi } = makePiano({ performances: () => [[{ effect: "starfield" }]] });
+        const ref = { id: "l1", name: "晴天", duration: 1200, source: "library" };
+        const form = open(TrackActionsPage, { piano, ref });
+        dropdown(form).setData(1);
+        form.click("＋ 加入播放队列");
+        dropdown(form).setData(-1);
+        form.click("＋ 加入播放队列");
+        expect(midi.queue.getRefs().map(item => item.performance)).toEqual([1, -1]);
+    });
     test("公共曲库且未插卡：只显示播放/加入队列，不显示复制或删除", () => {
         const { piano } = makePiano();
         const form = open(TrackActionsPage, {

@@ -136,10 +136,11 @@ export interface VfxEmitContext<TState = unknown> {
 }
 
 export interface VfxStageProp {
-    model: "porcelain_vase";
+    id: string;
     offset: Vec3;
     size: number;
     turn: number;
+    animation?: string;
 }
 
 export interface VfxEffectDefinition<TState = any> {
@@ -159,7 +160,7 @@ export interface VfxEffectDefinition<TState = any> {
     nextInterval?: (params: VfxEffectParams, state: TState) => number;
     emit?: (context: VfxEmitContext<TState>) => VfxBatch | null;
     resolveKeyParticle?: (params: VfxEffectParams) => PianoParticleOverride | undefined;
-    resolveStageProp?: (params: VfxEffectParams) => VfxStageProp | undefined;
+    resolveStageProp?: (params: VfxEffectParams, instrument: VfxInstrument) => VfxStageProp | undefined;
 }
 
 export const VFX_INPUTS = ["live", "phrase", "note", "chord", "dense", "solo"] as const;

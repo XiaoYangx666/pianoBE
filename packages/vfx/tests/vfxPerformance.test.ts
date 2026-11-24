@@ -24,6 +24,7 @@ import {
     getVfxEffectIds,
     getVfxTheme,
     getVfxThemeIds,
+    placeVfxStageProp,
     POINT_BRUSH_IDS,
     POINT_BRUSH_INDEX,
     quietFeatures,
@@ -36,10 +37,13 @@ import {
     VFX_EMITTERS_PER_TICK,
     VFX_MAX_PIANOS,
     VFX_PARTICLES_PER_PIANO,
+    VFX_RIGHT_OFFSETS,
     VfxBudget,
     VfxEngine,
     VfxMusic,
     VfxRegistry,
+    vfxPerformerDepth,
+    vfxStageFrame,
 } from "../src";
 import { ensureBuiltinPluginsRegistered, readParticleDoc } from "./helpers/builtinPlugins";
 
@@ -338,7 +342,7 @@ test("Blue and White Porcelain plays within budget using only the Chinese plugin
         expect(active(181)).toContain("chinese_glaze");
         expect(active(228)).toEqual([]);
         expect(engine.stageProp(155, quietFeatures)).toBeUndefined();
-        expect(engine.stageProp(182, quietFeatures)).toMatchObject({ model: "porcelain_vase", size: 1 });
+        expect(engine.stageProp(182, quietFeatures)).toMatchObject({ id: "pianobe.chinese:porcelain_vase", size: 1 });
         expect(engine.stageProp(221, quietFeatures)).toBeUndefined();
         expect(counts.get("chinese_ink")).toBeGreaterThan(1000);
         expect(counts.get("chinese_glow")).toBeGreaterThan(100);
@@ -348,6 +352,49 @@ test("Blue and White Porcelain plays within budget using only the Chinese plugin
 
     const nativeRun = simulateSongPerformance("f3b8fb2.pbe3", [0, 13, 26, 39], registry, true);
     expect(nativeRun.pianos[0].counts.get("chinese_porcelain_wash")).toBeLessThan(pianos[0].counts.get("chinese_porcelain_wash")!);
+});
+
+test("Sinner's Finale lands the sword on the MIDI accent and clears the stage at the coda", () => {
+    const source = JSON.parse(readFileSync(new URL("../../../midis/performances/28a2cb50.json", import.meta.url), "utf8"));
+    const { performance, pianos } = simulateSongPerformance("28a2cb50.pbe3", [0, 13, 26, 39], undefined, true);
+    expect(performance).toEqual(compilePerformanceSource(source, "28a2cb50"));
+    expect(performance.some(cue => cue.effect === "sinner_impact" && cue.op === "flash" && cue.tick === 2817)).toBe(true);
+    expect(performance.some(cue => cue.effect === "sinner_authority_release" && cue.op === "flash" && cue.tick === 5390)).toBe(true);
+    expect(performance.find(cue => cue.effect === "sinner_bubbles")?.tick).toBe(2850);
+    const opening = new VfxEngine(createPerformanceProgram(performance, 169.2), "grand");
+    const firstFrame = opening.update(0, 0, quietFeatures, [], { nativeStageProp: true })
+        .flatMap(batch => batch.emitters);
+    expect(firstFrame.map(emitter => emitter.particle)).toContain("sinner_spot_pool");
+    expect(firstFrame.map(emitter => emitter.particle)).toContain("sinner_spot_beam");
+    expect(firstFrame.map(emitter => emitter.particle)).not.toContain("sinner_bubble");
+
+    for (const [index, { engine, counts }] of pianos.entries()) {
+        const instrument = index % 2 === 0 ? "grand" : "upright";
+        const sword = (time: number) => engine.stageProp(time, quietFeatures);
+        expect(sword(0)).toMatchObject({ id: "pianobe.sinner:sinner_sword", size: 1.75, offset: { x: 0, y: 3.5 } });
+        for (const right of Object.values(VFX_RIGHT_OFFSETS)) {
+            const { position } = placeVfxStageProp({ x: 0, y: 0, z: 0 }, right, vfxStageFrame(instrument), sword(0)!);
+            expect(position.x).toBeCloseTo(right.z * vfxPerformerDepth(instrument));
+            expect(position.z).toBeCloseTo(-right.x * vfxPerformerDepth(instrument));
+        }
+        expect(sword(69.95)!.offset.y).toBeCloseTo(4);
+        expect(sword(70.25)!.offset.y).toBeWithin(0.25, 3.9);
+        expect(sword(70.425)!.offset.y).toBeCloseTo(0.12);
+        expect(sword(74)).toBeUndefined();
+        const light = (time: number) => engine.activeSummary(time).find(layer => layer.effect === "sinner_spotlight")!.level;
+        expect(light(69.95)).toBeLessThan(light(6) / 3);
+        expect(light(70.425)).toBeGreaterThan(light(74) * 2);
+        expect(light(132)).toBeGreaterThan(light(91) * 2);
+        expect(engine.activeSummary(74).map(layer => layer.effect)).toContain("sinner_upwelling");
+        expect(engine.activeSummary(137).map(layer => layer.effect)).toContain("sinner_authority");
+        expect(engine.activeSummary(137).map(layer => layer.effect)).not.toContain("sinner_upwelling");
+        expect(engine.activeSummary(148).map(layer => layer.effect)).not.toContain("sinner_authority");
+        expect(engine.activeSummary(168)).toEqual([]);
+        expect(counts.get("sinner_pool")).toBeGreaterThan(100);
+        expect(counts.get("sinner_bubble")).toBeGreaterThan(100);
+    }
+
+    simulateSongPerformance("28a2cb50.pbe3", [0]);
 });
 
 test("Floral Sea leaves space for the orbit and finishes with a single farewell petal", () => {

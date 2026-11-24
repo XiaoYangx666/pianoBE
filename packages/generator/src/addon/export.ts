@@ -1,15 +1,22 @@
-import type { AddonTemplate } from "@bepack/addon";
+import { AddonTemplate } from "@bepack/addon";
 import { metasToAddonIndex, songToAddonModule } from "@piano/core";
-import { VFX_API_VERSION, isApiVersionCompatible } from "@piano/vfx";
+import type { VfxPluginManifest } from "@piano/vfx";
 import {
     HOST_PARTICLE_IDS,
     HOST_TEXTURES,
+    assembleStageProp,
     pluginSlug,
     rewritePluginJsForAddon,
+    validatePluginAssembly,
+    serializeStagePropCatalog,
+    STAGE_PROP_BP_TREE,
+    STAGE_PROP_RP_TREES,
+    STAGE_PROP_REGISTRY_SCRIPT,
     type PbePluginArchive,
+    type StagePropRegistration,
 } from "@piano/vfx/package";
 import type { SongEntry } from "../types";
-import type { TemplateInfo } from "./template";
+import { LEGACY_MIDI_TREE, templateMidiTree, type TemplateInfo } from "./template";
 import type { LoadedTimbrePack, TimbreIndexEntry } from "./timbres";
 import { TIMBRES_SCRIPT_PATH } from "./timbres";
 import {
@@ -51,7 +58,12 @@ export async function generateAddonZip(
     songs: SongEntry[],
     opts: ExportOptions
 ): Promise<Blob> {
-    const { addon, bpPath, rpPath } = info;
+    const { bpPath, rpPath } = info;
+    const addon = new AddonTemplate(info.addon.sourceName, info.addon.entries(), info.addon.packs);
+    if ((songs.some(song => song.performances?.length) || opts.plugins?.some(plugin => plugin.manifest.dependencies?.length))
+        && !addon.readTextSync(bpPath + "scripts/vfx/host.js")?.includes("orderVfxPlugins")) {
+        throw new Error("导出附加编排或带依赖的插件需要新版 PianoBE 模板");
+    }
 
     const { identity } = addon.updateIdentity(
         {
@@ -76,8 +88,8 @@ export async function generateAddonZip(
         addon.writeText(scorePackModule, updated);
     }
 
-    // ---- 重写 scripts/midis ----
-    const midisDir = `${bpPath}scripts/midis/`.replace(/\/+/g, "/");
+    const midisDir = templateMidiTree(addon, bpPath);
+    addon.removeTree(bpPath + LEGACY_MIDI_TREE);
     addon.removeTree(midisDir);
 
     for (const entry of songs) {
@@ -94,6 +106,7 @@ export async function generateAddonZip(
             duration: s.duration,
             noteCount: s.noteCount,
             bytes: s.data?.length,
+            performances: s.performances,
         })))
     );
 
@@ -316,7 +329,7 @@ interface BpEntityJson {
 
 const HOST_PARTICLE_SET = new Set(HOST_PARTICLE_IDS);
 const HOST_TEXTURE_SET = new Set(HOST_TEXTURES);
-const EXTRA_RP_PATHS = new WeakMap<AddonTemplate, string[]>();
+const VFX_ASSET_INDEX = "scripts/vfx/pluginAssets.json";
 
 function isHostParticleAsset(fileName: string): boolean {
     const match = fileName.match(/^pbe_vfx_(.+)\.particle\.json$/);
@@ -330,9 +343,18 @@ function isHostParticleTexture(relPath: string): boolean {
 
 function stripExistingVfxPlugins(addon: AddonTemplate, bpPath: string, rpPath: string) {
     addon.removeTree(`${bpPath}scripts/plugins/`);
+    addon.removeTree(bpPath + STAGE_PROP_BP_TREE);
+    for (const tree of STAGE_PROP_RP_TREES) addon.removeTree(rpPath + tree);
 
-    const previousExtras = EXTRA_RP_PATHS.get(addon) ?? [];
-    for (const path of previousExtras) addon.remove(path);
+    const previousExtras: unknown = JSON.parse(addon.readTextSync(bpPath + VFX_ASSET_INDEX) ?? "[]");
+    if (Array.isArray(previousExtras)) {
+        for (const path of previousExtras) {
+            if (typeof path === "string" && /^textures\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.(?:png|tga|texture_set\.json)$/i.test(path)
+                && !path.split("/").some(part => part === "." || part === "..") && !isHostParticleTexture(path)) {
+                addon.remove(rpPath + path);
+            }
+        }
+    }
 
     const particlesPrefix = `${rpPath}particles/`;
     const particleTexturesPrefix = `${rpPath}textures/particle/`;
@@ -348,17 +370,18 @@ function stripExistingVfxPlugins(addon: AddonTemplate, bpPath: string, rpPath: s
 }
 
 function serializeVfxPluginsLoaderModule(
-    entries: readonly { id: string; slug: string; hasJs: boolean }[],
+    entries: readonly { manifest: VfxPluginManifest; slug: string; hasJs: boolean }[],
 ): string {
     const jsEntries = entries.filter((entry) => entry.hasJs);
+    const installed = JSON.stringify(entries.map(({ manifest }) => manifest.id));
     if (jsEntries.length === 0) {
-        return `export const INSTALLED_VFX_PLUGINS = ${JSON.stringify(entries.map((e) => e.id))};\nexport function registerVfxPlugins() {}\n`;
+        return `export const INSTALLED_VFX_PLUGINS = ${installed};\nexport function registerVfxPlugins() {}\n`;
     }
     const imports = [
         `import { registerVfxPlugin, vfxRegistry } from "./host.js";`,
         ...jsEntries.map((entry, index) => `import plugin_${index} from "../plugins/${entry.slug}/vfx/index.js";`),
     ];
-    const refs = jsEntries.map((_, index) => `    plugin_${index},`);
+    const refs = jsEntries.map(({ manifest }, index) => `    [plugin_${index}, ${JSON.stringify(manifest)}],`);
     return [
         ...imports,
         "",
@@ -366,17 +389,17 @@ function serializeVfxPluginsLoaderModule(
         ...refs,
         "];",
         "",
-        `export const INSTALLED_VFX_PLUGINS = ${JSON.stringify(entries.map((entry) => entry.id))};`,
+        `export const INSTALLED_VFX_PLUGINS = ${installed};`,
         "",
         "let registered = false;",
         "export function registerVfxPlugins() {",
         "    if (registered) return;",
         "    registered = true;",
-        "    for (const plugin of ASSEMBLED_PLUGINS) {",
-        '        const pluginId = plugin?.manifest?.id ?? "unknown";',
+        "    for (const [plugin, manifest] of ASSEMBLED_PLUGINS) {",
+        "        const pluginId = manifest.id;",
         "        if (vfxRegistry.hasPlugin(pluginId)) continue;",
         "        try {",
-        "            registerVfxPlugin(plugin, vfxRegistry);",
+        "            registerVfxPlugin({ manifest, register: api => plugin.register(api) }, vfxRegistry);",
         "        } catch (error) {",
         "            console.warn(`[piano-vfx] 注册插件 ${pluginId} 失败`, error);",
         "        }",
@@ -398,52 +421,59 @@ function applyVfxPlugins(
     rpPath: string,
     plugins: readonly PbePluginArchive[],
 ) {
+    const orderedPlugins = validatePluginAssembly(plugins);
+    const catalogPath = bpPath + STAGE_PROP_REGISTRY_SCRIPT;
+    const hasCatalog = addon.has(catalogPath);
+    if (!hasCatalog && plugins.some(plugin => plugin.stageProps.length)) {
+        throw new Error("当前模板不支持插件舞台道具，请使用新版 PianoBE 模板");
+    }
     stripExistingVfxPlugins(addon, bpPath, rpPath);
 
-    const seenIds = new Set<string>();
-    const seenSlugs = new Set<string>();
-    const loaderEntries: { id: string; slug: string; hasJs: boolean }[] = [];
+    const loaderEntries: { manifest: VfxPluginManifest; slug: string; hasJs: boolean }[] = [];
     const writtenRpPaths: string[] = [];
+    const catalog: StagePropRegistration[] = [];
 
-    for (const archive of plugins) {
+    const occupied = new Set(addon.entries().map(entry => entry.path.toLowerCase()));
+    for (const archive of orderedPlugins) {
         const { manifest } = archive;
-        if (seenIds.has(manifest.id)) {
-            throw new Error(`[generator] 插件 ID 重复：${manifest.id}`);
-        }
-        seenIds.add(manifest.id);
-
-        if (!isApiVersionCompatible(manifest.apiVersion, VFX_API_VERSION)) {
-            throw new Error(
-                `[generator] 插件 ${manifest.id} 需要 VFX API ${manifest.apiVersion}，与当前宿主 ${VFX_API_VERSION} 不兼容`
-            );
-        }
-
         const slug = pluginSlug(manifest.id);
-        if (seenSlugs.has(slug)) {
-            throw new Error(`[generator] 插件路径别名冲突：${slug}`);
-        }
-        seenSlugs.add(slug);
 
         const hasJs = Boolean(archive.vfxEntryJs?.trim());
-        if (hasJs && archive.vfxEntryJs) {
-            const rewritten = rewritePluginJsForAddon(archive.vfxEntryJs, "../../../vfx/host.js");
-            addon.writeText(`${bpPath}scripts/plugins/${slug}/vfx/index.js`, rewritten);
+        for (const [path, content] of archive.files) {
+            if (!path.startsWith("vfx/") || !path.endsWith(".js")) continue;
+            const host = `${"../".repeat(path.split("/").length + 1)}vfx/host.js`;
+            const source = new TextDecoder().decode(content);
+            const rewritten = rewritePluginJsForAddon(source, host);
+            if (rewritten.includes(host.replace(/host\.js$/, "core.js")) && !addon.has(bpPath + "scripts/vfx/core.js")) {
+                throw new Error(`插件 ${manifest.id} 使用 @piano/core，需要新版 PianoBE 模板`);
+            }
+            addon.writeText(`${bpPath}scripts/plugins/${slug}/${path}`, rewritten);
         }
 
-        for (const [relPath, bytes] of archive.particles) {
+        for (const [relPath, bytes] of [...archive.particles, ...archive.textures]) {
             const fullPath = `${rpPath}${relPath}`;
+            if (occupied.has(fullPath.toLowerCase())) throw new Error(`插件 ${manifest.id} 试图覆盖模板资源：${relPath}`);
             addon.write(fullPath, bytes);
-            writtenRpPaths.push(fullPath);
-        }
-        for (const [relPath, bytes] of archive.textures) {
-            const fullPath = `${rpPath}${relPath}`;
-            addon.write(fullPath, bytes);
-            writtenRpPaths.push(fullPath);
+            if (relPath.startsWith("textures/")) writtenRpPaths.push(relPath);
         }
 
-        loaderEntries.push({ id: manifest.id, slug, hasJs });
+        for (const prop of archive.stageProps) {
+            const { bp, rp } = assembleStageProp(prop, path => archive.files.get(path)!);
+            for (const [pack, files] of [[bpPath, bp], [rpPath, rp]] as const) {
+                for (const [path, content] of files) {
+                    const target = pack + path;
+                    if (addon.has(target)) throw new Error(`[generator] 舞台道具资源冲突：${target}`);
+                    if (typeof content === "string") addon.writeText(target, content);
+                    else addon.write(target, content);
+                }
+            }
+            catalog.push(prop.registration);
+        }
+
+        loaderEntries.push({ manifest, slug, hasJs });
     }
 
-    EXTRA_RP_PATHS.set(addon, writtenRpPaths);
+    addon.writeText(bpPath + VFX_ASSET_INDEX, JSON.stringify(writtenRpPaths));
+    if (hasCatalog) addon.writeText(catalogPath, serializeStagePropCatalog(catalog));
     addon.writeText(`${bpPath}scripts/vfx/plugins.js`, serializeVfxPluginsLoaderModule(loaderEntries));
 }

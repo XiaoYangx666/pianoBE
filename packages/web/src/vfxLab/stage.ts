@@ -8,6 +8,7 @@ import {
     DEFAULT_KEY_PARTICLE_SETTINGS,
     getKeyParticleStyleLabel,
     keyParticleOrigin,
+    hasAvailablePerformanceEffects,
     normalizeKeyParticlePalette,
     placeVfxEmitter,
     placeVfxStageProp,
@@ -21,6 +22,7 @@ import {
     type ActiveChannelSummary,
     type KeyParticleStyleId,
     type MusicFeatures,
+    type ResolvedVfxStageProp,
     type SingleEffectConfig,
     type VfxInstrument,
     type VfxNoteEvent,
@@ -30,7 +32,7 @@ import {
 import { createCast, type PianoModel } from "./models";
 import { loadParticles, particleStep } from "./particles";
 import { createDeck } from "./deck";
-import { createPorcelainProp } from "./stageProps";
+import { loadStageProps } from "./stageProps";
 
 export type Direction = keyof typeof VFX_RIGHT_OFFSETS;
 export type View = "stage" | "performer" | "orbit";
@@ -52,6 +54,7 @@ export interface PreviewStats {
     frameMs: number;
     draws: number;
     activeChannels: ActiveChannelSummary[];
+    stageProp?: string;
     keyParticle?: {
         style: KeyParticleStyleId;
         label: string;
@@ -67,7 +70,9 @@ export async function createStage(canvas: HTMLCanvasElement) {
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    const [cast, particles, porcelain] = await Promise.all([createCast(), loadParticles(), createPorcelainProp()]).catch(error => {
+    const [cast, particles, props] = await Promise.all([
+        createCast(), loadParticles(), loadStageProps(),
+    ]).catch(error => {
         renderer.dispose();
         throw error;
     });
@@ -100,9 +105,19 @@ export async function createStage(canvas: HTMLCanvasElement) {
     const fill = new THREE.PointLight(0xc4cdff, 0.48, 11, 1.25);
     fill.position.set(4.2, 2.7, 4.5);
     scene.add(key, key.target, rim, rim.target, fill, particles.space);
-    const porcelainFill = new THREE.PointLight(0xfff2df, 5.5, 9, 1.65);
-    porcelainFill.visible = false;
-    scene.add(porcelain, porcelainFill);
+    const propFill = new THREE.PointLight(0xfff2df, 5.5, 9, 1.65);
+    propFill.visible = false;
+    const stageLights = Array.from({ length: 3 }, () => new THREE.PointLight(0xffffff, 0, 10, 1.6));
+    scene.add(propFill, ...stageLights, ...[...props.values()].map(prop => prop.node));
+    let framing: "default" | "tall" | "water" = "default";
+    let activeProp: ResolvedVfxStageProp | undefined;
+    let propStart = 0;
+
+    function renderableProp(prop: ResolvedVfxStageProp | undefined) {
+        const asset = prop && props.get(prop.id);
+        if (!asset || (prop?.animation !== undefined && !asset.animations.has(prop.animation))) return undefined;
+        return asset;
+    }
     scene.add(cast.grand.group, cast.p88.group);
 
     const axes = new THREE.AxesHelper(2);
@@ -143,7 +158,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
     let keyParticleSettings: { particleStyle: number; particlePalette: number } = { ...DEFAULT_KEY_PARTICLE_SETTINGS };
 
     function buildProgram(): VfxProgram {
-        if (track.performance) {
+        if (track.performance && hasAvailablePerformanceEffects(track.performance)) {
             return createPerformanceProgram(track.performance, track.duration);
         }
         const seconds = Math.max(45, track.duration + 2);
@@ -163,6 +178,12 @@ export async function createStage(canvas: HTMLCanvasElement) {
             const right = VFX_RIGHT_OFFSETS[direction];
             orbit.target.set(right.z * 0.9, 1.0, -right.x * 0.9);
             camera.position.set(right.x * 2.25 - right.z * 4.0, 2.8, right.z * 2.25 + right.x * 4.0);
+        } else if (framing === "tall") {
+            orbit.target.set(0, 5.05, -0.48);
+            camera.position.set(7.4, 7.2, 19.35);
+        } else if (framing === "water") {
+            orbit.target.set(0, 3.2, -0.83);
+            camera.position.set(6.15, 5.6, 14.15);
         } else {
             orbit.target.set(0, 1.34, -0.85);
             camera.position.set(5.75, 4.42, 10.45);
@@ -211,7 +232,8 @@ export async function createStage(canvas: HTMLCanvasElement) {
                     }
                 }
                 if (tick % 4 === 0) features = music.sample(tick);
-                const nativeStageProp = Boolean(engine!.stageProp(tick / 20, features));
+                const prop = engine!.stageProp(tick / 20, features);
+                const nativeStageProp = renderableProp(prop) ? prop?.channelKey : undefined;
                 budget.enqueue(engine!.update(tick / 20, tick, features, music.recent(), { emitFlashes: true, nativeStageProp }));
                 budget.dispatch(tick, emitter => {
                     const placement = placeVfxEmitter(center, right, stage, emitter, tick / 20);
@@ -238,13 +260,41 @@ export async function createStage(canvas: HTMLCanvasElement) {
         }
         cast[model].pose(time, features.activity, features.pitch);
         const prop = engine!.stageProp(time, features);
-        porcelain.visible = porcelainFill.visible = Boolean(prop);
-        if (prop) {
+        const asset = renderableProp(prop);
+        if (activeProp) props.get(activeProp.id)!.node.visible = false;
+        if (rebuild || prop?.id !== activeProp?.id || prop?.animation !== activeProp?.animation) propStart = time;
+        activeProp = asset ? prop : undefined;
+        propFill.visible = Boolean(asset?.preview?.fillLight);
+        if (prop && asset) {
             const { position, yaw } = placeVfxStageProp(center, right, stage, prop);
-            porcelain.position.set(position.x, position.y, position.z);
-            porcelain.scale.set(prop.size, prop.size, -prop.size);
-            porcelain.rotation.y = -THREE.MathUtils.degToRad(yaw + prop.turn);
-            porcelainFill.position.set(position.x + 1.8, position.y + 2.7, position.z + 2.5);
+            asset.node.visible = true;
+            asset.node.position.set(position.x, position.y, position.z);
+            asset.node.scale.set(prop.size, prop.size, -prop.size);
+            asset.node.rotation.y = -THREE.MathUtils.degToRad(yaw + prop.turn);
+            if (prop.animation !== undefined) asset.pose?.(prop.animation, time - propStart);
+            else if (propStart === time) asset.pose?.(undefined, 0);
+            if (propFill.visible) propFill.position.set(position.x + 1.8, position.y + 2.7, position.z + 2.5);
+        }
+        const litStage = particles.active.filter(({ particle }) => particle === "sinner_pool" || particle === "sinner_spot_pool");
+        const nextFraming = asset?.preview?.tall ? "tall" : litStage.length > 0 ? "water" : "default";
+        if (nextFraming !== framing) {
+            framing = nextFraming;
+            if (view === "stage") setView(view);
+        }
+        for (const light of stageLights) light.intensity = 0;
+        for (const { instance } of litStage) {
+            const position = instance.global_space.position;
+            const side = position.x * right.x + position.z * right.z;
+            const light = stageLights[side < -1 ? 1 : side > 1 ? 2 : 0];
+            const variables = instance.Molang.global_variables as Record<string, number>;
+            const age = instance.view_age;
+            const fade = Math.max(0, Math.min(1, age / 0.32, ((variables["variable.vfx_life"] ?? 1.08) - age) / 0.49));
+            const gain = fade * (variables["variable.vfx_opacity"] ?? 0) * (light === stageLights[0] ? 19 : 11);
+            if (gain <= 0) continue;
+            const color = new THREE.Color(variables["variable.vfx_red"], variables["variable.vfx_green"], variables["variable.vfx_blue"]);
+            light.color.lerp(color, gain / (light.intensity + gain));
+            light.intensity += gain;
+            light.position.set(position.x, light === stageLights[0] ? 4.3 : 1.55, position.z);
         }
     }
 
@@ -348,6 +398,7 @@ export async function createStage(canvas: HTMLCanvasElement) {
                 frameMs: lastDrawMs,
                 draws: renderer.info.render.calls,
                 activeChannels: engine?.activeSummary(simTime, features) ?? [],
+                stageProp: activeProp?.id,
                 keyParticle: {
                     style: resolvedKey.style,
                     label: getKeyParticleStyleLabel(resolvedKey.style),
@@ -370,7 +421,9 @@ export async function createStage(canvas: HTMLCanvasElement) {
                 else if (mesh.material) materials.add(mesh.material);
             });
             for (const material of materials) {
-                (material as THREE.MeshStandardMaterial).map?.dispose();
+                const { map, emissiveMap } = material as THREE.MeshStandardMaterial;
+                map?.dispose();
+                if (emissiveMap !== map) emissiveMap?.dispose();
                 material.dispose();
             }
             key.shadow.map?.dispose();

@@ -26,7 +26,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 
 因此 `platform` 不是“唯一允许访问 Minecraft API 的层”。边界保护的是依赖方向（尤其 `platform` 不反向依赖 `app`、`domain` 不接触宿主），而不是形式上的绝对隔离。
 
-- `src/midis/index.ts` 是构建钩子的固定入口：`bepack` 的 `afterBuild` 会把仓库根目录 `midis/js/` 覆盖到 preserve-modules 输出中的 `packages/addon/src/midis/`（与 `app/midiManager.ts` 的相对导入一致），所以这个生成入口保留在 `src/midis/`，不随其他数据移入 `data/`。
+- `src/midis/index.ts` 是构建钩子的固定入口：`bepack` 的 `afterBuild` 会从 `midis/library/` 生成曲目模块，写入 preserve-modules 输出中的 `packages/addon/src/midis/`（与 `app/midiManager.ts` 的相对导入一致），所以这个生成入口保留在 `src/midis/`，不随其他数据移入 `data/`。
 
 自动检查：`tests/architecture.test.ts` 使用 TypeScript 编译器 API 解析真实模块图（包括路径别名、re-export、type-only import 和动态 import），并检查依赖方向与循环依赖。
 
@@ -130,7 +130,7 @@ Minecraft playSound / 粒子 / 显示
 - 可复用的平台操作（显示、方块、粒子、存储、网络）放在 `platform/**`。
 - `platform/**` 不反向依赖 `app`；服务器初始化这种跨模块编排放在 `app/serverAdmin.ts`。
 - `__PIANO_TARGET__` 双构建语义保持不变：client 构建通过 `compile.define` 折叠并裁剪 server 分支；server 构建保留 `server-admin`/`server-net` 动态加载。
-- 内嵌 MIDI 由构建钩子从仓库根目录 `midis/js/` 拷贝到 preserve-modules 输出中的 `packages/addon/src/midis/`，与 `app/midiManager.ts` 的 `../midis/index.js` 相对导入一致；远程曲库仍通过 `midiManager.setSource()` 切换。server 构建跳过该拷贝，使用远程源/空内嵌源。
+- 内嵌 MIDI 由构建钩子从 `midis/library/` 生成到 preserve-modules 输出中的 `packages/addon/src/midis/`，与 `app/midiManager.ts` 的 `../midis/index.js` 相对导入一致；远程曲库仍通过 `midiManager.setSource()` 切换。server 构建跳过内嵌曲库生成，使用远程源/空内嵌源。
 
 ### Observable 归属
 

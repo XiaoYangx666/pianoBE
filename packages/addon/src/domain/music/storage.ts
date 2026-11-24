@@ -1,4 +1,4 @@
-import type { MusicRef, StoredMusicEntry, StorageUsage } from "@piano/core";
+import type { MusicRef, PerformanceCue, StoredMusicEntry, StorageUsage } from "@piano/core";
 
 /**
  * 一份可写音乐存储。
@@ -12,6 +12,7 @@ export interface MusicStorage {
     list(): StoredMusicEntry[];
     has(id: string): boolean;
     get(id: string): Uint8Array | undefined;
+    getPerformances?(id: string): readonly (readonly PerformanceCue[])[];
     save(bytes: Uint8Array): StoredMusicEntry;
     remove(id: string): boolean;
     rename(id: string, name: string): StoredMusicEntry | undefined;

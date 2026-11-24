@@ -201,7 +201,10 @@ describe("VfxRegistry & plugin system", () => {
         expect(isApiVersionCompatible("1.1.0", "1.0.0")).toBe(false);
         expect(isApiVersionCompatible("2.0.0", "1.0.0")).toBe(false);
 
-        expect(() => validatePluginManifest({ ...makeManifest(), dependencies: ["other"] })).toThrow();
+        expect(() => validatePluginManifest({ ...makeManifest(), dependencies: ["thirdparty.sample"] })).toThrow();
+        expect(() => new VfxRegistry().registerPlugin({
+            manifest: makeManifest({ dependencies: ["other"] }), register() {},
+        })).toThrow(/缺少可用依赖/);
         expect(() => validatePluginManifest(makeManifest({ id: "Bad_ID" }))).toThrow();
         expect(() => validatePluginManifest(makeManifest({ version: "1.0" }))).toThrow();
         expect(() => validatePluginManifest(makeManifest({ capabilities: [] }))).toThrow();

@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bareSrc = path.resolve(here, "../../addon/dist/template-bare.mcaddon");
 const fullSrc = path.resolve(here, "../../addon/dist/template.mcaddon");
-const src = fs.existsSync(bareSrc) ? bareSrc : fullSrc;
+const bare = fs.statSync(bareSrc, { throwIfNoEntry: false });
+const full = fs.statSync(fullSrc, { throwIfNoEntry: false });
+const src = bare && (!full || bare.mtimeMs >= full.mtimeMs) ? bareSrc : fullSrc;
 const dstDir = path.resolve(here, "../public");
 const dst = path.join(dstDir, "template.mcaddon");
 

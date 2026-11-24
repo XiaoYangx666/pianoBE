@@ -614,6 +614,16 @@ export function renamePbe3(data: Uint8Array, name: string): Uint8Array {
     );
 }
 
+export function reidentifyPbe3(data: Uint8Array, id: string): Uint8Array {
+    readPbe3Header(data);
+    const tail = readString(data, 6).next;
+    const writer = new ByteWriter(data.length + id.length);
+    writer.bytes(data.subarray(0, 6));
+    pushString(writer, id);
+    writer.bytes(data.subarray(tail));
+    return writer.finish();
+}
+
 /** 统一的编解码入口 */
 export const Pbe3Codec = {
     encode: encodePbe3,

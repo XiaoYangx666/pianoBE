@@ -10,6 +10,8 @@ export type MusicSource = "card" | "library";
 
 export interface MusicRef extends MidiSongMeta {
     source: MusicSource;
+    /** -1 普通演奏，0 或缺省为文件内编排，1 起为附加编排。 */
+    performance?: number;
     /** 整份 PBE3 的 CRC32（16 进制，来源提供时用于内容校验） */
     checksum?: string;
     /**
@@ -35,10 +37,11 @@ export function musicRefKey(ref: Pick<MusicRef, "source" | "id" | "checksum" | "
 
 /** 卡片歌曲还必须属于同一张实体卡。 */
 export function sameMusicRef(
-    a: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid">,
-    b: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid">
+    a: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance">,
+    b: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance">
 ): boolean {
     return a.id === b.id && a.source === b.source && (a.checksum ?? "") === (b.checksum ?? "")
+        && (a.performance ?? 0) === (b.performance ?? 0)
         && (a.source !== "card" || (a.cardUid ?? "") === (b.cardUid ?? ""));
 }
 
@@ -75,6 +78,9 @@ export function normalizeMusicRef(value: unknown): MusicRef | undefined {
     if (typeof raw.noteCount === "number" && Number.isFinite(raw.noteCount)) ref.noteCount = raw.noteCount;
     if (typeof raw.bytes === "number" && Number.isFinite(raw.bytes) && raw.bytes > 0) ref.bytes = raw.bytes;
     if (typeof raw.checksum === "string" && /^[0-9a-f]{1,8}$/i.test(raw.checksum)) ref.checksum = raw.checksum;
+    if (typeof raw.performance === "number" && Number.isSafeInteger(raw.performance) && raw.performance >= -1) {
+        ref.performance = raw.performance;
+    }
     if (source === "card" && typeof raw.cardUid === "string" && raw.cardUid) ref.cardUid = raw.cardUid;
     return ref;
 }

@@ -2,15 +2,19 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { readSongHeader } from "@piano/core";
 import {
     quietFeatures,
+    missingPerformanceResources,
     resolveKeyParticle,
+    validateVfxTheme,
     VFX_PARTICLES_PER_PIANO,
     VfxRegistry,
 } from "@piano/vfx";
 import {
     HOST_PARTICLE_IDS,
     readPbePluginArchive,
+    validatePluginAssembly,
 } from "@piano/vfx/package";
 import { listBuiltinPluginDirs, packPluginDirectory } from "./pack-plugin.mjs";
 
@@ -63,12 +67,13 @@ async function importArchiveVfxModule(archive) {
     try {
         for (const [relPath, bytes] of archive.files) {
             if (!relPath.startsWith("vfx/")) continue;
-            const outFile = join(tempDir, relPath.replace(/\.js$/, ".mjs"));
+            const outFile = join(tempDir, relPath);
             mkdirSync(dirname(outFile), { recursive: true });
             const code = rewriteWorkspaceImportsForTemp(Buffer.from(bytes).toString("utf8"));
             writeFileSync(outFile, code);
         }
-        const entryFile = join(tempDir, "vfx", "index.mjs");
+        writeFileSync(join(tempDir, "package.json"), '{"type":"module"}');
+        const entryFile = join(tempDir, "vfx", "index.js");
         const mod = await import(`${pathToFileURL(entryFile).href}?t=${Date.now()}`);
         const pluginModule = mod.default;
         if (!pluginModule || typeof pluginModule !== "object" || typeof pluginModule.register !== "function") {
@@ -80,35 +85,33 @@ async function importArchiveVfxModule(archive) {
     }
 }
 
-export async function validatePluginTarget(targetPath, options = {}) {
+async function readTarget(targetPath) {
     const absPath = resolve(targetPath);
     const bytes = absPath.endsWith(".pbeplugin")
         ? new Uint8Array(readFileSync(absPath))
         : (await packPluginDirectory(absPath)).bytes;
 
-    const archive = readPbePluginArchive(bytes);
-    const { manifest } = archive;
-    const allowedParticles = new Set([...HOST_PARTICLE_IDS, ...(manifest.provides.particles ?? [])]);
+    return readPbePluginArchive(bytes);
+}
 
-    if (options.assetOwners) {
-        for (const relPath of [...archive.particles.keys(), ...archive.textures.keys()]) {
-            const owner = options.assetOwners.get(relPath);
-            if (owner && owner !== manifest.id) {
-                throw new Error(`资源路径冲突：${relPath} 同时属于插件 ${owner} 与 ${manifest.id}`);
-            }
-            options.assetOwners.set(relPath, manifest.id);
-        }
-    }
+async function validatePlugin(archive, registry, byId) {
+    const { manifest } = archive;
+    const sources = [archive, ...(manifest.dependencies ?? []).map(id => byId.get(id))];
+    const allowedParticles = new Set([...HOST_PARTICLE_IDS, ...sources.flatMap(source => source.manifest.provides.particles ?? [])]);
+    const allowedEffects = new Set(sources.flatMap(source => source.manifest.provides.effects ?? []));
 
     if (archive.vfxEntryJs) {
         const pluginModule = await importArchiveVfxModule(archive);
-        const registry = new VfxRegistry();
         const record = registry.registerPlugin(pluginModule);
-        options.sharedRegistry?.registerPlugin(pluginModule);
 
         if (record.manifest.id !== manifest.id) {
             throw new Error(`插件清单 id 不一致：plugin.json=${manifest.id}, 代码=${record.manifest.id}`);
         }
+        if (JSON.stringify(record.manifest.stageProps) !== JSON.stringify(manifest.stageProps)
+            || JSON.stringify(record.manifest.dependencies) !== JSON.stringify(manifest.dependencies)) {
+            throw new Error(`插件 ${manifest.id} 的代码清单与归档清单道具或依赖声明不一致`);
+        }
+        const props = new Map(sources.flatMap(source => source.stageProps.map(({ registration }) => [registration.id, registration])));
         assertSameSet(record.effects, manifest.provides.effects, "provides.effects", manifest.id);
         assertSameSet(record.themes, manifest.provides.themes, "provides.themes", manifest.id);
         assertSameSet(
@@ -118,6 +121,14 @@ export async function validatePluginTarget(targetPath, options = {}) {
             manifest.id,
         );
         assertSameSet(record.keyStyles, manifest.provides.keyStyles, "provides.keyStyles", manifest.id);
+        for (const themeId of record.themes) {
+            const theme = validateVfxTheme(registry.getTheme(themeId), registry);
+            for (const layer of theme.layers) {
+                if (!allowedEffects.has(layer.effect)) {
+                    throw new Error(`主题 ${themeId} 引用了未声明依赖的特效：${layer.effect}`);
+                }
+            }
+        }
 
         const maxBurst = manifest.limits?.maxParticlesPerBurst ?? VFX_PARTICLES_PER_PIANO;
         const sampleMusic = {
@@ -135,30 +146,34 @@ export async function validatePluginTarget(targetPath, options = {}) {
         for (const effectId of record.effects) {
             const def = registry.getEffect(effectId);
             if (!def) throw new Error(`特效 ${effectId} 注册后不可查询`);
+            const params = {
+                color: "#68E4FF",
+                color2: "#FFE29A",
+                intensity: 0.85,
+                scale: 1,
+                variant: def.variants?.[0],
+                zone: "stage",
+                motion: "normal",
+            };
+            if (def.resolveStageProp && (props.size || manifest.capabilities.includes("vfx.stageProps"))) {
+                for (const instrument of ["grand", "upright"]) {
+                    const prop = def.resolveStageProp(params, instrument);
+                    if (!prop) continue;
+                    const resource = props.get(prop.id);
+                    if (!resource || (prop.animation !== undefined && !resource.animations.includes(prop.animation))
+                        || ![prop.offset?.x, prop.offset?.y, prop.offset?.z, prop.size, prop.turn].every(Number.isFinite)) {
+                        throw new Error(`插件 ${manifest.id} 的特效 ${effectId} 返回了无效或未声明的道具：${String(prop.id)}`);
+                    }
+                }
+            }
             if (def.trigger === "control") {
-                def.resolveKeyParticle?.({
-                    color: "#68E4FF",
-                    color2: "#FFE29A",
-                    intensity: 0.85,
-                    scale: 1,
-                    variant: def.variants?.[0],
-                    zone: "stage",
-                    motion: "normal",
-                });
+                def.resolveKeyParticle?.(params);
                 continue;
             }
             for (const solo of [false, true]) {
                 const state = def.createState?.();
                 const batch = def.emit?.({
-                    params: {
-                        color: "#68E4FF",
-                        color2: "#FFE29A",
-                        intensity: 0.85,
-                        scale: 1,
-                        variant: def.variants?.[0],
-                        zone: "stage",
-                        motion: "normal",
-                    },
+                    params,
                     music: sampleMusic,
                     recentNotes: sampleNotes,
                     lastNoteTick: 0,
@@ -227,17 +242,32 @@ async function main() {
     }
 
     const sharedRegistry = new VfxRegistry();
-    const assetOwners = new Map();
-    for (const target of targets) {
-        const archive = await validatePluginTarget(target, { sharedRegistry, assetOwners });
+    const archives = validatePluginAssembly(await Promise.all(targets.map(readTarget)));
+    const byId = new Map(archives.map(archive => [archive.manifest.id, archive]));
+    for (const archive of archives) {
+        await validatePlugin(archive, sharedRegistry, byId);
         const counts = [
             `${archive.manifest.provides.effects?.length ?? 0} effects`,
             `${archive.manifest.provides.themes?.length ?? 0} themes`,
             `${archive.manifest.provides.layouts?.length ?? 0} layouts`,
             `${archive.manifest.provides.keyStyles?.length ?? 0} keyStyles`,
             `${archive.manifest.provides.particles?.length ?? 0} particles`,
+            `${archive.stageProps.length} stage props`,
         ].join(", ");
         console.log(`[validate-plugin] OK  ${archive.manifest.id} v${archive.manifest.version} (${counts})`);
+    }
+    if (validateAll) {
+        const library = join(root, "midis/library");
+        let performances = 0;
+        for (const file of readdirSync(library)) {
+            if (!file.endsWith(".pbe3")) continue;
+            const cues = readSongHeader(readFileSync(join(library, file))).performance;
+            if (!cues?.length) continue;
+            const missing = missingPerformanceResources(cues, sharedRegistry);
+            if (missing.length) throw new Error(`曲库演出 ${file} 引用无效：${missing.join(", ")}`);
+            performances++;
+        }
+        console.log(`[validate-plugin] OK  ${performances} library performances`);
     }
 }
 

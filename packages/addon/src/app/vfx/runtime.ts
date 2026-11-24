@@ -6,7 +6,8 @@ import type { MidiPlayer } from "@domain/playback/player";
 import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visualEvent";
 import {
     createPerformanceProgram, createSingleEffectProgram, createThemeProgram,
-    getVfxTheme, quietFeatures, simulatedVfxNotes, VFX_MAX_PIANOS, VfxBudget, VfxEngine, VfxMusic,
+    getVfxTheme, hasAvailablePerformanceEffects, missingPerformanceResources, quietFeatures, simulatedVfxNotes,
+    VFX_MAX_PIANOS, VfxBudget, VfxEngine, VfxMusic,
     type ActiveChannelSummary, type MusicFeatures, type PianoParticleOverride,
     type SingleEffectConfig, type VfxInput, type VfxProgram, type VfxTheme,
 } from "@piano/vfx";
@@ -14,6 +15,7 @@ import { inspectInstrument, instrumentDestroyed, instrumentKey, type InstrumentL
 import { vfxInstrumentFor } from "@domain/instrument/definition";
 import { spawnVfxEmitter } from "@platform/vfxParticle";
 import { VfxPropRenderer } from "@platform/vfxProp";
+import { STAGE_PROP_REGISTRATIONS } from "./stagePropCatalog";
 
 export type AutoRequest = { auto: true; piano: PianoRuntime } & (
     | { kind: "performance"; midi: MidiPlayer; performance: NonNullable<MidiPlayer["performance"]>; transport: PianoTransportEvent }
@@ -44,6 +46,7 @@ export interface VfxSession {
 }
 
 const sessions = new Map<string, VfxSession>();
+const stageProps = new Map(STAGE_PROP_REGISTRATIONS.map(prop => [prop.id, prop]));
 let timer: number | undefined;
 let sent = 0;
 let failures = 0;
@@ -93,6 +96,7 @@ function attachLiveMusic(piano: PianoRuntime, music: VfxMusic, session: VfxSessi
             music.transport(event);
             if (event.type !== "resume" && event.type !== "start") {
                 session.budget.clearPending();
+                session.prop.clear();
                 if (resetOnTransport) {
                     if (session.isPerformance && session.midi) {
                         session.engine?.seek(event.position, true);
@@ -206,7 +210,7 @@ function startSession(location: InstrumentLocation, request: LabRequest | AutoRe
         start,
         duration: Infinity,
         budget,
-        prop: new VfxPropRenderer(location),
+        prop: new VfxPropRenderer(location, stageProps),
         features: quietFeatures,
         lastManualNoteAt: "auto" in request && request.kind === "manualTheme" ? request.lastNoteAt : undefined,
     };
@@ -242,8 +246,12 @@ function syncSongVfx(piano: PianoRuntime, transport: PianoTransportEvent) {
 
     const settings = piano.settings ?? DEFAULT_PIANO_SETTINGS;
     const performance = midi.performance;
+    if (settings.stageChoreography && performance && transport.type === "start") {
+        const missing = missingPerformanceResources(performance.cues);
+        if (missing.length) console.warn(`[piano-vfx] 曲目 ${midi.getInfo().midiName} 缺少演出资源：${missing.join(", ")}`);
+    }
     let request: AutoRequest | undefined;
-    if (settings.stageChoreography && performance) {
+    if (settings.stageChoreography && performance && hasAvailablePerformanceEffects(performance.cues)) {
         request = { auto: true, kind: "performance", piano, midi, performance, transport };
     } else if (settings.stageTheme !== "off") {
         request = { auto: true, kind: "songTheme", piano, midi, theme: settings.stageTheme };
@@ -319,7 +327,8 @@ function updateTick() {
                     }
                     const timeSeconds = session.midi ? session.midi.position : elapsed / 20;
                     const solo = session.input === "solo";
-                    const nativeStageProp = session.prop.render(session.engine.stageProp(timeSeconds, session.features, solo), tick);
+                    const prop = session.engine.stageProp(timeSeconds, session.features, solo);
+                    const nativeStageProp = session.prop.render(prop, tick) ? prop?.channelKey : undefined;
                     const before = session.budget.dropped;
                     const batches = session.engine.update(
                         timeSeconds,

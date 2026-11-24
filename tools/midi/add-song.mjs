@@ -1,24 +1,22 @@
-// 增量添加/更新曲目到曲库（贡献者主入口：不碰现有曲目，git diff 干净）
+// 增量添加曲目到公共曲库。
 // 用法:
 //   npm run add-song -- <文件或目录> [<文件或目录>...]
 //   例: npm run add-song -- ~/Desktop/新歌.mid
 //       npm run add-song -- ./my-midis/ ./one.mid ./two.mid
-// 效果: 每首生成/更新 midis/library/<id>.pbe3，合并进 index.json，
-//       同步 midis/js/<id>.js 与 index.js（addon 构建源，不入库）。
-// 防重复: id = crc32(midi 内容)，内容相同自动幂等；同名不同内容会警告。
+// 按播放内容归并并保留已有曲目。编排通过独立演出文件交付。
 import fs from "node:fs";
 import path from "node:path";
 import {
     collectSongNoteCount,
     encodeSong,
-    metasToAddonIndex,
-    songToAddonModule,
+    findFreeSongId,
+    reidentifySong,
+    sameSongMusic,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 import { readPerformance } from "./performance.mjs";
 
 const libDir = path.resolve("./midis/library");
-const jsDir = path.resolve("./midis/js");
 
 // ---------- 1. 收集待转换文件 ----------
 const args = process.argv.slice(2).filter((a) => !a.startsWith("-"));
@@ -50,67 +48,40 @@ if (files.size === 0) {
 
 // ---------- 2. 转换 + 防重复合并 ----------
 fs.mkdirSync(libDir, { recursive: true });
-fs.mkdirSync(jsDir, { recursive: true });
 const indexPath = path.join(libDir, "index.json");
 const index = fs.existsSync(indexPath)
     ? JSON.parse(fs.readFileSync(indexPath, "utf8"))
     : [];
 
 let added = 0;
-let updated = 0;
 let skipped = 0;
 for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
     const song = midiBufferToSong(
         new Uint8Array(fs.readFileSync(file)),
         path.basename(file).replace(/\.midi?$/i, "")
     );
-    const pbe3 = encodeSong({ ...song, performance: readPerformance(song.id) });
-    const entry = {
-        id: song.id,
-        name: song.name,
-        duration: song.duration,
-        noteCount: collectSongNoteCount(song),
-        bytes: pbe3.length,
-    };
-    const pos = index.findIndex((m) => m.id === song.id);
-    let status;
-    const sameName = index.some((m) => m.name === song.name && m.id !== song.id);
-    if (sameName) {
-        console.warn(`⚠️  同名不同内容: 「${song.name}」曲库已有另一首 (${index.find((m) => m.name === song.name && m.id !== song.id).id})，仍会添加 (${song.id})`);
+    const data = encodeSong({ ...song, performance: readPerformance(song.id) });
+    const noteCount = collectSongNoteCount(song);
+    const existing = index.find(meta => meta.duration === song.duration && meta.noteCount === noteCount
+        && sameSongMusic(fs.readFileSync(path.join(libDir, `${meta.id}.pbe3`)), data));
+    if (existing) {
+        skipped++;
+        console.log(`  [已存在] ${existing.name} (${existing.id})`);
+        continue;
     }
-    if (pos >= 0) {
-        if (index[pos].name === song.name && index[pos].noteCount === entry.noteCount && index[pos].bytes === entry.bytes) {
-            status = "跳过"; // 内容与元数据完全一致 → 幂等跳过
-            skipped++;
-        } else {
-            index[pos] = entry;
-            status = "更新";
-            updated++;
-        }
-    } else {
-        index.push(entry);
-        status = "新增";
-        added++;
-    }
-    fs.writeFileSync(path.join(libDir, `${song.id}.pbe3`), pbe3);
-    fs.writeFileSync(path.join(jsDir, `${song.id}.js`), songToAddonModule(pbe3), "utf-8");
-    console.log(`  [${status}] ${song.name} (${song.id})`);
+    const id = findFreeSongId(data, candidate => index.some(meta => meta.id === candidate));
+    const pbe3 = id === song.id ? data : reidentifySong(data, id);
+    fs.writeFileSync(path.join(libDir, `${id}.pbe3`), pbe3);
+    index.push({ id, name: song.name, duration: song.duration, noteCount, bytes: pbe3.length });
+    added++;
+    console.log(`  [新增] ${song.name} (${id})`);
 }
 
 // ---------- 3. 统一写 index（按名称排序，便于 git diff 审查） ----------
 index.sort((a, b) => a.name.localeCompare(b.name, "zh"));
 fs.writeFileSync(indexPath, JSON.stringify(index, null, 1) + "\n", "utf-8");
-const addonMetas = index.map((meta) => {
-    try {
-        return { ...meta, bytes: fs.statSync(path.join(libDir, `${meta.id}.pbe3`)).size };
-    } catch {
-        return meta;
-    }
-});
-fs.writeFileSync(path.join(jsDir, "index.js"), metasToAddonIndex(addonMetas), "utf-8");
-
 // ---------- 4. 汇总 ----------
-console.log(`\n✅ 完成：新增 ${added} · 更新 ${updated} · 跳过(重复) ${skipped} · 曲库现有 ${index.length} 首`);
+console.log(`\n✅ 完成：新增 ${added} · 跳过(重复) ${skipped} · 曲库现有 ${index.length} 首`);
 console.log("💾 提交（只提交曲库，原始 midi 不入库）:");
 console.log("   git add midis/library && git commit -m \"曲库: 新增歌曲\"");
 console.log("📋 可选检查: npm run show-song -- <曲名关键词>");

@@ -13,6 +13,7 @@ import { notifications } from "@piano/ui";
 import { loadTemplate, type TemplateInfo } from "../addon/template";
 import { generateAddonZip } from "../addon/export";
 import { midiFileToEntry } from "../music/convert";
+import { mergeSongEntries } from "../music/groupSongs";
 import {
     libraryMetaToEntry,
     loadLibraryIndex,
@@ -36,6 +37,7 @@ import {
     parsePbePluginFile,
     storedPluginToEntry,
     unpackSongBundles,
+    withPluginDependencies,
     type GeneratorPluginEntry,
 } from "../addon/plugins";
 import type { PbePluginArchive } from "@piano/vfx/package";
@@ -193,7 +195,7 @@ function computeNextSelectedPlugins(
             next.add(requiredId);
         }
     }
-    return [...next];
+    return withPluginDependencies([...next], plugins).filter(id => overrides[id] !== false);
 }
 
 function withSyncedPlugins(
@@ -254,7 +256,10 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             .catch((error) => notifyError("曲库加载失败", error));
 
         listLocalSongs()
-            .then((myMusic) => set({ myMusic, myMusicReady: true }))
+            .then((myMusic) => set((state) => ({
+                myMusic: mergeSongEntries(myMusic, state.myMusic).rows.sort((a, b) => b.createdAt - a.createdAt),
+                myMusicReady: true,
+            })))
             .catch((error) => {
                 console.error("[generator] 本地音乐库加载失败", error);
                 set({ myMusicReady: true });
@@ -318,6 +323,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         set({ loadingText: "解析 Addon 模板…" });
         try {
             const template = await loadTemplate(file);
+            if (options?.silent && get().template) return;
             for (const pack of loadedTimbres.values()) attachTimbrePack(template, pack);
             previewPlayer.bindTemplate(template);
 
@@ -334,7 +340,9 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             const version = header?.version;
             set((state) => ({
                 template,
-                ...withSyncedPlugins(state, template.songs),
+                ...withSyncedPlugins(state, options?.silent
+                    ? mergeSongEntries(template.songs, state.songs).rows
+                    : template.songs),
                 scores: template.scores,
                 addonName: header?.name ?? "",
                 addonDesc: header?.description ?? "",
@@ -374,10 +382,6 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
             for (const file of files) {
                 try {
                     const entry = await midiFileToEntry(file);
-                    if (get().myMusic.some((song) => song.id === entry.id)) {
-                        skipped++;
-                        continue;
-                    }
                     added.push({ ...entry, createdAt: base + added.length });
                     if ((entry.voicePeak ?? 0) > BEDROCK_SIMULTANEOUS_SOUND) overloaded.push({ ...entry, createdAt: 0 });
                 } catch (error) {
@@ -385,23 +389,23 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                 }
             }
             if (added.length > 0) {
+                const local = mergeSongEntries(get().myMusic, added);
+                skipped = added.length - local.changed.length;
                 try {
-                    await putLocalSongs(added);
+                    await putLocalSongs(local.changed);
                 } catch (error) {
                     notifyError("写入我的音乐失败", error);
                     return;
                 }
-                set({ myMusic: [...added].reverse().concat(get().myMusic) });
+                set({ myMusic: local.rows.sort((a, b) => b.createdAt - a.createdAt) });
                 if (addToAddon) {
                     set((state) => {
-                        const fresh = added.filter((entry) => !state.songs.some((song) => song.id === entry.id));
-                        if (fresh.length === 0) return {};
-                        return withSyncedPlugins(state, [...state.songs, ...fresh]);
+                        return withSyncedPlugins(state, mergeSongEntries(state.songs, added).rows);
                     });
                 }
                 notifications.show({
                     title: addToAddon ? "已导入并加入附加包" : "已加入我的音乐",
-                    message: `新增 ${added.length} 首${skipped ? `，跳过 ${skipped} 首重复曲目` : ""}${addToAddon ? "" : " · 可在「我的音乐」加入附加包"}`,
+                    message: `新增或更新 ${local.changed.length} 首${skipped ? `，已归并或跳过 ${skipped} 份导入` : ""}`,
                     color: "teal",
                 });
                 if (overloaded.length > 0) {
@@ -417,12 +421,6 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                         duration: 10_000,
                     });
                 }
-            } else if (skipped > 0) {
-                notifications.show({
-                    title: "没有新增曲目",
-                    message: `${skipped} 首已经在我的音乐里`,
-                    color: "gray",
-                });
             }
         } finally {
             set({ loadingText: null });
@@ -440,17 +438,16 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         if (!library) return;
         const meta = library.find((item) => item.id === id);
         if (!meta) return;
-        if (get().songs.some((song) => song.id === id)) {
-            notifications.show({ title: "已在附加包中", message: meta.name, color: "gray" });
-            return;
-        }
         set({ pendingAddId: id });
         try {
             const song = await get().loadLibraryEntry(meta);
-            set((state) => {
-                if (state.songs.some((item) => item.id === song.id)) return {};
-                return withSyncedPlugins(state, [...state.songs, song]);
-            });
+            const state = get();
+            const merged = mergeSongEntries(state.songs, [song]);
+            if (!merged.changed.length) {
+                notifications.show({ title: "已在附加包中", message: meta.name, color: "gray" });
+                return;
+            }
+            set(withSyncedPlugins(state, merged.rows));
             notifications.show({ title: "已加入附加包", message: meta.name, color: "teal" });
             void recordLibraryAdd(id).then((counted) => {
                 if (!counted) return;
@@ -471,16 +468,13 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         if (!library) return;
         const meta = library.find((item) => item.id === id);
         if (!meta) return;
-        if (get().myMusic.some((song) => song.id === id)) {
-            notifications.show({ title: "已在我的音乐里", message: meta.name, color: "gray" });
-            return;
-        }
         set({ pendingAddId: id });
         try {
             const song = await get().loadLibraryEntry(meta);
             const stored: StoredSong = { ...song, fromLibrary: true, createdAt: Date.now() };
-            await putLocalSongs([stored]);
-            set({ myMusic: [stored, ...get().myMusic] });
+            const local = mergeSongEntries(get().myMusic, [stored]);
+            await putLocalSongs(local.changed);
+            set({ myMusic: local.rows.sort((a, b) => b.createdAt - a.createdAt) });
             notifications.show({ title: "已保存到我的音乐", message: meta.name, color: "teal" });
         } catch (error) {
             notifyError("保存到我的音乐失败", error);
@@ -490,11 +484,10 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
     },
 
     addToAddon: (entry) => {
-        if (get().songs.some((song) => song.id === entry.id)) return;
-        set((state) => {
-            if (state.songs.some((song) => song.id === entry.id)) return {};
-            return withSyncedPlugins(state, [...state.songs, entry]);
-        });
+        const state = get();
+        const merged = mergeSongEntries(state.songs, [entry]);
+        if (!merged.changed.length) return;
+        set(withSyncedPlugins(state, merged.rows));
         notifications.show({ title: "已加入附加包", message: entry.name, color: "teal" });
     },
 
@@ -672,8 +665,20 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         }
         const selected = new Set(get().selectedPlugins);
         checked ? selected.add(id) : selected.delete(id);
-        const nextSelected = [...selected];
         const overrides = { ...get().manualPluginOverrides, [id]: checked };
+        let nextSelected = [...selected];
+        if (checked) {
+            for (const required of withPluginDependencies([id], get().plugins)) {
+                selected.add(required);
+                overrides[required] = true;
+            }
+            nextSelected = [...selected];
+        } else {
+            nextSelected = nextSelected.filter(selectedId => !withPluginDependencies([selectedId], get().plugins).includes(id));
+            for (const dependent of selected) {
+                if (!nextSelected.includes(dependent)) overrides[dependent] = false;
+            }
+        }
         set({ selectedPlugins: nextSelected, manualPluginOverrides: overrides });
 
         if (!checked) {
@@ -683,7 +688,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                 const effectList = [...new Set(affected.map((item) => item.effect))].slice(0, 4).join("、");
                 notifications.show({
                     title: "已取消曲目所需插件",
-                    message: `特效 ${effectList}${affected.length > 4 ? " 等" : ""} 将在导出包中跳过`,
+                    message: `演出会跳过引用 ${effectList}${affected.length > 4 ? " 等" : ""} 的提示`,
                     color: "yellow",
                     duration: 8_000,
                 });
@@ -752,31 +757,21 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
         set({ loadingText: "正在解析曲目与附带资源..." });
         try {
             const bundle = await unpackSongBundles(files);
-            const existingMineIds = new Set(get().myMusic.map((item) => item.id));
-            const newMine: StoredSong[] = [];
             const now = Date.now();
-            for (const song of bundle.songs) {
-                if (!existingMineIds.has(song.id)) {
-                    existingMineIds.add(song.id);
-                    newMine.push({ ...song, createdAt: now + newMine.length });
-                }
-            }
-            if (newMine.length > 0) {
-                await putLocalSongs(newMine);
-            }
+            const local = mergeSongEntries(get().myMusic,
+                bundle.songs.map((song, index) => ({ ...song, createdAt: now + index })));
+            await putLocalSongs(local.changed);
             if (bundle.songs.length > 0) {
                 set((state) => {
-                    const existingSongs = new Set(state.songs.map((item) => item.id));
-                    const freshSongs = bundle.songs.filter((item) => !existingSongs.has(item.id));
-                    const nextSongs = freshSongs.length > 0 ? [...state.songs, ...freshSongs] : state.songs;
+                    const nextSongs = mergeSongEntries(state.songs, bundle.songs);
                     return {
-                        myMusic: newMine.length > 0 ? [...newMine].reverse().concat(state.myMusic) : state.myMusic,
-                        ...withSyncedPlugins(state, nextSongs),
+                        myMusic: local.rows.sort((a, b) => b.createdAt - a.createdAt),
+                        ...withSyncedPlugins(state, nextSongs.rows),
                     };
                 });
                 notifications.show({
                     title: "已导入曲目",
-                    message: `导入 ${bundle.songs.length} 首 PBE3 曲目并加入当前附加包`,
+                    message: `已处理 ${bundle.songs.length} 份 PBE3，按音乐内容归并到当前附加包`,
                     color: "teal",
                 });
             }
@@ -956,7 +951,7 @@ export const useGenerator = create<GeneratorState>((set, get) => ({
                 const uniqueEffects = [...new Set(missingNames)];
                 notifications.show({
                     title: "导出包的演出效果不完整",
-                    message: `缺少或未启用特效：${uniqueEffects.slice(0, 4).join("、")}${uniqueEffects.length > 4 ? " 等" : ""}（播放时将自动跳过）`,
+                    message: `缺少或未启用的资源：${uniqueEffects.slice(0, 4).join("、")}${uniqueEffects.length > 4 ? " 等" : ""}。播放时会保留可用的演出提示。`,
                     color: "yellow",
                     duration: 9_000,
                 });

@@ -1,5 +1,5 @@
 import { DDUI } from "sapi-pro";
-import { formatBytes, musicSourceLabel, type MusicRef } from "@piano/core";
+import { attachSongPerformance, formatBytes, musicSourceLabel, readSongHeader, type MusicRef } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 
 export interface TrackActionArgs {
@@ -24,6 +24,15 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
 
     const canCopy = ui.boolean(ref.source === "library" && Boolean(piano.cardAccess), { clientWritable: false });
     const canDelete = ui.boolean(ref.source === "card", { clientWritable: false });
+    const extra = piano.performances(ref);
+    const mode = ui.number(ref.performance ?? 0);
+    const showModes = ui.boolean(extra.length > 0, { clientWritable: false });
+    const chosen = (): MusicRef => ({ ...ref, performance: mode.getData() });
+    if (!extra.length) {
+        void Promise.resolve(piano.readBytes(ref)).then(bytes => {
+            if (bytes && alive() && !ui.closed) showModes.setData(Boolean(readSongHeader(bytes).performance?.length));
+        }).catch(() => {});
+    }
 
     ui.label(`§b${ref.name}`);
     ui.label(`§7来源：§f${musicSourceLabel(ref.source)}`);
@@ -31,17 +40,22 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
     ui.label(`§7音符：§f${ref.noteCount !== undefined ? ref.noteCount : "未知"}`);
     ui.label(`§7大小：§f${ref.bytes !== undefined ? formatBytes(ref.bytes) : "未知"}`);
     ui.label(status);
+    ui.dropdown("演奏方式", mode, [
+        { label: "曲目默认", value: 0 },
+        { label: "普通演奏", value: -1 },
+        ...extra.map((_, index) => ({ label: `附加演出 ${index + 1}`, value: index + 1 })),
+    ], { visible: showModes });
 
     ui.button("▶ 立即播放", () => {
         if (!alive()) return ui.close();
-        void piano.getMidiPlayer().playNow(ref)
+        void piano.getMidiPlayer().playNow(chosen())
             .then(() => status.setData("§a开始播放"))
             .catch(fail);
     });
 
     ui.button("＋ 加入播放队列", () => {
         if (!alive()) return ui.close();
-        const result = piano.getMidiPlayer().addToQueue(ref);
+        const result = piano.getMidiPlayer().addToQueue(chosen());
         status.setData(result === "added" ? "§a已加入播放队列" : "§e队列中已有这首歌");
     });
 
@@ -52,10 +66,13 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
             status.setData("§c卡槽为空，先插入一张音乐存储卡");
             return;
         }
+        const selection = chosen().performance ?? 0;
         void Promise.resolve(piano.readBytes(ref)).then(bytes => {
             if (!bytes) throw new Error("源曲目已不可用");
             const storage = card.storage();
-            const entry = storage.save(bytes);
+            const selected = selection === 0 ? bytes
+                : attachSongPerformance(bytes, selection < 0 ? [] : extra[selection - 1] ?? []);
+            const entry = storage.save(selected);
             card.refreshLore();
             status.setData(`§a已复制到存储卡：${entry.name}`);
         }).catch(fail);

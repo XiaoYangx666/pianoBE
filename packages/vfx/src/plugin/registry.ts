@@ -103,6 +103,11 @@ export class VfxRegistry {
         if (this.plugins.has(manifest.id)) {
             throw new Error(`插件 ${manifest.id} 已注册，禁止重复注册`);
         }
+        for (const dependency of manifest.dependencies ?? []) {
+            if (!this.plugins.has(dependency) || this.isPluginDisabled(dependency)) {
+                throw new Error(`插件 ${manifest.id} 缺少可用依赖 ${dependency}`);
+            }
+        }
 
         const stagedEffects = new Map<string, VfxEffectDefinition>();
         const stagedThemes = new Map<string, VfxTheme>();
@@ -420,7 +425,10 @@ export class VfxRegistry {
     }
 
     isPluginDisabled(pluginId: string): boolean {
-        return this.plugins.get(pluginId)?.disabled ?? false;
+        const record = this.plugins.get(pluginId);
+        return Boolean(record?.disabled || record?.manifest.dependencies?.some(
+            id => !this.plugins.has(id) || this.isPluginDisabled(id),
+        ));
     }
 
     reEnablePlugin(pluginId: string): void {

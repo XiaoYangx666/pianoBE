@@ -4,6 +4,7 @@ import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
 import type { VfxProgram } from "./programs";
 import type { VfxInstrument } from "../spatial/instrument";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
+import { stagePropId } from "../plugin/plugin";
 import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams, VfxStageProp } from "../types";
 
 interface ChannelRuntime {
@@ -16,7 +17,11 @@ interface ChannelRuntime {
 export interface VfxEngineUpdateOptions {
     emitFlashes?: boolean;
     solo?: boolean;
-    nativeStageProp?: boolean;
+    nativeStageProp?: boolean | string;
+}
+
+export interface ResolvedVfxStageProp extends VfxStageProp {
+    channelKey: string;
 }
 
 export interface ActiveChannelSummary {
@@ -196,7 +201,7 @@ export class VfxEngine {
         return matched ?? this.program.staticKeyParticle;
     }
 
-    stageProp(timeSeconds: number, music: Readonly<MusicFeatures>, solo = false): VfxStageProp | undefined {
+    stageProp(timeSeconds: number, music: Readonly<MusicFeatures>, solo = false): ResolvedVfxStageProp | undefined {
         if (timeSeconds < 0 || timeSeconds >= this.program.durationSeconds) return undefined;
         const tick = Math.floor(timeSeconds * 20 + 1e-6);
         for (const channel of this.program.channels) {
@@ -205,9 +210,18 @@ export class VfxEngine {
             const sample = channel.sample(timeSeconds, tick, solo ? quietFeatures : music, solo);
             if (!sample || sample.params.intensity < 0.005) continue;
             try {
-                const prop = def.resolveStageProp(this.resolvedParams(def, sample.params));
+                const prop = def.resolveStageProp(this.resolvedParams(def, sample.params), this.instrument);
                 this.reportSuccess(def);
-                if (prop) return prop;
+                if (!prop) continue;
+                const owner = this.registry.getEffectOwner(def.id);
+                const plugin = owner && this.registry.getPlugin(owner);
+                if (!plugin || ![plugin.manifest.id, ...(plugin.manifest.dependencies ?? [])].some(id =>
+                    !this.registry.isPluginDisabled(id) && this.registry.getPlugin(id)?.manifest.stageProps?.some(
+                        item => stagePropId(id, item.id) === prop.id,
+                    ))) continue;
+                if (![prop.offset?.x, prop.offset?.y, prop.offset?.z, prop.size, prop.turn].every(Number.isFinite)) continue;
+                if (prop.animation !== undefined && typeof prop.animation !== "string") continue;
+                return { ...prop, channelKey: channel.key };
             } catch (error) {
                 this.reportFailure(def, "resolveStageProp", error);
             }
@@ -385,7 +399,7 @@ export class VfxEngine {
                     (gameTick * 9 + channel.slot * 41) % 360,
                     solo,
                     runtime.effectState,
-                    options.nativeStageProp,
+                    options.nativeStageProp === true || options.nativeStageProp === channel.key,
                 );
                 const interval = this.safeNextInterval(def, sample.params, runtime.effectState);
                 runtime.nextTick = gameTick + Math.max(1, interval);

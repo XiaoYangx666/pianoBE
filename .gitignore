@@ -1,4 +1,5 @@
 build
+!/tools/build/
 cache
 node_modules
 packages/web/public/replay
@@ -43,3 +44,8 @@ tools/audio_lab_source/
 # VFX particle documents and textures are generated into packages/vfx/assets and synced into the RP
 packages/addon/rp/particles/
 packages/addon/rp/textures/particle/
+packages/addon/bp/entities/pbe_stage_props/
+packages/addon/rp/entity/pbe_stage_props/
+packages/addon/rp/models/entity/pbe_stage_props/
+packages/addon/rp/animations/pbe_stage_props/
+packages/addon/rp/textures/entity/pbe_stage_props/

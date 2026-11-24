@@ -238,7 +238,7 @@ docker compose -f docker-compose.dev.yml up
 | 目录 | 内容 | 版本控制 |
 |---|---|---|
 | `midis/files/` | 原始 `.mid` 源文件 | 不入库 |
-| `midis/js/` | addon 运行时模块（PBE3 的 Base64URL 文本） | 不入库（构建期生成） |
+| `packages/addon/bp/scripts/packages/addon/src/midis/` | 客户端构建直接从公共曲库生成的运行时模块 | 不入库 |
 | `midis/library/` | PBE3 曲库 `<id>.pbe3` + `index.json` | **入库**（生成器数据源） |
 
 原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
@@ -258,8 +258,8 @@ npm run show-song -- <关键词>
 
 命令说明：
 
-- **内容寻址防重复**：曲目 ID 为 MIDI 内容的 CRC32，内容相同的文件自动识别并跳过（输出 `跳过(重复)`）；同名但内容不同的文件打印警告并分别入库，不会互相覆盖
-- **最小改动**：`add-song` 仅新增/更新指定曲目，`git diff` 只包含对应的 `<id>.pbe3`（PBE3）与 `index.json` 两项变更，便于审查
+- **曲目归并**：曲目 ID 默认取 MIDI 的 CRC32。转换后的音乐内容相同则沿用已有曲目，同名不同音乐分别入库，ID 冲突时为新曲生成稳定的可用 ID。
+- **增量入库**：`add-song` 只写入新曲的 `<id>.pbe3` 和索引。专属演出可单独导出，再在生成器中与原曲归并。
 - **转换确定性**：同一文件重复转换结果一致；曲名取自文件名，无需了解二进制格式
 
 ### PBE3 与游戏内导入
@@ -288,7 +288,7 @@ git commit -m "曲库: 新增 <歌名>"
 git push origin <分支>    # 提交 Pull Request
 ```
 
-曲库与后端管理页曲库使用同一套 id 算法；后端新增曲目可将其 `packages/server/data/midis/{id}.mid` 导出后经 `add-song` 收编入库。
+公共曲库和后端管理页通常使用 MIDI 内容的 CRC32 作为 ID。后端新增曲目可将其 `packages/server/data/midis/{id}.mid` 导出后经 `add-song` 收编入库。
 
 ---
 

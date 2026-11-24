@@ -8,6 +8,8 @@ export interface MidiSongMeta {
     noteCount?: number;
     /** PBE3 原始字节数（来源提供时用于歌曲详情展示与内容校验） */
     bytes?: number;
+    /** 额外演出与 PBE3 内的默认演出共用音符数据。 */
+    performances?: readonly (readonly import("./pbe3/performance.js").PerformanceCue[])[];
 }
 
 export interface MidiTrackInstrument {

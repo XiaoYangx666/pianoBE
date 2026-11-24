@@ -8,6 +8,7 @@ import {
     readAllPbe3Notes,
     readPbe3Events,
     readPbe3Header,
+    reidentifyPbe3,
     renamePbe3,
     type EncodePbe3Options,
 } from "./pbe3/codec.js";
@@ -17,6 +18,8 @@ import type { Pbe3Header, Pbe3Note, Pbe3NoteEvent } from "./pbe3/format.js";
 import { validateMusic, type ValidatedMusic } from "./music/validate.js";
 import type { MusicStorageLimits } from "./music/limits.js";
 import { pbe3ToAddonModule } from "./midi/addonModule.js";
+import { crc32Hex } from "./midi/crc32.js";
+import { encodeUtf8 } from "./binary/utf8.js";
 
 /**
  * 曲目二进制格式的统一门面。
@@ -42,6 +45,19 @@ export function attachSongPerformance(bytes: Uint8Array, cues: readonly Performa
     return attachPbe3Performance(bytes, cues);
 }
 
+export function reidentifySong(bytes: Uint8Array, id: string): Uint8Array {
+    if (!/^[a-f0-9]{1,8}$/.test(id)) throw new Error("无效的歌曲 ID");
+    return reidentifyPbe3(bytes, id);
+}
+
+export function findFreeSongId(bytes: Uint8Array, occupied: (id: string) => boolean): string {
+    const header = readPbe3Header(bytes);
+    let id = header.id;
+    let salt = 0;
+    while (occupied(id)) id = crc32Hex(encodeUtf8(`${header.id}:${header.checksum}:${salt++}`));
+    return id;
+}
+
 /** 曲目二进制 → MidiSong（单轨视图，用于预览/测试/离线工具） */
 export function decodeSong(bytes: Uint8Array): MidiSong {
     return decodePbe3(bytes);
@@ -55,6 +71,33 @@ export function readSongHeader(bytes: Uint8Array): SongHeader {
 /** 读取并解压事件流 */
 export function readSongEvents(bytes: Uint8Array) {
     return readPbe3Events(bytes);
+}
+
+/** 只在比对候选曲目时解码音符。压缩方式、曲名、原始 MIDI ID 和演出均不参与比较。 */
+export function sameSongMusic(a: Uint8Array, b: Uint8Array): boolean {
+    if (a === b) return true;
+    const left = readPbe3Header(a);
+    const right = readPbe3Header(b);
+    if (left.duration !== right.duration || left.noteCount !== right.noteCount) return false;
+    const x = readAllSongNotes(a);
+    const y = readAllSongNotes(b);
+    if (x.length !== y.length) return false;
+    return x.every((note, index) => {
+        const other = y[index];
+        return note.time === other.time && note.midi === other.midi && note.velocity === other.velocity
+            && note.keyDuration === other.keyDuration && note.soundDuration === other.soundDuration;
+    });
+}
+
+/** 以 PBE3 自身的规范化编码比较编排，忽略对象字段顺序和区块压缩差异。 */
+export function sameSongPerformance(
+    base: Uint8Array, left: readonly PerformanceCue[], right: readonly PerformanceCue[],
+): boolean {
+    if (left === right) return true;
+    if (left.length !== right.length) return false;
+    const a = attachPbe3Performance(base, left);
+    const b = attachPbe3Performance(base, right);
+    return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 /** 曲目二进制 → 全部音符（含 soundDuration / keyDuration / velocity） */

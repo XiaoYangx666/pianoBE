@@ -90,7 +90,7 @@ export function PluginsPanel({
                             <div>
                                 <div className="font-semibold text-ore-text">缺少曲目所需的特效插件</div>
                                 <div className="mt-0.5 text-[11.5px] text-ore-dim">
-                                    仍可导出附加包，但缺少的特效在游戏内播放时会自动跳过：
+                                    仍可导出并播放音乐。游戏会保留可用的演出提示。
                                     {match.missingEffects
                                         .map((item) => ` ${item.effect}（${item.songs.join("、")}）`)
                                         .join("；")}
@@ -104,7 +104,7 @@ export function PluginsPanel({
                             <div>
                                 <div className="font-semibold text-ore-text">以下曲目所需插件未启用或尚未信任</div>
                                 <div className="mt-0.5 text-[11.5px] text-ore-dim">
-                                    相应特效将无法呈现：
+                                    游戏会跳过引用这些插件的提示。
                                     {match.disabledRequiredEffects
                                         .map((item) => ` ${item.effect} → ${item.pluginName}（${item.songs.join("、")}）`)
                                         .join("；")}

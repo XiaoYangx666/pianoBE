@@ -10,6 +10,12 @@ export interface QueueArgs {
     page?: number;
 }
 
+function trackName(ref: MusicRef): string {
+    if (ref.performance === -1) return `${ref.name} · 普通演奏`;
+    if (ref.performance && ref.performance > 0) return `${ref.name} · 附加演出 ${ref.performance}`;
+    return ref.name;
+}
+
 /** 播放队列：只负责顺序，播放控制统一保留在 MIDI 播放器主页面。 */
 export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => {
     const piano = args.piano;
@@ -40,7 +46,7 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
         const current = queue.current();
         head.setData(
             `§7队列 §f${refs.length} §7首` +
-            (current ? `\n§7当前：§b${current.name}` : "\n§7队列为空，点“添加歌曲”开始")
+            (current ? `\n§7当前：§b${trackName(current)}` : "\n§7队列为空，点“添加歌曲”开始")
         );
         const start = (state.page - 1) * PAGE_SIZE;
         for (let slot = 0; slot < PAGE_SIZE; slot++) {
@@ -53,7 +59,7 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
             visible[slot].setData(true);
             // 按钮文本不支持格式化符号，只放纯文本。
             const mark = index === state.index ? "▶ " : `${index + 1}. `;
-            labels[slot].setData(`${mark}${availabilityMark(piano.music.availability(ref))}${sourceMark(ref)} ${ref.name}`);
+            labels[slot].setData(`${mark}${availabilityMark(piano.music.availability(ref))}${sourceMark(ref)} ${trackName(ref)}`);
         }
         pageText.setData(refs.length ? `§7第 §f${state.page}§7 / §f${state.maxPage} §7页` : "§7队列是空的");
         prevVisible.setData(state.page > 1);
@@ -91,7 +97,7 @@ const QueueItemPage = DDUI.page<QueueItemArgs>("队列操作", (ui, args) => {
     const { piano, ref } = args;
     const status = ui.string("");
     const queue = () => piano.getMidiPlayer().queue;
-    ui.label(`§b${ref.name}`);
+    ui.label(`§b${trackName(ref)}`);
     ui.label(`§7来源：${sourceMark(ref)} §7时长：${Math.floor(ref.duration / 40 / 60)}:${String(Math.floor(ref.duration / 40) % 60).padStart(2, "0")}`);
     ui.label(`§7音符：${ref.noteCount !== undefined ? ref.noteCount : "未知"} §7大小：${ref.bytes !== undefined ? formatBytes(ref.bytes) : "未知"}`);
     ui.label(status);

@@ -7,6 +7,7 @@ export const VFX_API_VERSION = "1.0.0";
 
 export const VFX_PLUGIN_CAPABILITIES = [
     "vfx",
+    "vfx.stageProps",
     "audio.timbres",
     "audio.sfx",
     "scores",
@@ -34,6 +35,15 @@ export interface VfxPluginPreview {
     description?: string;
 }
 
+export interface VfxStagePropDeclaration {
+    id: string;
+    geometry: string;
+    texture: string;
+    merTexture?: string;
+    animations?: string;
+    preview?: { tall?: boolean; fillLight?: boolean; fullGlow?: boolean };
+}
+
 export interface VfxPluginManifest {
     id: string;
     name: string;
@@ -44,8 +54,10 @@ export interface VfxPluginManifest {
     author: string;
     license: string;
     provides: VfxPluginProvides;
+    dependencies?: readonly string[];
     limits?: VfxPluginLimits;
     preview?: VfxPluginPreview;
+    stageProps?: readonly VfxStagePropDeclaration[];
 }
 
 export interface VfxPluginRegistrar {
@@ -66,6 +78,49 @@ const ITEM_ID_PATTERN = /^[a-z][a-z0-9._-]{0,63}$/;
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const CAPABILITY_SET = new Set<string>(VFX_PLUGIN_CAPABILITIES);
 const PROVIDES_KEYS = ["effects", "themes", "layouts", "keyStyles", "particles"] as const;
+
+export function stagePropId(pluginId: string, localId: string): string {
+    return `${pluginId}:${localId}`;
+}
+
+function stagePropPath(value: unknown, field: string, suffix: string): string {
+    const path = nonEmptyString(value, field);
+    if (!/^stage_props\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+(?:\.[a-z0-9_-]+)+$/.test(path) || !path.endsWith(suffix)) {
+        throw new Error(`${field} 必须是 stage_props/ 下的 ${suffix} 文件：${path}`);
+    }
+    return path;
+}
+
+function validateStageProps(raw: unknown): readonly VfxStagePropDeclaration[] {
+    if (!Array.isArray(raw) || raw.length === 0) throw new Error("stageProps 需要是非空数组");
+    const declarations = raw.map((value, index) => asRecord(value, `stageProps[${index}]`));
+    const ids = validateIdList(declarations.map(value => value.id), "stageProps.id")!;
+    return declarations.map((value, index) => {
+        const id = ids[index];
+        const label = `stageProps.${id}`;
+        const prop: VfxStagePropDeclaration = {
+            id,
+            geometry: stagePropPath(value.geometry, `${label}.geometry`, ".geo.json"),
+            texture: stagePropPath(value.texture, `${label}.texture`, ".png"),
+        };
+        if (value.merTexture !== undefined) {
+            prop.merTexture = stagePropPath(value.merTexture, `${label}.merTexture`, ".png");
+        }
+        if (value.animations !== undefined) {
+            prop.animations = stagePropPath(value.animations, `${label}.animations`, ".animation.json");
+        }
+        if (value.preview !== undefined) {
+            const preview = asRecord(value.preview, `${label}.preview`);
+            prop.preview = {};
+            for (const key of ["tall", "fillLight", "fullGlow"] as const) {
+                if (preview[key] === undefined) continue;
+                if (typeof preview[key] !== "boolean") throw new Error(`${label}.preview.${key} 需要是布尔值`);
+                prop.preview[key] = preview[key];
+            }
+        }
+        return prop;
+    });
+}
 
 interface ParsedSemver {
     major: number;
@@ -136,13 +191,13 @@ function validateIdList(value: unknown, field: string): readonly string[] | unde
 
 export function validatePluginManifest(raw: unknown): VfxPluginManifest {
     const record = asRecord(raw, "plugin.json");
-    if (Object.hasOwn(record, "dependencies")) {
-        throw new Error("插件清单不允许声明 dependencies：插件之间不可互相依赖");
-    }
-
     const id = nonEmptyString(record.id, "id");
     if (!PLUGIN_ID_PATTERN.test(id)) {
         throw new Error(`插件 id 无效（需以小写字母开头，2-64 位小写字母/数字/._-）：${id}`);
+    }
+    const dependencies = validateIdList(record.dependencies, "dependencies");
+    if (dependencies?.some(dependency => dependency === id || !PLUGIN_ID_PATTERN.test(dependency))) {
+        throw new Error(`插件 ${id} 的 dependencies 包含自身或无效插件 ID`);
     }
 
     const name = nonEmptyString(record.name, "name");
@@ -166,6 +221,13 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
             capabilities.push(cap as VfxPluginCapability);
         }
     }
+
+    const hasStageProps = seenCaps.has("vfx.stageProps");
+    if (hasStageProps && !seenCaps.has("vfx")) throw new Error("vfx.stageProps 需要同时声明 vfx");
+    if (hasStageProps !== (record.stageProps !== undefined)) {
+        throw new Error("vfx.stageProps 能力与 stageProps 声明必须同时存在");
+    }
+    const stageProps = hasStageProps ? validateStageProps(record.stageProps) : undefined;
 
     const rawProvides = asRecord(record.provides, "provides");
     const provides: VfxPluginProvides = {};
@@ -222,7 +284,38 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
         author,
         license,
         provides,
+        ...(dependencies?.length ? { dependencies } : {}),
         ...(limits ? { limits } : {}),
         ...(preview ? { preview } : {}),
+        ...(stageProps ? { stageProps } : {}),
     };
+}
+
+/** 按声明顺序遍历，每个依赖只装配一次。 */
+export function orderVfxPlugins<T extends { manifest: VfxPluginManifest }>(plugins: readonly T[]): T[] {
+    const byId = new Map<string, T>();
+    for (const plugin of plugins) {
+        const { id } = plugin.manifest;
+        if (byId.has(id)) throw new Error(`插件 ID 重复：${id}`);
+        byId.set(id, plugin);
+    }
+    const ordered: T[] = [];
+    const active = new Set<string>();
+    const visited = new Set<string>();
+    function visit(plugin: T) {
+        const { id, dependencies } = plugin.manifest;
+        if (active.has(id)) throw new Error(`插件循环依赖：${[...active, id].join(" → ")}`);
+        if (visited.has(id)) return;
+        active.add(id);
+        for (const dependency of dependencies ?? []) {
+            const required = byId.get(dependency);
+            if (!required) throw new Error(`插件 ${id} 缺少依赖 ${dependency}`);
+            visit(required);
+        }
+        active.delete(id);
+        visited.add(id);
+        ordered.push(plugin);
+    }
+    for (const plugin of plugins) visit(plugin);
+    return ordered;
 }

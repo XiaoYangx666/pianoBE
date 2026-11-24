@@ -30,6 +30,7 @@ import {
     listVfxPlugins,
     listVfxThemes,
     normalizeKeyParticlePalette,
+    orderVfxPlugins,
     POINT_BRUSHES,
     quietFeatures,
     registerVfxPlugin,
@@ -64,15 +65,31 @@ const DISCOVERED_PLUGINS: readonly VfxPluginModule[] = Object.values(discoveredP
     .sort((a, b) => a.manifest.id.localeCompare(b.manifest.id));
 
 function syncDiscoveredPlugins(wantIds?: ReadonlySet<string>) {
+    const available = new Map(DISCOVERED_PLUGINS.map(plugin => [plugin.manifest.id, plugin]));
+    const wanted = new Set<string>();
+    function include(id: string) {
+        const plugin = available.get(id);
+        if (!plugin || wanted.has(id)) return;
+        wanted.add(id);
+        for (const dependency of plugin.manifest.dependencies ?? []) include(dependency);
+    }
+    for (const id of wantIds ?? available.keys()) include(id);
     for (const plugin of DISCOVERED_PLUGINS) {
         const id = plugin.manifest.id;
-        const shouldEnable = !wantIds || wantIds.has(id);
-        const has = vfxRegistry.hasPlugin(id);
-        if (has && !shouldEnable) {
-            unregisterVfxPlugin(id);
-        } else if (!has && shouldEnable) {
-            registerVfxPlugin(plugin);
-        }
+        if (!wanted.has(id) && vfxRegistry.hasPlugin(id)) unregisterVfxPlugin(id);
+    }
+    let ordered;
+    try {
+        ordered = orderVfxPlugins(DISCOVERED_PLUGINS.filter(plugin => wanted.has(plugin.manifest.id)));
+    } catch (error) {
+        console.warn("[piano-vfx] 插件依赖校验失败", error);
+        return;
+    }
+    for (const plugin of ordered) {
+        const id = plugin.manifest.id;
+        if (vfxRegistry.hasPlugin(id)) continue;
+        try { registerVfxPlugin(plugin); }
+        catch (error) { console.warn(`[piano-vfx] 无法加载 ${id}`, error); }
     }
 }
 

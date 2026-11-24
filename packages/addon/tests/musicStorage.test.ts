@@ -2,16 +2,19 @@ import { describe, expect, test } from "bun:test";
 import {
     MusicCollection,
     MusicValidationError,
+    attachSongPerformance,
     StorageBudget,
     encodePbe3,
     entryStoredBytes,
     metaKey,
     musicRefKey,
     type MidiSong,
+    type PerformanceCue,
 } from "@piano/core";
 import { MemoryKv } from "./support/fakeItems";
 
 const PREFIX = "pb.test.";
+const cue: PerformanceCue = { tick: 0, effect: "starfield", color: "#FFFFFF", level: 50, scale: 100, op: "set", fade: 0 };
 
 function song(id: string, name = id, notes = 8, compress: boolean | "auto" = "auto"): Uint8Array {
     const values: number[] = [];
@@ -35,6 +38,25 @@ function collection(kv: MemoryKv, limit: () => number) {
 }
 
 describe("音乐存储：提交与读取", () => {
+    test("同一 ID 的普通演奏与多个编排共用一个正文，重复编排幂等", () => {
+        const kv = new MemoryKv();
+        const store = collection(kv, () => 64 * 1024);
+        const standalone = song("shared", "原曲");
+        const original = store.save(standalone);
+        const first = store.save(attachSongPerformance(standalone, [cue]));
+        const secondCue = { ...cue, effect: "firefly_rise" };
+        const second = store.save(attachSongPerformance(standalone, [secondCue]));
+        expect(first.checksum).toBe(original.checksum);
+        expect(store.save(attachSongPerformance(standalone, [cue])).gen).toBe(second.gen);
+        expect(store.save(standalone).gen).toBe(second.gen);
+        expect(store.entries()).toHaveLength(1);
+        const reloaded = collection(kv, () => 64 * 1024);
+        expect(reloaded.get("shared")).toEqual(standalone);
+        expect(reloaded.getPerformances("shared").map(cues => cues[0].effect)).toEqual(["starfield", "firefly_rise"]);
+        expect(store.usage().usedBytes).toBeGreaterThan(entryStoredBytes(PREFIX, original));
+        expect(() => store.save(song("shared", "冲突", 3))).toThrow(/ID 冲突/);
+        expect(reloaded.get("shared")).toEqual(standalone);
+    });
     test("保存后可完整读回，并按实际字节计量", () => {
         const kv = new MemoryKv();
         const store = collection(kv, () => 64 * 1024);
@@ -153,7 +175,7 @@ describe("音乐存储：中断与恢复", () => {
         const oldBytes = store.get(first.id)!;
 
         kv.failOn = metaKey(PREFIX, first.id);
-        expect(() => store.save(song("safe", "第二版", 40))).toThrow(MusicValidationError);
+        expect(() => store.save(attachSongPerformance(oldBytes, [cue]))).toThrow(/保存失败/);
         kv.failOn = undefined;
 
         expect(store.get(first.id)).toEqual(oldBytes);

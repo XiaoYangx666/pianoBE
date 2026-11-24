@@ -1,0 +1,7 @@
+{
+    "format_version": "1.21.30",
+    "minecraft:texture_set": {
+        "color": "pbe_sinner_spot_beam",
+        "metalness_emissive_roughness": "pbe_sinner_spot_beam_mer"
+    }
+}
