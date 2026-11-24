@@ -1,9 +1,12 @@
 import { AddonTemplate } from "@bepack/addon";
 import {
+    PIANO_TIMBRES,
     crc32Hex,
     encodeUtf8,
     mergeSongCatalog,
     metasToAddonIndex,
+    pianoSoundId,
+    pianoSoundLayers,
     readSongHeader,
     songToAddonModule,
 } from "@piano/core";
@@ -35,8 +38,10 @@ import type {
     AssemblyResult,
     AssemblyScoreEntry,
     AssemblySongEntry,
+    LoadedTimbrePack,
     TemplateInfo,
     TimbreExportSelection,
+    TimbreIndexEntry,
 } from "./types.js";
 
 const HOST_PARTICLE_SET = new Set(HOST_PARTICLE_IDS);
@@ -48,15 +53,21 @@ function computeConfigHash(
     plugins: readonly PbePluginArchive[] | undefined,
     timbres: TimbreExportSelection | undefined,
     embedSongs: boolean,
+    scores?: readonly AssemblyScoreEntry[],
 ): string {
     const pluginSpecs = (plugins ?? [])
         .map((archive) => `${archive.manifest.id}@${archive.manifest.version}:${crc32Hex(archive.bytes)}`)
         .sort();
     const timbreSpecs = timbres ? [...timbres.enabledIds].sort() : [];
+    const customScores = scores?.filter((s) => s.source === "custom") ?? [];
+    const scoreSpecs = customScores.length
+        ? customScores.map((s) => `${s.id}:${s.pages.join(",")}`).sort()
+        : undefined;
     const payload = JSON.stringify({
         plugins: pluginSpecs,
         timbres: timbreSpecs,
         embedSongs,
+        ...(scoreSpecs ? { scores: scoreSpecs } : {}),
     });
     return crc32Hex(encodeUtf8(payload)).padStart(8, "0");
 }
@@ -154,10 +165,33 @@ export function assembleAddonTemplate(
     addon.removeTree(midisDir);
 
     if (embedSongs) {
-        const pluginSongs = opts.plugins?.length ? collectPluginSongs(opts.plugins) : [];
+        const pluginSongs = !opts.skipPluginSongs && opts.plugins?.length ? collectPluginSongs(opts.plugins) : [];
         const mergedSongs = pluginSongs.length
             ? mergeSongCatalog(songs, pluginSongs, { reidentifyOnIdConflict: true }).songs
             : [...songs];
+
+        const libraryNameMap = new Map<string, string>();
+        for (const lib of opts.libraries ?? []) {
+            if (lib.id && lib.name && !libraryNameMap.has(lib.id)) {
+                libraryNameMap.set(lib.id, lib.name);
+            }
+        }
+        if (!opts.skipPluginSongs && opts.plugins?.length) {
+            for (const archive of opts.plugins) {
+                for (const lib of archive.libraries) {
+                    if (lib.id && lib.name && !libraryNameMap.has(lib.id)) {
+                        libraryNameMap.set(lib.id, lib.name);
+                    }
+                }
+            }
+        }
+        const referencedLibIds = new Set<string>();
+        for (const s of mergedSongs) {
+            for (const lid of s.libraries ?? []) referencedLibIds.add(lid);
+        }
+        const usedLibraries = [...referencedLibIds]
+            .filter((id) => libraryNameMap.has(id))
+            .map((id) => ({ id, name: libraryNameMap.get(id)! }));
 
         for (const entry of mergedSongs) {
             const content = entry.data
@@ -191,20 +225,42 @@ export function assembleAddonTemplate(
                         ...(extraPerfs?.length ? { performances: extraPerfs } : {}),
                     };
                 }),
+                usedLibraries,
             ),
         );
     } else {
         addon.writeText(`${midisDir}index.js`, "export const midis=[];\n");
     }
 
-    if (opts.timbres) applyTimbres(addon, bpPath, rpPath, opts.timbres);
+    if (opts.timbres) {
+        const pluginTimbres = opts.plugins ? collectPluginTimbres(opts.plugins) : null;
+        if (pluginTimbres && pluginTimbres.packs.length > 0) {
+            const existingIds = new Set(opts.timbres.selected.map((p) => p.meta.id));
+            const extraPacks = pluginTimbres.packs.filter((p) => !existingIds.has(p.meta.id));
+            const extraEnabled = pluginTimbres.enabledIds.filter((id) => !opts.timbres!.enabledIds.includes(id));
+            const extraAll = extraPacks
+                .map((p) => p.meta)
+                .filter((m) => !opts.timbres!.all.some((a) => a.id === m.id));
+            applyTimbres(addon, bpPath, rpPath, {
+                all: [...opts.timbres.all, ...extraAll],
+                selected: [...opts.timbres.selected, ...extraPacks],
+                enabledIds: [...opts.timbres.enabledIds, ...extraEnabled],
+            });
+        } else {
+            applyTimbres(addon, bpPath, rpPath, opts.timbres);
+        }
+    } else if (opts.plugins !== undefined) {
+        const pluginTimbres = collectPluginTimbres(opts.plugins);
+        const stripDirs = new Set([...defaultOptionalTimbreDirs(), ...pluginTimbres.customDirs]);
+        applyTimbresCore(addon, bpPath, rpPath, stripDirs, pluginTimbres.packs, pluginTimbres.enabledIds);
+    }
 
     let installedPlugins: string[] = [];
     if (opts.plugins !== undefined) {
         installedPlugins = applyVfxPlugins(addon, bpPath, rpPath, opts.plugins);
     }
 
-    const configHash = computeConfigHash(opts.plugins, opts.timbres, embedSongs);
+    const configHash = computeConfigHash(opts.plugins, opts.timbres, embedSongs, opts.scores);
     addon.writeText(
         `${bpPath}${DEPLOYMENT_INFO_SCRIPT}`,
         `export const DEPLOYMENT_INFO = ${JSON.stringify({
@@ -261,11 +317,80 @@ export function extractPackFiles(
     return { bpFiles, rpFiles };
 }
 
+function collectPluginTimbres(plugins: readonly PbePluginArchive[]): {
+    packs: LoadedTimbrePack[];
+    enabledIds: string[];
+    customDirs: string[];
+} {
+    const packs: LoadedTimbrePack[] = [];
+    const enabledIds: string[] = [];
+    const customDirs: string[] = [];
+    for (const archive of plugins) {
+        for (const timbre of archive.timbres) {
+            const files = new Map<string, Uint8Array>();
+            for (const dir of Object.values(timbre.dirs)) {
+                customDirs.push(dir, `${dir}_stereo`);
+                for (const note of timbre.notes) {
+                    const samplePath = `sounds/${dir}/${note}.ogg`;
+                    const bytes = archive.sounds.get(samplePath);
+                    if (bytes) files.set(samplePath, bytes);
+                }
+            }
+            const meta: TimbreIndexEntry = {
+                id: timbre.id,
+                value: timbre.value ?? 0,
+                label: timbre.label,
+                description: timbre.description ?? "",
+                required: false,
+                bundled: false,
+                dirs: timbre.dirs,
+                notes: [...timbre.notes],
+                layers: [...timbre.layers],
+                size: archive.size,
+                file: null,
+            };
+            packs.push({ meta, files, soundDefinitions: timbre.soundDefinitions });
+            if (!enabledIds.includes(timbre.id)) enabledIds.push(timbre.id);
+        }
+    }
+    return { packs, enabledIds, customDirs };
+}
+
+function defaultOptionalTimbreDirs(): string[] {
+    const dirs: string[] = [];
+    for (const timbre of PIANO_TIMBRES) {
+        if (timbre.id === "piano") continue;
+        for (const layer of pianoSoundLayers(timbre.value)) {
+            dirs.push(pianoSoundId(timbre.value, layer), pianoSoundId(timbre.value, layer, true));
+        }
+    }
+    return dirs;
+}
+
 function applyTimbres(
     addon: AddonTemplate,
     bpPath: string,
     rpPath: string,
     selection: TimbreExportSelection,
+) {
+    const optionalDirs = new Set<string>(defaultOptionalTimbreDirs());
+    for (const timbre of selection.all) {
+        if (timbre.id === "piano") continue;
+        for (const dir of Object.values(timbre.dirs)) {
+            optionalDirs.add(dir);
+            optionalDirs.add(`${dir}_stereo`);
+        }
+    }
+    applyTimbresCore(addon, bpPath, rpPath, optionalDirs, selection.selected, selection.enabledIds);
+}
+
+function applyTimbresCore(
+    addon: AddonTemplate,
+    bpPath: string,
+    rpPath: string,
+    stripDirs: ReadonlySet<string>,
+    selected: readonly LoadedTimbrePack[],
+    enabledIds: readonly string[],
 ) {
     const soundRoot = `${rpPath}sounds/`;
     const definitionsPath = `${soundRoot}sound_definitions.json`;
@@ -275,28 +400,25 @@ function applyTimbres(
         : { format_version: "1.26.0", sound_definitions: {} };
     definitions.sound_definitions ??= {};
 
-    const optionalDirs = new Set<string>();
-    for (const timbre of selection.all) {
-        if (timbre.id === "piano") continue;
-        for (const dir of Object.values(timbre.dirs)) {
-            optionalDirs.add(dir);
-            optionalDirs.add(`${dir}_stereo`);
-            addon.removeTree(`${soundRoot}${dir}/`);
-        }
+    for (const dir of stripDirs) {
+        if (!dir.endsWith("_stereo")) addon.removeTree(`${soundRoot}${dir}/`);
     }
     for (const key of Object.keys(definitions.sound_definitions)) {
-        if (optionalDirs.has(key.split(".")[0])) delete definitions.sound_definitions[key];
+        if (stripDirs.has(key.split(".")[0])) delete definitions.sound_definitions[key];
     }
 
-    for (const pack of selection.selected) {
+    for (const pack of selected) {
         for (const [path, data] of pack.files) {
             if (path.startsWith("sounds/")) addon.write(`${rpPath}${path}`, data);
         }
         Object.assign(definitions.sound_definitions, pack.soundDefinitions);
     }
 
-    addon.writeText(definitionsPath, `${JSON.stringify(definitions, null, 4)}\n`);
-    const enabled = [...new Set(["piano", ...selection.enabledIds])];
+    const definitionsJson = `${JSON.stringify(definitions, null, 4)}\n`
+        .replace(/"min_distance": (-?\d+)(?![\d.])/g, '"min_distance": $1.0')
+        .replace(/"max_distance": (-?\d+)(?![\d.])/g, '"max_distance": $1.0');
+    addon.writeText(definitionsPath, definitionsJson);
+    const enabled = [...new Set(["piano", ...enabledIds])];
     const timbresModule = `${bpPath}${TIMBRES_SCRIPT_PATH}`;
     if (!addon.has(timbresModule)) {
         console.warn(`[assembly] 模板缺少 ${timbresModule}，音色勾选可能无法在游戏内生效`);

@@ -1,4 +1,4 @@
-import { midis } from "../midis/index.js";
+import * as midiIndex from "../midis/index.js";
 import { EmbeddedMidiSource } from "@data/midiSource/embedded";
 import { MidiManager } from "@domain/playback/midiManager";
 import { PUBLIC_LIBRARY_CACHE_BYTES } from "@app/pianoConfig";
@@ -8,6 +8,6 @@ import { PUBLIC_LIBRARY_CACHE_BYTES } from "@app/pianoConfig";
  * 内嵌/远程公共曲库 + 世界级全局曲库均通过同一个 SongCache 共享事件流。
  */
 export const midiManager = new MidiManager(
-    new EmbeddedMidiSource(midis),
+    new EmbeddedMidiSource(midiIndex.midis, midiIndex.libraries ?? []),
     PUBLIC_LIBRARY_CACHE_BYTES
 );

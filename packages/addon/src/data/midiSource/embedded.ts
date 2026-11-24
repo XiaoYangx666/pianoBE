@@ -11,7 +11,10 @@ export class EmbeddedMidiSource {
     private readonly metas: MidiSongMeta[];
     private readonly map = new Map<string, MidiInfo>();
 
-    constructor(infos: MidiInfo[]) {
+    constructor(
+        infos: MidiInfo[],
+        private readonly libs: readonly { id: string; name: string }[] = [],
+    ) {
         this.metas = infos.map(({ id, name, duration, noteCount, bytes, libraries, performanceEntries, performances }) => {
             const meta: MidiSongMeta = { id, name, duration };
             if (noteCount !== undefined) meta.noteCount = noteCount;
@@ -29,6 +32,10 @@ export class EmbeddedMidiSource {
     /** 同步返回（内嵌源元信息在构造时即齐备） */
     list(): MidiSongMeta[] {
         return this.metas;
+    }
+
+    libraries(): readonly { id: string; name: string }[] {
+        return this.libs;
     }
 
     async get(id: string): Promise<Uint8Array | undefined> {

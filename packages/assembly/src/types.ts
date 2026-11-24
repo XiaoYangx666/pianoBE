@@ -68,6 +68,10 @@ export interface AssemblyOptions {
     scores?: AssemblyScoreEntry[];
     /** 插件包；传 [] 表示零插件模式，不传则保持模板原样 */
     plugins?: readonly PbePluginArchive[];
+    /** 曲库定义（仅导出实际被选中曲目引用的曲库） */
+    libraries?: readonly { id: string; name: string }[];
+    /** 为 true 时不再自动把 plugins 里的歌曲合入内嵌曲库（由调用方显式筛选后通过 songs 传入） */
+    skipPluginSongs?: boolean;
     /** 是否内嵌曲目到脚本（本地客户端默认 true；服务端 BDS 部署传 false） */
     embedSongs?: boolean;
 }

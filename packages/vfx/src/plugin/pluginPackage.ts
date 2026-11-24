@@ -77,6 +77,18 @@ export interface PluginLibraryEntry {
     path: string;
 }
 
+export interface PluginTimbreEntry {
+    id: string;
+    value?: number;
+    label: string;
+    description?: string;
+    dirs: Record<string, string>;
+    notes: readonly string[];
+    layers: readonly string[];
+    soundDefinitions: Record<string, unknown>;
+    path: string;
+}
+
 export interface PbePluginArchive {
     manifest: VfxPluginManifest;
     bytes: Uint8Array;
@@ -85,6 +97,7 @@ export interface PbePluginArchive {
     vfxEntryJs?: string;
     particles: Map<string, Uint8Array>;
     textures: Map<string, Uint8Array>;
+    sounds: Map<string, Uint8Array>;
     previews: Map<string, Uint8Array>;
     files: Map<string, Uint8Array>;
     stageProps: readonly StagePropAssets[];
@@ -92,6 +105,7 @@ export interface PbePluginArchive {
     songs: Map<string, PluginSongEntry>;
     performances: readonly PluginPerformanceEntry[];
     libraries: readonly PluginLibraryEntry[];
+    timbres: readonly PluginTimbreEntry[];
 }
 
 const HOST_TEXTURE_SET = new Set<string>(HOST_TEXTURES);
@@ -209,9 +223,9 @@ export function writePbePluginArchive(
     }
 
     normalized.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    const entries: Record<string, Uint8Array> = {};
+    const entries: Record<string, Uint8Array | [Uint8Array, { level: 0 | 6 }]> = {};
     for (const [path, bytes] of normalized) {
-        entries[path] = bytes;
+        entries[path] = path.endsWith(".ogg") ? [bytes, { level: 0 }] : bytes;
     }
     return zipSync(entries, { level: 6 });
 }
@@ -227,10 +241,12 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
     const files = new Map<string, Uint8Array>();
     const particles = new Map<string, Uint8Array>();
     const textures = new Map<string, Uint8Array>();
+    const sounds = new Map<string, Uint8Array>();
     const previews = new Map<string, Uint8Array>();
     const songFiles = new Map<string, Uint8Array>();
     const performanceFiles = new Map<string, Uint8Array>();
     const libraryFiles = new Map<string, Uint8Array>();
+    const timbreFiles = new Map<string, Uint8Array>();
 
     let entryCount = 0;
     for (const [rawPath, data] of Object.entries(rawEntries)) {
@@ -253,10 +269,17 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
             }
             textures.set(path, data);
         }
+        else if (path.startsWith("sounds/")) {
+            if (!/^sounds\/(?:[a-z0-9_.-]+\/)+[a-z0-9_#.-]+\.ogg$/i.test(path)) {
+                throw new Error(`插件音色采样路径无效：${path}`);
+            }
+            sounds.set(path, data);
+        }
         else if (path.startsWith("preview/")) previews.set(path, data);
         else if (path.startsWith("songs/")) songFiles.set(path, data);
         else if (path.startsWith("performances/")) performanceFiles.set(path, data);
         else if (path.startsWith("libraries/")) libraryFiles.set(path, data);
+        else if (path.startsWith("timbres/")) timbreFiles.set(path, data);
     }
 
     const manifestBytes = files.get("plugin.json");
@@ -477,6 +500,90 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
         });
     }
 
+    const timbres: PluginTimbreEntry[] = [];
+    const seenTimbreIds = new Set<string>();
+    for (const [path, data] of timbreFiles) {
+        if (!path.endsWith(".json")) {
+            throw new Error(`timbres/ 目录只支持 .json 文件：${path}`);
+        }
+        let raw: Record<string, unknown>;
+        try {
+            raw = JSON.parse(strFromU8(data)) as Record<string, unknown>;
+        } catch (error) {
+            throw new Error(`音色文件 ${path} JSON 无效：${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+            throw new Error(`音色文件 ${path} 必须是 JSON 对象`);
+        }
+        const stem = path.slice("timbres/".length, -".json".length);
+        const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : stem;
+        if (!/^[a-z][a-z0-9._-]{0,63}$/.test(id)) {
+            throw new Error(`音色 ID 无效：${id}`);
+        }
+        if (seenTimbreIds.has(id)) {
+            throw new Error(`插件 ${manifest.id} 包含重复音色 ID：${id}`);
+        }
+        seenTimbreIds.add(id);
+        const label = typeof raw.label === "string" && raw.label.trim() ? raw.label.trim() : "";
+        if (!label) {
+            throw new Error(`音色文件 ${path} 缺少 label`);
+        }
+        if (!raw.dirs || typeof raw.dirs !== "object" || Array.isArray(raw.dirs)) {
+            throw new Error(`音色文件 ${path} 缺少 dirs 映射`);
+        }
+        const dirs: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw.dirs as Record<string, unknown>)) {
+            if (typeof v === "string" && v.trim()) dirs[k] = v.trim();
+        }
+        if (Object.keys(dirs).length === 0) {
+            throw new Error(`音色文件 ${path} 的 dirs 不能为空`);
+        }
+        const notes = Array.isArray(raw.notes)
+            ? raw.notes.filter((n): n is string => typeof n === "string" && n.trim().length > 0)
+            : [];
+        const layers = Array.isArray(raw.layers)
+            ? raw.layers.filter((l): l is string => typeof l === "string" && l.trim().length > 0)
+            : [];
+        if (notes.length === 0 || layers.length === 0) {
+            throw new Error(`音色文件 ${path} 缺少 notes 或 layers 数组`);
+        }
+        if (!raw.soundDefinitions || typeof raw.soundDefinitions !== "object" || Array.isArray(raw.soundDefinitions)) {
+            throw new Error(`音色文件 ${path} 缺少 soundDefinitions 对象`);
+        }
+        for (const dir of Object.values(dirs)) {
+            for (const note of notes) {
+                const samplePath = `sounds/${dir}/${note}.ogg`;
+                if (!sounds.has(samplePath)) {
+                    throw new Error(`音色 ${id} 缺少采样文件：${samplePath}`);
+                }
+            }
+        }
+        timbres.push({
+            id,
+            ...(typeof raw.value === "number" && Number.isFinite(raw.value) ? { value: raw.value } : {}),
+            label,
+            ...(typeof raw.description === "string" && raw.description.trim()
+                ? { description: raw.description.trim() }
+                : {}),
+            dirs,
+            notes,
+            layers,
+            soundDefinitions: raw.soundDefinitions as Record<string, unknown>,
+            path,
+        });
+    }
+
+    const declaredTimbres = [...(manifest.provides.timbres ?? [])].sort();
+    const sortedFoundTimbres = timbres.map((t) => t.id).sort();
+    if (
+        declaredTimbres.length !== sortedFoundTimbres.length
+        || declaredTimbres.some((id, idx) => id !== sortedFoundTimbres[idx])
+    ) {
+        throw new Error(
+            `插件 ${manifest.id} provides.timbres ([${declaredTimbres.join(", ")}]) 与 timbres/ 实际文件 ([${sortedFoundTimbres.join(", ")}]) 不一致`,
+        );
+    }
+
     const hasExecutableCode = pluginHasExecutableCode({ manifest, vfxEntryJs, files });
 
     return {
@@ -487,6 +594,7 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
         ...(vfxEntryJs !== undefined ? { vfxEntryJs } : {}),
         particles,
         textures,
+        sounds,
         previews,
         files,
         stageProps,
@@ -494,6 +602,7 @@ export function readPbePluginArchive(bytes: Uint8Array): PbePluginArchive {
         songs,
         performances,
         libraries,
+        timbres,
     };
 }
 
@@ -533,6 +642,13 @@ export function validatePluginAssembly(plugins: readonly PbePluginArchive[]): Pb
             const normalized = path.toLowerCase();
             const stem = normalized.replace(/(?:_mer|_normal)?\.(?:png|tga|texture_set\.json)$/i, "");
             if (HOST_TEXTURE_SET.has(stem)) throw new Error(`插件 ${id} 试图覆盖宿主贴图：${path}`);
+            claim(normalized, id);
+        }
+        for (const path of archive.sounds.keys()) {
+            const normalized = path.toLowerCase();
+            if (normalized.startsWith("sounds/piano_v")) {
+                throw new Error(`插件 ${id} 试图覆盖内置标准钢琴采样：${path}`);
+            }
             claim(normalized, id);
         }
         for (const ref of archive.externalParticleTextures) {

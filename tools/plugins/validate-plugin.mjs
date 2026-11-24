@@ -253,6 +253,7 @@ async function main() {
             `${archive.manifest.provides.keyStyles?.length ?? 0} keyStyles`,
             `${archive.manifest.provides.particles?.length ?? 0} particles`,
             `${archive.stageProps.length} stage props`,
+            `${archive.timbres.length} timbres`,
             `${archive.songs.size} songs`,
             `${archive.performances.length} performances`,
             `${archive.libraries.length} libraries`,

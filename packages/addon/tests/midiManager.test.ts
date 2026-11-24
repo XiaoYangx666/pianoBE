@@ -85,4 +85,24 @@ describe("MidiManager 公共附加来源", () => {
         b?.release();
         expect(await manager.read(worldId)).toEqual(worldBytes);
     });
+
+    test("EmbeddedMidiSource 暴露内嵌曲库列表并支持按 libraryId 过滤", async () => {
+        const { EmbeddedMidiSource } = await import("../src/data/midiSource/embedded");
+        const src = new EmbeddedMidiSource(
+            [
+                { ...meta("s1", "曲1"), libraries: ["lib_a"], value: async () => "" },
+                { ...meta("s2", "曲2"), libraries: ["lib_b"], value: async () => "" },
+            ],
+            [
+                { id: "lib_a", name: "精选" },
+                { id: "lib_b", name: "流行" },
+            ],
+        );
+        const manager = new MidiManager(src);
+        expect(manager.listLibrariesSync()).toEqual([
+            { id: "lib_a", name: "精选" },
+            { id: "lib_b", name: "流行" },
+        ]);
+        expect((await manager.page(1, 10, undefined, "lib_a")).items.map((i) => i.id)).toEqual(["s1"]);
+    });
 });

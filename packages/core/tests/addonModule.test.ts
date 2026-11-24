@@ -58,4 +58,14 @@ describe("addonModule", () => {
                 "];"
         );
     });
+
+    it("传入 libraries 时导出曲库列表，空数组时不额外输出", () => {
+        expect(metasToAddonIndex([], [])).toBe("export const midis=[];");
+        const withLibs = metasToAddonIndex(
+            [{ id: "ccc", name: "C", duration: 300, libraries: ["lib_1"] }],
+            [{ id: "lib_1", name: "精选曲库" }],
+        );
+        expect(withLibs).toContain('libraries:["lib_1"]');
+        expect(withLibs).toContain('export const libraries=[{"id":"lib_1","name":"精选曲库"}];');
+    });
 });

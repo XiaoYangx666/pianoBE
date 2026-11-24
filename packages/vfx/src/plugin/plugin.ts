@@ -24,6 +24,7 @@ export interface VfxPluginProvides {
     layouts?: readonly string[];
     keyStyles?: readonly string[];
     particles?: readonly string[];
+    timbres?: readonly string[];
     songs?: readonly string[];
     performances?: readonly string[];
     libraries?: readonly string[];
@@ -99,9 +100,11 @@ export interface VfxPluginModule {
 
 const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9._-]{1,63}$/;
 const ITEM_ID_PATTERN = /^[a-z][a-z0-9._-]{0,63}$/;
+const CONTENT_ID_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,95}$/i;
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const CAPABILITY_SET = new Set<string>(VFX_PLUGIN_CAPABILITIES);
-const PROVIDES_KEYS = ["effects", "themes", "layouts", "keyStyles", "particles", "songs", "performances", "libraries"] as const;
+const PROVIDES_KEYS = ["effects", "themes", "layouts", "keyStyles", "particles", "timbres", "songs", "performances", "libraries"] as const;
+const CONTENT_PROVIDES_KEYS = new Set<string>(["songs", "performances", "libraries"]);
 
 export function stagePropId(pluginId: string, localId: string): string {
     return `${pluginId}:${localId}`;
@@ -192,7 +195,7 @@ function semverString(value: unknown, field: string): string {
     return text;
 }
 
-function validateIdList(value: unknown, field: string): readonly string[] | undefined {
+function validateIdList(value: unknown, field: string, pattern: RegExp = ITEM_ID_PATTERN): readonly string[] | undefined {
     if (value === undefined) return undefined;
     if (!Array.isArray(value)) {
         throw new Error(`插件清单字段 ${field} 需要是字符串数组`);
@@ -201,7 +204,7 @@ function validateIdList(value: unknown, field: string): readonly string[] | unde
     const list: string[] = [];
     for (const item of value) {
         const text = nonEmptyString(item, `${field}[]`);
-        if (!ITEM_ID_PATTERN.test(text)) {
+        if (!pattern.test(text)) {
             throw new Error(`插件清单字段 ${field} 包含无效标识符 ${text}`);
         }
         if (seen.has(text)) {
@@ -256,7 +259,8 @@ export function validatePluginManifest(raw: unknown): VfxPluginManifest {
     const rawProvides = record.provides === undefined ? {} : asRecord(record.provides, "provides");
     const provides: VfxPluginProvides = {};
     for (const key of PROVIDES_KEYS) {
-        const parsed = validateIdList(rawProvides[key], `provides.${key}`);
+        const pattern = CONTENT_PROVIDES_KEYS.has(key) ? CONTENT_ID_PATTERN : ITEM_ID_PATTERN;
+        const parsed = validateIdList(rawProvides[key], `provides.${key}`, pattern);
         if (parsed !== undefined) provides[key] = parsed;
     }
 

@@ -52,18 +52,18 @@ describe("embedded MIDI build layout", () => {
         }
     });
 
-    test("generator timbres path follows the preserve-modules layout", () => {
+    test("assembly timbres path follows the preserve-modules layout", () => {
         const timbresModule = "scripts/packages/addon/src/domain/piano/timbres.js";
-        const generatorTimbres = fs.readFileSync(
-            path.join(addonRoot, "../generator/src/addon/timbres.ts"), "utf8"
+        const assemblyTemplate = fs.readFileSync(
+            path.join(addonRoot, "../assembly/src/template.ts"), "utf8"
         );
-        expect(generatorTimbres).toContain(`TIMBRES_SCRIPT_PATH = "${timbresModule}"`);
+        expect(assemblyTemplate).toContain(`TIMBRES_SCRIPT_PATH = "${timbresModule}"`);
 
-        const generatorExport = fs.readFileSync(
-            path.join(addonRoot, "../generator/src/addon/export.ts"), "utf8"
+        const assemblyAssembler = fs.readFileSync(
+            path.join(addonRoot, "../assembly/src/assembler.ts"), "utf8"
         );
-        expect(generatorExport).toContain("TIMBRES_SCRIPT_PATH");
-        expect(generatorExport).not.toContain("scripts/piano/timbres.js");
+        expect(assemblyAssembler).toContain("TIMBRES_SCRIPT_PATH");
+        expect(assemblyAssembler).not.toContain("scripts/piano/timbres.js");
 
         expect(fs.readFileSync(path.join(addonRoot, "../../tools/build/strip-template-timbres.mjs"), "utf8"))
             .toContain(timbresModule);

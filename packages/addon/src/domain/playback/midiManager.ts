@@ -70,6 +70,10 @@ export class MidiManager {
     private refreshSync() {
         const list = this.source.list();
         this.reset(Array.isArray(list) ? list : []);
+        const libs = this.source.libraries?.();
+        if (Array.isArray(libs)) {
+            this.cachedLibraries = libs;
+        }
     }
 
     /** 异步刷新元信息（远程来源用；失败时保持现有列表） */

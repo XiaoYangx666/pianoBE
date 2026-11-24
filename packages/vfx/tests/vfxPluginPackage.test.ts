@@ -217,4 +217,62 @@ describe(".pbeplugin archive codec and validation", () => {
         }));
         expect(validatePluginAssembly([parsed, secondPerfPlugin])).toHaveLength(2);
     });
+
+    test("supports audio.timbres plugins and detects sample or ID conflicts", () => {
+        const oggStub = new Uint8Array([0x4f, 0x67, 0x67, 0x53]);
+        const validManifest = {
+            id: "community.warm_grand",
+            name: "温暖大三角",
+            version: "1.0.0",
+            apiVersion: "1.0.0",
+            minPianoBeVersion: "1.3.0",
+            capabilities: ["audio.timbres"],
+            visibility: "public",
+            author: "Tester",
+            license: "CC0-1.0",
+            provides: { timbres: ["warm_grand"] },
+        };
+        const timbreMeta = {
+            id: "warm_grand",
+            label: "温暖三角",
+            dirs: { v1: "warm_grand_v1" },
+            notes: ["C4", "D#4"],
+            layers: ["v1"],
+            soundDefinitions: {
+                "warm_grand_v1.C4": { category: "record", sounds: [{ name: "sounds/warm_grand_v1/C4", is3D: true }] },
+            },
+        };
+        const archiveBytes = writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest),
+            "timbres/warm_grand.json": JSON.stringify(timbreMeta),
+            "sounds/warm_grand_v1/C4.ogg": oggStub,
+            "sounds/warm_grand_v1/D#4.ogg": oggStub,
+        });
+        const parsed = readPbePluginArchive(archiveBytes);
+        expect(parsed.hasExecutableCode).toBe(false);
+        expect(parsed.timbres).toHaveLength(1);
+        expect(parsed.timbres[0].id).toBe("warm_grand");
+        expect(parsed.sounds.has("sounds/warm_grand_v1/D#4.ogg")).toBe(true);
+
+        expect(() => readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify(validManifest),
+            "timbres/warm_grand.json": JSON.stringify(timbreMeta),
+            "sounds/warm_grand_v1/C4.ogg": oggStub,
+        }))).toThrow(/缺少采样文件/);
+
+        expect(() => readPbePluginArchive(writePbePluginArchive({
+            "plugin.json": JSON.stringify({ ...validManifest, provides: { timbres: ["other_timbre"] } }),
+            "timbres/warm_grand.json": JSON.stringify(timbreMeta),
+            "sounds/warm_grand_v1/C4.ogg": oggStub,
+            "sounds/warm_grand_v1/D#4.ogg": oggStub,
+        }))).toThrow(/provides\.timbres/);
+
+        const dupBytes = writePbePluginArchive({
+            "plugin.json": JSON.stringify({ ...validManifest, id: "community.warm_grand_dup" }),
+            "timbres/warm_grand.json": JSON.stringify(timbreMeta),
+            "sounds/warm_grand_v1/C4.ogg": oggStub,
+            "sounds/warm_grand_v1/D#4.ogg": oggStub,
+        });
+        expect(() => validatePluginAssembly([parsed, readPbePluginArchive(dupBytes)])).toThrow(/插件资源冲突/);
+    });
 });
