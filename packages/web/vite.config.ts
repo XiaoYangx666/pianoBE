@@ -7,7 +7,7 @@ export default defineConfig({
     server: {
         // 开发模式：/api 转发到本地 server
         proxy: {
-            "/api": "http://localhost:3000",
+            "/api": "http://127.0.0.1:3000",
         },
     },
     build: {

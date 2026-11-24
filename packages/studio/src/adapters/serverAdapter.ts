@@ -56,6 +56,8 @@ export const serverApi = {
         try {
             const res = await fetch("/api/health");
             if (!res.ok) return { ok: false, authRequired: false, authenticated: false };
+            const health = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+            if (!health?.ok) return { ok: false, authRequired: false, authenticated: false };
             const songRes = await fetch("/api/songs?pageSize=1", {
                 headers: getServerToken() ? { Authorization: `Bearer ${getServerToken()}` } : {},
             });
