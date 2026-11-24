@@ -239,7 +239,7 @@ docker compose -f docker-compose.dev.yml up
 |---|---|---|
 | `midis/files/` | 原始 `.mid` 源文件 | 不入库 |
 | `packages/addon/bp/scripts/packages/addon/src/midis/` | 客户端构建直接从公共曲库生成的运行时模块 | 不入库 |
-| `midis/library/` | PBE3 曲库 `<id>.pbe3` + `index.json` | **入库**（生成器数据源） |
+| `midis/library/` | PBE3 曲库 `<id>.pbe3` + `index.json` + 人工分类表 `genres.json` | **入库**（生成器数据源） |
 
 原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
 
@@ -260,6 +260,7 @@ npm run show-song -- <关键词>
 
 - **曲目归并**：曲目 ID 默认取 MIDI 的 CRC32。转换后的音乐内容相同则沿用已有曲目，同名不同音乐分别入库，ID 冲突时为新曲生成稳定的可用 ID。
 - **增量入库**：`add-song` 只写入新曲的 `<id>.pbe3` 和索引。专属演出可单独导出，再在生成器中与原曲归并。
+- **手动分类**：官方分发包的曲库归属以 `midis/library/genres.json` 为准（`歌曲 id -> 曲库 key`），新增曲目必须在这里补一行；打包脚本遇到未登记曲目会直接报错，避免再被关键词规则分错。
 - **转换确定性**：同一文件重复转换结果一致；曲名取自文件名，无需了解二进制格式
 
 ### PBE3 与游戏内导入
