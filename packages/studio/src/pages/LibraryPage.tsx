@@ -425,7 +425,7 @@ export function LibraryPage() {
                 title="音乐库"
                 description="从官方曲包挑歌或拖入 MIDI / PBE3，选好后直接导出为游戏附加包。"
                 actions={
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
                         <Button
                             type="button"
                             color="secondary"
@@ -433,17 +433,6 @@ export function LibraryPage() {
                             onClick={openOfficialPicker}
                         >
                             <Boxes size={14} /> 从官方曲包添加
-                        </Button>
-                        <Button
-                            type="button"
-                            color="secondary"
-                            size="sm"
-                            onClick={() => {
-                                setNewLibName("");
-                                setNewLibOpen(true);
-                            }}
-                        >
-                            <FolderPlus size={14} /> 新建曲库
                         </Button>
                         <Menu
                             align="end"
@@ -525,6 +514,16 @@ export function LibraryPage() {
                             </button>
                         );
                     })}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setNewLibName("");
+                            setNewLibOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border border-dashed border-ore-border px-2.5 py-1 text-[12px] text-ore-dim transition-colors hover:border-brand/60 hover:text-ore-text"
+                    >
+                        <FolderPlus size={12} /> 新建曲库
+                    </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">

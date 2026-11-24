@@ -5,13 +5,11 @@ import {
     Boxes,
     Code2,
     Download,
-    Eye,
     EyeOff,
+    Info,
     ListMusic,
-    Music2,
     Search,
     ShieldCheck,
-    Sparkles,
     Trash2,
     Upload,
 } from "lucide-react";
@@ -32,14 +30,16 @@ import { bundledPianoEntry } from "../adapters/timbres";
 import type { StudioPlugin } from "../adapters/types";
 import { studioPlayer } from "../audio/player";
 import { PluginContentDialog } from "../components/PluginContentDialog";
+import { PluginDetailDialog } from "../components/PluginDetailDialog";
+import { PluginIcon } from "../components/PluginIcon";
 import { TrustPluginsDialog } from "../components/TrustPluginsDialog";
 import { summarizePluginCapabilities, useStudio } from "../store/studio";
 
 const SOURCE_LABELS: Record<StudioPlugin["source"], string> = {
-    builtin: "官方内置",
-    local: "本地导入",
+    builtin: "官方",
+    local: "本地",
     upload: "已上传",
-    song: "随曲附带",
+    song: "随曲",
 };
 
 const DEPLOY_STATUS_LABELS: Record<
@@ -77,6 +77,7 @@ export function ExtensionsPage() {
     const plugins = useStudio((s) => s.plugins);
     const songs = useStudio((s) => s.songs);
     const libraries = useStudio((s) => s.libraries);
+    const installedTimbreIds = useStudio((s) => s.installedTimbreIds);
     const previewTimbreId = useStudio((s) => s.previewTimbreId);
     const pendingTrustPlugins = useStudio((s) => s.pendingTrustPlugins);
     const busy = useStudio((s) => s.busy);
@@ -110,10 +111,17 @@ export function ExtensionsPage() {
     const [query, setQuery] = useState("");
     const [uninstallTarget, setUninstallTarget] = useState<StudioPlugin | null>(null);
     const [browsePlugin, setBrowsePlugin] = useState<StudioPlugin | null>(null);
+    const [detailPluginId, setDetailPluginId] = useState<string | null>(null);
     const [installingId, setInstallingId] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
     const playerState = usePlayerState(studioPlayer);
+
+    const detailPlugin = useMemo(
+        () => (detailPluginId ? plugins.find((p) => p.id === detailPluginId) ?? null : null),
+        [detailPluginId, plugins],
+    );
+    const installedTimbreSet = useMemo(() => new Set(installedTimbreIds ?? []), [installedTimbreIds]);
 
     const existingSongIds = useMemo(() => new Set(songs.map((s) => s.id)), [songs]);
     const existingFingerprints = useMemo(
@@ -364,62 +372,63 @@ export function ExtensionsPage() {
                             Boolean(timbreId) &&
                             playerState.songId === `timbre-demo:${timbreId}` &&
                             playerState.status === "playing";
-                        const canUseTimbre = Boolean(timbreId) && plugin.installed && plugin.enabled;
+                        const canUseTimbre = Boolean(timbreId) && installedTimbreSet.has(timbreId!);
                         return (
                             <div
                                 key={plugin.id}
-                                className="flex flex-col justify-between gap-3 rounded-lg border border-ore-border bg-ore-raised p-4"
+                                className="flex flex-col justify-between gap-3 rounded-lg border border-ore-border bg-ore-raised p-4 transition-colors hover:border-ore-border-strong"
                             >
                                 <div className="flex items-start gap-3">
-                                    {plugin.previewDataUrl ? (
-                                        <img
-                                            src={plugin.previewDataUrl}
-                                            alt={plugin.name}
-                                            className="h-12 w-12 shrink-0 rounded-md border border-ore-divider object-cover"
-                                        />
-                                    ) : (
-                                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md border border-ore-divider bg-ore-sunken text-ore-dim">
-                                            {isTimbre ? (
-                                                <AudioWaveform size={18} />
-                                            ) : hasSongs ? (
-                                                <Music2 size={18} />
-                                            ) : (
-                                                <Sparkles size={18} />
-                                            )}
-                                        </div>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setDetailPluginId(plugin.id)}
+                                        className="shrink-0 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand/70 rounded-lg"
+                                        title={`查看 ${plugin.name} 详情`}
+                                    >
+                                        <PluginIcon plugin={plugin} />
+                                    </button>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            <span className="text-[14px] font-semibold">{plugin.name}</span>
-                                            <SongBadge>v{plugin.version}</SongBadge>
-                                            <SongBadge>{SOURCE_LABELS[plugin.source]}</SongBadge>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDetailPluginId(plugin.id)}
+                                                className="text-left text-[14px] font-semibold hover:text-brand transition-colors"
+                                            >
+                                                {plugin.name}
+                                            </button>
+                                            <span className="text-[11px] tabular-nums text-ore-dimmer">
+                                                v{plugin.version}
+                                            </span>
                                             {plugin.installed ? (
                                                 mode === "server" ? (
                                                     <SongBadge tone={statusMeta.tone}>
                                                         {statusMeta.label}
                                                     </SongBadge>
                                                 ) : (
-                                                    <SongBadge tone={plugin.enabled ? "brand" : "default"}>
-                                                        {plugin.enabled ? "已启用" : "已停用"}
+                                                    <SongBadge
+                                                        tone={
+                                                            isTimbre || plugin.enabled
+                                                                ? "brand"
+                                                                : "default"
+                                                        }
+                                                    >
+                                                        {isTimbre
+                                                            ? "已安装"
+                                                            : plugin.enabled
+                                                              ? "已启用"
+                                                              : "已停用"}
                                                     </SongBadge>
                                                 )
                                             ) : (
                                                 <SongBadge>未安装</SongBadge>
                                             )}
                                             {timbreId && canUseTimbre && previewTimbreId === timbreId && (
-                                                <SongBadge tone="brand">当前音色</SongBadge>
+                                                <SongBadge tone="brand">当前试听</SongBadge>
                                             )}
                                             {plugin.visibility === "internal" && (
                                                 <SongBadge>
                                                     <span className="inline-flex items-center gap-1">
                                                         <EyeOff size={10} /> 内部
-                                                    </span>
-                                                </SongBadge>
-                                            )}
-                                            {plugin.visibility === "public" && !hasSongs && !isTimbre && (
-                                                <SongBadge>
-                                                    <span className="inline-flex items-center gap-1">
-                                                        <Eye size={10} /> 公开
                                                     </span>
                                                 </SongBadge>
                                             )}
@@ -431,9 +440,12 @@ export function ExtensionsPage() {
                                                 </SongBadge>
                                             )}
                                         </div>
-                                        <div className="mt-1 text-[11.5px] text-ore-dim">
-                                            <code>{plugin.id}</code> · {plugin.author}
-                                            {plugin.sizeBytes > 0 && ` · ${formatBytes(plugin.sizeBytes)}`}
+                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11.5px] text-ore-dim">
+                                            <span>{SOURCE_LABELS[plugin.source]}</span>
+                                            <span>· {plugin.author}</span>
+                                            {plugin.sizeBytes > 0 && (
+                                                <span className="tabular-nums">· {formatBytes(plugin.sizeBytes)}</span>
+                                            )}
                                         </div>
                                         {plugin.description && (
                                             <p className="mt-1.5 line-clamp-2 text-[12px] text-ore-dim">
@@ -441,9 +453,7 @@ export function ExtensionsPage() {
                                             </p>
                                         )}
                                         <div className="mt-2 text-[11px] text-ore-dimmer">
-                                            内容：{summarizePluginCapabilities(plugin)}
-                                            {plugin.dependencies.length > 0 &&
-                                                ` · 依赖：${plugin.dependencies.map((d) => d.id).join("、")}`}
+                                            {summarizePluginCapabilities(plugin)}
                                         </div>
                                     </div>
                                     {timbreId && (
@@ -452,7 +462,7 @@ export function ExtensionsPage() {
                                             label={
                                                 canUseTimbre
                                                     ? `试听 ${plugin.name}`
-                                                    : `试听样音 ${plugin.name}（安装启用后可在播放器中切换）`
+                                                    : `试听样音 ${plugin.name}（安装后可在播放器中切换）`
                                             }
                                             onPlay={() => {
                                                 if (isPlayingDemo) {
@@ -486,6 +496,10 @@ export function ExtensionsPage() {
                                             >
                                                 <ShieldCheck size={13} /> 信任并启用
                                             </Button>
+                                        ) : isTimbre && mode === "local" ? (
+                                            <span className="text-[11.5px] text-ore-dim">
+                                                网页端已就绪 · 可在附加包选择打包
+                                            </span>
                                         ) : (
                                             <label className="inline-flex cursor-pointer items-center gap-2 text-[12px]">
                                                 <input
@@ -510,22 +524,44 @@ export function ExtensionsPage() {
                                         )}
                                     </div>
 
-                                    {plugin.installed && (
+                                    <div className="flex items-center gap-1">
                                         <Button
                                             type="button"
                                             color="ghost"
                                             size="sm"
-                                            onClick={() => setUninstallTarget(plugin)}
+                                            onClick={() => setDetailPluginId(plugin.id)}
                                         >
-                                            <Trash2 size={13} /> 卸载
+                                            <Info size={13} /> 详情
                                         </Button>
-                                    )}
+                                        {plugin.installed && (
+                                            <Button
+                                                type="button"
+                                                color="ghost"
+                                                size="sm"
+                                                onClick={() => setUninstallTarget(plugin)}
+                                            >
+                                                <Trash2 size={13} /> 卸载
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             )}
+
+            <PluginDetailDialog
+                plugin={detailPlugin}
+                mode={mode}
+                installing={Boolean(detailPlugin && installingId === detailPlugin.id)}
+                onClose={() => setDetailPluginId(null)}
+                onInstall={(plugin) => void handleInstall(plugin)}
+                onToggle={(plugin) => void handleToggle(plugin)}
+                onTrust={(plugin) => void handleTrust(plugin)}
+                onUninstall={(plugin) => setUninstallTarget(plugin)}
+                onBrowseSongs={(plugin) => setBrowsePlugin(plugin)}
+            />
 
             <PluginContentDialog
                 plugin={browsePlugin}

@@ -244,7 +244,7 @@ export function Segmented<T extends string>({
                 onChange(options[next].value);
             }}
             className={cx(
-                "inline-flex w-full items-center gap-0.5 rounded-lg bg-[var(--pb-soft)] p-0.5 md:w-auto",
+                "inline-flex w-full max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-[var(--pb-soft)] p-0.5 md:w-auto",
                 className
             )}
         >
@@ -258,7 +258,7 @@ export function Segmented<T extends string>({
                         aria-selected={selected}
                         onClick={() => onChange(option.value)}
                         className={cx(
-                            "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-[6px] px-2.5 text-[12.5px] font-medium transition-[background-color,color,box-shadow] md:flex-none",
+                            "inline-flex h-7 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-2 text-[12px] font-medium transition-[background-color,color,box-shadow] sm:px-2.5 sm:text-[12.5px] md:flex-none",
                             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand/70",
                             selected
                                 ? "bg-ore-raised text-[color:var(--pb-primary-light)] shadow-[0_1px_2px_var(--pb-shadow)]"

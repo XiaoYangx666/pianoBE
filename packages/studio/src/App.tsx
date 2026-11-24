@@ -21,8 +21,7 @@ export default function App() {
     const songsCount = useStudio((s) => s.songs.length);
     const installedPluginsCount = useStudio((s) => s.plugins.filter((p) => p.installed).length);
     const timbreIndex = useStudio((s) => s.timbreIndex);
-    const selectedTimbreIds = useStudio((s) => s.selectedTimbreIds);
-    const deploymentStatus = useStudio((s) => s.deploymentStatus);
+    const installedTimbreIds = useStudio((s) => s.installedTimbreIds);
     const previewTimbreId = useStudio((s) => s.previewTimbreId);
     const normalizeLoudness = useStudio((s) => s.normalizeLoudness);
 
@@ -37,18 +36,10 @@ export default function App() {
         void init();
     }, [init]);
 
-    const activeTimbreIds = useMemo(
-        () =>
-            mode === "server"
-                ? (deploymentStatus?.enabledTimbres ?? ["piano"])
-                : selectedTimbreIds,
-        [mode, deploymentStatus?.enabledTimbres, selectedTimbreIds],
-    );
-
     const playerTimbres = useMemo(() => {
-        const activeSet = new Set(["piano", ...activeTimbreIds]);
+        const installedSet = new Set(["piano", ...(installedTimbreIds ?? [])]);
         const filtered = timbreIndex
-            .filter((item) => item.bundled || activeSet.has(item.id))
+            .filter((item) => item.bundled || installedSet.has(item.id))
             .map((item) => ({
                 id: item.id,
                 label: item.label,
@@ -56,7 +47,7 @@ export default function App() {
         return filtered.length > 0
             ? filtered
             : [{ id: PIANO_TIMBRES[0].id, label: PIANO_TIMBRES[0].label }];
-    }, [timbreIndex, activeTimbreIds]);
+    }, [timbreIndex, installedTimbreIds]);
 
     const nav = useMemo<AppNavItem[]>(
         () => [
@@ -107,6 +98,7 @@ export default function App() {
             }}
             nav={nav}
             bottomNav={nav}
+            mobileDrawer={false}
             player={studioPlayer}
             playerExtras={{
                 timbres: playerTimbres,
@@ -117,7 +109,33 @@ export default function App() {
                     onToggle: setNormalizeLoudness,
                 },
             }}
-            headerActions={<ThemeToggle />}
+            headerActions={
+                <div className="flex items-center gap-1.5">
+                    {serverAvailable && (
+                        <button
+                            type="button"
+                            onClick={() => void switchMode(mode === "server" ? "local" : "server")}
+                            className="inline-flex h-8 items-center gap-1 rounded-md border border-ore-border bg-ore-raised px-2 text-[11.5px] font-medium text-ore-dim hover:text-ore-text md:hidden"
+                            title={mode === "server" ? "切换到本地模式" : "切换到服务器模式"}
+                        >
+                            {mode === "server" ? <Server size={13} /> : <HardDrive size={13} />}
+                            <span>{mode === "server" ? "服务器" : "本地"}</span>
+                        </button>
+                    )}
+                    {mode === "server" && authenticated && (
+                        <button
+                            type="button"
+                            onClick={() => void logoutServer()}
+                            aria-label="退出登录"
+                            title="退出登录"
+                            className="grid h-8 w-8 place-items-center rounded-md border border-ore-border bg-ore-raised text-ore-dim hover:text-ore-text md:hidden"
+                        >
+                            <LogOut size={14} />
+                        </button>
+                    )}
+                    <ThemeToggle />
+                </div>
+            }
             sidebarFooter={
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between rounded-md border border-ore-divider bg-ore-raised px-2.5 py-1.5 text-[11.5px]">
