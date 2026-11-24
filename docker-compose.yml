@@ -10,6 +10,7 @@ services:
             BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-change-me-admin-token}
             DB_PATH: /app/data/piano.db
             MIDIS_DIR: /app/data/midis
+            LOG_FILE: /app/data/logs/server.log
             WEB_ROOT: /app/packages/studio/dist
             BUILTIN_PLUGINS_DIR: /app/build/plugins
             # 需要公开读时设为 true

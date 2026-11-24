@@ -40,6 +40,8 @@ export interface ServerConfig {
     amtTimeoutMs: number;
     /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
     biliSessdata?: string;
+    /** 日志文件路径；设为 off 时只输出到控制台（默认 ./data/logs/server.log） */
+    logFile?: string;
 }
 
 /**
@@ -71,5 +73,9 @@ export function loadConfig(
         amtEco: env.AMT_ECO === "true",
         amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
         biliSessdata: env.BILI_SESSDATA || undefined,
+        logFile:
+            env.LOG_FILE === "off"
+                ? undefined
+                : env.LOG_FILE || "./data/logs/server.log",
     };
 }

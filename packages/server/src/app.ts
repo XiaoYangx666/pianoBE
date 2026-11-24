@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { logger } from "hono/logger";
 import { existsSync } from "node:fs";
 import { serveStatic } from "hono/bun";
 import type { Database } from "bun:sqlite";
 import type { SqliteSongPort } from "./drivers/sqlitePorts.js";
 import type { ServerConfig } from "./config.js";
+import { NOOP_LOGGER, type Logger } from "./logger.js";
 import { authMiddleware, requireRole, type AppVariables } from "./auth.js";
 import { songsRoutes } from "./routes/songs.js";
 import { tokensRoutes } from "./routes/tokens.js";
@@ -24,11 +24,20 @@ export interface AppDeps {
     amt?: AmtService;
     pluginService?: PluginService;
     deploymentService?: DeploymentService;
+    /** 文件/控制台日志；测试未传时静默 */
+    logger?: Logger;
 }
 
 export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    app.use("*", logger());
+    const log = deps.logger ?? NOOP_LOGGER;
+
+    // 访问日志：一条一行，带耗时；静态资源成功请求不落盘
+    app.use("*", async (c, next) => {
+        const start = Date.now();
+        await next();
+        log.http(c.req.method, c.req.path, c.res.status, Date.now() - start);
+    });
 
     const pluginService = deps.pluginService ?? new PluginService(deps.songPort, deps.config);
     const deploymentService = deps.deploymentService ?? new DeploymentService(deps.songPort, pluginService, deps.config);
@@ -71,6 +80,12 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
     api.get("/health", (c) => c.json({ ok: true, name: "pianobe-server", studio: true }));
     app.route("/api", api);
+
+    // 未捕获的请求异常：记录堆栈后返回 JSON，而不是裸 500 文本
+    app.onError((err, c) => {
+        log.error(`${c.req.method} ${c.req.path} 处理异常`, err);
+        return c.json({ error: "服务器内部错误" }, 500);
+    });
 
     // 未匹配的 /api 路由必须返回 JSON 404，不能被 SPA 回退成 index.html
     app.notFound((c) => {
