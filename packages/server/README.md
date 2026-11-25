@@ -64,6 +64,7 @@ docker compose -f docker-compose.dev.yml up
 | `AMT_THREADS` | `4` | 转录线程数 |
 | `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
 | `AMT_MAX_QUEUE` | `10` | 最多排队的转录任务数，超过返回 429 |
+| `AMT_MAX_AUDIO_SECONDS` | `600` | 单个音频/视频最大时长（秒）；B 站视频在下载前直接拒绝 |
 | `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
 | `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
 | `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |

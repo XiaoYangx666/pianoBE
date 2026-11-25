@@ -19,7 +19,7 @@ import {
     AmtUnavailableError,
     type AmtService,
 } from "./amt.js";
-import { BiliError, downloadBiliAudio, resolveBiliVideo } from "./bilibili.js";
+import { BiliError, downloadBiliAudio, resolveBiliVideo, type BiliVideo } from "./bilibili.js";
 
 /**
  * 音频转 MIDI 任务：转录结果先留在临时任务里（原音频 + MIDI），
@@ -128,6 +128,11 @@ function percentFor(base: number, audioTime: number, durationSec: number | undef
     if (!durationSec || durationSec <= 0) return -1;
     const ratio = Math.max(0, Math.min(1, audioTime / durationSec));
     return Math.round(base + ratio * (96 - base));
+}
+
+export function formatDuration(seconds: number): string {
+    const total = Math.max(0, Math.round(seconds));
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function sanitizeName(raw: string): string {
@@ -289,6 +294,8 @@ export class TranscribeJobStore {
         page: number;
         name?: string;
         ownerId?: number;
+        /** 路由层已解析并校验过的视频信息，避免重复请求 B 站 */
+        video?: BiliVideo;
     }): TranscribeJobSnapshot {
         const job = this.createJob(
             {
@@ -318,7 +325,7 @@ export class TranscribeJobStore {
                 message: "解析视频并下载音频…",
                 percent: 2,
             });
-            await this.downloadAndTranscribe(job, input.url, input.page, signal);
+            await this.downloadAndTranscribe(job, input.url, input.page, input.video, signal);
         });
         return this.snapshot(job);
     }
@@ -472,12 +479,20 @@ export class TranscribeJobStore {
         job: TranscribeJob,
         url: string,
         page: number,
+        prepared: BiliVideo | undefined,
         signal?: AbortSignal
     ) {
         try {
             if (!this.deps.amt) throw new AmtUnavailableError("服务端未启用 AMT");
             if (signal?.aborted) return;
-            const video = await resolveBiliVideo(url, page, this.deps.config.biliSessdata);
+            const video = prepared ?? (await resolveBiliVideo(url, page, this.deps.config.biliSessdata));
+            if (video.durationSec && video.durationSec > this.deps.config.amtMaxAudioSeconds) {
+                throw new BiliError(
+                    `视频时长超过上限（${formatDuration(video.durationSec)} > ${formatDuration(
+                        this.deps.config.amtMaxAudioSeconds
+                    )}）`
+                );
+            }
             if (signal?.aborted || !this.jobs.has(job.id)) return;
             const audioPath = join(job.dir, "audio.m4s");
             await downloadBiliAudio(video, audioPath, this.deps.config.biliSessdata);

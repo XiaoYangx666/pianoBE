@@ -5,9 +5,10 @@ import type { AppDeps } from "../app.js";
 import { getToken, requireRole, type AppVariables } from "../auth.js";
 import {
     TranscribeJobStore,
+    formatDuration,
     type TranscribeJobSnapshot,
 } from "../services/transcribeJobs.js";
-import { searchBiliVideos } from "../services/bilibili.js";
+import { BiliError, resolveBiliVideo, searchBiliVideos } from "../services/bilibili.js";
 
 /** 音频上传上限：B 站无损音频通常不到 30 MB，100 MB 足够覆盖长录音 */
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
@@ -143,6 +144,16 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         const ext = audioExtension(rawName, contentType);
         const durationRaw = Number(c.req.header("X-Audio-Duration") ?? 0);
         const durationSec = Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : undefined;
+        if (durationSec !== undefined && durationSec > deps.config.amtMaxAudioSeconds) {
+            return c.json(
+                {
+                    error: `音频时长超过上限（${formatDuration(durationSec)} > ${formatDuration(
+                        deps.config.amtMaxAudioSeconds
+                    )}）`,
+                },
+                413
+            );
+        }
 
         const job = jobs.startUpload({
             buffer: new Uint8Array(buffer),
@@ -173,7 +184,32 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         const page = Math.max(1, Number(body?.page ?? 1) || 1);
         const name = typeof body?.name === "string" ? cleanName(body.name) : undefined;
 
-        const job = jobs.startBilibili({ url: input, page, name, ownerId: getToken(c)?.id });
+        // 先解析视频元信息并在下载前拒绝超长视频，避免白下载、白占队列。
+        let video;
+        try {
+            video = await resolveBiliVideo(input, page, deps.config.biliSessdata);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return c.json({ error: message }, error instanceof BiliError ? 502 : 400);
+        }
+        if (video.durationSec && video.durationSec > deps.config.amtMaxAudioSeconds) {
+            return c.json(
+                {
+                    error: `视频时长超过上限（${formatDuration(video.durationSec)} > ${formatDuration(
+                        deps.config.amtMaxAudioSeconds
+                    )}）`,
+                },
+                413
+            );
+        }
+
+        const job = jobs.startBilibili({
+            url: input,
+            page,
+            name,
+            ownerId: getToken(c)?.id,
+            video,
+        });
         return c.json(job, 201);
     });
 
