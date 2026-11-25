@@ -79,6 +79,13 @@ docker compose -f docker-compose.dev.yml up
 - 曲目的 `owner` 记录为上传令牌身份
 - 前端与外部服务共用同一套 API 与令牌
 
+### 静态资源与登录
+
+- **没有令牌拿不到任何前端文件**：Studio 的 `index.html`、`assets/*`、`template.mcaddon`、`plugins/*`、`amt/*`、`piano/*` 全部校验访问凭证；未登录的浏览器打开 `/` 只会得到服务端内联的登录页（不引用任何静态资源）
+- 登录页把令牌 POST 到 `/api/session`，服务端下发 `HttpOnly` 会话 Cookie（`pianobe_studio`，值只存令牌的 SHA-256，默认 30 天）；静态资源凭这个 Cookie 读取，吊销令牌后立即失效
+- API 仍然只认 `Authorization: Bearer`，Cookie 不能调用任何 `/api/*`（避免 CSRF）；脚本/自动化也可以直接用 Bearer 读静态文件
+- `POST /api/session` 返回 `{ ok, role, label }`；`DELETE /api/session` 退出登录
+
 ## API 速查
 
 ```
