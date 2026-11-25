@@ -7,7 +7,7 @@ import { createLogger } from "./logger.js";
 import { SqliteSongPort } from "./drivers/sqlitePorts.js";
 import { createApp } from "./app.js";
 import { AmtService } from "./services/amt.js";
-import { sweepTranscribeTempDirs } from "./services/transcribeJobs.js";
+import { TranscribeJobStore } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
 
@@ -48,10 +48,7 @@ if (generated) {
     log.info(`bootstrap 管理员令牌已就绪 (${token.slice(0, 8)}…)`);
 }
 
-const songPort = new SqliteSongPort(db, config.midisDir);
-if (songPort.legacyImported > 0) {
-    log.info(`已把 ${songPort.legacyImported} 个旧版曲目文件导入 SQLite（原文件已删除）`);
-}
+const songPort = new SqliteSongPort(db);
 const pluginService = new PluginService(songPort, config);
 const deploymentService = new DeploymentService(songPort, pluginService, config);
 const amt = new AmtService(config);
@@ -62,7 +59,9 @@ if (amtStatus.available) {
     log.warn(`AMT 转录未启用: ${amtStatus.message}`);
 }
 
-const app = createApp({ db, songPort, config, amt, pluginService, deploymentService, logger: log });
+const transcribeJobs = new TranscribeJobStore({ songPort, config, amt });
+
+const app = createApp({ db, songPort, config, amt, pluginService, deploymentService, logger: log, transcribeJobs });
 
 const server = Bun.serve({
     port: config.port,
@@ -86,7 +85,7 @@ if (log.file) {
 }
 
 let shuttingDown = false;
-function shutdown(signal: string): void {
+async function shutdown(signal: string): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info(`收到 ${signal}，正在关闭…`);
@@ -95,10 +94,18 @@ function shutdown(signal: string): void {
     } catch {
         // 关闭监听失败不影响进程退出
     }
+    // 兜底：即使子进程/网络请求卡住，也要在限定时间内退出
+    const forceExit = setTimeout(() => {
+        log.warn("转录任务未在 10 秒内结束，强制退出");
+        process.exit(1);
+    }, 10_000);
     try {
-        sweepTranscribeTempDirs(0);
-    } catch {
-        // 临时目录清理失败不影响退出
+        // 终止 AMT 子进程，等待任务真正停止后再清理本实例的任务目录。
+        await transcribeJobs.dispose();
+    } catch (error) {
+        log.warn("转录任务清理失败", error);
+    } finally {
+        clearTimeout(forceExit);
     }
     try {
         db.close();
@@ -107,5 +114,5 @@ function shutdown(signal: string): void {
     }
     process.exit(0);
 }
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));

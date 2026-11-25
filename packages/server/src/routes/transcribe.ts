@@ -5,6 +5,7 @@ import type { AppDeps } from "../app.js";
 import { getToken, requireRole, type AppVariables } from "../auth.js";
 import {
     TranscribeJobStore,
+    TranscribeQueueFullError,
     formatDuration,
     type TranscribeJobSnapshot,
 } from "../services/transcribeJobs.js";
@@ -70,15 +71,17 @@ function audioMime(ext: string, contentType: string | undefined): string {
     return AUDIO_MIME[ext] ?? "application/octet-stream";
 }
 
-export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
-    const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("user", deps.config.allowPublicRead);
-    const jobRole = () => requireRole("user");
-    const jobs = new TranscribeJobStore({
+export function transcribeRoutes(
+    deps: AppDeps,
+    jobs = new TranscribeJobStore({
         songPort: deps.songPort,
         config: deps.config,
         amt: deps.amt,
-    });
+    })
+): Hono<{ Variables: AppVariables }> {
+    const app = new Hono<{ Variables: AppVariables }>();
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
+    const jobRole = () => requireRole("user");
 
     // 任务产物不跟随 ALLOW_PUBLIC_READ：必须带令牌，且只能看自己发起的（admin 除外）。
     const jobOr404 = (c: Context<{ Variables: AppVariables }>, id: string) =>
@@ -155,15 +158,23 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             );
         }
 
-        const job = jobs.startUpload({
-            buffer: new Uint8Array(buffer),
-            ext,
-            mime: audioMime(ext, contentType),
-            name: cleanName(rawName, "上传转录"),
-            durationSec,
-            fileName: rawName || undefined,
-            ownerId: getToken(c)?.id,
-        });
+        const job = (() => {
+            try {
+                return jobs.startUpload({
+                    buffer: new Uint8Array(buffer),
+                    ext,
+                    mime: audioMime(ext, contentType),
+                    name: cleanName(rawName, "上传转录"),
+                    durationSec,
+                    fileName: rawName || undefined,
+                    ownerId: getToken(c)?.id,
+                });
+            } catch (error) {
+                if (error instanceof TranscribeQueueFullError) return undefined;
+                throw error;
+            }
+        })();
+        if (!job) return c.json({ error: "转录队列已满，请稍后再试" }, 429);
         return c.json(job, 201);
     });
 
@@ -203,13 +214,21 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             );
         }
 
-        const job = jobs.startBilibili({
-            url: input,
-            page,
-            name,
-            ownerId: getToken(c)?.id,
-            video,
-        });
+        const job = (() => {
+            try {
+                return jobs.startBilibili({
+                    url: input,
+                    page,
+                    name,
+                    ownerId: getToken(c)?.id,
+                    video,
+                });
+            } catch (error) {
+                if (error instanceof TranscribeQueueFullError) return undefined;
+                throw error;
+            }
+        })();
+        if (!job) return c.json({ error: "转录队列已满，请稍后再试" }, 429);
         return c.json(job, 201);
     });
 

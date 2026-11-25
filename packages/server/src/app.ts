@@ -13,6 +13,7 @@ import { librariesRoutes } from "./routes/libraries.js";
 import { pluginsRoutes } from "./routes/plugins.js";
 import { addonRoutes } from "./routes/addon.js";
 import type { AmtService } from "./services/amt.js";
+import { TranscribeJobStore } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
 
@@ -22,6 +23,8 @@ export interface AppDeps {
     config: ServerConfig;
     /** AMT 转录服务；未配置时相关接口返回 503 */
     amt?: AmtService;
+    /** 转录任务管理器；不传时由 createApp 创建（调用方需要生命周期控制时应显式传入） */
+    transcribeJobs?: TranscribeJobStore;
     pluginService?: PluginService;
     deploymentService?: DeploymentService;
     /** 文件/控制台日志；测试未传时静默 */
@@ -47,6 +50,9 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
     const pluginService = deps.pluginService ?? new PluginService(deps.songPort, deps.config);
     const deploymentService = deps.deploymentService ?? new DeploymentService(deps.songPort, pluginService, deps.config);
+    const transcribeJobs =
+        deps.transcribeJobs ??
+        new TranscribeJobStore({ songPort: deps.songPort, config: deps.config, amt: deps.amt });
     const readRole = () => requireRole("user", deps.config.allowPublicRead);
 
     // 解析令牌（仅挂上下文，不拦截；角色门槛由具体路由决定）
@@ -61,7 +67,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     api.route("/plugins", pluginsRoutes(deps, pluginService, deploymentService));
     api.route("/addon", addonRoutes(deps, deploymentService));
     api.route("/tokens", tokensRoutes(deps));
-    api.route("/transcribe", transcribeRoutes(deps));
+    api.route("/transcribe", transcribeRoutes(deps, transcribeJobs));
 
     api.get("/performances/:perfId", readRole(), (c) => {
         const perf = deps.songPort.getPerformance(c.req.param("perfId") ?? "");

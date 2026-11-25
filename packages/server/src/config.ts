@@ -2,8 +2,6 @@ export interface ServerConfig {
     port: number;
     /** sqlite 文件路径（":memory:" 用于测试） */
     dbPath: string;
-    /** 曲目内容目录；旧版文件在这里，启动时会导入 SQLite 并清空 */
-    midisDir: string;
     /** 插件存储目录（存 {id}.pbeplugin 归档） */
     pluginsDir: string;
     /** 内置插件目录（可选，默认尝试 ../../build/plugins） */
@@ -42,6 +40,8 @@ export interface ServerConfig {
     amtMaxQueue: number;
     /** 单个音频/视频最大时长（秒，默认 600）；超过直接拒绝，避免长时间下载和转录 */
     amtMaxAudioSeconds: number;
+    /** B 站音频下载字节上限（默认 200 MB），防止异常大文件占满内存/临时盘 */
+    amtMaxDownloadBytes: number;
     /** 单次转录超时（默认 10 分钟） */
     amtTimeoutMs: number;
     /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
@@ -60,7 +60,6 @@ export function loadConfig(
     return {
         port: Number(env.PORT ?? 3000),
         dbPath: env.DB_PATH ?? "./data/piano.db",
-        midisDir: env.MIDIS_DIR ?? "./data/midis",
         pluginsDir: env.PLUGINS_DIR ?? "./data/plugins",
         builtinPluginsDir: env.BUILTIN_PLUGINS_DIR || undefined,
         timbresDir: env.TIMBRES_DIR || undefined,
@@ -80,6 +79,10 @@ export function loadConfig(
         amtConcurrency: Math.max(1, Number(env.AMT_CONCURRENCY ?? 1) || 1),
         amtMaxQueue: Math.max(1, Number(env.AMT_MAX_QUEUE ?? 10) || 10),
         amtMaxAudioSeconds: Math.max(30, Number(env.AMT_MAX_AUDIO_SECONDS ?? 600) || 600),
+        amtMaxDownloadBytes: Math.max(
+            1024 * 1024,
+            Number(env.AMT_MAX_DOWNLOAD_BYTES ?? 200 * 1024 * 1024) || 200 * 1024 * 1024
+        ),
         amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
         biliSessdata: env.BILI_SESSDATA || undefined,
         logFile:

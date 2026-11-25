@@ -46,7 +46,6 @@ export interface AmtProgress {
 }
 
 export class AmtUnavailableError extends Error {}
-export class AmtBusyError extends Error {}
 export class AmtTimeoutError extends Error {}
 export class AmtAbortedError extends Error {}
 
@@ -163,38 +162,9 @@ function resolveRuntime(config: ServerConfig): AmtResolution {
     return { runtime: { cli, model } };
 }
 
-/** 串行队列：AMT 推理很吃内存，默认同一时间只跑一个任务 */
-class TaskQueue {
-    private active = 0;
-    private readonly waiting: Array<() => void> = [];
-
-    constructor(
-        private readonly maxActive = 1,
-        private readonly maxWaiting = 8
-    ) {}
-
-    async run<T>(task: () => Promise<T>): Promise<T> {
-        if (this.active >= this.maxActive) {
-            if (this.waiting.length >= this.maxWaiting) {
-                throw new AmtBusyError("转录队列已满，请稍后再试");
-            }
-            await new Promise<void>((resolveWait) => this.waiting.push(resolveWait));
-        }
-        this.active++;
-        try {
-            return await task();
-        } finally {
-            this.active--;
-            const next = this.waiting.shift();
-            if (next) next();
-        }
-    }
-}
-
 export class AmtService {
     private readonly runtime: AmtRuntime | undefined;
     private readonly resolutionMessage: string | undefined;
-    private readonly queue = new TaskQueue();
 
     constructor(private readonly config: ServerConfig) {
         const { runtime, message } = resolveRuntime(config);
@@ -231,9 +201,9 @@ export class AmtService {
         if (!runtime) throw new AmtUnavailableError(this.status().message ?? "AMT 不可用");
         if (options.signal?.aborted) throw new AmtAbortedError("任务已取消");
 
-        return this.queue.run(async () => {
+        const task = (async () => {
             if (options.signal?.aborted) throw new AmtAbortedError("任务已取消");
-            const tmp = mkdtempSync(join(tmpdir(), "pianobe-amt-"));
+            const tmp = mkdtempSync(join(tmpdir(), `pianobe-amt-${process.pid}-`));
             const outPath = join(tmp, "out.mid");
             const args = [
                 runtime.cli,
@@ -346,7 +316,8 @@ export class AmtService {
                 clearTimeout(timer);
                 rmSync(tmp, { recursive: true, force: true });
             }
-        });
+        })();
+        return task;
     }
 }
 

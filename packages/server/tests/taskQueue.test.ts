@@ -123,3 +123,32 @@ test("取消执行中的任务会触发 AbortSignal", async () => {
     expect(aborted).toBe(true);
     expect(queue.activeCount).toBe(0);
 });
+
+test("队列容量在入队处强制生效", async () => {
+    const queue = new TaskQueue(1, 1);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    expect(queue.add("running", () => gate)).toBe(true);
+    expect(queue.add("waiting", async () => {})).toBe(true);
+    expect(queue.isFull).toBe(true);
+    expect(queue.add("overflow", async () => {})).toBe(false);
+    expect(queue.pendingCount).toBe(1);
+    release();
+    await tick();
+    expect(queue.activeCount).toBe(0);
+});
+
+test("whenIdle 等待执行中的任务真正结束", async () => {
+    const queue = new TaskQueue(1);
+    let finished = false;
+    queue.add("running", async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 30));
+        finished = true;
+    });
+    await tick(5);
+    expect(await queue.whenIdle(1000)).toBe(true);
+    expect(finished).toBe(true);
+});
+
