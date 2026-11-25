@@ -84,7 +84,9 @@ function attachLiveMusic(piano: PianoRuntime, music: VfxMusic, session: VfxSessi
                 music.note({
                     midi: note.midi,
                     duration: note.soundDuration ?? note.duration,
-                    tick: note.tick,
+                    // 曲目播放按歌曲时间轴记 tick，与 VfxEngine 的 gameTick 对齐；
+                    // 现场弹奏没有歌曲时间，沿用游戏刻。
+                    tick: note.songTime !== undefined ? Math.max(0, Math.round(note.songTime * 20)) : note.tick,
                     velocity: note.velocity,
                     source: note.source,
                     hasVelocity: note.hasVelocity,
@@ -322,17 +324,21 @@ function updateTick() {
                     if (session.input !== "live" && session.input !== "solo") {
                         for (const note of simulatedVfxNotes(tick, elapsed, session.input)) session.music.note(note);
                     }
-                    if (elapsed % 4 === 0) {
-                        session.features = session.input === "solo" ? quietFeatures : session.music.sample(tick);
-                    }
                     const timeSeconds = session.midi ? session.midi.position : elapsed / 20;
+                    // VFX 引擎的 gameTick 必须与 timeSeconds 同属歌曲时间轴：引擎 seek 后
+                    // 通道冷却以歌曲 tick 记录。传入会话经过的 tick 会在中途跳转后错位，
+                    // 持续通道会静默到实际播放时长追上歌曲进度。
+                    const vfxTick = session.midi ? Math.floor(timeSeconds * 20 + 1e-6) : elapsed;
+                    if (elapsed % 4 === 0) {
+                        session.features = session.input === "solo" ? quietFeatures : session.music.sample(vfxTick);
+                    }
                     const solo = session.input === "solo";
                     const prop = session.engine.stageProp(timeSeconds, session.features, solo);
                     const nativeStageProp = session.prop.render(prop, tick) ? prop?.channelKey : undefined;
                     const before = session.budget.dropped;
                     const batches = session.engine.update(
                         timeSeconds,
-                        elapsed,
+                        vfxTick,
                         session.features,
                         session.music.recent(),
                         { emitFlashes: true, solo, nativeStageProp },
