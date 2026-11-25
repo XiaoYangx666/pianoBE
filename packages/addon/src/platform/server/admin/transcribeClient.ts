@@ -27,6 +27,11 @@ export interface TranscribeJob {
     noteCount: number;
     durationSec?: number;
     midiDuration?: number;
+    /** 转录结果 .mid 字节数 */
+    dataSize?: number;
+    /** 服务端任务创建/更新时间（用于计算结果 TTL） */
+    createdAt?: number;
+    updatedAt?: number;
     error?: string;
 }
 
@@ -48,7 +53,11 @@ export interface OnlineTranscribeOptions {
     extraHeaders?: () => Record<string, unknown>;
 }
 
-export class OnlineTranscribeError extends Error {}
+export class OnlineTranscribeError extends Error {
+    constructor(message: string, readonly status?: number) {
+        super(message);
+    }
+}
 
 export class OnlineTranscribeClient {
     constructor(private readonly opts: OnlineTranscribeOptions) {}
@@ -81,7 +90,7 @@ export class OnlineTranscribeClient {
                 payload && typeof payload === "object" && typeof (payload as { error?: unknown }).error === "string"
                     ? (payload as { error: string }).error
                     : `请求失败 (${res.status})`;
-            throw new OnlineTranscribeError(message);
+            throw new OnlineTranscribeError(message, res.status);
         }
         return payload;
     }

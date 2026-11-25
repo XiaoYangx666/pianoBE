@@ -134,6 +134,33 @@ describe("addon architecture boundaries", () => {
         expect(reachable(runtime).has(world)).toBe(false);
     });
 
+    test("generic UI never depends on server-only online transcription", () => {
+        const serverRoot = normalize(path.join(sourceRoot, "app", "server"));
+        const transcribeClient = normalize(path.join(sourceRoot, "platform", "server", "admin", "transcribeClient.ts"));
+        const genericUi = sourceFiles.filter(file => file.includes("/app/ui/"));
+        const offenders = genericUi.filter(file =>
+            [...reachable(file)].some(target =>
+                target.startsWith(serverRoot + "/") || target === transcribeClient
+            )
+        );
+        expect(offenders.map(file => path.relative(packageRoot, file))).toEqual([]);
+    });
+
+    test("server feature composition owns the transcription manager and UI", () => {
+        const features = modules.get(normalize(path.join(sourceRoot, "app", "server", "features.ts")));
+        expect(features?.imports.has(normalize(path.join(sourceRoot, "app", "server", "transcription", "manager.ts"))))
+            .toBe(true);
+        expect(features?.imports.has(normalize(path.join(sourceRoot, "app", "server", "transcription", "ui.ts"))))
+            .toBe(true);
+    });
+
+    test("MIDI player exposes a generic optional-action registry, not transcription code", () => {
+        const playerUI = normalize(path.join(sourceRoot, "app", "ui", "midi", "playerUI.ts"));
+        const menuActions = normalize(path.join(sourceRoot, "app", "ui", "midi", "menuActions.ts"));
+        expect(modules.get(playerUI)?.imports.has(menuActions)).toBe(true);
+        expect([...reachable(playerUI)].some(target => target.includes("/app/server/"))).toBe(false);
+    });
+
     test("internal module graph has no cycles", () => {
         const visiting = new Set<string>();
         const visited = new Set<string>();

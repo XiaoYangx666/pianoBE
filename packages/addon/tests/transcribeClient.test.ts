@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { encodeBase64Url, encodePbe3, readPbe3Header } from "@piano/core";
 import type { NetFetch } from "../src/platform/server/admin/netSource";
-import { OnlineTranscribeClient } from "../src/platform/server/admin/transcribeClient";
+import { OnlineTranscribeClient, OnlineTranscribeError } from "../src/platform/server/admin/transcribeClient";
 
 const SONG_META = { id: "abc12345", name: "转录曲目", duration: 400 };
 const PBE3 = encodePbe3({
@@ -104,5 +104,15 @@ describe("OnlineTranscribeClient", () => {
             }),
         });
         await expect(client.getSong("job-1")).rejects.toThrow("缺少曲目数据");
+    });
+
+    test("错误保留 HTTP 状态，供上层区分任务过期(404)", async () => {
+        const client = new OnlineTranscribeClient({
+            baseUrl: BASE,
+            fetch: makeFetch({}),
+        });
+        const error = await client.getJob("missing").catch((reason) => reason);
+        expect(error).toBeInstanceOf(OnlineTranscribeError);
+        expect((error as OnlineTranscribeError).status).toBe(404);
     });
 });

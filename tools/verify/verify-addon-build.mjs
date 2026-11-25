@@ -150,6 +150,13 @@ if (fs.existsSync(builtManager)) {
             .filter((file) => file.endsWith(".js"))
             .filter((file) => /@minecraft\/server-(?:net|admin)/.test(read(file)));
         check(leaked.length === 0, "client output has no @minecraft/server-net/admin imports");
+
+        check(!fs.existsSync(path.join(scripts, "server")),
+            "client output has no server feature modules");
+        const transcribeLeaks = walk(scripts)
+            .filter((file) => file.endsWith(".js"))
+            .filter((file) => /TranscriptionManager|online-transcribe|在线转录/.test(read(file)));
+        check(transcribeLeaks.length === 0, "client output has no online transcription code");
     } else {
         check(fs.existsSync(path.join(scripts, "serverAdmin.js")), "server output includes serverAdmin.js");
         check(fs.existsSync(path.join(scripts, "packages/addon/src/platform/server")),
@@ -157,6 +164,15 @@ if (fs.existsSync(builtManager)) {
         const serverAdmin = path.join(scripts, "serverAdmin.js");
         if (fs.existsSync(serverAdmin)) {
             check(/@minecraft\/server-admin/.test(read(serverAdmin)), "serverAdmin imports server-admin");
+        }
+
+        const features = path.join(scripts, "server/features.js");
+        check(fs.existsSync(path.join(scripts, "server/transcription/manager.js")),
+            "server output includes the transcription manager");
+        check(fs.existsSync(features), "server output includes the feature bootstrap");
+        if (fs.existsSync(features)) {
+            check(read(features).includes("online-transcribe"),
+                "server registers the online transcription menu entry");
         }
     }
 }
