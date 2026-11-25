@@ -144,7 +144,8 @@ async function main() {
     const phase3 = [
         () => runStep("Test @piano/assembly", "bun", ["test"], assemblyDir),
         () => runStep("Test @piano/server", "bun", ["test"], serverDir),
-        () => runStep("Test @piano/addon", "bun", ["test"], addonDir),
+        // --isolate：各测试文件独立全局，避免 mock.module 污染后续文件
+        () => runStep("Test @piano/addon", "bun", ["test", "--isolate"], addonDir),
     ];
 
     if (!fastMode) {
