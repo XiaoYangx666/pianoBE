@@ -152,7 +152,10 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs/bilibili —— { input, page?, name? }
-    app.post("/jobs/bilibili", requireRole("write"), async (c) => {
+    // BDS 游戏内导入只需要建临时任务：开启 AMT_ALLOW_READ_JOBS 后 read 令牌即可；
+    // 上传音频仍要求 write，避免只读令牌占用临时空间。
+    const bilibiliRole = requireRole(deps.config.amtAllowReadJobs ? "read" : "write");
+    app.post("/jobs/bilibili", bilibiliRole, async (c) => {
         if (!deps.amt?.status().available) {
             return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
         }
@@ -266,6 +269,13 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         const code = jobs.code(c.req.param("id") ?? "");
         if (!code) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
         return c.json(code);
+    });
+
+    // GET /api/transcribe/jobs/:id/song —— 转录结果的 PBE3（BDS 直接写入存储卡）
+    app.get("/jobs/:id/song", readRole(), (c) => {
+        const song = jobs.song(c.req.param("id") ?? "");
+        if (!song) return c.json({ error: "任务不存在、尚未转录完成或已过期" }, 404);
+        return c.json(song);
     });
 
     // GET /api/transcribe/jobs/:id/audio —— 原始音频（支持 Range，用于试听）

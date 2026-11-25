@@ -86,6 +86,17 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
         ui.push(CardOrderPage, { piano });
     }, { visible: hasSongs });
 
+    // 仅服务器专用包可用：BDS 经 server-net 让后端起转录任务，取回 PBE3 后
+    // 直接走现有存储卡保存路径。客户端构建的这里会被 compile.define 裁掉。
+    if (__PIANO_TARGET__ === "server") {
+        ui.button("从 B 站转录导入", () => {
+            if (!piano.isAlive()) return;
+            void import("./transcribeImportUI.js")
+                .then((module) => ui.push(module.TranscribeImportPage, { piano }))
+                .catch((error) => status.setData(`§c打开转录导入失败：${(error as Error)?.message ?? error}`));
+        });
+    }
+
     ui.button("保存名称", () => {
         const access = piano.cardAccess;
         if (!access) return status.setData("§c卡槽为空");

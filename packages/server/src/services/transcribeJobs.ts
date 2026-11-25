@@ -1,7 +1,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { encodeSong, planImportChunks, type MidiSongMeta } from "@piano/core";
+import {
+    encodeBase64Url,
+    encodeSong,
+    planImportChunks,
+    readPbe3Header,
+    type MidiSongMeta,
+} from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 import type { SqliteSongPort } from "../drivers/sqlitePorts.js";
 import type { ServerConfig } from "../config.js";
@@ -299,6 +305,36 @@ export class TranscribeJobStore {
         const cache = { name: job.name, chunks: planImportChunks(pbe3), bytes: pbe3.byteLength };
         job.codeCache = cache;
         return cache;
+    }
+
+    /**
+     * 转录结果转成游戏可直接播放/导入的 PBE3（与 /api/songs/:id 同形）。
+     * BDS 用它在游戏内把结果写入存储卡，不经过曲目库。
+     */
+    song(id: string):
+        | {
+              id: string;
+              name: string;
+              duration: number;
+              noteCount: number;
+              bytes: number;
+              expiresAt: number;
+              data: string;
+          }
+        | undefined {
+        const job = this.jobs.get(id);
+        if (!job?.midi) return undefined;
+        const pbe3 = encodeSong(midiBufferToSong(job.midi, job.name));
+        const header = readPbe3Header(pbe3);
+        return {
+            id: header.id,
+            name: header.name,
+            duration: header.duration,
+            noteCount: header.noteCount,
+            bytes: pbe3.byteLength,
+            expiresAt: job.createdAt + JOB_TTL_MS,
+            data: encodeBase64Url(pbe3),
+        };
     }
 
     remove(id: string): boolean {

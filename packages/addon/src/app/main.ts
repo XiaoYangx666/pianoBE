@@ -68,6 +68,11 @@ system.run(() => {
 // 玩家离开时清空 MIDI 导入进度；其它表单实例会随各自 show() 结束自动释放。
 world.afterEvents.playerLeave.subscribe((e) => {
     invalidateMidiImport(e.playerId);
+    if (__PIANO_TARGET__ === "server") {
+        void import("./ui/midi/transcribeImportUI.js")
+            .then((module) => module.invalidateTranscribeImport(e.playerId))
+            .catch(() => {});
+    }
 });
 
 // 启动标记：确认行为包脚本已加载及其构建目标（模板包=client / 服务器专用包=server）

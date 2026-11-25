@@ -40,6 +40,8 @@ export interface ServerConfig {
     amtConcurrency: number;
     /** 最多允许排队的转录任务数（默认 10，防止大量上传占满临时空间） */
     amtMaxQueue: number;
+    /** 为 true 时 read 令牌也能创建 B 站转录任务（游戏内直接导入存储卡用） */
+    amtAllowReadJobs: boolean;
     /** 单次转录超时（默认 10 分钟） */
     amtTimeoutMs: number;
     /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
@@ -77,6 +79,7 @@ export function loadConfig(
         amtEco: env.AMT_ECO === "true",
         amtConcurrency: Math.max(1, Number(env.AMT_CONCURRENCY ?? 1) || 1),
         amtMaxQueue: Math.max(1, Number(env.AMT_MAX_QUEUE ?? 10) || 10),
+        amtAllowReadJobs: env.AMT_ALLOW_READ_JOBS === "true",
         amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
         biliSessdata: env.BILI_SESSDATA || undefined,
         logFile:

@@ -64,6 +64,7 @@ docker compose -f docker-compose.dev.yml up
 | `AMT_THREADS` | `4` | 转录线程数 |
 | `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
 | `AMT_MAX_QUEUE` | `10` | 最多排队的转录任务数，超过返回 429 |
+| `AMT_ALLOW_READ_JOBS` | `false` | `true` 时 `read` 令牌也能创建 B 站转录任务（BDS 游戏内导入存储卡）；上传音频仍要求 `write` |
 | `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
 | `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
 | `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |
@@ -96,6 +97,7 @@ GET    /api/transcribe/jobs/:id/events  SSE 进度（percent 为 -1 时无法估
 GET    /api/transcribe/jobs/:id/audio  原始音频试听（支持 Range）
 GET    /api/transcribe/jobs/:id/midi   转录结果 .mid（试听）
 GET    /api/transcribe/jobs/:id/code   游戏内导入码
+GET    /api/transcribe/jobs/:id/song   转录结果的 PBE3（BDS 直接写入存储卡）
 PATCH  /api/transcribe/jobs/:id       { name } 改任务名
 POST   /api/transcribe/jobs/:id/save  显式保存到曲目库
 DELETE /api/transcribe/jobs/:id       放弃任务并清理临时文件
