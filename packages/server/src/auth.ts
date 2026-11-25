@@ -67,6 +67,12 @@ export function listTokens(db: Database) {
     return rows.map((row) => ({ ...row, role: normalizeRole(row.role) }));
 }
 
+/** 把旧库的 read/write 一次性迁移为 user；返回迁移数量。 */
+export function migrateLegacyRoles(db: Database): number {
+    const result = db.prepare(`UPDATE tokens SET role='user' WHERE role IN ('read','write')`).run();
+    return result.changes;
+}
+
 export function revokeToken(db: Database, id: number): boolean {
     const r = db.prepare(`UPDATE tokens SET revoked=1 WHERE id=? AND revoked=0`).run(id);
     return r.changes > 0;

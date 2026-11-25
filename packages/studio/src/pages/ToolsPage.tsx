@@ -151,8 +151,20 @@ export function ToolsPage() {
                         .then(setServerAmtStatus)
                         .catch(() => {});
                 }
-            } catch {
+            } catch (err) {
                 window.clearInterval(timer);
+                if (cancelled) return;
+                const message = err instanceof Error ? err.message : String(err);
+                setServerJobState({
+                    stage: "error",
+                    progress: -1,
+                    error: `状态查询失败：${message}`,
+                });
+                notify({
+                    title: "任务状态查询失败",
+                    message: `${message}，请关闭任务后重试`,
+                    color: "red",
+                });
             }
         }, 1200);
         return () => {
@@ -256,9 +268,10 @@ export function ToolsPage() {
 
     const handleCancelServerJob = async () => {
         const id = serverJobId;
+        const removeRemote = serverJobState?.stage !== "done";
         setServerJobId(null);
         setServerJobState(null);
-        if (!id) return;
+        if (!id || !removeRemote) return;
         try {
             await serverApi.cancelTranscribeJob(id);
         } catch {
@@ -692,9 +705,17 @@ export function ToolsPage() {
                                                 type="button"
                                                 size="sm"
                                                 onClick={() =>
-                                                    void serverApi.saveTranscribeJob(serverJobId).then(() =>
-                                                        useStudio.getState().refresh(),
-                                                    )
+                                                    void serverApi
+                                                        .saveTranscribeJob(serverJobId)
+                                                        .then(() => useStudio.getState().refresh())
+                                                        .catch((err) =>
+                                                            notify({
+                                                                title: "保存到曲库失败",
+                                                                message:
+                                                                    err instanceof Error ? err.message : String(err),
+                                                                color: "red",
+                                                            }),
+                                                        )
                                                 }
                                             >
                                                 <Save size={13} /> 入库

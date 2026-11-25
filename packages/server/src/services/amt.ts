@@ -48,6 +48,7 @@ export interface AmtProgress {
 export class AmtUnavailableError extends Error {}
 export class AmtBusyError extends Error {}
 export class AmtTimeoutError extends Error {}
+export class AmtAbortedError extends Error {}
 
 interface AmtRuntime {
     cli: string;
@@ -224,12 +225,14 @@ export class AmtService {
      */
     async transcribe(
         audioPath: string,
-        options: { onProgress?: (progress: AmtProgress) => void } = {}
+        options: { onProgress?: (progress: AmtProgress) => void; signal?: AbortSignal } = {}
     ): Promise<AmtResult> {
         const runtime = this.runtime;
         if (!runtime) throw new AmtUnavailableError(this.status().message ?? "AMT 不可用");
+        if (options.signal?.aborted) throw new AmtAbortedError("任务已取消");
 
         return this.queue.run(async () => {
+            if (options.signal?.aborted) throw new AmtAbortedError("任务已取消");
             const tmp = mkdtempSync(join(tmpdir(), "pianobe-amt-"));
             const outPath = join(tmp, "out.mid");
             const args = [
@@ -254,11 +257,21 @@ export class AmtService {
 
             const started = performance.now();
             let timedOut = false;
+            let aborted = false;
             const proc = Bun.spawn(args, {
                 stdout: "pipe",
                 stderr: "pipe",
                 env: { ...process.env },
             });
+            const onAbort = () => {
+                aborted = true;
+                try {
+                    proc.kill();
+                } catch {
+                    // 进程可能已经结束
+                }
+            };
+            options.signal?.addEventListener("abort", onAbort, { once: true });
             const timer = setTimeout(() => {
                 timedOut = true;
                 try {
@@ -317,6 +330,7 @@ export class AmtService {
                 await eventsTask;
                 if (options.onProgress) options.onProgress({ audioTime, noteCount });
                 const log = stderr.trim();
+                if (aborted) throw new AmtAbortedError("任务已取消");
                 if (timedOut) throw new AmtTimeoutError("转录超时，请缩短音频或调大 AMT_TIMEOUT_MS");
                 if (code !== 0 || !existsSync(outPath)) {
                     throw new Error(`amt-cli 退出码 ${code}${log ? `：${tail(log)}` : ""}`);
@@ -328,6 +342,7 @@ export class AmtService {
                     noteCount,
                 };
             } finally {
+                options.signal?.removeEventListener("abort", onAbort);
                 clearTimeout(timer);
                 rmSync(tmp, { recursive: true, force: true });
             }

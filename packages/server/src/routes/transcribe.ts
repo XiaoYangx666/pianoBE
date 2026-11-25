@@ -1,8 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { extname } from "node:path";
 import type { AppDeps } from "../app.js";
-import { requireRole, type AppVariables } from "../auth.js";
+import { getToken, requireRole, type AppVariables } from "../auth.js";
 import {
     TranscribeJobStore,
     type TranscribeJobSnapshot,
@@ -49,7 +49,7 @@ function decodeHeader(raw: string | undefined): string {
 function cleanName(raw: string | undefined, fallback = "未命名转录"): string {
     let value = decodeHeader(raw);
     value = value.replace(/\.(mp3|m4a|mp4|m4s|aac|wav|flac|ogg|opus|wma|mid|midi)$/i, "");
-    value = value.replace(/[\\/:*?"<>|\r\n\t]/g, "_").trim().slice(0, 100);
+    value = value.replace(/[\\/:*?"<>|\r\n\t§]/g, "_").trim().slice(0, 100);
     return value || fallback;
 }
 
@@ -72,13 +72,16 @@ function audioMime(ext: string, contentType: string | undefined): string {
 export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
     const readRole = () => requireRole("user", deps.config.allowPublicRead);
+    const jobRole = () => requireRole("user");
     const jobs = new TranscribeJobStore({
         songPort: deps.songPort,
         config: deps.config,
         amt: deps.amt,
     });
 
-    const jobOr404 = (id: string) => jobs.get(id);
+    // 任务产物不跟随 ALLOW_PUBLIC_READ：必须带令牌，且只能看自己发起的（admin 除外）。
+    const jobOr404 = (c: Context<{ Variables: AppVariables }>, id: string) =>
+        jobs.visible(id, getToken(c)) ? jobs.get(id) : undefined;
 
     // GET /api/transcribe/status —— 前端据此提示 AMT 是否部署完成
     app.get("/status", readRole(), (c) => {
@@ -114,7 +117,8 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs —— 上传音频，返回任务（不写入曲目库）
-    app.post("/jobs", requireRole("user"), async (c) => {
+    // 上传最多 100 MB，保持管理员限定，避免普通令牌占内存/临时盘。
+    app.post("/jobs", requireRole("admin"), async (c) => {
         if (!deps.amt?.status().available) {
             return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
         }
@@ -147,6 +151,7 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             name: cleanName(rawName, "上传转录"),
             durationSec,
             fileName: rawName || undefined,
+            ownerId: getToken(c)?.id,
         });
         return c.json(job, 201);
     });
@@ -168,21 +173,21 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         const page = Math.max(1, Number(body?.page ?? 1) || 1);
         const name = typeof body?.name === "string" ? cleanName(body.name) : undefined;
 
-        const job = jobs.startBilibili({ url: input, page, name });
+        const job = jobs.startBilibili({ url: input, page, name, ownerId: getToken(c)?.id });
         return c.json(job, 201);
     });
 
     // GET /api/transcribe/jobs/:id —— 任务状态（轮询/刷新后恢复）
-    app.get("/jobs/:id", readRole(), (c) => {
-        const job = jobOr404(c.req.param("id") ?? "");
+    app.get("/jobs/:id", jobRole(), (c) => {
+        const job = jobOr404(c, c.req.param("id") ?? "");
         if (!job) return c.json({ error: "任务不存在或已过期" }, 404);
         return c.json(job);
     });
 
     // GET /api/transcribe/jobs/:id/events —— SSE 进度
-    app.get("/jobs/:id/events", readRole(), async (c) => {
+    app.get("/jobs/:id/events", jobRole(), async (c) => {
         const id = c.req.param("id") ?? "";
-        const initial = jobOr404(id);
+        const initial = jobOr404(c, id);
         if (!initial) return c.json({ error: "任务不存在或已过期" }, 404);
 
         c.header("Cache-Control", "no-cache");
@@ -241,10 +246,11 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // PATCH /api/transcribe/jobs/:id —— { name } 改任务名
-    app.patch("/jobs/:id", requireRole("user"), async (c) => {
+    app.patch("/jobs/:id", jobRole(), async (c) => {
         const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或已过期" }, 404);
         const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
-        const name = typeof body?.name === "string" ? body.name.trim() : "";
+        const name = typeof body?.name === "string" ? cleanName(body.name, "") : "";
         if (!name) return c.json({ error: "曲名不能为空" }, 400);
         const job = jobs.rename(id, name);
         if (!job) return c.json({ error: "任务不存在或已过期" }, 404);
@@ -263,22 +269,30 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // GET /api/transcribe/jobs/:id/code —— 游戏内导入码
-    app.get("/jobs/:id/code", readRole(), (c) => {
-        const code = jobs.code(c.req.param("id") ?? "");
+    app.get("/jobs/:id/code", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
+        const code = jobs.code(id);
         if (!code) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
         return c.json(code);
     });
 
     // GET /api/transcribe/jobs/:id/song —— 转录结果的 PBE3（BDS 直接写入存储卡）
-    app.get("/jobs/:id/song", readRole(), (c) => {
-        const song = jobs.song(c.req.param("id") ?? "");
+    app.get("/jobs/:id/song", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) {
+            return c.json({ error: "任务不存在、尚未转录完成或已过期" }, 404);
+        }
+        const song = jobs.song(id);
         if (!song) return c.json({ error: "任务不存在、尚未转录完成或已过期" }, 404);
         return c.json(song);
     });
 
     // GET /api/transcribe/jobs/:id/audio —— 原始音频（支持 Range，用于试听）
-    app.get("/jobs/:id/audio", readRole(), async (c) => {
-        const audio = jobs.audio(c.req.param("id") ?? "");
+    app.get("/jobs/:id/audio", jobRole(), async (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或音频未就绪" }, 404);
+        const audio = jobs.audio(id);
         if (!audio) return c.json({ error: "任务不存在或音频未就绪" }, 404);
 
         const file = Bun.file(audio.path);
@@ -309,15 +323,19 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // GET /api/transcribe/jobs/:id/midi —— 转录结果原始 MIDI（试听）
-    app.get("/jobs/:id/midi", readRole(), (c) => {
-        const midi = jobs.midi(c.req.param("id") ?? "");
+    app.get("/jobs/:id/midi", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
+        const midi = jobs.midi(id);
         if (!midi) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
         return c.body(midi, 200, { "content-type": "audio/midi", "cache-control": "no-store" });
     });
 
     // DELETE /api/transcribe/jobs/:id —— 放弃任务并清理临时文件
-    app.delete("/jobs/:id", requireRole("user"), (c) => {
-        const removed = jobs.remove(c.req.param("id") ?? "");
+    app.delete("/jobs/:id", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或已过期" }, 404);
+        const removed = jobs.remove(id);
         if (!removed) return c.json({ error: "任务不存在或已过期" }, 404);
         return c.body(null, 204);
     });

@@ -72,7 +72,7 @@ docker compose -f docker-compose.dev.yml up
 
 - 令牌即身份：`Authorization: Bearer <token>`，服务端存 SHA-256 哈希，明文只在创建时返回一次
 - 只有两种令牌：
-  - `user`（普通）：读取曲库、创建/查看/取消转录任务；**不能修改曲库**
+  - `user`（普通）：读取曲库、创建/查看/取消**自己的** B 站转录任务；**不能修改曲库**
   - `admin`（管理员）：曲库增删改、插件、部署、令牌管理
 - 旧库里的 `read` / `write` 读取时统一按 `user` 处理；需要曲库写权限请新建 `admin` 令牌
 - 曲目的 `owner` 记录为上传令牌身份
@@ -93,7 +93,7 @@ GET    /api/tokens                    令牌列表（admin）
 POST   /api/tokens                    { label, role } 创建，返回明文一次（admin）
 DELETE /api/tokens/:id                吊销（admin）
 GET    /api/transcribe/status         AMT 是否就绪（CLI/模型/解码器）
-POST   /api/transcribe/jobs           上传音频 → 创建转录任务（不写曲库；X-File-Name/X-Audio-Duration 头）
+POST   /api/transcribe/jobs           上传音频 → 创建转录任务（admin；不写曲库；X-File-Name/X-Audio-Duration 头）
 GET    /api/transcribe/jobs/:id       任务状态（stage/percent/noteCount/…）
 GET    /api/transcribe/jobs/:id/events  SSE 进度（percent 为 -1 时无法估算）
 GET    /api/transcribe/jobs/:id/audio  原始音频试听（支持 Range）
@@ -107,7 +107,8 @@ GET    /api/transcribe/bilibili/search?q=  按关键词搜索 B 站视频
 POST   /api/transcribe/jobs/bilibili  { input: BV/URL, page?, name? } → 后台下载并创建任务
 ```
 
-转录任务权限：普通令牌（`user`）可以创建、查看、改名、取消任务；只有
+转录任务权限：普通令牌（`user`）可以创建 B 站任务，并且只能查看/改名/取消
+自己发起的任务；任务产物接口不再跟随 `ALLOW_PUBLIC_READ` 公开。上传音频与
 `POST /api/transcribe/jobs/:id/save`（写入曲库）要求管理员令牌。
 
 ### 音频转 MIDI（AMT）

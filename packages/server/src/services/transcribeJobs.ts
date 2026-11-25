@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -10,8 +10,15 @@ import {
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
 import type { SqliteSongPort } from "../drivers/sqlitePorts.js";
+import type { TokenInfo } from "../auth.js";
 import type { ServerConfig } from "../config.js";
-import { AmtBusyError, AmtTimeoutError, AmtUnavailableError, type AmtService } from "./amt.js";
+import {
+    AmtAbortedError,
+    AmtBusyError,
+    AmtTimeoutError,
+    AmtUnavailableError,
+    type AmtService,
+} from "./amt.js";
 import { BiliError, downloadBiliAudio, resolveBiliVideo } from "./bilibili.js";
 
 /**
@@ -70,6 +77,8 @@ export interface TranscribeJobSnapshot {
 }
 
 interface TranscribeJob extends TranscribeJobSnapshot {
+    /** 发起任务的令牌 id；任务接口按 owner 或 admin 校验 */
+    ownerId?: number;
     dir: string;
     audioPath?: string;
     audioMime?: string;
@@ -88,6 +97,27 @@ export interface TranscribeJobDeps {
 
 const JOB_TTL_MS = 30 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const TEMP_PREFIXES = ["pianobe-job-", "pianobe-amt-"] as const;
+
+/** 清理进程崩溃/重启留下的临时目录；只删超过 maxAgeMs 的，避免误删并发实例。 */
+export function sweepTranscribeTempDirs(maxAgeMs: number): void {
+    const root = tmpdir();
+    const cutoff = Date.now() - maxAgeMs;
+    try {
+        for (const entry of readdirSync(root, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+            if (!TEMP_PREFIXES.some((prefix) => entry.name.startsWith(prefix))) continue;
+            const path = join(root, entry.name);
+            try {
+                if (statSync(path).mtimeMs < cutoff) rmSync(path, { recursive: true, force: true });
+            } catch {
+                // 目录已被删除/无权限时忽略
+            }
+        }
+    } catch {
+        // tmpdir 不可读时忽略
+    }
+}
 
 /** 上传：音频已在任务目录里，转录从 10% 起算 */
 const UPLOAD_BASE_PERCENT = 10;
@@ -109,15 +139,35 @@ function sanitizeName(raw: string): string {
  * 简单的 FIFO 并发队列。转录会拉起 amt-cli 子进程（默认 4 线程、数百 MB 内存），
  * 多个任务同时跑容易打满 CPU/内存，所以默认串行（AMT_CONCURRENCY=1）。
  */
+interface QueueTask {
+    id: string;
+    run: (signal: AbortSignal) => Promise<void>;
+}
+
 export class TaskQueue {
-    private readonly pending: Array<() => Promise<void>> = [];
-    private running = 0;
+    private readonly pending: QueueTask[] = [];
+    private readonly running = new Map<string, AbortController>();
 
     constructor(private readonly concurrency: number) {}
 
-    add(task: () => Promise<void>): void {
-        this.pending.push(task);
+    add(id: string, run: (signal: AbortSignal) => Promise<void>): void {
+        this.pending.push({ id, run });
         this.pump();
+    }
+
+    /** 取消排队或执行中的任务；返回是否找到。执行中的任务会收到 AbortSignal。 */
+    cancel(id: string): boolean {
+        const index = this.pending.findIndex((task) => task.id === id);
+        if (index >= 0) {
+            this.pending.splice(index, 1);
+            return true;
+        }
+        const running = this.running.get(id);
+        if (running) {
+            running.abort();
+            return true;
+        }
+        return false;
     }
 
     get pendingCount(): number {
@@ -125,21 +175,22 @@ export class TaskQueue {
     }
 
     get activeCount(): number {
-        return this.running;
+        return this.running.size;
     }
 
     private pump(): void {
-        while (this.running < this.concurrency && this.pending.length > 0) {
+        while (this.running.size < this.concurrency && this.pending.length > 0) {
             const task = this.pending.shift()!;
-            this.running++;
+            const controller = new AbortController();
+            this.running.set(task.id, controller);
             void (async () => {
                 try {
-                    await task();
+                    await task.run(controller.signal);
                 } catch (error) {
                     // 单个任务异常不能卡死队列
                     console.error("转录队列任务异常", error);
                 } finally {
-                    this.running--;
+                    this.running.delete(task.id);
                     this.pump();
                 }
             })();
@@ -154,6 +205,8 @@ export class TranscribeJobStore {
 
     constructor(private readonly deps: TranscribeJobDeps) {
         this.queue = new TaskQueue(Math.max(1, deps.config.amtConcurrency || 1));
+        // 崩溃/强杀会留下 pianobe-* 临时目录；启动时清掉旧残留。
+        sweepTranscribeTempDirs(JOB_TTL_MS);
         this.timer = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS);
         // 不阻止进程退出（bun 的定时器句柄）
         (this.timer as unknown as { unref?: () => void }).unref?.();
@@ -204,11 +257,13 @@ export class TranscribeJobStore {
         name: string;
         durationSec?: number;
         fileName?: string;
+        ownerId?: number;
     }): TranscribeJobSnapshot {
         const job = this.createJob(
             { kind: "upload", fileName: input.fileName },
             input.name,
-            input.durationSec
+            input.durationSec,
+            input.ownerId
         );
         const audioPath = join(job.dir, `audio${input.ext}`);
         writeFileSync(audioPath, input.buffer);
@@ -221,15 +276,20 @@ export class TranscribeJobStore {
         });
         // Bun.spawn 在 Windows 上可能阻塞数秒（杀软扫描 CLI）：交给队列在下一轮事件循环执行，
         // 让创建任务的 HTTP 响应先返回，前端才能立即进入进度界面。
-        this.queue.add(async () => {
+        this.queue.add(job.id, async (signal) => {
             if (!this.jobs.has(job.id)) return;
-            await this.transcribe(job, UPLOAD_BASE_PERCENT);
+            await this.transcribe(job, UPLOAD_BASE_PERCENT, signal);
         });
         return this.snapshot(job);
     }
 
     /** 解析 B 站视频并下载音频（下载与转录在后台进行） */
-    startBilibili(input: { url: string; page: number; name?: string }): TranscribeJobSnapshot {
+    startBilibili(input: {
+        url: string;
+        page: number;
+        name?: string;
+        ownerId?: number;
+    }): TranscribeJobSnapshot {
         const job = this.createJob(
             {
                 kind: "bilibili",
@@ -242,21 +302,23 @@ export class TranscribeJobStore {
                 codecs: "",
                 bandwidth: 0,
             },
-            input.name ?? "B站转录"
+            input.name ?? "B站转录",
+            undefined,
+            input.ownerId
         );
         this.update(job, {
             stage: "queued",
             message: "已加入队列，等待处理…",
             percent: 0,
         });
-        this.queue.add(async () => {
+        this.queue.add(job.id, async (signal) => {
             if (!this.jobs.has(job.id)) return;
             this.update(job, {
                 stage: "downloading",
                 message: "解析视频并下载音频…",
                 percent: 2,
             });
-            await this.downloadAndTranscribe(job, input.url, input.page);
+            await this.downloadAndTranscribe(job, input.url, input.page, signal);
         });
         return this.snapshot(job);
     }
@@ -332,15 +394,37 @@ export class TranscribeJobStore {
             duration: header.duration,
             noteCount: header.noteCount,
             bytes: pbe3.byteLength,
-            expiresAt: job.createdAt + JOB_TTL_MS,
+            expiresAt: job.updatedAt + JOB_TTL_MS,
             data: encodeBase64Url(pbe3),
         };
+    }
+
+    /** 任务对查看者是否可见：管理员全部可见，普通令牌只能看自己发起的。 */
+    visible(id: string, viewer?: TokenInfo): boolean {
+        const job = this.jobs.get(id);
+        if (!job || !viewer) return false;
+        return viewer.role === "admin" || job.ownerId === undefined || job.ownerId === viewer.id;
     }
 
     remove(id: string): boolean {
         const job = this.jobs.get(id);
         if (!job) return false;
+        // 先取消排队/终止 amt-cli，避免删掉记录后进程还在跑、并发槽不释放。
+        this.queue.cancel(id);
+        const cancelled: TranscribeJobSnapshot = {
+            ...this.snapshot(job),
+            stage: "error",
+            message: "任务已取消",
+            error: "任务已取消",
+        };
         this.jobs.delete(id);
+        for (const listener of [...job.listeners]) {
+            try {
+                listener(cancelled);
+            } catch {
+                // 单个订阅者异常不影响清理
+            }
+        }
         job.listeners.clear();
         rmSync(job.dir, { recursive: true, force: true });
         return true;
@@ -358,11 +442,13 @@ export class TranscribeJobStore {
     private createJob(
         source: TranscribeJobSource,
         name: string,
-        durationSec?: number
+        durationSec?: number,
+        ownerId?: number
     ): TranscribeJob {
         const now = Date.now();
         const job: TranscribeJob = {
             id: crypto.randomUUID(),
+            ownerId,
             stage: "queued",
             message: "排队中…",
             percent: 0,
@@ -382,12 +468,20 @@ export class TranscribeJobStore {
         return job;
     }
 
-    private async downloadAndTranscribe(job: TranscribeJob, url: string, page: number) {
+    private async downloadAndTranscribe(
+        job: TranscribeJob,
+        url: string,
+        page: number,
+        signal?: AbortSignal
+    ) {
         try {
             if (!this.deps.amt) throw new AmtUnavailableError("服务端未启用 AMT");
+            if (signal?.aborted) return;
             const video = await resolveBiliVideo(url, page, this.deps.config.biliSessdata);
+            if (signal?.aborted || !this.jobs.has(job.id)) return;
             const audioPath = join(job.dir, "audio.m4s");
             await downloadBiliAudio(video, audioPath, this.deps.config.biliSessdata);
+            if (signal?.aborted || !this.jobs.has(job.id)) return;
             job.audioPath = audioPath;
             job.audioMime = "audio/mp4";
             if (job.name === "B站转录") job.name = sanitizeName(video.title);
@@ -409,23 +503,27 @@ export class TranscribeJobStore {
                 audioReady: true,
                 durationSec: video.durationSec ?? job.durationSec,
             });
-            await this.transcribe(job, BILI_BASE_PERCENT);
+            await this.transcribe(job, BILI_BASE_PERCENT, signal);
         } catch (error) {
+            if (!this.jobs.has(job.id) || error instanceof AmtAbortedError) return;
             this.fail(job, error);
         }
     }
 
-    private async transcribe(job: TranscribeJob, basePercent: number) {
+    private async transcribe(job: TranscribeJob, basePercent: number, signal?: AbortSignal) {
         try {
             if (!this.deps.amt) throw new AmtUnavailableError("服务端未启用 AMT");
             if (!job.audioPath) throw new Error("音频文件缺失");
+            if (signal?.aborted) return;
             this.update(job, {
                 stage: "analyzing",
                 message: "分析音频…",
                 percent: basePercent + 2,
             });
             const result = await this.deps.amt.transcribe(job.audioPath, {
+                signal,
                 onProgress: ({ audioTime, noteCount }) => {
+                    if (!this.jobs.has(job.id) || signal?.aborted) return;
                     this.update(job, {
                         stage: "transcribing",
                         message: "转录音符…",
@@ -435,27 +533,32 @@ export class TranscribeJobStore {
                     });
                 },
             });
+            if (!this.jobs.has(job.id) || signal?.aborted) return;
             this.update(job, {
                 stage: "finalizing",
                 message: "生成 MIDI…",
                 percent: 97,
             });
             const song = midiBufferToSong(result.midi, job.name);
+            const noteCount = song.tracks.reduce(
+                (sum, track) => sum + Math.floor((track.notes?.length ?? 0) / 4),
+                0
+            );
+            // 0 音符的 MIDI 存进存储卡必然被校验拒绝，直接按失败处理，避免“完成但存不进”。
+            if (noteCount === 0) throw new Error("未识别到音符，请换一段音频或检查音质");
             job.midi = result.midi;
             job.transcribeMs = result.elapsedMs;
             this.update(job, {
                 stage: "done",
                 message: "转录完成",
                 percent: 100,
-                noteCount: song.tracks.reduce(
-                    (sum, track) => sum + Math.floor((track.notes?.length ?? 0) / 4),
-                    0
-                ),
+                noteCount,
                 midiDuration: song.duration,
                 dataSize: result.midi.byteLength,
                 midiReady: true,
             });
         } catch (error) {
+            if (!this.jobs.has(job.id) || error instanceof AmtAbortedError) return;
             this.fail(job, error);
         }
     }
@@ -518,9 +621,16 @@ export class TranscribeJobStore {
     }
 
     private cleanup() {
-        const cutoff = Date.now() - JOB_TTL_MS;
+        const now = Date.now();
+        const cutoff = now - JOB_TTL_MS;
+        // 执行中的任务给足「排队 + 单任务超时」的余量；只有远超上限的僵尸任务才强制清理。
+        const activeCutoff = JOB_TTL_MS + this.deps.config.amtTimeoutMs + 5 * 60_000;
         for (const job of [...this.jobs.values()]) {
-            if (job.updatedAt < cutoff) this.remove(job.id);
+            if (job.stage === "done" || job.stage === "error") {
+                if (job.updatedAt < cutoff) this.remove(job.id);
+                continue;
+            }
+            if (now - job.createdAt > activeCutoff) this.remove(job.id);
         }
     }
 }

@@ -2,11 +2,12 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { openDb } from "./db.js";
 import { loadConfig } from "./config.js";
-import { ensureBootstrapToken } from "./auth.js";
+import { ensureBootstrapToken, migrateLegacyRoles } from "./auth.js";
 import { createLogger } from "./logger.js";
 import { SqliteSongPort } from "./drivers/sqlitePorts.js";
 import { createApp } from "./app.js";
 import { AmtService } from "./services/amt.js";
+import { sweepTranscribeTempDirs } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
 
@@ -31,6 +32,10 @@ if (!config.webRoot) {
 
 const db = openDb(config.dbPath);
 const { token, generated } = ensureBootstrapToken(db, config.bootstrapToken);
+const migratedRoles = migrateLegacyRoles(db);
+if (migratedRoles > 0) {
+    log.warn(`已把 ${migratedRoles} 个旧 read/write 令牌迁移为 user（曲库写权限请使用 admin 令牌）`);
+}
 if (generated) {
     // 令牌只打到控制台，不写日志文件
     console.log("===============================================");
@@ -89,6 +94,11 @@ function shutdown(signal: string): void {
         server.stop(true);
     } catch {
         // 关闭监听失败不影响进程退出
+    }
+    try {
+        sweepTranscribeTempDirs(0);
+    } catch {
+        // 临时目录清理失败不影响退出
     }
     try {
         db.close();
