@@ -129,6 +129,11 @@ export const useStudio = create<StudioState>((set, get) => ({
         setServerToken(token);
         try {
             await serverApi.listSongs({ pageSize: 1 });
+            // 静态资源（前端 bundle / 模板 / 插件 / 采样）需要服务端会话 Cookie
+            await fetch("/api/session", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => undefined);
             set({ authenticated: true, authRequired: true, mode: "server" });
             localStorage.setItem(MODE_PREF_KEY, "server");
             await get().refresh();
@@ -141,6 +146,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     async logoutServer() {
         studioPlayer.stop();
         setServerToken(null);
+        await fetch("/api/session", { method: "DELETE" }).catch(() => undefined);
         const probe = await serverApi.checkAvailable();
         set({
             authenticated: probe.authenticated,
