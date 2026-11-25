@@ -18,6 +18,8 @@ import uuid
 
 from PIL import Image, ImageDraw
 
+from icon_export import save_pixel_icon
+
 ADDON = Path(__file__).resolve().parents[2] / "packages/addon"
 RP = ADDON / "rp"
 BP = ADDON / "bp"
@@ -204,8 +206,8 @@ def atlas():
 
 def inventory_icon(texture):
     """Rasterize the same geometry and atlas for the item slot."""
-    size = 192
-    scale = 5
+    size = 384
+    scale = 10
     # A slight turn and tilt keep the keys and pedal bank readable at 64px.
     view = (.21, .43, -.878)
     right = (-.9726, 0, -.2326)
@@ -257,7 +259,7 @@ def inventory_icon(texture):
                     rgb = texels[int(u + s * width), int(v + t * height)]
                     pixels[ix, iy] = (*(min(255, round(channel * shade)) for channel in rgb), 255)
 
-    return icon.resize((64, 64), Image.Resampling.LANCZOS)
+    return icon
 
 
 def to_bedrock(p):
@@ -443,7 +445,7 @@ def write(path, data):
 
 
 def write_hitboxes():
-    path = ADDON / "src/piano/hitboxes.generated.ts"
+    path = ADDON / "src/data/hitboxes.generated.ts"
     key_parts = [p for p in parts if p.bone.startswith("key_")]
     keys = [(int(p.bone.split("_")[1]), *rounded(p.start), *rounded(p.end), *rounded(p.pivot[1:]))
             for p in key_parts]
@@ -497,7 +499,7 @@ def main():
     write_hitboxes()
     image = atlas()
     image.save(RP / "textures/blocks/piano.png")
-    inventory_icon(image).save(RP / "textures/items/piano_item.png")
+    save_pixel_icon(inventory_icon(image), 128, RP / "textures/items/piano_item.png")
     native = [to_bedrock(p) for p in parts]
     write(ASSETS / "piano_full.bbmodel", project(native, image))
     for name, center in (("left", -8), ("right", 8)):

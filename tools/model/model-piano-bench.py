@@ -7,6 +7,8 @@ from runpy import run_path
 
 from PIL import Image, ImageDraw
 
+from icon_export import save_pixel_icon
+
 
 RP = Path(__file__).resolve().parents[2] / "packages/addon/rp"
 BP = RP.with_name("bp")
@@ -252,9 +254,48 @@ def write_p88_block(identifier, center):
         json.dumps({"format_version": "1.26.10", "minecraft:block": block}, indent=4) + "\n", encoding="utf-8")
 
 
+def close_cracks(image):
+    """Fill transparent pixels enclosed by the drawing.
+
+    The facets of the hand-drawn bench share edges, and PIL's rasteriser can
+    leave 1px gaps between them. Those gaps sit in the middle of the seat and
+    read as holes once the icon is drawn over the slot background; the artwork
+    has no intentional see-through areas of its own.
+    """
+    width, height = image.size
+    pixels = image.load()
+    enclosed = Image.new("L", image.size, 0)
+    mask = enclosed.load()
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y][3] == 0:
+                mask[x, y] = 255
+    ImageDraw.floodfill(enclosed, (0, 0), 128, thresh=0)
+
+    while True:
+        pending = [(x, y) for y in range(height) for x in range(width)
+                   if mask[x, y] == 255 and pixels[x, y][3] == 0]
+        if not pending:
+            return image
+        for x, y in pending:
+            neighbours = [pixels[x + dx, y + dy]
+                          for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                          if 0 <= x + dx < width and 0 <= y + dy < height
+                          and pixels[x + dx, y + dy][3] == 255]
+            if not neighbours:
+                continue
+            pixels[x, y] = tuple(sum(c[i] for c in neighbours) // len(neighbours)
+                                 for i in range(3)) + (255,)
+
+
 def make_p88_icon():
+    # Hand-painted at 64px, then doubled with the same hard pixels so every
+    # inventory icon ships at 128px.
     image = Image.new("RGBA", (64, 64))
     draw = ImageDraw.Draw(image)
+    # Seat silhouette first so the dark front and light top never leave a crack
+    # between them.
+    draw.polygon([(6, 26), (20, 15), (57, 22), (57, 30), (44, 42), (6, 34)], fill=(100, 105, 112))
     for x, y in ((22, 30), (51, 26), (12, 37), (43, 42)):
         draw.polygon([(x, y), (x + 4, y - 1), (x + 4, y + 15), (x + 2, y + 17),
                       (x, y + 17)], fill=(48, 54, 60))
@@ -263,7 +304,7 @@ def make_p88_icon():
     draw.polygon([(6, 26), (20, 15), (57, 22), (43, 34)], fill=(100, 105, 112))
     draw.polygon([(9, 26), (21, 17), (54, 23), (42, 32)], fill=(78, 84, 93))
     draw.line([(7, 29), (43, 36), (56, 26)], fill=(120, 124, 132), width=1)
-    image.resize((32, 32), Image.Resampling.LANCZOS).save(RP / "textures/items/p88_bench.png")
+    save_pixel_icon(close_cracks(image), 128, RP / "textures/items/p88_bench.png")
 
 
 if __name__ == "__main__":

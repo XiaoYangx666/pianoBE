@@ -41,3 +41,5 @@ packages/addon/rp/entity/pbe_stage_props/
 packages/addon/rp/models/entity/pbe_stage_props/
 packages/addon/rp/animations/pbe_stage_props/
 packages/addon/rp/textures/entity/pbe_stage_props/
+
+__pycache__/

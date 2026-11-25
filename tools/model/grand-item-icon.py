@@ -6,11 +6,13 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from icon_export import save_pixel_icon
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "assets/grand/grand_full.bbmodel"
 OUT = ROOT / "packages/addon/rp/textures/items/grand_piano_item.png"
 CANVAS = 1024
-SIZE = 64
+SIZE = 128
 
 PALETTE = {
     "body": (24, 28, 35),
@@ -127,5 +129,5 @@ image = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
 draw = ImageDraw.Draw(image)
 for _, colour_value, polygon in faces:
     draw.polygon(polygon, fill=(*colour_value, 255))
-image.resize((SIZE, SIZE), Image.Resampling.LANCZOS).save(OUT)
+save_pixel_icon(image, SIZE, OUT)
 print(OUT)
