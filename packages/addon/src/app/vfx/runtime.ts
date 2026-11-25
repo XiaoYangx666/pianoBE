@@ -12,6 +12,7 @@ import {
     type SingleEffectConfig, type VfxInput, type VfxProgram, type VfxTheme,
 } from "@piano/vfx";
 import { inspectInstrument, instrumentDestroyed, instrumentKey, type InstrumentLocation } from "@platform/assembly";
+import { isUnloadedChunkError } from "@platform/errors";
 import { vfxInstrumentFor } from "@domain/instrument/definition";
 import { spawnVfxEmitter } from "@platform/vfxParticle";
 import { VfxPropRenderer } from "@platform/vfxProp";
@@ -348,7 +349,7 @@ function updateTick() {
                 }
             } catch (error) {
                 failures++;
-                console.warn("[piano-vfx] 运行失败", error);
+                if (!isUnloadedChunkError(error)) console.warn("[piano-vfx] 运行失败", error);
                 stopSession(session);
             }
         }
@@ -364,7 +365,8 @@ function updateTick() {
             // A failed spawn must not leave the session half-dispatched: stop it so
             // cleanup, pending reservations and the engine lifecycle all close.
             failures++;
-            console.warn("[piano-vfx] 发射失败", error);
+            // 区块卸载导致的发射失败是预期情况：静默结束会话即可。
+            if (!isUnloadedChunkError(error)) console.warn("[piano-vfx] 发射失败", error);
             stopSession(session);
         }
 

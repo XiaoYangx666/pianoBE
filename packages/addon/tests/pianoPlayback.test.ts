@@ -384,6 +384,21 @@ test("加入队列按来源/ID/指纹去重", () => {
     expect(midi.queue.getLength()).toBe(2);
 });
 
+test("播放已删除曲目时摘除队列条目并继续后继曲目", async () => {
+    const midi = new MidiPlayer({
+        acquire: async ref => (ref.id === "gone" ? undefined : handleFor(song)),
+    }, { note: () => {}, playing: () => {}, stopNotes: () => {} });
+    midi.queue.enqueue({ id: "gone", name: "Gone", duration: 1, source: "library" });
+    midi.queue.enqueue({ id: "song-2", name: "Next", duration: 1, source: "library" });
+
+    await midi.play();
+
+    expect(midi.queue.getQueue()).toEqual(["Next"]);
+    expect(midi.queue.current()?.id).toBe("song-2");
+    expect(midi.getInfo().state).toBe("playing");
+    midi.end();
+});
+
 test("响度归一化开启后 MIDI 音符带增益，关闭后回到 1", async () => {
     const gains: number[] = [];
     const midi = new MidiPlayer(loader, {

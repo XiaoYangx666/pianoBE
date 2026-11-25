@@ -46,6 +46,8 @@ export class MidiPlayer {
 
     private isLoading = false;
     private generation = 0;
+    /** 本轮 loadMidi 因曲目内容缺失（本地/远程都取不到）而失败。 */
+    private loadMissing = false;
 
     /** 逐曲响度归一化（默认关闭，由钢琴设置控制）。 */
     private normalizeLoudnessValue = false;
@@ -86,6 +88,11 @@ export class MidiPlayer {
         await this.loadMidi(song, generation);
         if (generation !== this.generation) return;
         this.isLoading = false;
+        if (this.loadMissing) {
+            this.queue.dropCurrent(song);
+            this.state = "idle";
+            return;
+        }
         this.state = "paused";
         this.currentTime = record.seconds;
         if (!this.hasContent()) return;
@@ -113,6 +120,12 @@ export class MidiPlayer {
         await this.loadMidi(info, generation);
         if (generation !== this.generation) return;
         this.isLoading = false;
+
+        if (this.loadMissing) {
+            // 失效条目已被 `play()` 选中：摘除后从它的后继继续。
+            await this.prepareNext(this.queue.dropCurrent(info), true);
+            return;
+        }
 
         if (!this.hasContent()) {
             this.prepareNext();
@@ -310,7 +323,13 @@ export class MidiPlayer {
         return durationSec <= 0 || this.currentTime >= durationSec;
     }
 
-    private async prepareNext() {
+    /**
+     * 切到下一首。
+     * @param first 指定首轮候选（由 dropCurrent 给出），此时不再调用 `queue.next()`，
+     *              避免指针二次前进跳过后继曲目。
+     * @param useFirst 为 true 表示完全采用 `first`（即使为 undefined 也不再自行取歌）。
+     */
+    private async prepareNext(first?: MusicRef, useFirst = false) {
         if (this.isLoading) return;
 
         this.isLoading = true;
@@ -321,12 +340,18 @@ export class MidiPlayer {
         this.totalNotes = 0;
 
         const limit = this.queue.getLength();
-        for (let attempt = 0; attempt < limit; attempt++) {
-            const nextInfo = this.queue.next();
-            if (!nextInfo) break;
+        let nextInfo = useFirst ? first : this.queue.next();
+        for (let attempt = 0; attempt < limit && nextInfo; attempt++) {
             this.output.transport?.({ type: "track", position: 0 });
             await this.loadMidi(nextInfo, generation);
             if (generation !== this.generation) return;
+
+            if (this.loadMissing) {
+                // 曲目已从曲库删除（或曲库快照过期）：摘掉队列里的失效条目，
+                // 避免每次轮播都重试同一首并刷“曲目内容不存在”。
+                nextInfo = this.queue.dropCurrent(nextInfo);
+                continue;
+            }
 
             if (this.hasContent()) {
                 this.state = "playing";
@@ -336,6 +361,7 @@ export class MidiPlayer {
                 this.isLoading = false;
                 return;
             }
+            nextInfo = this.queue.next();
         }
         this.state = "idle";
         this.output.playing(false);
@@ -368,13 +394,17 @@ export class MidiPlayer {
     }
 
     private async loadMidi(info: MusicRef, generation: number) {
+        this.loadMissing = false;
         try {
             const song = await this.loader.acquire(info);
             if (generation !== this.generation) {
                 song?.release();
                 return;
             }
-            if (!song) throw new Error(`曲目内容不存在: ${info.name} (${info.id})`);
+            if (!song) {
+                this.loadMissing = true;
+                throw new Error(`曲目内容不存在: ${info.name} (${info.id})`);
+            }
 
             this.releaseSong();
             this.song = song;
@@ -408,7 +438,9 @@ export class MidiPlayer {
             this.updateNormalizationGain();
         } catch (e) {
             if (generation !== this.generation) return;
-            console.error(`加载 MIDI 失败: ${info.name}`, e);
+            // 曲目被删除属于数据过期，不是播放器故障：降级为 WARN，并附上被摘除的信息。
+            if (this.loadMissing) console.warn(`曲目已失效，已从队列移除: ${info.name} (${info.id})`);
+            else console.error(`加载 MIDI 失败: ${info.name}`, e);
             this.releaseSong();
             this.totalNotes = 0;
         }

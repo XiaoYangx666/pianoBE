@@ -12,6 +12,7 @@ import { hitsGrandPanel, pickScorePage, pickPianoKey, pickPianoMenu, pickPianoPa
 import { PianoRuntime, pianoCenter } from "@app/PianoRuntime";
 import { playerVelocity } from "@app/playerSound";
 import { animateMidiPerformance, animatePianoPress, MIDI_PERFORMANCE_INTERVAL } from "@app/playerPerformance";
+import { isUnloadedChunkError } from "@platform/errors";
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
@@ -213,7 +214,7 @@ class PianoWorld {
                     piano.refreshScreen();
                 }
             } catch (error) {
-                console.warn("[piano] 钢琴运行时扫描失败", error);
+                if (!isUnloadedChunkError(error)) console.warn("[piano] 钢琴运行时扫描失败", error);
                 try {
                     this.unload(piano.location, false);
                 } catch (cleanupError) {
@@ -242,7 +243,9 @@ class PianoWorld {
                     }
                 }
             } catch (error) {
-                console.warn("[piano] 钢琴运行时更新失败", error);
+                // 区块卸载后访问位置失败是正常现象：直接结束该运行时，等区块
+                // 重新加载时再从组装体恢复，不需要专门轮询区块是否加载。
+                if (!isUnloadedChunkError(error)) console.warn("[piano] 钢琴运行时更新失败", error);
                 // Rebuild from the assembly on the next interaction/sweep instead
                 // of leaving a runtime that is loaded but no longer ticked.
                 try {

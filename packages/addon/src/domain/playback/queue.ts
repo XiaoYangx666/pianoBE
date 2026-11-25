@@ -163,6 +163,29 @@ export class PlayQueue {
         return this.list[index];
     }
 
+    /**
+     * 摘除读取失败的曲目，返回它的后继曲目。
+     *
+     * 不沿用 `next()` 的取歌规则：单曲循环/随机模式下“再放一次当前曲”没有意义，
+     * 失效条目被摘掉后应继续往后走。返回 undefined 表示已无后继。
+     *
+     * @param expected 期望被摘除的引用。`loadMidi` 是异步的，期间玩家可能改动队列，
+     *                 按引用定位可避免误删当前选中的其它曲目。
+     */
+    dropCurrent(expected?: MusicRef): MusicRef | undefined {
+        const index = expected ? this.indexOf(expected) : this.index;
+        if (index < 0 || index >= this.list.length) return expected ? this.current() : undefined;
+        this.list.splice(index, 1);
+        if (index < this.index) {
+            this.index--;
+            return this.current();
+        }
+        if (index > this.index) return this.current();
+        // 摘除的正是当前项：splice 后指针正好落在原后继上，越界表示已到末尾。
+        if (this.index >= this.list.length) this.index = this.list.length;
+        return this.list[this.index];
+    }
+
     /* ================== 跳转 ================== */
 
     next(): MusicRef | undefined {

@@ -32,6 +32,10 @@ function switchPlayMode(player: MidiPlayer, label: ObservableString) {
 export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
     "§bMIDI播放",
     (ui, args) => {
+        if (!args.piano.isAlive()) {
+            ui.close();
+            return;
+        }
         const midi = args.piano.getMidiPlayer();
         const piano = args.piano;
         const block = args.block;
