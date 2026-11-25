@@ -90,6 +90,10 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             ...status,
             bilibili: true,
             maxAudioBytes: MAX_AUDIO_BYTES,
+            queued: jobs.pendingCount,
+            active: jobs.activeCount,
+            queueLimit: deps.config.amtMaxQueue,
+            queueFull: jobs.isQueueFull,
         });
     });
 

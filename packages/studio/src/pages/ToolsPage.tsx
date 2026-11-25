@@ -5,11 +5,13 @@ import {
     CloudDownload,
     Download,
     FileCode2,
+    Link2,
     Play,
     QrCode,
     Save,
     Search,
     Trash2,
+    X,
 } from "lucide-react";
 import {
     TIME_SCALE,
@@ -74,7 +76,11 @@ export function ToolsPage() {
     // Server AMT state
     const [serverAmtStatus, setServerAmtStatus] = useState<{
         available: boolean;
-        bilibili?: { available: boolean; reason?: string };
+        bilibili?: boolean;
+        queued?: number;
+        active?: number;
+        queueLimit?: number;
+        queueFull?: boolean;
     } | null>(null);
     const [serverAmtTab, setServerAmtTab] = useState<"upload" | "bilibili">("upload");
     const [biliQuery, setBiliQuery] = useState("");
@@ -86,9 +92,13 @@ export function ToolsPage() {
     const [serverJobState, setServerJobState] = useState<{
         stage: string;
         progress: number;
+        message?: string;
         error?: string;
         result?: { noteCount: number; duration: number };
     } | null>(null);
+    const [serverBusy, setServerBusy] = useState(false);
+    const serverJobActive =
+        serverJobState !== null && serverJobState.stage !== "done" && serverJobState.stage !== "error";
 
     // MIDI / PBE3 inspector state
     const [inspected, setInspected] = useState<{
@@ -130,11 +140,16 @@ export function ToolsPage() {
                 setServerJobState({
                     stage: job.stage,
                     progress: job.progress,
+                    message: job.message,
                     error: job.error,
                     result: job.result,
                 });
                 if (job.stage === "done" || job.stage === "error") {
                     window.clearInterval(timer);
+                    void serverApi
+                        .getTranscribeStatus()
+                        .then(setServerAmtStatus)
+                        .catch(() => {});
                 }
             } catch {
                 window.clearInterval(timer);
@@ -194,20 +209,62 @@ export function ToolsPage() {
         }
     };
 
+    const startServerJob = (jobId: string) => {
+        setServerJobId(jobId);
+        setServerJobState({ stage: "queued", progress: -1, message: "已提交，等待处理…" });
+        void serverApi.getTranscribeStatus().then(setServerAmtStatus).catch(() => {});
+    };
+
     const handleServerUploadTranscribe = async () => {
-        if (!audioFile) return;
+        if (!audioFile || serverBusy || serverJobActive) return;
         const title = songName.trim() || audioFile.name.replace(/\.[^.]+$/, "");
+        setServerBusy(true);
         try {
             const { jobId } = await serverApi.startTranscribeUpload(audioFile, title);
-            setServerJobId(jobId);
-            setServerJobState({ stage: "queued", progress: 0 });
+            startServerJob(jobId);
         } catch (err) {
             notify({
                 title: "提交服务端转录失败",
                 message: err instanceof Error ? err.message : String(err),
                 color: "red",
             });
+        } finally {
+            setServerBusy(false);
         }
+    };
+
+    const handleBiliTranscribe = async (input: string, songNameHint?: string) => {
+        const value = input.trim();
+        if (!value || serverBusy || serverJobActive) return;
+        setServerBusy(true);
+        try {
+            const { jobId } = await serverApi.startTranscribeBilibili(
+                value,
+                songNameHint ?? (biliQuery === value ? undefined : biliQuery.trim()),
+            );
+            startServerJob(jobId);
+        } catch (err) {
+            notify({
+                title: "提交 B 站转录失败",
+                message: err instanceof Error ? err.message : String(err),
+                color: "red",
+            });
+        } finally {
+            setServerBusy(false);
+        }
+    };
+
+    const handleCancelServerJob = async () => {
+        const id = serverJobId;
+        setServerJobId(null);
+        setServerJobState(null);
+        if (!id) return;
+        try {
+            await serverApi.cancelTranscribeJob(id);
+        } catch {
+            // 任务可能已过期，忽略
+        }
+        void serverApi.getTranscribeStatus().then(setServerAmtStatus).catch(() => {});
     };
 
     const handleSearchBili = async () => {
@@ -256,6 +313,8 @@ export function ToolsPage() {
             });
         }
     };
+
+    const directBiliInput = useMemo(() => /BV[0-9A-Za-z]{10}|av\d+/i.test(biliQuery), [biliQuery]);
 
     const rollNotes = useMemo(() => {
         if (!localOutput) return [];
@@ -447,8 +506,18 @@ export function ToolsPage() {
                                     上传音频或检索 B 站视频交给后端异步转录，完成后预览并一键入库。
                                 </p>
                             </div>
-                            <SongBadge tone={serverAmtStatus?.available ? "brand" : "default"}>
-                                {serverAmtStatus?.available ? "服务端转录就绪" : "服务端未启用转录组件"}
+                            <SongBadge
+                                tone={serverAmtStatus?.available && !serverAmtStatus.queueFull ? "brand" : "default"}
+                            >
+                                {!serverAmtStatus?.available
+                                    ? "服务端未启用转录组件"
+                                    : serverAmtStatus.queueFull
+                                      ? "转录队列已满"
+                                      : `服务端转录就绪${
+                                            serverAmtStatus.queued
+                                                ? ` · 排队 ${serverAmtStatus.queued}/${serverAmtStatus.queueLimit ?? 10}`
+                                                : ""
+                                        }`}
                             </SongBadge>
                         </div>
 
@@ -487,7 +556,12 @@ export function ToolsPage() {
                                                 }}
                                             />
                                         </div>
-                                        <Button type="button" onClick={() => void handleServerUploadTranscribe()}>
+                                        <Button
+                                            type="button"
+                                            loading={serverBusy}
+                                            disabled={serverJobActive || Boolean(serverAmtStatus?.queueFull)}
+                                            onClick={() => void handleServerUploadTranscribe()}
+                                        >
                                             <AudioWaveform size={14} /> 提交转录任务
                                         </Button>
                                     </div>
@@ -501,15 +575,37 @@ export function ToolsPage() {
                                         value={biliQuery}
                                         onChange={(e) => setBiliQuery(e.target.value)}
                                         onKeyDown={(e) => {
-                                            if (e.key === "Enter") void handleSearchBili();
+                                            if (e.key !== "Enter") return;
+                                            if (directBiliInput) void handleBiliTranscribe(biliQuery);
+                                            else void handleSearchBili();
                                         }}
-                                        placeholder="输入关键词搜索 B 站钢琴曲 / 原曲..."
+                                        placeholder="粘贴 BV 号 / 视频链接，或输入关键词搜索..."
                                         className="h-9 flex-1 rounded-md border border-[var(--pb-control-border)] bg-ore-sunken px-3 text-[13px] outline-none focus:border-brand"
                                     />
-                                    <Button type="button" loading={biliBusy} onClick={() => void handleSearchBili()}>
-                                        <Search size={14} /> 搜索
-                                    </Button>
+                                    {directBiliInput ? (
+                                        <Button
+                                            type="button"
+                                            loading={serverBusy}
+                                            disabled={serverJobActive || Boolean(serverAmtStatus?.queueFull)}
+                                            onClick={() => void handleBiliTranscribe(biliQuery)}
+                                        >
+                                            <Link2 size={14} /> 直接转录
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            type="button"
+                                            color="secondary"
+                                            loading={biliBusy}
+                                            disabled={!biliQuery.trim()}
+                                            onClick={() => void handleSearchBili()}
+                                        >
+                                            <Search size={14} /> 搜索
+                                        </Button>
+                                    )}
                                 </div>
+                                <p className="text-[11px] text-ore-dim">
+                                    支持 BV 号、av 号或视频链接直接转录；关键词请先搜索再选择结果。
+                                </p>
                                 <div className="flex max-h-[280px] flex-col divide-y divide-ore-divider overflow-y-auto rounded-lg border border-ore-divider">
                                     {biliResults.map((item) => (
                                         <div
@@ -528,14 +624,10 @@ export function ToolsPage() {
                                                 type="button"
                                                 size="sm"
                                                 color="secondary"
+                                                disabled={serverBusy || serverJobActive || Boolean(serverAmtStatus?.queueFull)}
                                                 onClick={() => {
                                                     const clean = item.title.replace(/<[^>]+>/g, "");
-                                                    void serverApi
-                                                        .startTranscribeBilibili(item.bvid, clean)
-                                                        .then(({ jobId }) => {
-                                                            setServerJobId(jobId);
-                                                            setServerJobState({ stage: "queued", progress: 0 });
-                                                        });
+                                                    void handleBiliTranscribe(item.bvid, clean);
                                                 }}
                                             >
                                                 转录
@@ -550,38 +642,74 @@ export function ToolsPage() {
                             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ore-divider bg-ore-sunken px-3.5 py-2.5 text-[12.5px]">
                                 <div>
                                     状态：<span className="font-semibold">{serverJobState.stage}</span> ·{" "}
-                                    {Math.round(serverJobState.progress * 100)}%
+                                    {serverJobState.progress >= 0
+                                        ? `${Math.round(serverJobState.progress * 100)}%`
+                                        : "处理中…"}
+                                    {serverJobState.message && (
+                                        <span className="ml-2 text-ore-dim">{serverJobState.message}</span>
+                                    )}
                                     {serverJobState.error && (
                                         <span className="ml-2 text-red-400">{serverJobState.error}</span>
                                     )}
                                 </div>
-                                {serverJobState.stage === "done" && (
-                                    <div className="flex gap-2">
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            color="secondary"
-                                            onClick={() =>
-                                                void serverApi.downloadTranscribeMidi(serverJobId).then((mid) =>
-                                                    studioPlayer.playBytes("server-amt", "转录试听", mid, "mid"),
-                                                )
-                                            }
-                                        >
-                                            <Play size={13} /> 试听
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            onClick={() =>
-                                                void serverApi.saveTranscribeJob(serverJobId).then(() =>
-                                                    useStudio.getState().refresh(),
-                                                )
-                                            }
-                                        >
-                                            <Save size={13} /> 入库
-                                        </Button>
-                                    </div>
-                                )}
+                                <div className="flex gap-2">
+                                    {serverJobState.stage === "done" && (
+                                        <>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                color="secondary"
+                                                onClick={() =>
+                                                    void serverApi.downloadTranscribeMidi(serverJobId).then((mid) =>
+                                                        studioPlayer.playBytes("server-amt", "转录试听", mid, "mid"),
+                                                    )
+                                                }
+                                            >
+                                                <Play size={13} /> 试听
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                color="secondary"
+                                                onClick={() => {
+                                                    if (!serverJobId) return;
+                                                    void serverApi
+                                                        .getTranscribeCode(serverJobId)
+                                                        .then(setCodeDialog)
+                                                        .catch((err) =>
+                                                            notify({
+                                                                title: "生成导入码失败",
+                                                                message:
+                                                                    err instanceof Error ? err.message : String(err),
+                                                                color: "red",
+                                                            }),
+                                                        );
+                                                }}
+                                            >
+                                                <QrCode size={13} /> 导入码
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() =>
+                                                    void serverApi.saveTranscribeJob(serverJobId).then(() =>
+                                                        useStudio.getState().refresh(),
+                                                    )
+                                                }
+                                            >
+                                                <Save size={13} /> 入库
+                                            </Button>
+                                        </>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        color="ghost"
+                                        onClick={() => void handleCancelServerJob()}
+                                    >
+                                        <X size={13} /> {serverJobActive ? "取消任务" : "关闭"}
+                                    </Button>
+                                </div>
                             </div>
                         )}
                     </div>

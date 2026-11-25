@@ -163,6 +163,11 @@ export class TranscribeJobStore {
         return this.queue.pendingCount;
     }
 
+    /** 正在执行的任务数 */
+    get activeCount(): number {
+        return this.queue.activeCount;
+    }
+
     /** 队列是否已满：满了拒绝新任务，避免上传占满临时空间 */
     get isQueueFull(): boolean {
         return this.queue.pendingCount >= this.deps.config.amtMaxQueue;
