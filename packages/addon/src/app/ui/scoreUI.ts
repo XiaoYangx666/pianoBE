@@ -105,7 +105,7 @@ export const PianoScorePage = DDUI.page<{ piano: PianoRuntime; query?: string; p
 
     ui.label(status).toggle("安装谱架", mount);
     if (empty) {
-        ui.label("§7当前资源包没有曲谱\n请通过生成器导入真实谱面图片或 PDF\n仍可先安装空白谱架");
+        ui.label("§7当前资源包没有曲谱\n可先安装空白谱架");
     }
     ui.label("   ").textField("搜索曲谱标题或 id", search).label(pageLabel);
 

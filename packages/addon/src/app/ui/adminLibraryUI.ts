@@ -48,7 +48,7 @@ export const AdminLibraryPage = DDUI.page("全局曲库管理", (ui) => {
         }
     };
 
-    ui.label("§8世界级公共曲库：歌曲完整保存在世界动态属性中，重启后自动恢复。")
+    ui.label("§8世界公共曲库 · 重启保留")
         .label(stats)
         .label(status)
         .button("导入全局歌曲", () => ui.push(MidiImportPage, { target: "world" }))
@@ -118,7 +118,7 @@ export const AdminLibrarySongsPage = DDUI.page<AdminSongsArgs>("全局曲库歌�
         nextVisible.setData(state.page < state.maxPage);
     };
 
-    ui.textField("搜索 / 跳页（如 曲名 p2）", search);
+    ui.textField("搜索 / p5 跳页", search);
     ui.label(status).label(pageText);
     ui.onChange(search, (value) => {
         const parsed = parseLibrarySearch(value);

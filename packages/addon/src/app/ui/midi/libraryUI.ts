@@ -129,15 +129,14 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
                 }
                 state.refs = result.refs;
                 renderLabels();
-                const note = result.note ? `\n${result.note}` : "";
                 status.setData(
                     result.note
                         ? result.note
                         : result.total
                           ? `§7共 §f${result.total} §7首`
-                          : "§7这个来源还没有歌曲",
+                          : "§7暂无歌曲",
                 );
-                pageText.setData(`§7第 §f${state.page}§7 / §f${state.maxPage} §7页${note}`);
+                pageText.setData(`§7第 §f${state.page}§7 / §f${state.maxPage} §7页`);
                 prevVisible.setData(state.page > 1);
                 nextVisible.setData(state.page < state.maxPage);
                 syncUsage();
@@ -150,7 +149,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
 
     const syncUsage = () => {
         if (state.tab === "library") {
-            usage.setData("§7公共曲库提供歌曲浏览与播放，只读，不能删除或覆盖。");
+            usage.setData("§7只读");
             return;
         }
         const storage = piano.cardStorage;
@@ -217,7 +216,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         refresh();
     });
 
-    ui.textField("搜索 / 跳页（如 周杰伦 p5）", search);
+    ui.textField("搜索 / p5 跳页", search);
     ui.label(status).label(usage).label(notice);
     ui.label(pageText);
 
@@ -230,7 +229,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         scheduleRefresh();
     });
 
-    ui.label(mode === "add" ? "§7添加模式：点击歌曲直接加入播放队列，可连续添加" : "§7管理模式：点击歌曲查看详情与单曲操作");
+    ui.label(mode === "add" ? "§7点歌加入队列" : "§7点歌查看详情");
 
     for (let index = 0; index < PAGE_SIZE; index++) {
         ui.button(

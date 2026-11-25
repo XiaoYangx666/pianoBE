@@ -25,7 +25,6 @@ export const ParticleSettingsPage = DDUI.page<{ piano: PianoRuntime }>("粒子�
     const palette = ui.number(settings.particlePalette);
     ui.onChange(palette, (value) => editor.apply({ particlePalette: value }));
 
-    ui.label("§7弹奏时在琴键位置生成的特效。");
     ui.toggle("显示弹奏粒子", particles);
     if (styles.length > 0) {
         ui.dropdown("粒子样式", style, styles.map(({ label, value }) => ({ label, value })));
@@ -33,10 +32,10 @@ export const ParticleSettingsPage = DDUI.page<{ piano: PianoRuntime }>("粒子�
         if (colorOptions) {
             ui.dropdown("粒子配色", palette, colorOptions.map(({ label, value }) => ({ label, value })));
         } else {
-            ui.label("§7该粒子使用固定的自然配色，无需选择颜色。");
+            ui.label("§7固定自然配色");
         }
     } else {
-        ui.label("§7当前未安装弹奏粒子样式插件，弹奏粒子已关闭。");
+        ui.label("§7未安装弹奏粒子插件");
     }
     ui.button("恢复本页默认", () => {
         editor.apply({

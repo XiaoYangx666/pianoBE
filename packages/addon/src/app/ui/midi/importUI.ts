@@ -111,10 +111,9 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
     const access = target === "card" ? args.piano?.cardAccess : undefined;
     if (target === "card" && (!args.piano || !access)) {
         status.setData("§c卡槽为空，请先插入音乐存储卡");
-        ui.label(status)
-            .label("§7MIDI 只能导入到当前钢琴卡槽内的存储卡。")
-            .label(session.pendingPayload ? "§e已接收但未保存的曲目仍保留，插卡后再打开即可重试。" : "§8插入存储卡后重新打开导入页面。")
-            .closeButton();
+        ui.label(status);
+        if (session.pendingPayload) ui.label("§e未保存的曲目已保留，插卡后重试");
+        ui.closeButton();
         return;
     }
     const cardStorage = access?.storage();
@@ -239,7 +238,7 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
     ui.label(`§7目标：§f${targetLabel}`);
     ui.label(status)
         .label(progress)
-        .label("§7把生成器导出的分段逐段粘贴到下面（可乱序，重复段会自动忽略）")
+        .label("§7粘贴生成器导出的分段（可乱序）")
         .textField("导入码", input)
         .button("重试保存已接收的曲目", () => {
             if (session.pendingPayload) commit(session.pendingPayload);

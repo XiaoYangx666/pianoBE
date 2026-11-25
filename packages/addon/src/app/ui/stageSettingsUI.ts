@@ -23,7 +23,6 @@ export const StageSettingsPage = DDUI.page<{ piano: PianoRuntime }>("舞台演�
         if (theme) editor.apply({ stageTheme: theme });
     });
 
-    ui.label("§7控制曲目自带舞台编排、弹奏粒子替换与默认演奏主题。");
     ui.toggle("启用曲目自带舞台编排", stageChoreography, {
         description: "播放含演出区块的 PBE3 曲目时自动呈现定制舞台。",
     });
