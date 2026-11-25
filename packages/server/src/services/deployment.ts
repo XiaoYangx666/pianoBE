@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { writeFileAtomic } from "../atomic.js";
 import { readAddonArchive } from "@bepack/addon";
 import {
     MAX_SCORES,
@@ -112,7 +113,7 @@ export class DeploymentService {
     saveServerTemplate(bytes: Uint8Array): void {
         const path = this.customTemplatePath();
         mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, bytes);
+        writeFileAtomic(path, bytes);
     }
 
     resolveTemplatePath(): string | undefined {
@@ -256,7 +257,7 @@ export class DeploymentService {
     private saveScoresMeta(scores: readonly ServerScoreMeta[]): void {
         const dir = this.scoresDir();
         mkdirSync(dir, { recursive: true });
-        writeFileSync(this.scoresMetaPath(), `${JSON.stringify(scores, null, 2)}\n`);
+        writeFileAtomic(this.scoresMetaPath(), `${JSON.stringify(scores, null, 2)}\n`);
     }
 
     addScore(input: {
@@ -292,7 +293,7 @@ export class DeploymentService {
                 : encoded.includes("+") || encoded.includes("/") || encoded.endsWith("=")
                   ? Uint8Array.from(Buffer.from(encoded, "base64"))
                   : decodeBase64Url(encoded);
-            writeFileSync(outPath, bytes);
+            writeFileAtomic(outPath, bytes);
         }
         const entry: ServerScoreMeta = {
             id,
@@ -538,6 +539,8 @@ export class DeploymentService {
         mkdirSync(bpRoot, { recursive: true });
         mkdirSync(rpRoot, { recursive: true });
 
+        this.bumpPackVersions(bpFiles, rpFiles);
+
         writePackDirAtomic(bpRoot, bdsConfig.bdsBpName, bpFiles);
         writePackDirAtomic(rpRoot, bdsConfig.bdsRpName, rpFiles);
 
@@ -562,6 +565,67 @@ export class DeploymentService {
         this.songPort.setState("deployed_plugins_json", JSON.stringify(assembled.installedPlugins));
         this.songPort.setState("deployed_at", String(Date.now()));
         return this.getStatus();
+    }
+
+    /**
+     * 每次部署都把 BP/RP 的 header.version patch 位 +1，并同步两侧依赖版本。
+     * 客户端按 uuid+version 缓存附加包：版本不变时重进服务器不会重新下载资源包，
+     * 会出现"资源包内容已更新但客户端仍是旧缓存"的问题。
+     */
+    private bumpPackVersions(bpFiles: Map<string, Uint8Array>, rpFiles: Map<string, Uint8Array>): void {
+        const decoder = new TextDecoder();
+        const encoder = new TextEncoder();
+        const bpRaw = bpFiles.get("manifest.json");
+        const rpRaw = rpFiles.get("manifest.json");
+        if (!bpRaw || !rpRaw) return;
+
+        const sequence = (Number(this.songPort.getState("deploy_seq") ?? 0) || 0) + 1;
+        const bump = (manifest: Record<string, unknown>) => {
+            const header = (manifest.header ?? {}) as { version?: unknown };
+            // 模板里的 version 可能是 "1.3.0" 这样的字符串，也可能是数组
+            const base = Array.isArray(header.version)
+                ? header.version.map(Number)
+                : typeof header.version === "string"
+                  ? header.version.split(".").map(Number)
+                  : [1, 0, 0];
+            const next = [
+                Number.isFinite(base[0]) ? base[0] : 1,
+                Number.isFinite(base[1]) ? base[1] : 0,
+                (Number.isFinite(base[2]) ? base[2] : 0) + sequence,
+            ];
+            // format_version 3 的 manifest 要求字符串版本（如 "1.3.4"），数组会被 BDS 拒绝
+            const text = next.join(".");
+            header.version = text;
+            manifest.header = header;
+            return { next, text };
+        };
+
+        const bpManifest = JSON.parse(decoder.decode(bpRaw)) as Record<string, unknown>;
+        const rpManifest = JSON.parse(decoder.decode(rpRaw)) as Record<string, unknown>;
+        const bpVersion = bump(bpManifest);
+        const rpVersion = bump(rpManifest);
+
+        // BP → RP 与 RP → BP 的依赖版本都对齐，避免 manifest 里残留旧版本
+        const bpUuid = (bpManifest.header as { uuid?: string }).uuid;
+        const rpUuid = (rpManifest.header as { uuid?: string }).uuid;
+        const syncDependency = (
+            manifest: Record<string, unknown>,
+            uuid: string | undefined,
+            version: string
+        ) => {
+            const deps = Array.isArray(manifest.dependencies) ? manifest.dependencies : [];
+            for (const dep of deps) {
+                if (dep && typeof dep === "object" && uuid && (dep as { uuid?: string }).uuid === uuid) {
+                    (dep as { version?: string }).version = version;
+                }
+            }
+        };
+        syncDependency(bpManifest, rpUuid, rpVersion.text);
+        syncDependency(rpManifest, bpUuid, bpVersion.text);
+
+        bpFiles.set("manifest.json", encoder.encode(`${JSON.stringify(bpManifest, null, 4)}\n`));
+        rpFiles.set("manifest.json", encoder.encode(`${JSON.stringify(rpManifest, null, 4)}\n`));
+        this.songPort.setState("deploy_seq", String(sequence));
     }
 
     reportLoaded(input: { configHash?: string; installedPlugins?: string[] }): AddonDeploymentStatus {
@@ -645,7 +709,7 @@ function updateWorldPackFile(filePath: string, packId: string, version: number[]
     } else {
         entries.push(nextEntry);
     }
-    writeFileSync(filePath, `${JSON.stringify(entries, null, 2)}\n`);
+    writeFileAtomic(filePath, `${JSON.stringify(entries, null, 2)}\n`);
 }
 
 function parseList(raw?: string): string[] {

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { encodeBase64Url, PBE3_MAGIC, planImportChunks, type PerformanceCue } from "@piano/core";
+import { encodeBase64Url, PBE3_MAGIC, planImportChunks, readPbe3Header, type PerformanceCue } from "@piano/core";
 import type { AppDeps } from "../app.js";
 import { requireRole, type AppVariables } from "../auth.js";
 import { SongConflictError } from "../drivers/sqlitePorts.js";
@@ -18,7 +18,7 @@ function isPbe3Bytes(bytes: Uint8Array): boolean {
 
 export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
 
     // GET /api/songs?q=&page=&pageSize=&libraryId=
     app.get("/", readRole(), (c) => {
@@ -42,10 +42,21 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     // GET /api/songs/:id/raw —— 原始 .mid 或 .pbe3 字节
     app.get("/:id/raw", readRole(), (c) => {
         const id = c.req.param("id") ?? "";
+        const safeId = id.replace(/[^0-9A-Za-z_-]/g, "_");
         const raw = deps.songPort.getRaw(id);
-        if (raw) return c.body(raw, 200, { "content-type": "audio/midi" });
+        if (raw) {
+            return c.body(raw, 200, {
+                "content-type": "audio/midi",
+                "content-disposition": `attachment; filename="${safeId}.mid"`,
+            });
+        }
         const pbe3 = deps.songPort.getPbe3(id);
-        if (pbe3) return c.body(Uint8Array.from(pbe3), 200, { "content-type": "application/octet-stream" });
+        if (pbe3) {
+            return c.body(Uint8Array.from(pbe3), 200, {
+                "content-type": "application/octet-stream",
+                "content-disposition": `attachment; filename="${safeId}.pbe3"`,
+            });
+        }
         return c.json({ error: "曲目内容不存在" }, 404);
     });
 
@@ -70,7 +81,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // POST /api/songs/:id/performances
-    app.post("/:id/performances", requireRole("write"), async (c) => {
+    app.post("/:id/performances", requireRole("admin"), async (c) => {
         const songId = c.req.param("id") ?? "";
         const meta = deps.songPort.getDetailedMeta(songId);
         if (!meta) return c.json({ error: "曲目不存在" }, 404);
@@ -118,7 +129,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // POST /api/songs —— 上传 .mid 或 .pbe3
-    app.post("/", requireRole("write"), async (c) => {
+    app.post("/", requireRole("admin"), async (c) => {
         const length = Number(c.req.header("Content-Length") ?? 0);
         if (length > MAX_UPLOAD_BYTES) {
             return c.json({ error: "文件超过大小限制" }, 413);
@@ -126,6 +137,9 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         const buffer = await c.req.arrayBuffer();
         if (!buffer || buffer.byteLength === 0) {
             return c.json({ error: "空文件" }, 400);
+        }
+        if (buffer.byteLength > MAX_UPLOAD_BYTES) {
+            return c.json({ error: "文件超过大小限制" }, 413);
         }
 
         let fileName = c.req.header("X-File-Name") ?? "";
@@ -137,7 +151,14 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
         try {
             if (isPbe3Bytes(bytes) || /\.pbe3$/i.test(fileName)) {
-                const name = fileName ? fileName.replace(/\.pbe3$/i, "") : undefined;
+                // .pbe3 自带曲名：文件名常常只是 crc32 id，优先用文件头里的 name
+                let headerName: string | undefined;
+                try {
+                    headerName = readPbe3Header(bytes).name;
+                } catch {
+                    headerName = undefined;
+                }
+                const name = headerName || (fileName ? fileName.replace(/\.pbe3$/i, "") : undefined);
                 const meta = deps.songPort.savePbe3File(bytes, {
                     name,
                     libraryId,
@@ -161,7 +182,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // PATCH /api/songs/:id —— 改曲名 { name }
-    app.patch("/:id", requireRole("write"), async (c) => {
+    app.patch("/:id", requireRole("admin"), async (c) => {
         const id = c.req.param("id") ?? "";
         const body = await c.req.json().catch(() => null);
         const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -172,7 +193,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // DELETE /api/songs/:id
-    app.delete("/:id", requireRole("write"), (c) => {
+    app.delete("/:id", requireRole("admin"), (c) => {
         deps.songPort.remove(c.req.param("id") ?? "");
         return c.body(null, 204);
     });

@@ -3,6 +3,7 @@ import { INSTALLED_VFX_PLUGINS } from "@app/vfx";
 import { DEPLOYMENT_INFO } from "@app/vfx/deploymentInfo";
 import { getNetFetch } from "@platform/server/net";
 import { RemoteMidiSource } from "@platform/server/admin/netSource";
+import type { NetFetch } from "@platform/server/admin/netSource";
 import { world } from "@minecraft/server";
 import { secrets, variables } from "@minecraft/server-admin";
 
@@ -11,9 +12,17 @@ export const KEY_BACKEND_URL = "pianoBackendUrl";
 /** secrets.json 键名：Bearer 令牌（SecretString，整体透传 HttpHeader） */
 export const KEY_BACKEND_TOKEN = "pianoBackendToken";
 
+/** 已配置的后端连接信息；服务器版可选功能复用它，避免各建一套 fetch/令牌。 */
+export interface ServerBackend {
+    baseUrl: string;
+    fetch: NetFetch;
+    extraHeaders?: () => Record<string, unknown>;
+}
+
 const LEGACY_CACHE_PREFIX = "midi_remote.";
 
 let initialized = false;
+let backend: ServerBackend | undefined;
 
 function clearLegacyRemoteCache(): number {
     const ids = world
@@ -28,8 +37,8 @@ function clearLegacyRemoteCache(): number {
     return ids.length;
 }
 
-export async function initServerAdmin(): Promise<boolean> {
-    if (initialized) return true;
+export async function initServerAdmin(): Promise<ServerBackend | undefined> {
+    if (initialized) return backend;
 
     clearLegacyRemoteCache();
 
@@ -39,14 +48,14 @@ export async function initServerAdmin(): Promise<boolean> {
         console.warn(
             `[serverAdmin] 未配置 ${KEY_BACKEND_URL}（BDS config/default/variables.json），使用内嵌曲库`
         );
-        return false;
+        return undefined;
     }
 
     console.log("[serverAdmin] step2 获取 @minecraft/server-net 适配器");
     const fetch = await getNetFetch();
     if (!fetch) {
         console.warn("[serverAdmin] @minecraft/server-net 不可用（getNetFetch 返回 null），使用内嵌曲库");
-        return false;
+        return undefined;
     }
     console.log("[serverAdmin] @minecraft/server-net 适配器就绪");
 
@@ -57,6 +66,7 @@ export async function initServerAdmin(): Promise<boolean> {
             : "[serverAdmin] step3 未读取到 secrets 令牌（请求将不带 Authorization 头）"
     );
     const extraHeaders = token ? () => ({ Authorization: token }) : undefined;
+    backend = { baseUrl: url, fetch, extraHeaders };
 
     console.log(`[serverAdmin] step4 切换到远程曲库: ${url}`);
     const remote = new RemoteMidiSource({
@@ -74,5 +84,5 @@ export async function initServerAdmin(): Promise<boolean> {
     }).catch(() => {});
     console.log(`[serverAdmin] 远程曲库已启用: ${url}`);
     initialized = true;
-    return true;
+    return backend;
 }

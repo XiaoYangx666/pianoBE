@@ -30,7 +30,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 - **MIDI 播放**：内嵌或远程曲库，播放队列（顺序/循环/单曲/随机）、多钢琴独立播放、UI 同步、区块卸载自动停止
 - **DDUI 表单**：按需创建、关闭即释放；同一玩家同时只保留一个活动表单
 - **自托管后端**：Hono + bun:sqlite + Docker；token 鉴权（Bootstrap 令牌 env 注入、分角色令牌）；React 管理页
-- **曲目文件存储**：SQLite 仅存元数据，完整曲目以 `data/midis/{id}.mid` 源文件存储；游戏播放器按需转为 PBE3，管理页前端直接解析 `.mid` 播放
+- **曲目存储**：曲目内容与元数据一起存在 SQLite（`song_files` 表，mid/pbe3 BLOB），删库即删曲；不再读取旧版 `data/midis` 文件
 - **无事务一致性**：存储端口单键原子写、派生索引、崩溃自愈（core 契约测试覆盖）
 - **音频转 MIDI（AMT）**：生成器在浏览器本地运行转录模型；自托管后端调用 Rust `amt-cli`，并可直接解析 B 站视频音频
 
@@ -55,7 +55,7 @@ FluidR3 GM，各音色的来源与授权见 `packages/addon/rp/THIRD_PARTY_NOTIC
 # 启动后端（Docker，根目录 compose；镜像内含 core/web 构建产物）
 docker compose up -d
 # 管理页 http://<host>:35050 登录 → 上传曲目、生成导入码、签发令牌
-# （.env 中 BOOTSTRAP_TOKEN 为管理员令牌；对外端口 35050，容器内 3000）
+# （不设 BOOTSTRAP_TOKEN 时首次启动会自动生成随机管理员令牌，打印在 docker logs 里）
 
 # 构建服务器专用包
 npm run build:server   # 产出 packages/addon/dist/server.mcaddon
@@ -64,6 +64,8 @@ npm run build:server   # 产出 packages/addon/dist/server.mcaddon
 #   variables.json → { "pianoBackendUrl": "http://<后端>:35050" }
 #   secrets.json   → { "pianoBackendToken": "Bearer <令牌>" }
 ```
+
+后端日志默认写入 `packages/server/data/logs/server.log`（单文件 5 MB，轮转保留 `.1`～`.3`），同时输出到控制台；`LOG_FILE=off` 可关闭文件日志，路径也可用 `LOG_FILE` 自定义。
 
 只有服务器专用构建会在启动后动态 `import()` `serverAdmin`；该模块静态导入 `@minecraft/server-admin`（读配置）与 `@minecraft/server-net`（拉曲目），依赖由服务器包 manifest 声明。客户端构建会整体裁掉这个分支，继续使用内嵌曲库；服务器专用构建**不打包内嵌曲库**，配置不可用时没有任何曲目。详见 `packages/addon/README.md`。
 
@@ -145,6 +147,11 @@ npm run test -w @piano/addon  # addon netSource 缓存/降级
 
 # 运行
 npm run dev:generator    # 生成器开发模式（predev 自动同步底包与曲库到 public/）
+
+# 本机直接跑后端（非 Docker）
+cp .env.example packages/server/.env   # 按需改端口 / 令牌
+npm run build:core                     # @piano/server 依赖 core 的构建产物
+npm run start:server                   # http://127.0.0.1:3000，日志在 packages/server/data/logs/
 ```
 
 ### 音频转 MIDI（AMT）资源
@@ -289,7 +296,7 @@ git commit -m "曲库: 新增 <歌名>"
 git push origin <分支>    # 提交 Pull Request
 ```
 
-公共曲库和后端管理页通常使用 MIDI 内容的 CRC32 作为 ID。后端新增曲目可将其 `packages/server/data/midis/{id}.mid` 导出后经 `add-song` 收编入库。
+公共曲库和后端管理页通常使用 MIDI 内容的 CRC32 作为 ID。后端曲目可通过 `/api/songs/{id}/raw` 导出 MIDI，再经 `add-song` 收编入库。
 
 ---
 

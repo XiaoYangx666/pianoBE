@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AppDeps } from "../app.js";
 import { createToken, listTokens, requireRole, revokeToken, type AppVariables, type Role } from "../auth.js";
 
-const ROLES: Role[] = ["read", "write", "admin"];
+const ROLES: Role[] = ["user", "admin"];
 
 export function tokensRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
@@ -22,7 +22,7 @@ export function tokensRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
             return c.json({ error: "label 必填且不超过 32 字符" }, 400);
         }
         if (!ROLES.includes(role)) {
-            return c.json({ error: "role 需为 read/write/admin 之一" }, 400);
+            return c.json({ error: "role 需为 user/admin 之一" }, 400);
         }
         try {
             const { id, token } = createToken(deps.db, label, role);

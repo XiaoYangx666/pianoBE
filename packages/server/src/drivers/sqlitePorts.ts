@@ -1,6 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import type {
     ContentOrigin,
     LibraryRecord,
@@ -17,6 +15,7 @@ import {
     encodeSong,
     extractCueEffects,
     readSongHeader,
+    renameSong,
     sameSongMusic,
     sameSongPerformance,
     validateSong,
@@ -101,25 +100,39 @@ export interface SongMetaWithStats extends MidiSongMeta {
     format?: string;
 }
 
+/** 曲目内容在 song_files 表里的类型 */
+export type SongFileKind = "mid" | "pbe3" | "json";
+
 export class SqliteSongPort implements SongPort {
     private readonly pbe3Cache = new Map<string, Uint8Array>();
     private static readonly MAX_PBE3_CACHE = 32;
 
-    constructor(
-        private readonly db: Database,
-        private readonly contentDir = "./data/midis",
-    ) {
-        mkdirSync(contentDir, { recursive: true });
+    constructor(private readonly db: Database) {}
+
+    /* ================== 曲目内容（song_files） ================== */
+
+    private getFileBlob(id: string, kind: SongFileKind): Uint8Array<ArrayBuffer> | undefined {
+        const row = this.db
+            .query(`SELECT bytes FROM song_files WHERE song_id=? AND kind=?`)
+            .get(id, kind) as { bytes: Uint8Array } | null;
+        return row?.bytes ? Uint8Array.from(row.bytes) : undefined;
     }
 
-    private midiPath(id: string): string {
-        return join(this.contentDir, `${id}.mid`);
+    private putFileBlob(id: string, kind: SongFileKind, bytes: Uint8Array): void {
+        this.db
+            .query(
+                `INSERT INTO song_files(song_id,kind,bytes) VALUES(?,?,?)
+                 ON CONFLICT(song_id,kind) DO UPDATE SET bytes=excluded.bytes`
+            )
+            .run(id, kind, bytes);
     }
-    private pbe3Path(id: string): string {
-        return join(this.contentDir, `${id}.pbe3`);
+
+    private deleteFileBlobs(id: string): void {
+        this.db.query(`DELETE FROM song_files WHERE song_id=?`).run(id);
     }
-    private jsonPath(id: string): string {
-        return join(this.contentDir, `${id}.json`);
+
+    private deleteFileBlob(id: string, kind: SongFileKind): void {
+        this.db.query(`DELETE FROM song_files WHERE song_id=? AND kind=?`).run(id, kind);
     }
 
     /* ================== Server State & Catalog Version ================== */
@@ -155,6 +168,9 @@ export class SqliteSongPort implements SongPort {
     saveMidiFile(buffer: Uint8Array, name: string, options: SaveSongOptions = {}): MidiSongMeta {
         const song = midiBufferToSong(buffer, name);
         const pbe3 = encodeSong(song);
+        // MIDI 转换结果也走一遍 PBE3 校验：音符数/时长/解压长度超限的文件不能入库，
+        // 否则会绕过上传时的结构上限，拖慢编码或让游戏端卡死
+        validateSong(pbe3);
         const fp = computeMusicFingerprint(pbe3);
         const displayName = (options.name ?? name).trim() || song.id;
         const origin = options.origin ?? { kind: "user" };
@@ -174,15 +190,18 @@ export class SqliteSongPort implements SongPort {
             throw new SongConflictError(`歌曲 ID 冲突：${song.id} 已存在且音乐内容不同`);
         }
 
-        writeFileSync(this.midiPath(song.id), buffer);
+        this.db.transaction(() => {
+            this.putFileBlob(song.id, "mid", buffer);
+            this.putFileBlob(song.id, "pbe3", pbe3);
+            this.upsertMeta(song.id, displayName, song.duration, countNotes(song), buffer.byteLength, {
+                musicFingerprint: fp,
+                format: "mid",
+                origin,
+            });
+            this.ensureLibraryMembership(options.libraryId ?? "default", song.id);
+            this.bumpCatalogVersion();
+        })();
         this.cachePbe3(song.id, pbe3);
-        this.upsertMeta(song.id, displayName, song.duration, countNotes(song), buffer.byteLength, {
-            musicFingerprint: fp,
-            format: "mid",
-            origin,
-        });
-        this.ensureLibraryMembership(options.libraryId ?? "default", song.id);
-        this.bumpCatalogVersion();
         return { id: song.id, name: displayName, duration: song.duration };
     }
 
@@ -219,24 +238,31 @@ export class SqliteSongPort implements SongPort {
             }
         }
 
-        writeFileSync(this.pbe3Path(header.id), buffer);
+        this.db.transaction(() => {
+            this.putFileBlob(header.id, "pbe3", buffer);
+            this.upsertMeta(header.id, displayName, header.duration, header.noteCount, buffer.byteLength, {
+                musicFingerprint: fp,
+                format: "pbe3",
+                origin,
+            });
+            this.ensureLibraryMembership(options.libraryId ?? "default", header.id);
+            if (header.performance?.length) {
+                this.upsertPerformanceForSong(
+                    header.id,
+                    fp,
+                    header.performance,
+                    origin,
+                    options.performanceMeta,
+                );
+            }
+            this.bumpCatalogVersion();
+        })();
         this.cachePbe3(header.id, buffer);
-        this.upsertMeta(header.id, displayName, header.duration, header.noteCount, buffer.byteLength, {
-            musicFingerprint: fp,
-            format: "pbe3",
-            origin,
-        });
-        this.ensureLibraryMembership(options.libraryId ?? "default", header.id);
-        if (header.performance?.length) {
-            this.upsertPerformanceForSong(header.id, fp, header.performance, origin, options.performanceMeta);
-        }
-        this.bumpCatalogVersion();
         return { id: header.id, name: displayName, duration: header.duration };
     }
 
     add(song: MidiSong): void {
         const data = JSON.stringify(song);
-        writeFileSync(this.jsonPath(song.id), data);
         this.pbe3Cache.delete(song.id);
         let fp: string | undefined;
         try {
@@ -244,13 +270,16 @@ export class SqliteSongPort implements SongPort {
         } catch {
             fp = undefined;
         }
-        this.upsertMeta(song.id, song.name, song.duration, countNotes(song), Buffer.byteLength(data, "utf8"), {
-            musicFingerprint: fp,
-            format: "json",
-            origin: { kind: "user" },
-        });
-        this.ensureLibraryMembership("default", song.id);
-        this.bumpCatalogVersion();
+        this.db.transaction(() => {
+            this.putFileBlob(song.id, "json", new TextEncoder().encode(data));
+            this.upsertMeta(song.id, song.name, song.duration, countNotes(song), Buffer.byteLength(data, "utf8"), {
+                musicFingerprint: fp,
+                format: "json",
+                origin: { kind: "user" },
+            });
+            this.ensureLibraryMembership("default", song.id);
+            this.bumpCatalogVersion();
+        })();
     }
 
     private findSongByFingerprint(fp: string, candidatePbe3: Uint8Array): SongRow | undefined {
@@ -352,6 +381,8 @@ export class SqliteSongPort implements SongPort {
             SongRow,
             "id" | "name" | "duration" | "note_count" | "music_fingerprint" | "aliases_json" | "origin_kind" | "origin_id"
         >,
+        libraries?: Map<string, string[]>,
+        performances?: Map<string, PerformanceDescriptor[]>,
     ): MidiSongMeta {
         const meta: MidiSongMeta = {
             id: r.id,
@@ -370,13 +401,48 @@ export class SqliteSongPort implements SongPort {
             kind: (r.origin_kind as ContentOrigin["kind"]) || "user",
             ...(r.origin_id ? { id: r.origin_id } : {}),
         };
-        const libRows = this.db
-            .query(`SELECT library_id FROM library_songs WHERE song_id=? ORDER BY added_at`)
-            .all(r.id) as { library_id: string }[];
-        if (libRows.length) meta.libraries = libRows.map((row) => row.library_id);
-        const perfs = this.listSongPerformances(r.id, false);
+        const libs = libraries
+            ? (libraries.get(r.id) ?? [])
+            : (
+                  this.db
+                      .query(`SELECT library_id FROM library_songs WHERE song_id=? ORDER BY added_at`)
+                      .all(r.id) as { library_id: string }[]
+              ).map((row) => row.library_id);
+        if (libs.length) meta.libraries = libs;
+        const perfs = performances
+            ? (performances.get(r.id) ?? [])
+            : this.listSongPerformances(r.id, false);
         if (perfs.length) meta.performanceEntries = perfs;
         return meta;
+    }
+
+    /** 列表页一次性取全部曲库归属，避免每首一次查询 */
+    private loadLibraryMemberships(): Map<string, string[]> {
+        const rows = this.db
+            .query(`SELECT song_id, library_id FROM library_songs ORDER BY added_at`)
+            .all() as { song_id: string; library_id: string }[];
+        const map = new Map<string, string[]>();
+        for (const row of rows) {
+            const list = map.get(row.song_id);
+            if (list) list.push(row.library_id);
+            else map.set(row.song_id, [row.library_id]);
+        }
+        return map;
+    }
+
+    /** 列表页一次性取演奏摘要，避免每首一次查询 */
+    private loadPerformanceSummaries(): Map<string, PerformanceDescriptor[]> {
+        const rows = this.db
+            .query(`SELECT * FROM performances ORDER BY created_at, rowid`)
+            .all() as PerformanceRow[];
+        const map = new Map<string, PerformanceDescriptor[]>();
+        for (const row of rows) {
+            const descriptor = this.rowToPerformance(row, false);
+            const list = map.get(row.song_id);
+            if (list) list.push(descriptor);
+            else map.set(row.song_id, [descriptor]);
+        }
+        return map;
     }
 
     rename(id: string, name: string): MidiSongMeta | undefined {
@@ -384,15 +450,30 @@ export class SqliteSongPort implements SongPort {
         if (!clean) return undefined;
         const res = this.db.query(`UPDATE songs SET name=? WHERE id=?`).run(clean, id);
         if (res.changes === 0) return undefined;
+        // 持久化的 PBE3 文件头里也有旧曲名：同步重编码，保证列表、导入码和下载一致。
+        const stored = this.getFileBlob(id, "pbe3");
+        if (stored) {
+            try {
+                this.putFileBlob(id, "pbe3", renameSong(stored, clean));
+            } catch (error) {
+                // 只有 PBE3、没有 MIDI/JSON 时删掉 BLOB 会永久丢失曲目；
+                // 此时宁可保留旧文件头，也不能丢内容。有回退来源时才删除以便重新生成。
+                const hasFallback = Boolean(this.getRaw(id) || this.getFileBlob(id, "json"));
+                console.warn(
+                    `[songs] PBE3 改名失败，曲目 ${id} 的元数据已更新但文件头仍为旧曲名` +
+                        (hasFallback ? "（将从 MIDI/JSON 重新生成）" : "（保留唯一原始数据，未删除 BLOB）"),
+                    error
+                );
+                if (hasFallback) this.deleteFileBlob(id, "pbe3");
+            }
+        }
         this.pbe3Cache.delete(id);
         this.bumpCatalogVersion();
         return this.getMeta(id);
     }
 
     getRaw(id: string): Uint8Array<ArrayBuffer> | undefined {
-        const p = this.midiPath(id);
-        if (!existsSync(p)) return undefined;
-        return Uint8Array.from(readFileSync(p));
+        return this.getFileBlob(id, "mid");
     }
 
     getPbe3(id: string): Uint8Array | undefined {
@@ -402,11 +483,10 @@ export class SqliteSongPort implements SongPort {
             this.pbe3Cache.set(id, cached);
             return cached;
         }
-        const pbe3File = this.pbe3Path(id);
-        if (existsSync(pbe3File)) {
-            const bytes = Uint8Array.from(readFileSync(pbe3File));
-            this.cachePbe3(id, bytes);
-            return bytes;
+        const stored = this.getFileBlob(id, "pbe3");
+        if (stored) {
+            this.cachePbe3(id, stored);
+            return stored;
         }
         const raw = this.getRaw(id);
         const meta = this.getMeta(id);
@@ -419,10 +499,10 @@ export class SqliteSongPort implements SongPort {
             }
         }
         if (!song) {
-            const json = this.jsonPath(id);
-            if (!existsSync(json)) return undefined;
+            const json = this.getFileBlob(id, "json");
+            if (!json) return undefined;
             try {
-                song = JSON.parse(readFileSync(json, "utf8")) as MidiSong;
+                song = JSON.parse(new TextDecoder().decode(json)) as MidiSong;
             } catch {
                 return undefined;
             }
@@ -430,6 +510,12 @@ export class SqliteSongPort implements SongPort {
         try {
             const pbe3 = encodeSong(song);
             this.cachePbe3(id, pbe3);
+            // 旧版只有 mid 的曲目：编码结果顺手存库，下次不用再解码
+            try {
+                this.putFileBlob(id, "pbe3", pbe3);
+            } catch {
+                // 读路径写库失败不影响本次返回
+            }
             return pbe3;
         } catch {
             return undefined;
@@ -464,16 +550,16 @@ export class SqliteSongPort implements SongPort {
                 return midiBufferToSong(raw, meta?.name ?? id);
             } catch { /* fallback */ }
         }
-        const pbe3File = this.pbe3Path(id);
-        if (existsSync(pbe3File)) {
+        const stored = this.getFileBlob(id, "pbe3");
+        if (stored) {
             try {
-                return decodeSong(Uint8Array.from(readFileSync(pbe3File)));
+                return decodeSong(stored);
             } catch { /* fallback */ }
         }
-        const json = this.jsonPath(id);
-        if (existsSync(json)) {
+        const json = this.getFileBlob(id, "json");
+        if (json) {
             try {
-                return JSON.parse(readFileSync(json, "utf8")) as MidiSong;
+                return JSON.parse(new TextDecoder().decode(json)) as MidiSong;
             } catch {
                 return undefined;
             }
@@ -519,8 +605,10 @@ export class SqliteSongPort implements SongPort {
               )
             : rows;
 
+        const libraryMap = this.loadLibraryMemberships();
+        const performanceMap = this.loadPerformanceSummaries();
         return filtered.map((r) => ({
-            ...this.hydrateMeta(r),
+            ...this.hydrateMeta(r, libraryMap, performanceMap),
             noteCount: r.note_count,
             dataSize: r.data_size,
             format: r.format,
@@ -528,14 +616,14 @@ export class SqliteSongPort implements SongPort {
     }
 
     remove(id: string): void {
-        this.db.query(`DELETE FROM library_songs WHERE song_id=?`).run(id);
-        this.db.query(`DELETE FROM performances WHERE song_id=?`).run(id);
-        this.db.query(`DELETE FROM songs WHERE id=?`).run(id);
+        this.db.transaction(() => {
+            this.deleteFileBlobs(id);
+            this.db.query(`DELETE FROM library_songs WHERE song_id=?`).run(id);
+            this.db.query(`DELETE FROM performances WHERE song_id=?`).run(id);
+            this.db.query(`DELETE FROM songs WHERE id=?`).run(id);
+            this.bumpCatalogVersion();
+        })();
         this.pbe3Cache.delete(id);
-        for (const p of [this.midiPath(id), this.pbe3Path(id), this.jsonPath(id)]) {
-            if (existsSync(p)) rmSync(p);
-        }
-        this.bumpCatalogVersion();
     }
 
     /* ================== Libraries ================== */

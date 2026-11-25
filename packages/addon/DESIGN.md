@@ -45,6 +45,7 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 | 存储驱动 | `platform/storage/**` | 动态属性播放列表存储；不依赖 UI。 |
 | 服务器适配 | `platform/server/**` | `server-net` 传输、远程 MIDI/播放列表读取；不依赖 app。 |
 | 服务器初始化 | `app/serverAdmin.ts` | 读取 secrets/variables，切换 `midiManager` 与播放列表 facade；属于组装逻辑。 |
+| `TranscriptionManager` | `app/server/transcription/manager.ts`（仅服务器版） | 在线转录任务所有权、轮询、超时/过期、通知与远程清理；不依赖 Minecraft，便于单测。 |
 
 `PianoWorld → PianoRuntime` 是单向依赖。`PianoRuntime` 不导入 `PianoWorld`。
 
@@ -132,6 +133,15 @@ Minecraft playSound / 粒子 / 显示
 - `__PIANO_TARGET__` 双构建语义保持不变：client 构建通过 `compile.define` 折叠并裁剪 server 分支；server 构建保留 `server-admin`/`server-net` 动态加载。
 - 内嵌 MIDI 由构建钩子从 `midis/library/` 生成到 preserve-modules 输出中的 `packages/addon/src/midis/`，与 `app/midiManager.ts` 的 `../midis/index.js` 相对导入一致；远程曲库仍通过 `midiManager.setSource()` 切换。server 构建跳过内嵌曲库生成，使用远程源/空内嵌源。
 
+### 在线转录（仅服务器版）
+
+- 实现在 `app/server/transcription/**`，只由 `app/server/features.ts` 在 server 构建、后端配置成功后初始化；client 构建经 `__PIANO_TARGET__` 常量折叠后不包含该目录，也不会注册入口。
+- 基础包只提供通用 `app/ui/midi/menuActions.ts` 可选菜单注册表。普通版没有动作，因此不会出现不可用的“在线转录”按钮，也不需要空实现。
+- `TranscriptionManager` 是任务状态的唯一事实来源：每个玩家最多一个任务（含已完成未导入的结果），轮询、超时、结果过期、完成通知与远程清理都由它负责；不持久化、不跨会话恢复。
+- 任务所有权归玩家，不归 UI、钢琴或存储卡。关闭页面、离开钢琴、拆除钢琴、拔出存储卡都不影响任务；玩家退出或主动取消时释放本地任务并尽力取消远程任务。
+- UI 只读 `changeSignal` 并调用管理器的提交/取消/导入；页面关闭时仅释放自身订阅。重新打开按当前任务状态恢复界面。
+- 存储卡只是导入目标：导入时使用当前钢琴和当前卡，复用 `CardAccess.storage().save()`；异步取回结果后重新校验玩家、钢琴、权限与卡 UID。导入成功才释放任务和远程结果，失败保留结果以便换卡重试。
+
 ### Observable 归属
 
 | 归属 | 创建时机 | 销毁时机 | 内容 |
@@ -196,6 +206,8 @@ cd packages/addon && node ../../tools/verify/verify-addon-build.mjs server
 - `tests/pianoDisplayLifecycle.test.ts`：运行时释放保留显示实体、真正拆除删除实体、重复实体恢复。
 - `tests/instrument.test.ts`：装配完整性、放置/销毁、回滚。
 - `tests/pianoDisplay.test.ts`、`pianoRay.test.ts`、`pianoSettings.test.ts`、`pianoTimbres.test.ts`、`netSource.test.ts`、`remotePlaylist.test.ts`。
+- `tests/transcriptionManager.test.ts`：单任务限制、并发提交/取消竞态、旧请求隔离、通知一次、超时/过期、导入成功/失败、玩家退出与管理器销毁。
+- `tests/transcribeUI.test.ts`：关闭页面不取消、重新打开恢复、完成后导入/丢弃、换卡不影响任务、重复点击与无卡提示。
 
 无法可靠自动覆盖、需要实机验证的场景：
 

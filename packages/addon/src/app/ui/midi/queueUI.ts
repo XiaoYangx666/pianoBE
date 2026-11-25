@@ -67,7 +67,7 @@ export const PlayQueuePage = DDUI.page<QueueArgs>("播放队列", (ui, args) => 
     };
 
     ui.label(head).label(pageText);
-    ui.label(`§7播放控制请回到 MIDI 播放器主页面（状态：§f${piano.getMidiPlayer().getInfo().state}§7）`);
+    ui.label("§7播放控制请回播放器主页");
     ui.button("＋ 添加歌曲", () => ui.push(MusicLibraryPage, { piano, mode: "add", tab: "library" }));
 
     for (let slot = 0; slot < PAGE_SIZE; slot++) {

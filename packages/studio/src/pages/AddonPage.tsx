@@ -149,7 +149,7 @@ export function AddonPage() {
     const [tokens, setTokens] = useState<StudioTokenInfo[]>([]);
     const [tokenForbidden, setTokenForbidden] = useState(false);
     const [tokenLabel, setTokenLabel] = useState("");
-    const [tokenRole, setTokenRole] = useState<"read" | "write" | "admin">("read");
+    const [tokenRole, setTokenRole] = useState<"user" | "admin">("user");
     const [createdToken, setCreatedToken] = useState<{ label: string; token: string } | null>(null);
     const [revokeTarget, setRevokeTarget] = useState<StudioTokenInfo | null>(null);
     const [copied, setCopied] = useState(false);
@@ -1076,13 +1076,12 @@ export function AddonPage() {
                                         <select
                                             value={tokenRole}
                                             onChange={(e) =>
-                                                setTokenRole(e.target.value as "read" | "write" | "admin")
+                                                setTokenRole(e.target.value as "user" | "admin")
                                             }
                                             className="h-9 rounded-md border border-[var(--pb-control-border)] bg-ore-sunken px-2.5 text-[12.5px]"
                                         >
-                                            <option value="read">read · 只读</option>
-                                            <option value="write">write · 可写</option>
-                                            <option value="admin">admin · 管理员</option>
+                                            <option value="user">普通 · 读取曲库 / 转录</option>
+                                            <option value="admin">管理员 · 曲库 / 插件 / 令牌</option>
                                         </select>
                                         <Button
                                             type="button"

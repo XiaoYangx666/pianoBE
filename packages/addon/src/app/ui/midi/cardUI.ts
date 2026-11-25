@@ -61,8 +61,8 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
         return entries.map(entry => storageRef(entry, access.uid));
     };
 
-    ui.label(title).label(usage).label("§8卡槽与物品栏中的实体卡实时同步").label(status);
-    ui.textField("重命名（输入后点保存）", rename);
+    ui.label(title).label(usage).label("§8与物品栏实体卡同步").label(status);
+    ui.textField("重命名", rename);
 
     ui.button("▶ 播放整张存储卡", () => {
         if (!piano.isAlive()) return ui.close();

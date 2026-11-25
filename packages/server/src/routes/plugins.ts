@@ -13,7 +13,7 @@ export function pluginsRoutes(
     deploymentService: DeploymentService,
 ): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
     const adminRole = () => requireRole("admin");
 
     app.get("/", readRole(), (c) => {
@@ -46,6 +46,9 @@ export function pluginsRoutes(
         const buf = await c.req.arrayBuffer();
         if (!buf || buf.byteLength === 0) {
             return c.json({ error: "插件文件为空" }, 400);
+        }
+        if (buf.byteLength > MAX_PLUGIN_BYTES) {
+            return c.json({ error: "插件包超过大小限制" }, 413);
         }
         try {
             const record = pluginService.installPluginBytes(new Uint8Array(buf), "upload");

@@ -2,8 +2,6 @@ export interface ServerConfig {
     port: number;
     /** sqlite 文件路径（":memory:" 用于测试） */
     dbPath: string;
-    /** 曲目内容目录（存 {id}.mid / {id}.pbe3 源文件） */
-    midisDir: string;
     /** 插件存储目录（存 {id}.pbeplugin 归档） */
     pluginsDir: string;
     /** 内置插件目录（可选，默认尝试 ../../build/plugins） */
@@ -36,10 +34,20 @@ export interface ServerConfig {
     amtThreads: number;
     /** 使用 --eco 低负载模式（单线程 + 主动让出 CPU） */
     amtEco: boolean;
+    /** 同时运行的转录任务数（默认 1，避免多个 amt-cli 打满 CPU） */
+    amtConcurrency: number;
+    /** 最多允许排队的转录任务数（默认 10，防止大量上传占满临时空间） */
+    amtMaxQueue: number;
+    /** 单个音频/视频最大时长（秒，默认 600）；超过直接拒绝，避免长时间下载和转录 */
+    amtMaxAudioSeconds: number;
+    /** B 站音频下载字节上限（默认 200 MB），防止异常大文件占满内存/临时盘 */
+    amtMaxDownloadBytes: number;
     /** 单次转录超时（默认 10 分钟） */
     amtTimeoutMs: number;
     /** B 站登录 Cookie（SESSDATA），仅高码率音轨需要 */
     biliSessdata?: string;
+    /** 日志文件路径；设为 off 时只输出到控制台（默认 ./data/logs/server.log） */
+    logFile?: string;
 }
 
 /**
@@ -52,7 +60,6 @@ export function loadConfig(
     return {
         port: Number(env.PORT ?? 3000),
         dbPath: env.DB_PATH ?? "./data/piano.db",
-        midisDir: env.MIDIS_DIR ?? "./data/midis",
         pluginsDir: env.PLUGINS_DIR ?? "./data/plugins",
         builtinPluginsDir: env.BUILTIN_PLUGINS_DIR || undefined,
         timbresDir: env.TIMBRES_DIR || undefined,
@@ -69,7 +76,18 @@ export function loadConfig(
         amtDecoder: env.AMT_DECODER === "ffmpeg" ? "ffmpeg" : "native",
         amtThreads: Math.max(1, Number(env.AMT_THREADS ?? 4) || 4),
         amtEco: env.AMT_ECO === "true",
+        amtConcurrency: Math.max(1, Number(env.AMT_CONCURRENCY ?? 1) || 1),
+        amtMaxQueue: Math.max(1, Number(env.AMT_MAX_QUEUE ?? 10) || 10),
+        amtMaxAudioSeconds: Math.max(30, Number(env.AMT_MAX_AUDIO_SECONDS ?? 600) || 600),
+        amtMaxDownloadBytes: Math.max(
+            1024 * 1024,
+            Number(env.AMT_MAX_DOWNLOAD_BYTES ?? 200 * 1024 * 1024) || 200 * 1024 * 1024
+        ),
         amtTimeoutMs: Math.max(30_000, Number(env.AMT_TIMEOUT_MS ?? 600_000) || 600_000),
         biliSessdata: env.BILI_SESSDATA || undefined,
+        logFile:
+            env.LOG_FILE === "off"
+                ? undefined
+                : env.LOG_FILE || "./data/logs/server.log",
     };
 }

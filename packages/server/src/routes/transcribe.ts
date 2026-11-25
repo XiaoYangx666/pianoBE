@@ -1,13 +1,15 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { extname } from "node:path";
 import type { AppDeps } from "../app.js";
-import { requireRole, type AppVariables } from "../auth.js";
+import { getToken, requireRole, type AppVariables } from "../auth.js";
 import {
     TranscribeJobStore,
+    TranscribeQueueFullError,
+    formatDuration,
     type TranscribeJobSnapshot,
 } from "../services/transcribeJobs.js";
-import { searchBiliVideos } from "../services/bilibili.js";
+import { BiliError, resolveBiliVideo, searchBiliVideos } from "../services/bilibili.js";
 
 /** 音频上传上限：B 站无损音频通常不到 30 MB，100 MB 足够覆盖长录音 */
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
@@ -49,7 +51,7 @@ function decodeHeader(raw: string | undefined): string {
 function cleanName(raw: string | undefined, fallback = "未命名转录"): string {
     let value = decodeHeader(raw);
     value = value.replace(/\.(mp3|m4a|mp4|m4s|aac|wav|flac|ogg|opus|wma|mid|midi)$/i, "");
-    value = value.replace(/[\\/:*?"<>|\r\n\t]/g, "_").trim().slice(0, 100);
+    value = value.replace(/[\\/:*?"<>|\r\n\t§]/g, "_").trim().slice(0, 100);
     return value || fallback;
 }
 
@@ -69,16 +71,21 @@ function audioMime(ext: string, contentType: string | undefined): string {
     return AUDIO_MIME[ext] ?? "application/octet-stream";
 }
 
-export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
-    const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
-    const jobs = new TranscribeJobStore({
+export function transcribeRoutes(
+    deps: AppDeps,
+    jobs = new TranscribeJobStore({
         songPort: deps.songPort,
         config: deps.config,
         amt: deps.amt,
-    });
+    })
+): Hono<{ Variables: AppVariables }> {
+    const app = new Hono<{ Variables: AppVariables }>();
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
+    const jobRole = () => requireRole("user");
 
-    const jobOr404 = (id: string) => jobs.get(id);
+    // 任务产物不跟随 ALLOW_PUBLIC_READ：必须带令牌，且只能看自己发起的（admin 除外）。
+    const jobOr404 = (c: Context<{ Variables: AppVariables }>, id: string) =>
+        jobs.visible(id, getToken(c)) ? jobs.get(id) : undefined;
 
     // GET /api/transcribe/status —— 前端据此提示 AMT 是否部署完成
     app.get("/status", readRole(), (c) => {
@@ -90,6 +97,10 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
             ...status,
             bilibili: true,
             maxAudioBytes: MAX_AUDIO_BYTES,
+            queued: jobs.pendingCount,
+            active: jobs.activeCount,
+            queueLimit: deps.config.amtMaxQueue,
+            queueFull: jobs.isQueueFull,
         });
     });
 
@@ -110,8 +121,14 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs —— 上传音频，返回任务（不写入曲目库）
-    app.post("/jobs", requireRole("write"), async (c) => {
-        if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
+    // 上传最多 100 MB，保持管理员限定，避免普通令牌占内存/临时盘。
+    app.post("/jobs", requireRole("admin"), async (c) => {
+        if (!deps.amt?.status().available) {
+            return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
+        }
+        if (jobs.isQueueFull) {
+            return c.json({ error: "转录队列已满，请稍后再试" }, 429);
+        }
 
         const length = Number(c.req.header("Content-Length") ?? 0);
         if (length > MAX_AUDIO_BYTES) {
@@ -130,21 +147,46 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         const ext = audioExtension(rawName, contentType);
         const durationRaw = Number(c.req.header("X-Audio-Duration") ?? 0);
         const durationSec = Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : undefined;
+        if (durationSec !== undefined && durationSec > deps.config.amtMaxAudioSeconds) {
+            return c.json(
+                {
+                    error: `音频时长超过上限（${formatDuration(durationSec)} > ${formatDuration(
+                        deps.config.amtMaxAudioSeconds
+                    )}）`,
+                },
+                413
+            );
+        }
 
-        const job = jobs.startUpload({
-            buffer: new Uint8Array(buffer),
-            ext,
-            mime: audioMime(ext, contentType),
-            name: cleanName(rawName, "上传转录"),
-            durationSec,
-            fileName: rawName || undefined,
-        });
+        const job = (() => {
+            try {
+                return jobs.startUpload({
+                    buffer: new Uint8Array(buffer),
+                    ext,
+                    mime: audioMime(ext, contentType),
+                    name: cleanName(rawName, "上传转录"),
+                    durationSec,
+                    fileName: rawName || undefined,
+                    ownerId: getToken(c)?.id,
+                });
+            } catch (error) {
+                if (error instanceof TranscribeQueueFullError) return undefined;
+                throw error;
+            }
+        })();
+        if (!job) return c.json({ error: "转录队列已满，请稍后再试" }, 429);
         return c.json(job, 201);
     });
 
     // POST /api/transcribe/jobs/bilibili —— { input, page?, name? }
-    app.post("/jobs/bilibili", requireRole("write"), async (c) => {
-        if (!deps.amt) return c.json({ error: "服务端未启用 AMT" }, 503);
+    // 普通令牌即可创建临时任务；结果只有显式 save 才会进入曲库（要求管理员）。
+    app.post("/jobs/bilibili", requireRole("user"), async (c) => {
+        if (!deps.amt?.status().available) {
+            return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
+        }
+        if (jobs.isQueueFull) {
+            return c.json({ error: "转录队列已满，请稍后再试" }, 429);
+        }
         const body = (await c.req.json().catch(() => null)) as
             | { input?: unknown; page?: unknown; name?: unknown }
             | null;
@@ -153,21 +195,54 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
         const page = Math.max(1, Number(body?.page ?? 1) || 1);
         const name = typeof body?.name === "string" ? cleanName(body.name) : undefined;
 
-        const job = jobs.startBilibili({ url: input, page, name });
+        // 先解析视频元信息并在下载前拒绝超长视频，避免白下载、白占队列。
+        let video;
+        try {
+            video = await resolveBiliVideo(input, page, deps.config.biliSessdata);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return c.json({ error: message }, error instanceof BiliError ? 502 : 400);
+        }
+        if (video.durationSec && video.durationSec > deps.config.amtMaxAudioSeconds) {
+            return c.json(
+                {
+                    error: `视频时长超过上限（${formatDuration(video.durationSec)} > ${formatDuration(
+                        deps.config.amtMaxAudioSeconds
+                    )}）`,
+                },
+                413
+            );
+        }
+
+        const job = (() => {
+            try {
+                return jobs.startBilibili({
+                    url: input,
+                    page,
+                    name,
+                    ownerId: getToken(c)?.id,
+                    video,
+                });
+            } catch (error) {
+                if (error instanceof TranscribeQueueFullError) return undefined;
+                throw error;
+            }
+        })();
+        if (!job) return c.json({ error: "转录队列已满，请稍后再试" }, 429);
         return c.json(job, 201);
     });
 
     // GET /api/transcribe/jobs/:id —— 任务状态（轮询/刷新后恢复）
-    app.get("/jobs/:id", readRole(), (c) => {
-        const job = jobOr404(c.req.param("id") ?? "");
+    app.get("/jobs/:id", jobRole(), (c) => {
+        const job = jobOr404(c, c.req.param("id") ?? "");
         if (!job) return c.json({ error: "任务不存在或已过期" }, 404);
         return c.json(job);
     });
 
     // GET /api/transcribe/jobs/:id/events —— SSE 进度
-    app.get("/jobs/:id/events", readRole(), async (c) => {
+    app.get("/jobs/:id/events", jobRole(), async (c) => {
         const id = c.req.param("id") ?? "";
-        const initial = jobOr404(id);
+        const initial = jobOr404(c, id);
         if (!initial) return c.json({ error: "任务不存在或已过期" }, 404);
 
         c.header("Cache-Control", "no-cache");
@@ -226,10 +301,11 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // PATCH /api/transcribe/jobs/:id —— { name } 改任务名
-    app.patch("/jobs/:id", requireRole("write"), async (c) => {
+    app.patch("/jobs/:id", jobRole(), async (c) => {
         const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或已过期" }, 404);
         const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
-        const name = typeof body?.name === "string" ? body.name.trim() : "";
+        const name = typeof body?.name === "string" ? cleanName(body.name, "") : "";
         if (!name) return c.json({ error: "曲名不能为空" }, 400);
         const job = jobs.rename(id, name);
         if (!job) return c.json({ error: "任务不存在或已过期" }, 404);
@@ -237,7 +313,7 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs/:id/save —— 显式保存到曲目库
-    app.post("/jobs/:id/save", requireRole("write"), async (c) => {
+    app.post("/jobs/:id/save", requireRole("admin"), async (c) => {
         const id = c.req.param("id") ?? "";
         const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
         const name = typeof body?.name === "string" ? body.name.trim() : undefined;
@@ -248,15 +324,30 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // GET /api/transcribe/jobs/:id/code —— 游戏内导入码
-    app.get("/jobs/:id/code", readRole(), (c) => {
-        const code = jobs.code(c.req.param("id") ?? "");
+    app.get("/jobs/:id/code", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
+        const code = jobs.code(id);
         if (!code) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
         return c.json(code);
     });
 
+    // GET /api/transcribe/jobs/:id/song —— 转录结果的 PBE3（BDS 直接写入存储卡）
+    app.get("/jobs/:id/song", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) {
+            return c.json({ error: "任务不存在、尚未转录完成或已过期" }, 404);
+        }
+        const song = jobs.song(id);
+        if (!song) return c.json({ error: "任务不存在、尚未转录完成或已过期" }, 404);
+        return c.json(song);
+    });
+
     // GET /api/transcribe/jobs/:id/audio —— 原始音频（支持 Range，用于试听）
-    app.get("/jobs/:id/audio", readRole(), async (c) => {
-        const audio = jobs.audio(c.req.param("id") ?? "");
+    app.get("/jobs/:id/audio", jobRole(), async (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或音频未就绪" }, 404);
+        const audio = jobs.audio(id);
         if (!audio) return c.json({ error: "任务不存在或音频未就绪" }, 404);
 
         const file = Bun.file(audio.path);
@@ -287,15 +378,19 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // GET /api/transcribe/jobs/:id/midi —— 转录结果原始 MIDI（试听）
-    app.get("/jobs/:id/midi", readRole(), (c) => {
-        const midi = jobs.midi(c.req.param("id") ?? "");
+    app.get("/jobs/:id/midi", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
+        const midi = jobs.midi(id);
         if (!midi) return c.json({ error: "任务不存在或尚未转录完成" }, 404);
         return c.body(midi, 200, { "content-type": "audio/midi", "cache-control": "no-store" });
     });
 
     // DELETE /api/transcribe/jobs/:id —— 放弃任务并清理临时文件
-    app.delete("/jobs/:id", requireRole("write"), (c) => {
-        const removed = jobs.remove(c.req.param("id") ?? "");
+    app.delete("/jobs/:id", jobRole(), (c) => {
+        const id = c.req.param("id") ?? "";
+        if (!jobs.visible(id, getToken(c))) return c.json({ error: "任务不存在或已过期" }, 404);
+        const removed = jobs.remove(id);
         if (!removed) return c.json({ error: "任务不存在或已过期" }, 404);
         return c.body(null, 204);
     });

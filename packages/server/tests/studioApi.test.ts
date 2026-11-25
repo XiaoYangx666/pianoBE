@@ -58,7 +58,6 @@ function req(path: string, init: RequestInit & { token?: string } = {}) {
 
 beforeAll(() => {
     tempRoot = mkdtempSync(join(tmpdir(), "piano-studio-api-"));
-    const midisDir = join(tempRoot, "midis");
     const pluginsDir = join(tempRoot, "plugins");
     bdsDir = join(tempRoot, "bds");
     mkdirSync(join(bdsDir, "worlds", "MyWorld"), { recursive: true });
@@ -70,7 +69,7 @@ beforeAll(() => {
 
     const db = openDb(":memory:");
     ensureBootstrapToken(db, ADMIN);
-    const songPort = new SqliteSongPort(db, midisDir);
+    const songPort = new SqliteSongPort(db);
     const config = loadConfig({
         PLUGINS_DIR: pluginsDir,
         BDS_DIR: bdsDir,
@@ -80,7 +79,7 @@ beforeAll(() => {
     const deploymentService = new DeploymentService(songPort, pluginService, config);
     deps = { db, songPort, config, pluginService, deploymentService };
     app = createApp(deps);
-    writerToken = createToken(db, "studio-writer", "write").token;
+    writerToken = createToken(db, "studio-writer", "admin").token;
 });
 
 afterAll(() => {

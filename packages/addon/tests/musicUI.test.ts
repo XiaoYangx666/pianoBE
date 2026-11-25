@@ -578,7 +578,7 @@ describe("管理员全局曲库入口", () => {
     test("管理员入口显示容量与导入/浏览按钮", () => {
         openAdminLibrary(makePlayer("op"));
         const form = host.lastForm();
-        expect(form.labelTexts().some(text => text.includes("世界动态属性"))).toBe(true);
+        expect(form.labelTexts().some(text => text.includes("世界公共曲库"))).toBe(true);
         expect(form.labelTexts().some(text => text.includes("500"))).toBe(true);
         expect(form.buttonLabels()).toContain("导入全局歌曲");
         expect(form.buttonLabels()).toContain("浏览与删除歌曲");

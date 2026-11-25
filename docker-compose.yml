@@ -6,10 +6,10 @@ services:
         ports:
             - "35050:3000"
         environment:
-            # 管理员令牌：部署时务必修改！忘记可在 .env 中修改后重启容器重置
-            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-change-me-admin-token}
+            # 管理员令牌：留空则首次启动自动生成并打印到 docker logs / 日志文件
+            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
             DB_PATH: /app/data/piano.db
-            MIDIS_DIR: /app/data/midis
+            LOG_FILE: /app/data/logs/server.log
             WEB_ROOT: /app/packages/studio/dist
             BUILTIN_PLUGINS_DIR: /app/build/plugins
             # 需要公开读时设为 true
@@ -17,3 +17,15 @@ services:
         volumes:
             - ./packages/server/data:/app/data
         restart: unless-stopped
+        init: true
+        healthcheck:
+            test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 20s
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"

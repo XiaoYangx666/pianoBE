@@ -111,18 +111,21 @@ pcommand.registerNative(
     })
 );
 
-// 远程曲库（BDS 专用：server-admin 读 secrets.json 配置后端 URL/token，
-// 经 server-net 拉取）。client 构建时此分支被 compile.define 注入常量折叠
-// + 死代码消除整体裁剪（产物不含 serverAdmin/serverNet 代码，不依赖 BDS 模块）。
+// 远程曲库与服务器版可选功能（BDS 专用：server-admin 读 secrets.json 配置后端
+// URL/token，经 server-net 拉取）。client 构建时此分支被 compile.define 注入常量
+// 折叠 + 死代码消除整体裁剪（产物不含 serverAdmin/serverNet/在线转录代码）。
 if (__PIANO_TARGET__ === "server") {
     console.log("[piano] server 构建：20 tick 后尝试初始化远程曲库");
     system.runTimeout(async () => {
         try {
             const { initServerAdmin } = await import("./serverAdmin.js");
-            const ok = await initServerAdmin();
+            const backend = await initServerAdmin();
             console.log(
-                `[piano] 远程曲库初始化结果: ${ok ? "成功" : "未启用（使用内嵌曲库）"}`
+                `[piano] 远程曲库初始化结果: ${backend ? "成功" : "未启用（使用内嵌曲库）"}`
             );
+            if (!backend) return;
+            const { initServerFeatures } = await import("./server/features.js");
+            initServerFeatures(backend);
         } catch (e) {
             console.warn("[serverAdmin] 初始化失败，使用内嵌曲库", e);
         }

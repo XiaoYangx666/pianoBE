@@ -50,6 +50,6 @@ RUN cd packages/server/amt \
 RUN bun install --production --no-save --filter @piano/server
 
 WORKDIR /app/packages/server
-ENV PORT=3000 DB_PATH=/app/data/piano.db MIDIS_DIR=/app/data/midis WEB_ROOT=/app/packages/studio/dist BUILTIN_PLUGINS_DIR=/app/build/plugins
+ENV PORT=3000 DB_PATH=/app/data/piano.db LOG_FILE=/app/data/logs/server.log WEB_ROOT=/app/packages/studio/dist BUILTIN_PLUGINS_DIR=/app/build/plugins
 VOLUME /app/data
 CMD ["bun", "src/index.ts"]

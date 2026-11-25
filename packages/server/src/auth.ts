@@ -2,7 +2,14 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Database } from "bun:sqlite";
 import type { Context, Next } from "hono";
 
-export type Role = "read" | "write" | "admin";
+/**
+ * 只有两种令牌：
+ * - user：普通令牌，可读曲库、创建临时转录任务，不能修改曲库；
+ * - admin：管理员令牌，可管理曲库、插件、部署与令牌。
+ *
+ * 旧库里的 read/write 在读取时统一按 user 处理（write 的曲库写权限不再保留）。
+ */
+export type Role = "user" | "admin";
 
 export interface TokenInfo {
     id: number;
@@ -10,7 +17,9 @@ export interface TokenInfo {
     role: Role;
 }
 
-const ROLE_LEVEL: Record<Role, number> = { read: 1, write: 2, admin: 3 };
+function normalizeRole(raw: string): Role {
+    return raw === "admin" ? "admin" : "user";
+}
 
 export function sha256Hex(s: string): string {
     return createHash("sha256").update(s).digest("hex");
@@ -25,7 +34,7 @@ interface TokenRow {
     id: number;
     label: string;
     token_hash: string;
-    role: Role;
+    role: string;
     revoked: number;
 }
 
@@ -33,7 +42,7 @@ export function getTokenInfo(db: Database, token: string): TokenInfo | undefined
     const r = db
         .prepare(`SELECT id,label,role FROM tokens WHERE token_hash=? AND revoked=0`)
         .get(sha256Hex(token)) as Pick<TokenRow, "id" | "label" | "role"> | null;
-    return r ?? undefined;
+    return r ? { id: r.id, label: r.label, role: normalizeRole(r.role) } : undefined;
 }
 
 /** 创建令牌，返回明文（仅此一次可见） */
@@ -52,9 +61,16 @@ export function createToken(
 }
 
 export function listTokens(db: Database) {
-    return db
+    const rows = db
         .prepare(`SELECT id,label,role,created_at,revoked FROM tokens ORDER BY id`)
-        .all() as Omit<TokenRow, "token_hash">[];
+        .all() as Array<Omit<TokenRow, "token_hash">>;
+    return rows.map((row) => ({ ...row, role: normalizeRole(row.role) }));
+}
+
+/** 把旧库的 read/write 一次性迁移为 user；返回迁移数量。 */
+export function migrateLegacyRoles(db: Database): number {
+    const result = db.prepare(`UPDATE tokens SET role='user' WHERE role IN ('read','write')`).run();
+    return result.changes;
 }
 
 export function revokeToken(db: Database, id: number): boolean {
@@ -113,7 +129,7 @@ export async function authMiddleware(c: Context<{ Variables: AppVariables }>, ne
     await next();
 }
 
-/** 角色门槛：至少 require 级别；allowPublic 时公开接口放行未登录 */
+/** 令牌门槛：user 只需有效令牌，admin 额外要求管理员令牌 */
 export function requireRole(require: Role, allowPublic = false) {
     return async (c: Context<{ Variables: AppVariables }>, next: Next) => {
         const token = getToken(c);
@@ -121,8 +137,8 @@ export function requireRole(require: Role, allowPublic = false) {
             if (allowPublic) return next();
             return c.json({ error: "缺少有效令牌" }, 401);
         }
-        if (ROLE_LEVEL[token.role] < ROLE_LEVEL[require]) {
-            return c.json({ error: "令牌权限不足" }, 403);
+        if (require === "admin" && token.role !== "admin") {
+            return c.json({ error: "需要管理员令牌" }, 403);
         }
         return next();
     };

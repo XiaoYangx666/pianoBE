@@ -14,7 +14,7 @@
         "build:template": "npm run sync:assets && bepack build --skip-copy --pack --mode template && node ../../tools/build/strip-template-timbres.mjs",
         "build:server": "npm run sync:assets && bepack build --config bepack.server.config.ts --skip-copy --pack",
         "verify:build": "npm run sync:assets && bepack build --skip-copy && node ../../tools/verify/verify-addon-build.mjs client && bepack build --config bepack.server.config.ts --skip-copy && node ../../tools/verify/verify-addon-build.mjs server",
-        "test": "bun test"
+        "test": "bun test --isolate"
     },
     "dependencies": {
         "@begame/tabletop": "file:../../vendor/begame-tabletop-0.1.16.tgz",

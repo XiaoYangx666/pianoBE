@@ -76,12 +76,16 @@ export class PianoMusic {
     }
 
     performances(ref: MusicRef) {
-        if (ref.source === "library") return midiManager.performances(ref.id);
+        if (ref.source === "library") {
+            const list = midiManager.performances(ref.id);
+            if (list.length) return list;
+            return ref.performances ?? this.libraryEntries(ref).flatMap((entry) => entry.cues ? [entry.cues] : []);
+        }
         return this.cardMatches(ref) ? this.cardStorageProvider()?.getPerformances?.(ref.id) ?? [] : [];
     }
 
     performanceEntries(ref: MusicRef): readonly PerformanceDescriptor[] {
-        if (ref.source === "library") return midiManager.performanceEntries(ref.id);
+        if (ref.source === "library") return this.libraryEntries(ref);
         if (!this.cardMatches(ref)) return [];
         const entries = this.cardStorageProvider()?.getPerformanceEntries?.(ref.id);
         if (entries) {
@@ -101,9 +105,27 @@ export class PianoMusic {
         }));
     }
 
+    /**
+     * 公共曲库演出摘要：优先用 MidiManager 的索引；远程分页结果尚未登记
+     * （例如世界曲库刷新后）时退回引用自身携带的摘要，避免只剩默认演出。
+     */
+    private libraryEntries(ref: MusicRef): readonly PerformanceDescriptor[] {
+        const indexed = midiManager.performanceEntries(ref.id);
+        if (indexed.length) return indexed;
+        if (ref.performanceEntries?.length) return ref.performanceEntries;
+        return (ref.performances ?? []).map((cues, index) => ({
+            id: `${ref.id}:perf:${index + 1}`,
+            name: `附加演出 ${index + 1}`,
+            songId: ref.id,
+            cues,
+        }));
+    }
+
     async resolvePerformanceCues(ref: MusicRef, performanceId: string): Promise<readonly PerformanceCue[] | undefined> {
         if (performanceId === "plain") return undefined;
         if (ref.source === "library") {
+            const local = this.libraryEntries(ref).find((entry) => entry.id === performanceId);
+            if (local?.cues) return local.cues;
             return midiManager.resolvePerformanceCues(ref.id, performanceId);
         }
         const entries = this.performanceEntries(ref);

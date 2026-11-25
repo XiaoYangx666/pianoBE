@@ -51,6 +51,22 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     return (await res.arrayBuffer()) as unknown as T;
 }
 
+/** 读取本地音频时长，供服务端计算转录进度；读取失败时返回 undefined */
+function probeAudioDuration(file: File): Promise<number | undefined> {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file);
+        const audio = new Audio();
+        const done = (value?: number) => {
+            URL.revokeObjectURL(url);
+            audio.removeAttribute("src");
+            resolve(value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined);
+        };
+        audio.onloadedmetadata = () => done(audio.duration);
+        audio.onerror = () => done();
+        audio.src = url;
+    });
+}
+
 export const serverApi = {
     async checkAvailable(): Promise<{ ok: boolean; authRequired: boolean; authenticated: boolean }> {
         try {
@@ -341,7 +357,12 @@ export const serverApi = {
     getTranscribeStatus() {
         return req<{
             available: boolean;
-            bilibili?: { available: boolean; reason?: string };
+            bilibili?: boolean;
+            message?: string;
+            queued?: number;
+            active?: number;
+            queueLimit?: number;
+            queueFull?: boolean;
         }>("/api/transcribe/status");
     },
 
@@ -358,38 +379,71 @@ export const serverApi = {
         }>(`/api/transcribe/bilibili/search?q=${encodeURIComponent(q)}&page=${page}`);
     },
 
-    startTranscribeUpload(file: File, name: string, duration?: number) {
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("name", name);
-        if (duration !== undefined) fd.append("duration", String(duration));
-        return req<{ jobId: string }>("/api/transcribe/jobs", { method: "POST", body: fd });
+    async startTranscribeUpload(file: File, name: string, duration?: number) {
+        const dot = file.name.lastIndexOf(".");
+        const ext = dot >= 0 ? file.name.slice(dot) : "";
+        const fileName = `${name}${ext}`;
+        const headers: Record<string, string> = {
+            "X-File-Name": encodeURIComponent(fileName),
+            "Content-Type": file.type || "application/octet-stream",
+        };
+        const audioDuration = duration ?? (await probeAudioDuration(file));
+        if (audioDuration !== undefined) headers["X-Audio-Duration"] = String(audioDuration);
+        const job = await req<{ id: string }>("/api/transcribe/jobs", {
+            method: "POST",
+            headers,
+            body: await file.arrayBuffer(),
+        });
+        return { jobId: job.id };
     },
 
-    startTranscribeBilibili(bvid: string, name: string) {
-        return req<{ jobId: string }>("/api/transcribe/jobs/bilibili", {
+    async startTranscribeBilibili(input: string, name?: string) {
+        const job = await req<{ id: string }>("/api/transcribe/jobs/bilibili", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bvid, name }),
+            body: JSON.stringify({ input, name }),
         });
+        return { jobId: job.id };
     },
 
-    getTranscribeJob(jobId: string) {
-        return req<{
+    async getTranscribeJob(jobId: string) {
+        const job = await req<{
             id: string;
             name: string;
             stage: "queued" | "downloading" | "analyzing" | "transcribing" | "finalizing" | "done" | "error";
-            progress: number;
+            message?: string;
+            /** 0-100；-1 表示无法估算 */
+            percent: number;
+            noteCount: number;
+            midiDuration?: number;
             error?: string;
-            result?: {
-                noteCount: number;
-                duration: number;
-            };
         }>(`/api/transcribe/jobs/${encodeURIComponent(jobId)}`);
+        return {
+            id: job.id,
+            name: job.name,
+            stage: job.stage,
+            message: job.message,
+            progress: job.percent >= 0 ? job.percent / 100 : -1,
+            error: job.error,
+            result:
+                job.stage === "done"
+                    ? { noteCount: job.noteCount, duration: job.midiDuration ?? 0 }
+                    : undefined,
+        };
+    },
+
+    cancelTranscribeJob(jobId: string) {
+        return req<void>(`/api/transcribe/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" });
+    },
+
+    getTranscribeCode(jobId: string) {
+        return req<{ name: string; chunks: string[]; bytes: number }>(
+            `/api/transcribe/jobs/${encodeURIComponent(jobId)}/code`,
+        );
     },
 
     saveTranscribeJob(jobId: string, name?: string) {
-        return req<StudioSong>(`/api/transcribe/jobs/${encodeURIComponent(jobId)}/save`, {
+        return req<unknown>(`/api/transcribe/jobs/${encodeURIComponent(jobId)}/save`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name }),

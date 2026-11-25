@@ -11,6 +11,7 @@ import { midiViewModel } from "./playerViewModel";
 import { MusicLibraryPage } from "./libraryUI";
 import { MusicCardPage } from "./cardUI";
 import { MidiImportPage } from "./importUI";
+import { midiMenuActions } from "./menuActions";
 import { PlayQueuePage } from "./queueUI";
 
 const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
@@ -122,6 +123,13 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
             if (!alive() || !block.isValid) return ui.close();
             ui.push(MidiImportPage, { piano });
         });
+        // 可选扩展入口（例如服务器版的在线转录）；基础包不注册任何动作。
+        for (const action of midiMenuActions()) {
+            ui.button(action.label, () => {
+                if (!alive() || !block.isValid) return ui.close();
+                action.open(ui, piano);
+            });
+        }
         ui.closeButton();
     }
 );

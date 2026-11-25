@@ -8,6 +8,7 @@
  */
 
 import { writeFileSync } from "node:fs";
+import { fetchWithTimeout } from "./http.js";
 
 const API = "https://api.bilibili.com";
 const UA =
@@ -93,9 +94,11 @@ async function getBuvidCookie(): Promise<string> {
     sessionAt = Date.now();
     cookiePromise = (async () => {
         try {
-            const res = await fetch(`${API}/x/frontend/finger/spi`, {
-                headers: { "User-Agent": UA, Referer: REFERER },
-            });
+            const res = await fetchWithTimeout(
+                `${API}/x/frontend/finger/spi`,
+                { headers: { "User-Agent": UA, Referer: REFERER } },
+                10_000
+            );
             const json = (await res.json()) as {
                 code?: number;
                 data?: { b_3?: string; b_4?: string };
@@ -141,13 +144,17 @@ async function fetchJson<T>(
         let lastError: unknown;
         for (let i = 0; i < retries; i++) {
             try {
-                const res = await fetch(`${url}?${query}`, {
-                    headers: {
-                        "User-Agent": UA,
-                        Referer: REFERER,
-                        ...(cookie ? { Cookie: cookie } : {}),
+                const res = await fetchWithTimeout(
+                    `${url}?${query}`,
+                    {
+                        headers: {
+                            "User-Agent": UA,
+                            Referer: REFERER,
+                            ...(cookie ? { Cookie: cookie } : {}),
+                        },
                     },
-                });
+                    15_000
+                );
                 return (await res.json()) as T;
             } catch (error) {
                 lastError = error;
@@ -299,32 +306,114 @@ export async function resolveBiliVideo(
     };
 }
 
+function abortError(signal?: AbortSignal): Error {
+    const reason = signal?.reason;
+    return reason instanceof Error ? reason : new Error("任务已取消");
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) throw abortError(signal);
+}
+
+/** 流式读取响应体，超过上限立即取消，避免先完整下载再判断。 */
+export async function readBodyLimited(
+    res: Response,
+    maxBytes: number,
+    signal?: AbortSignal
+): Promise<Uint8Array> {
+    if (!res.body) {
+        const buffer = new Uint8Array(await res.arrayBuffer());
+        throwIfAborted(signal);
+        if (buffer.byteLength > maxBytes) {
+            throw new BiliError(`音频文件超过大小限制（${buffer.byteLength} > ${maxBytes} 字节）`);
+        }
+        return buffer;
+    }
+
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (!value) continue;
+            total += value.byteLength;
+            if (total > maxBytes) {
+                await reader.cancel().catch(() => {});
+                throw new BiliError(`音频文件超过大小限制（${total} > ${maxBytes} 字节）`);
+            }
+            chunks.push(value);
+        }
+    } catch (error) {
+        if (signal?.aborted) throw abortError(signal);
+        throw error;
+    } finally {
+        reader.releaseLock();
+    }
+    throwIfAborted(signal);
+
+    const buffer = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        buffer.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return buffer;
+}
+
 export async function downloadBiliAudio(
     video: BiliVideo,
     dest: string,
-    sessdata?: string
+    sessdata?: string,
+    options: { signal?: AbortSignal; maxBytes?: number } = {}
 ): Promise<number> {
+    const { signal, maxBytes = Number.POSITIVE_INFINITY } = options;
+    throwIfAborted(signal);
     const buvid = await getBuvidCookie();
+    throwIfAborted(signal);
     const cookie = [buvid, sessdata ? `SESSDATA=${sessdata}` : ""].filter(Boolean).join("; ");
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
+        throwIfAborted(signal);
         try {
-            const res = await fetch(video.trackUrl, {
-                headers: {
-                    "User-Agent": UA,
-                    Referer: REFERER,
-                    ...(cookie ? { Cookie: cookie } : {}),
+            const res = await fetchWithTimeout(
+                video.trackUrl,
+                {
+                    headers: {
+                        "User-Agent": UA,
+                        Referer: REFERER,
+                        ...(cookie ? { Cookie: cookie } : {}),
+                    },
+                    ...(signal ? { signal } : {}),
                 },
-            });
+                300_000
+            );
             if (!res.ok) {
                 throw new BiliError(`音频下载失败（HTTP ${res.status}）`, res.status);
             }
-            // 不直接 Bun.write(res)：部分 CDN 会中断流式写入，先完整读入内存更稳
-            const buffer = await res.arrayBuffer();
+            const declared = Number(res.headers.get("content-length") ?? 0);
+            if (declared > maxBytes) {
+                throw new BiliError(`音频文件超过大小限制（${declared} > ${maxBytes} 字节）`);
+            }
+            // 不直接 Bun.write(res)：部分 CDN 会中断流式写入，先完整读入内存更稳；
+            // 读取过程中按累计字节数检查上限，超限立即取消响应流。
+            const buffer = await readBodyLimited(res, maxBytes, signal);
+            throwIfAborted(signal);
             if (buffer.byteLength === 0) throw new BiliError("下载到的音频为空");
-            writeFileSync(dest, new Uint8Array(buffer));
+            writeFileSync(dest, buffer);
             return buffer.byteLength;
         } catch (error) {
+            // 用户取消后不再重试，也不继续占用并发槽。
+            if (signal?.aborted) throw abortError(signal);
+            // 文件过大/4xx 属于确定性失败，重试只会重复消耗带宽和时间。
+            if (
+                error instanceof BiliError &&
+                ((error.code !== undefined && error.code >= 400 && error.code < 500) ||
+                    error.message.includes("超过大小限制"))
+            ) {
+                throw error;
+            }
             lastError = error;
             console.warn(`[bilibili] 音频下载失败（第 ${attempt + 1} 次）`, error);
             if (attempt < 2) await Bun.sleep(1000 * (attempt + 1));

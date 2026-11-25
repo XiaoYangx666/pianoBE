@@ -50,7 +50,7 @@ export const TextSettingsPage = DDUI.page<{ piano: PianoRuntime }>("文字设置
     const textForward = field("textForward", ui.number(settings.textForward));
     const textDistance = field("textDistance", ui.number(settings.textDistance));
 
-    ui.label("§7只影响琴面 LCD 文字，不影响演奏与播放。");
+    ui.label("§7仅影响琴面文字");
     ui.toggle("显示琴面文字", textVisible);
     ui.textField("标题颜色", titleColor, { description: "输入 #RRGGBB，色值有效后生效" });
     ui.textField("状态颜色", statusColor, { description: "输入 #RRGGBB，色值有效后生效" });

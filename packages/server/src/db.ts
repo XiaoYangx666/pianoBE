@@ -69,11 +69,19 @@ CREATE TABLE IF NOT EXISTS server_state (
     updated_at INTEGER NOT NULL
 );
 
+-- 曲目原始内容（mid/pbe3/json）。与 songs 元数据分开存，列表查询不碰大字段。
+CREATE TABLE IF NOT EXISTS song_files (
+    song_id TEXT NOT NULL,
+    kind    TEXT NOT NULL,       -- mid | pbe3 | json
+    bytes   BLOB NOT NULL,
+    PRIMARY KEY (song_id, kind)
+);
+
 CREATE TABLE IF NOT EXISTS tokens (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     label      TEXT NOT NULL UNIQUE,  -- 身份名（如 bootstrap / my-uploader）
     token_hash TEXT NOT NULL,         -- SHA-256(明文令牌)
-    role       TEXT NOT NULL,         -- read | write | admin
+    role       TEXT NOT NULL,         -- user | admin（旧 read/write 读取时按 user 处理）
     created_at INTEGER NOT NULL,
     revoked    INTEGER NOT NULL DEFAULT 0
 );
@@ -82,6 +90,10 @@ CREATE TABLE IF NOT EXISTS tokens (
 /** 打开数据库并确保表结构存在（幂等迁移） */
 export function openDb(path: string): Database {
     const db = new Database(path);
+    // WAL + 忙等：部署批量写库与 BDS 拉曲并发时，避免直接 SQLITE_BUSY
+    db.exec("PRAGMA journal_mode = WAL");
+    db.exec("PRAGMA busy_timeout = 5000");
+    db.exec("PRAGMA synchronous = NORMAL");
     db.exec(SCHEMA);
     migrateSongsColumns(db);
     seedDefaults(db);

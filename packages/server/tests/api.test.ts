@@ -1,7 +1,4 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { openDb } from "../src/db";
 import { createApp, type AppDeps } from "../src/app";
 import { createToken, ensureBootstrapToken, getTokenInfo } from "../src/auth";
@@ -25,7 +22,6 @@ let app: ReturnType<typeof createApp>;
 let writerToken = "";
 let readerToken = "";
 let songId = "";
-let midisDir = "";
 
 /** 类型化 json 解析 */
 async function j<T>(res: Response): Promise<T> {
@@ -42,21 +38,19 @@ function req(path: string, init: RequestInit & { token?: string } = {}) {
 beforeAll(() => {
     const db = openDb(":memory:");
     ensureBootstrapToken(db, ADMIN);
-    midisDir = mkdtempSync(join(tmpdir(), "piano-api-midis-"));
-    const songPort = new SqliteSongPort(db, midisDir);
+    const songPort = new SqliteSongPort(db);
     deps = {
         db,
         songPort,
         config: loadConfig({}),
     };
     app = createApp(deps);
-    writerToken = createToken(db, "writer", "write").token;
-    readerToken = createToken(db, "reader", "read").token;
+    writerToken = createToken(db, "writer", "admin").token;
+    readerToken = createToken(db, "reader", "user").token;
 });
 
 afterAll(() => {
     deps.db.close();
-    rmSync(midisDir, { recursive: true, force: true });
 });
 
 describe("健康检查与鉴权", () => {
@@ -113,6 +107,13 @@ describe("曲库 API", () => {
         });
         const list = await j<{ total: number }>(await req("/api/songs", { token: readerToken }));
         expect(list.total).toBe(1);
+    });
+
+    test("原始文件下载带 nosniff 与 attachment", async () => {
+        const res = await req(`/api/songs/${songId}/raw`, { token: readerToken });
+        expect(res.status).toBe(200);
+        expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+        expect(res.headers.get("content-disposition")).toContain("attachment");
     });
 
     test("无文件名时 name 回退为 id", async () => {
@@ -197,14 +198,14 @@ describe("曲库 API", () => {
 
 describe("令牌管理 API", () => {
     test("非 admin 访问 → 403", async () => {
-        expect((await req("/api/tokens", { token: writerToken })).status).toBe(403);
+        expect((await req("/api/tokens", { token: readerToken })).status).toBe(403);
     });
 
-    test("创建 read 令牌 → 明文一次；新令牌可用；吊销后失效", async () => {
+    test("创建 user 令牌 → 明文一次；新令牌可用；吊销后失效", async () => {
         const created = await req("/api/tokens", {
             token: ADMIN, method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ label: "external-bot", role: "read" }),
+            body: JSON.stringify({ label: "external-bot", role: "user" }),
         });
         expect(created.status).toBe(201);
         const { token, id } = await j<{ token: string; id: number }>(created);
@@ -217,7 +218,7 @@ describe("令牌管理 API", () => {
         const dup = await req("/api/tokens", {
             token: ADMIN, method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ label: "external-bot", role: "read" }),
+            body: JSON.stringify({ label: "external-bot", role: "user" }),
         });
         expect(dup.status).toBe(409);
 

@@ -31,7 +31,7 @@ describe("addonModule", () => {
         expect(decoded.length).toBe(pbe3.length);
     });
 
-    it("生成索引文本", () => {
+    it("生成索引文本（空曲库也要导出 libraries）", () => {
         expect(metasToAddonIndex([])).toBe("export const midis=[];export const libraries=[];");
     });
 
