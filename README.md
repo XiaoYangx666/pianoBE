@@ -30,7 +30,7 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 - **MIDI 播放**：内嵌或远程曲库，播放队列（顺序/循环/单曲/随机）、多钢琴独立播放、UI 同步、区块卸载自动停止
 - **DDUI 表单**：按需创建、关闭即释放；同一玩家同时只保留一个活动表单
 - **自托管后端**：Hono + bun:sqlite + Docker；token 鉴权（Bootstrap 令牌 env 注入、分角色令牌）；React 管理页
-- **曲目存储**：曲目内容与元数据一起存在 SQLite（`song_files` 表，mid/pbe3 BLOB），删库即删曲；旧版 `data/midis` 文件启动时自动导入并清理
+- **曲目存储**：曲目内容与元数据一起存在 SQLite（`song_files` 表，mid/pbe3 BLOB），删库即删曲；不再读取旧版 `data/midis` 文件
 - **无事务一致性**：存储端口单键原子写、派生索引、崩溃自愈（core 契约测试覆盖）
 - **音频转 MIDI（AMT）**：生成器在浏览器本地运行转录模型；自托管后端调用 Rust `amt-cli`，并可直接解析 B 站视频音频
 
@@ -296,7 +296,7 @@ git commit -m "曲库: 新增 <歌名>"
 git push origin <分支>    # 提交 Pull Request
 ```
 
-公共曲库和后端管理页通常使用 MIDI 内容的 CRC32 作为 ID。后端新增曲目可将其 `packages/server/data/midis/{id}.mid` 导出后经 `add-song` 收编入库。
+公共曲库和后端管理页通常使用 MIDI 内容的 CRC32 作为 ID。后端曲目可通过 `/api/songs/{id}/raw` 导出 MIDI，再经 `add-song` 收编入库。
 
 ---
 

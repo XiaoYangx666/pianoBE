@@ -9,7 +9,6 @@ services:
             # 管理员令牌：留空则首次启动自动生成并打印到 docker logs / 日志文件
             BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
             DB_PATH: /app/data/piano.db
-            MIDIS_DIR: /app/data/midis
             LOG_FILE: /app/data/logs/server.log
             WEB_ROOT: /app/packages/studio/dist
             BUILTIN_PLUGINS_DIR: /app/build/plugins

@@ -1,6 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
 import type {
     ContentOrigin,
     LibraryRecord,
@@ -17,6 +15,7 @@ import {
     encodeSong,
     extractCueEffects,
     readSongHeader,
+    renameSong,
     sameSongMusic,
     sameSongPerformance,
     validateSong,
@@ -107,15 +106,8 @@ export type SongFileKind = "mid" | "pbe3" | "json";
 export class SqliteSongPort implements SongPort {
     private readonly pbe3Cache = new Map<string, Uint8Array>();
     private static readonly MAX_PBE3_CACHE = 32;
-    /** 启动时从旧版 data/midis 导入的曲目数量 */
-    readonly legacyImported: number;
 
-    constructor(
-        private readonly db: Database,
-        private readonly contentDir = "./data/midis",
-    ) {
-        this.legacyImported = this.importLegacyFiles();
-    }
+    constructor(private readonly db: Database) {}
 
     /* ================== 曲目内容（song_files） ================== */
 
@@ -139,45 +131,8 @@ export class SqliteSongPort implements SongPort {
         this.db.query(`DELETE FROM song_files WHERE song_id=?`).run(id);
     }
 
-    /**
-     * 旧版把曲目存在 data/midis/{id}.mid/.pbe3/.json。
-     * 启动时一次性搬进 song_files，成功写入后删除原文件；失败的下次启动重试。
-     */
-    private importLegacyFiles(): number {
-        if (!existsSync(this.contentDir)) return 0;
-        let entries;
-        try {
-            entries = readdirSync(this.contentDir, { withFileTypes: true });
-        } catch {
-            return 0;
-        }
-        const imported: string[] = [];
-        const insert = this.db.query(
-            `INSERT INTO song_files(song_id,kind,bytes) VALUES(?,?,?)
-             ON CONFLICT(song_id,kind) DO NOTHING`
-        );
-        this.db.transaction(() => {
-            for (const entry of entries) {
-                if (!entry.isFile()) continue;
-                const match = /^([0-9A-Za-z_-]{1,24})\.(mid|pbe3|json)$/.exec(entry.name);
-                if (!match) continue;
-                try {
-                    const bytes = readFileSync(join(this.contentDir, entry.name));
-                    const res = insert.run(match[1], match[2] as SongFileKind, bytes);
-                    if (res.changes > 0) imported.push(join(this.contentDir, entry.name));
-                } catch {
-                    // 单个文件失败不阻断其他曲目，下次启动重试
-                }
-            }
-        })();
-        for (const file of imported) {
-            try {
-                rmSync(file, { force: true });
-            } catch {
-                // 删除失败保留原文件，下次启动会因已存在而跳过
-            }
-        }
-        return imported.length;
+    private deleteFileBlob(id: string, kind: SongFileKind): void {
+        this.db.query(`DELETE FROM song_files WHERE song_id=? AND kind=?`).run(id, kind);
     }
 
     /* ================== Server State & Catalog Version ================== */
@@ -495,6 +450,23 @@ export class SqliteSongPort implements SongPort {
         if (!clean) return undefined;
         const res = this.db.query(`UPDATE songs SET name=? WHERE id=?`).run(clean, id);
         if (res.changes === 0) return undefined;
+        // 持久化的 PBE3 文件头里也有旧曲名：同步重编码，保证列表、导入码和下载一致。
+        const stored = this.getFileBlob(id, "pbe3");
+        if (stored) {
+            try {
+                this.putFileBlob(id, "pbe3", renameSong(stored, clean));
+            } catch (error) {
+                // 只有 PBE3、没有 MIDI/JSON 时删掉 BLOB 会永久丢失曲目；
+                // 此时宁可保留旧文件头，也不能丢内容。有回退来源时才删除以便重新生成。
+                const hasFallback = Boolean(this.getRaw(id) || this.getFileBlob(id, "json"));
+                console.warn(
+                    `[songs] PBE3 改名失败，曲目 ${id} 的元数据已更新但文件头仍为旧曲名` +
+                        (hasFallback ? "（将从 MIDI/JSON 重新生成）" : "（保留唯一原始数据，未删除 BLOB）"),
+                    error
+                );
+                if (hasFallback) this.deleteFileBlob(id, "pbe3");
+            }
+        }
         this.pbe3Cache.delete(id);
         this.bumpCatalogVersion();
         return this.getMeta(id);

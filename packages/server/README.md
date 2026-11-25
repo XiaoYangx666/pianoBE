@@ -45,7 +45,7 @@ docker compose -f docker-compose.dev.yml up
 - 游戏播放器需要曲目时直接读 `song_files.pbe3`；缺少 pbe3 时从 mid 按需编码（内存 LRU 最近 32 首）
 - 管理页前端直接拉 `/raw` 字节解析播放
 - 曲目 `id = crc32(.mid 内容)` 内容寻址，重复上传幂等
-- 旧版 `MIDIS_DIR` 下的 `{id}.mid/.pbe3/.json` 会在启动时自动导入数据库并删除原文件；之后备份只需 `piano.db`（WAL 模式下用 `.backup` 或连 `-wal` 一起拷）
+- 曲目内容只存在于 SQLite，不再读取 `data/midis` 等旧版文件目录；备份只需 `piano.db`（WAL 模式下用 `.backup` 或连 `-wal` 一起拷）
 - 删除曲目会立即释放数据库记录，磁盘空间通过 `VACUUM` 回收
 
 ## 环境变量
@@ -54,7 +54,6 @@ docker compose -f docker-compose.dev.yml up
 |---|---|---|
 | `PORT` | `3000` | 监听端口 |
 | `DB_PATH` | `./data/piano.db` | SQLite 文件路径（曲目 meta/内容/令牌） |
-| `MIDIS_DIR` | `./data/midis` | 旧版曲目文件目录（仅启动时迁移用） |
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
 | `WEB_ROOT` | 无 | 前端构建产物目录（不存在则不托管） |
@@ -63,8 +62,9 @@ docker compose -f docker-compose.dev.yml up
 | `AMT_DECODER` | `native` | `native` 内置解码（mp3/m4a/flac/wav/ogg）；`ffmpeg` 外部解码 |
 | `AMT_THREADS` | `4` | 转录线程数 |
 | `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
-| `AMT_MAX_QUEUE` | `10` | 最多排队的转录任务数，超过返回 429 |
+| `AMT_MAX_QUEUE` | `10` | 最多排队的转录任务数，超过返回 429（入队时强制校验） |
 | `AMT_MAX_AUDIO_SECONDS` | `600` | 单个音频/视频最大时长（秒）；B 站视频在下载前直接拒绝 |
+| `AMT_MAX_DOWNLOAD_BYTES` | `209715200` | B 站音频下载字节上限（默认 200 MB） |
 | `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
 | `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
 | `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |

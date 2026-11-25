@@ -1,7 +1,4 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { openDb } from "../src/db";
 import { createApp, type AppDeps } from "../src/app";
 import { createToken, ensureBootstrapToken, getTokenInfo } from "../src/auth";
@@ -25,7 +22,6 @@ let app: ReturnType<typeof createApp>;
 let writerToken = "";
 let readerToken = "";
 let songId = "";
-let midisDir = "";
 
 /** 类型化 json 解析 */
 async function j<T>(res: Response): Promise<T> {
@@ -42,8 +38,7 @@ function req(path: string, init: RequestInit & { token?: string } = {}) {
 beforeAll(() => {
     const db = openDb(":memory:");
     ensureBootstrapToken(db, ADMIN);
-    midisDir = mkdtempSync(join(tmpdir(), "piano-api-midis-"));
-    const songPort = new SqliteSongPort(db, midisDir);
+    const songPort = new SqliteSongPort(db);
     deps = {
         db,
         songPort,
@@ -56,7 +51,6 @@ beforeAll(() => {
 
 afterAll(() => {
     deps.db.close();
-    rmSync(midisDir, { recursive: true, force: true });
 });
 
 describe("健康检查与鉴权", () => {
