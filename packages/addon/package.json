@@ -21,12 +21,12 @@
         "@minecraft/server": "2.11.0",
         "@minecraft/server-admin": "1.0.0-beta.1.26.50-stable",
         "@minecraft/server-net": "1.0.0-beta.1.26.50-stable",
-        "@minecraft/server-ui": "2.2.0",
+        "@minecraft/server-ui": "2.3.0",
         "@minecraft/vanilla-data": "1.26.50",
         "@piano/core": "file:../core",
         "@piano/plugins": "file:../../plugins",
         "@piano/vfx": "file:../vfx",
-        "sapi-pro": "file:../../vendor/sapi-pro-dev.tgz"
+        "sapi-pro": "0.4.4-stable"
     },
     "devDependencies": {
         "@bepack/cli": "^0.1.0-beta.9"

@@ -45,7 +45,7 @@ export default defineConfig({
             dependencies: {
                 "@minecraft/server": "2.11.0",
                 "@minecraft/server-ui": "beta",
-                "sapi-pro": "0.4.3-stable",
+                "sapi-pro": "0.4.4-stable",
                 "@minecraft/vanilla-data": "1.26.50",
                 "@minecraft/server-net": "beta",
                 "@minecraft/server-admin": "beta",

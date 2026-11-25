@@ -38,8 +38,8 @@ export default defineConfig({
             description: "钢琴行为包",
             dependencies: {
                 "@minecraft/server": "2.11.0",
-                "@minecraft/server-ui": "2.2.0",
-                "sapi-pro": "0.4.3-stable",
+                "@minecraft/server-ui": "2.3.0",
+                "sapi-pro": "0.4.4-stable",
                 "@minecraft/vanilla-data": "1.26.50",
             },
             achievement: true,
