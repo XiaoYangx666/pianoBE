@@ -5,8 +5,8 @@ import { requireRole, type AppVariables } from "../auth.js";
 
 export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
-    const writeRole = () => requireRole("write");
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
+    const adminRole = () => requireRole("admin");
 
     app.get("/", readRole(), (c) => {
         return c.json({
@@ -15,7 +15,7 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         });
     });
 
-    app.post("/", writeRole(), async (c) => {
+    app.post("/", adminRole(), async (c) => {
         const body = await c.req.json().catch(() => null);
         const name = typeof body?.name === "string" ? body.name.trim() : "";
         if (!name) return c.json({ error: "曲库名称不能为空" }, 400);
@@ -33,7 +33,7 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         }
     });
 
-    app.patch("/:id", writeRole(), async (c) => {
+    app.patch("/:id", adminRole(), async (c) => {
         const id = c.req.param("id") ?? "";
         const existing = deps.songPort.getLibrary(id);
         if (!existing) return c.json({ error: "曲库不存在" }, 404);
@@ -49,7 +49,7 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         return c.json(updated);
     });
 
-    app.delete("/:id", writeRole(), (c) => {
+    app.delete("/:id", adminRole(), (c) => {
         const id = c.req.param("id") ?? "";
         if (id === "default") return c.json({ error: "默认曲库不可删除" }, 403);
         const existing = deps.songPort.getLibrary(id);
@@ -59,7 +59,7 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         return c.body(null, 204);
     });
 
-    app.post("/:id/songs", writeRole(), async (c) => {
+    app.post("/:id/songs", adminRole(), async (c) => {
         const id = c.req.param("id") ?? "";
         const existing = deps.songPort.getLibrary(id);
         if (!existing) return c.json({ error: "曲库不存在" }, 404);
@@ -72,7 +72,7 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         return c.json({ added, library: deps.songPort.getLibrary(id) });
     });
 
-    app.delete("/:id/songs/:songId", writeRole(), (c) => {
+    app.delete("/:id/songs/:songId", adminRole(), (c) => {
         const id = c.req.param("id") ?? "";
         const songId = c.req.param("songId") ?? "";
         const existing = deps.songPort.getLibrary(id);
@@ -82,7 +82,7 @@ export function librariesRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }
         return c.body(null, 204);
     });
 
-    app.delete("/:id/songs", writeRole(), (c) => {
+    app.delete("/:id/songs", adminRole(), (c) => {
         const id = c.req.param("id") ?? "";
         const existing = deps.songPort.getLibrary(id);
         if (!existing) return c.json({ error: "曲库不存在" }, 404);

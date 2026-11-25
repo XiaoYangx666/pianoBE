@@ -80,7 +80,7 @@ beforeAll(() => {
     const deploymentService = new DeploymentService(songPort, pluginService, config);
     deps = { db, songPort, config, pluginService, deploymentService };
     app = createApp(deps);
-    writerToken = createToken(db, "studio-writer", "write").token;
+    writerToken = createToken(db, "studio-writer", "admin").token;
 });
 
 afterAll(() => {

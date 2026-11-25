@@ -18,7 +18,7 @@ function isPbe3Bytes(bytes: Uint8Array): boolean {
 
 export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
 
     // GET /api/songs?q=&page=&pageSize=&libraryId=
     app.get("/", readRole(), (c) => {
@@ -81,7 +81,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // POST /api/songs/:id/performances
-    app.post("/:id/performances", requireRole("write"), async (c) => {
+    app.post("/:id/performances", requireRole("admin"), async (c) => {
         const songId = c.req.param("id") ?? "";
         const meta = deps.songPort.getDetailedMeta(songId);
         if (!meta) return c.json({ error: "曲目不存在" }, 404);
@@ -129,7 +129,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // POST /api/songs —— 上传 .mid 或 .pbe3
-    app.post("/", requireRole("write"), async (c) => {
+    app.post("/", requireRole("admin"), async (c) => {
         const length = Number(c.req.header("Content-Length") ?? 0);
         if (length > MAX_UPLOAD_BYTES) {
             return c.json({ error: "文件超过大小限制" }, 413);
@@ -182,7 +182,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // PATCH /api/songs/:id —— 改曲名 { name }
-    app.patch("/:id", requireRole("write"), async (c) => {
+    app.patch("/:id", requireRole("admin"), async (c) => {
         const id = c.req.param("id") ?? "";
         const body = await c.req.json().catch(() => null);
         const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -193,7 +193,7 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // DELETE /api/songs/:id
-    app.delete("/:id", requireRole("write"), (c) => {
+    app.delete("/:id", requireRole("admin"), (c) => {
         deps.songPort.remove(c.req.param("id") ?? "");
         return c.body(null, 204);
     });

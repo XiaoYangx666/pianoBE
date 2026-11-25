@@ -8,7 +8,7 @@ export function addonRoutes(
     deploymentService: DeploymentService,
 ): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
     const adminRole = () => requireRole("admin");
 
     app.get("/status", readRole(), (c) => {

@@ -56,8 +56,7 @@ config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
 保存后就是普通存储卡歌曲，播放、队列、演出、快照全部走现有 card 路径。
 
 - 仅 `__PIANO_TARGET__ === "server"` 构建包含入口和网络代码，客户端产物会被裁掉
-- 后端开启 `AMT_ALLOW_READ_JOBS=true` 后，BDS 用 `read` 令牌即可创建 B 站任务；
-  音频上传接口仍要求 `write`
+- BDS 用普通令牌（`user`）即可创建转录任务；只有显式“保存到曲库”需要管理员令牌
 - 需要存储卡已插入，且管理员开放玩家导入（`allowPlayerImport`）
 - 等待时间受后端全局转录队列影响；关闭页面后任务号会保留，重新打开可继续等待
 

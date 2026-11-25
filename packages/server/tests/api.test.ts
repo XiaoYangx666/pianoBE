@@ -50,8 +50,8 @@ beforeAll(() => {
         config: loadConfig({}),
     };
     app = createApp(deps);
-    writerToken = createToken(db, "writer", "write").token;
-    readerToken = createToken(db, "reader", "read").token;
+    writerToken = createToken(db, "writer", "admin").token;
+    readerToken = createToken(db, "reader", "user").token;
 });
 
 afterAll(() => {
@@ -204,14 +204,14 @@ describe("曲库 API", () => {
 
 describe("令牌管理 API", () => {
     test("非 admin 访问 → 403", async () => {
-        expect((await req("/api/tokens", { token: writerToken })).status).toBe(403);
+        expect((await req("/api/tokens", { token: readerToken })).status).toBe(403);
     });
 
-    test("创建 read 令牌 → 明文一次；新令牌可用；吊销后失效", async () => {
+    test("创建 user 令牌 → 明文一次；新令牌可用；吊销后失效", async () => {
         const created = await req("/api/tokens", {
             token: ADMIN, method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ label: "external-bot", role: "read" }),
+            body: JSON.stringify({ label: "external-bot", role: "user" }),
         });
         expect(created.status).toBe(201);
         const { token, id } = await j<{ token: string; id: number }>(created);
@@ -224,7 +224,7 @@ describe("令牌管理 API", () => {
         const dup = await req("/api/tokens", {
             token: ADMIN, method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ label: "external-bot", role: "read" }),
+            body: JSON.stringify({ label: "external-bot", role: "user" }),
         });
         expect(dup.status).toBe(409);
 

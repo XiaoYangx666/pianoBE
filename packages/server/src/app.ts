@@ -47,7 +47,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
     const pluginService = deps.pluginService ?? new PluginService(deps.songPort, deps.config);
     const deploymentService = deps.deploymentService ?? new DeploymentService(deps.songPort, pluginService, deps.config);
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
 
     // 解析令牌（仅挂上下文，不拦截；角色门槛由具体路由决定）
     app.use("/api/*", async (c, next) => {
@@ -69,7 +69,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         return c.json(perf);
     });
 
-    api.delete("/performances/:perfId", requireRole("write"), (c) => {
+    api.delete("/performances/:perfId", requireRole("admin"), (c) => {
         const removed = deps.songPort.deletePerformance(c.req.param("perfId") ?? "");
         if (!removed) return c.json({ error: "演出不存在" }, 404);
         return c.body(null, 204);

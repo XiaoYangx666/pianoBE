@@ -5,15 +5,14 @@ import { ConfirmDialog, Dialog, EmptyState, PageHeader, SongBadge, copyText, not
 import { api, type TokenInfo } from "./api";
 
 const ROLES = [
-    { value: "read", label: "read · 只读" },
-    { value: "write", label: "write · 可写" },
-    { value: "admin", label: "admin · 管理员" },
+    { value: "user", label: "普通 · 读取曲库 / 转录" },
+    { value: "admin", label: "管理员 · 曲库 / 插件 / 令牌" },
 ];
 
 export function TokensPage() {
     const [list, setList] = useState<TokenInfo[]>([]);
     const [label, setLabel] = useState("");
-    const [role, setRole] = useState("read");
+    const [role, setRole] = useState("user");
     const [created, setCreated] = useState<{ label: string; role: string; token: string } | null>(null);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState("");

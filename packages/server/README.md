@@ -64,7 +64,6 @@ docker compose -f docker-compose.dev.yml up
 | `AMT_THREADS` | `4` | 转录线程数 |
 | `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
 | `AMT_MAX_QUEUE` | `10` | 最多排队的转录任务数，超过返回 429 |
-| `AMT_ALLOW_READ_JOBS` | `false` | `true` 时 `read` 令牌也能创建 B 站转录任务（BDS 游戏内导入存储卡）；上传音频仍要求 `write` |
 | `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
 | `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
 | `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |
@@ -72,7 +71,10 @@ docker compose -f docker-compose.dev.yml up
 ## 令牌与角色
 
 - 令牌即身份：`Authorization: Bearer <token>`，服务端存 SHA-256 哈希，明文只在创建时返回一次
-- 角色：`read`（只读）/ `write`（读写）/ `admin`（读写 + 令牌管理）
+- 只有两种令牌：
+  - `user`（普通）：读取曲库、创建/查看/取消转录任务；**不能修改曲库**
+  - `admin`（管理员）：曲库增删改、插件、部署、令牌管理
+- 旧库里的 `read` / `write` 读取时统一按 `user` 处理；需要曲库写权限请新建 `admin` 令牌
 - 曲目的 `owner` 记录为上传令牌身份
 - 前端与外部服务共用同一套 API 与令牌
 
@@ -104,6 +106,9 @@ DELETE /api/transcribe/jobs/:id       放弃任务并清理临时文件
 GET    /api/transcribe/bilibili/search?q=  按关键词搜索 B 站视频
 POST   /api/transcribe/jobs/bilibili  { input: BV/URL, page?, name? } → 后台下载并创建任务
 ```
+
+转录任务权限：普通令牌（`user`）可以创建、查看、改名、取消任务；只有
+`POST /api/transcribe/jobs/:id/save`（写入曲库）要求管理员令牌。
 
 ### 音频转 MIDI（AMT）
 

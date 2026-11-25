@@ -71,7 +71,7 @@ function audioMime(ext: string, contentType: string | undefined): string {
 
 export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
-    const readRole = () => requireRole("read", deps.config.allowPublicRead);
+    const readRole = () => requireRole("user", deps.config.allowPublicRead);
     const jobs = new TranscribeJobStore({
         songPort: deps.songPort,
         config: deps.config,
@@ -114,7 +114,7 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs —— 上传音频，返回任务（不写入曲目库）
-    app.post("/jobs", requireRole("write"), async (c) => {
+    app.post("/jobs", requireRole("user"), async (c) => {
         if (!deps.amt?.status().available) {
             return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
         }
@@ -152,10 +152,8 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs/bilibili —— { input, page?, name? }
-    // BDS 游戏内导入只需要建临时任务：开启 AMT_ALLOW_READ_JOBS 后 read 令牌即可；
-    // 上传音频仍要求 write，避免只读令牌占用临时空间。
-    const bilibiliRole = requireRole(deps.config.amtAllowReadJobs ? "read" : "write");
-    app.post("/jobs/bilibili", bilibiliRole, async (c) => {
+    // 普通令牌即可创建临时任务；结果只有显式 save 才会进入曲库（要求管理员）。
+    app.post("/jobs/bilibili", requireRole("user"), async (c) => {
         if (!deps.amt?.status().available) {
             return c.json({ error: deps.amt?.status().message ?? "服务端未启用 AMT" }, 503);
         }
@@ -243,7 +241,7 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // PATCH /api/transcribe/jobs/:id —— { name } 改任务名
-    app.patch("/jobs/:id", requireRole("write"), async (c) => {
+    app.patch("/jobs/:id", requireRole("user"), async (c) => {
         const id = c.req.param("id") ?? "";
         const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
         const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -254,7 +252,7 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // POST /api/transcribe/jobs/:id/save —— 显式保存到曲目库
-    app.post("/jobs/:id/save", requireRole("write"), async (c) => {
+    app.post("/jobs/:id/save", requireRole("admin"), async (c) => {
         const id = c.req.param("id") ?? "";
         const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
         const name = typeof body?.name === "string" ? body.name.trim() : undefined;
@@ -318,7 +316,7 @@ export function transcribeRoutes(deps: AppDeps): Hono<{ Variables: AppVariables 
     });
 
     // DELETE /api/transcribe/jobs/:id —— 放弃任务并清理临时文件
-    app.delete("/jobs/:id", requireRole("write"), (c) => {
+    app.delete("/jobs/:id", requireRole("user"), (c) => {
         const removed = jobs.remove(c.req.param("id") ?? "");
         if (!removed) return c.json({ error: "任务不存在或已过期" }, 404);
         return c.body(null, 204);

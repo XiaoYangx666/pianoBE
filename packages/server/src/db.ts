@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     label      TEXT NOT NULL UNIQUE,  -- 身份名（如 bootstrap / my-uploader）
     token_hash TEXT NOT NULL,         -- SHA-256(明文令牌)
-    role       TEXT NOT NULL,         -- read | write | admin
+    role       TEXT NOT NULL,         -- user | admin（旧 read/write 读取时按 user 处理）
     created_at INTEGER NOT NULL,
     revoked    INTEGER NOT NULL DEFAULT 0
 );
