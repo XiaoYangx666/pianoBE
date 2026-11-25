@@ -9,7 +9,6 @@ import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
 import { pianoSoundId, velocityLayerIndex, velocityVolume, type MusicRef, type SongHandle } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
-import { pianoHandZoneBit } from "@domain/util/note";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
 import { PianoDisplay, readCardFromDisplay, recoverScoreStand, removeScoreStand, SCORE_SPREAD, SCORE_VARIANT, setCardInserted } from "@platform/display";
@@ -66,7 +65,7 @@ export class PianoRuntime {
     private text?: NativeTextSurface;
     private textValue?: string;
     private midi?: MidiPlayer;
-    private midiHandsThisTick = 0;
+    private midiNotesThisTick: number[] = [];
     private particleOverrideProvider?: (songTime?: number) => PianoParticleOverride | undefined;
     private verifiedAt = -Infinity;
     private integrity: ReturnType<typeof inspectInstrument> = "unloaded";
@@ -86,7 +85,7 @@ export class PianoRuntime {
     constructor(
         readonly location: InstrumentLocation,
         private activate: () => void,
-        private onManualPress: (player: Player, hands: number) => void,
+        private onManualPress: (player: Player, midis: readonly number[]) => void,
     ) {
         this.right = RightOffsets[location.direction];
         this.center = pianoCenter(location);
@@ -291,7 +290,7 @@ export class PianoRuntime {
                     note: (note, soundDuration, velocity, gain, songTime, hasVelocity, keyDuration) => {
                         if (this.playNote(note, velocity, soundDuration, keyDuration, gain, false, songTime, hasVelocity)
                             && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance) {
-                            this.midiHandsThisTick |= pianoHandZoneBit(note.midi);
+                            this.midiNotesThisTick.push(note.midi);
                         }
                     },
                     playing: value => {
@@ -310,11 +309,11 @@ export class PianoRuntime {
     }
 
     playManualNotes(player: Player, notes: readonly NoteInfo[], velocity: number) {
-        let hands = 0;
+        const played: number[] = [];
         for (const note of notes) {
-            if (this.playNote(note, velocity, .15, .15, 1, true)) hands |= pianoHandZoneBit(note.midi);
+            if (this.playNote(note, velocity, .15, .15, 1, true)) played.push(note.midi);
         }
-        if (hands) this.onManualPress(player, hands);
+        if (played.length > 0) this.onManualPress(player, played);
     }
 
     turnScore(spread: 0 | 1) {
@@ -420,7 +419,7 @@ export class PianoRuntime {
     tick(tick: number, now: number) {
         this.tickSignal.publish(tick);
         this.soundReleases.update(tick);
-        this.midiHandsThisTick = 0;
+        this.midiNotesThisTick = [];
         this.midi?.tick(now);
         const playing = this.midi?.isPlaying() === true;
         // 释放队列里还有实例时必须继续 tick，否则淡出后的 stop() 永远不会执行，
@@ -433,8 +432,8 @@ export class PianoRuntime {
         }
         // Include notes from the last tick even if playback ended in midi.tick().
         const animateMidi = playing && (this.settings ?? DEFAULT_PIANO_SETTINGS).midiPerformance;
-        const midiHands = animateMidi || this.midiHandsThisTick ? this.midiHandsThisTick : undefined;
-        return { active: visualActive || playing || sounding, midiHands };
+        const midiNotes = animateMidi || this.midiNotesThisTick.length > 0 ? this.midiNotesThisTick : undefined;
+        return { active: visualActive || playing || sounding, midiNotes };
     }
 
     holdPlaybackClock(now: number) { this.midi?.holdClock(now); }

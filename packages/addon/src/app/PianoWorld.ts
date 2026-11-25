@@ -77,7 +77,7 @@ class PianoWorld {
             const runtime = new PianoRuntime(
                 location,
                 () => this.active.add(runtime),
-                (player, hands) => animatePianoPress(player, runtime, hands),
+                (player, midis) => animatePianoPress(player, runtime, midis),
             );
             if (runtime.verify(tick) !== "complete") {
                 runtime.dispose(false);
@@ -235,10 +235,10 @@ class PianoWorld {
                 }
                 else if (integrity === "unloaded") piano.holdPlaybackClock(now);
                 else {
-                    const { active, midiHands } = piano.tick(tick, now);
+                    const { active, midiNotes } = piano.tick(tick, now);
                     if (!active) this.active.delete(piano);
-                    if (midiHands !== undefined && (midiHands || tick % MIDI_PERFORMANCE_INTERVAL === 0)) {
-                        animateMidiPerformance(piano, midiHands);
+                    if (midiNotes !== undefined && (midiNotes.length > 0 || tick % MIDI_PERFORMANCE_INTERVAL === 0)) {
+                        animateMidiPerformance(piano, midiNotes);
                     }
                 }
             } catch (error) {

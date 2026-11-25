@@ -1,4 +1,10 @@
 import type { PianoRuntime } from "@app/PianoRuntime";
+import {
+    allocateHands,
+    DEFAULT_LEFT_POS,
+    DEFAULT_RIGHT_POS,
+    handTimelineClip,
+} from "@domain/piano/handAllocation";
 import { PIANO_BENCH_SEAT } from "@platform/benchSeat";
 import { reportPianoError } from "@runtime/scope";
 import { system } from "@minecraft/server";
@@ -18,6 +24,8 @@ interface Performance {
     piano: PianoRuntime;
     stopAt: number;
     seated: boolean;
+    leftPos: number;
+    rightPos: number;
     checkRun?: number;
     detach?: () => void;
 }
@@ -51,7 +59,7 @@ function playingPosition(player: Player, piano: PianoRuntime) {
         || (!mount && Math.abs(localX) > STANDING_SIDE_LIMIT)) return;
 
     if (facingPiano(player.getRotation().y, right) < (mount ? MIN_FACING_DOT : STANDING_FACING_DOT)) return;
-    return { seated: mount !== undefined, distance: Math.hypot(dx, dz) };
+    return { seated: mount !== undefined, distance: Math.hypot(dx, dz), localX };
 }
 
 function stop(id: string, performance: Performance) {
@@ -101,7 +109,7 @@ function bindPiano(id: string, performance: Performance, piano: PianoRuntime) {
     performance.detach = piano.onDispose(() => stop(id, performance));
 }
 
-function play(player: Player, ticks: number, piano: PianoRuntime, seated: boolean) {
+function play(player: Player, ticks: number, piano: PianoRuntime, seated: boolean): Performance | undefined {
     if (!player.isValid || !piano.isAlive()) return;
     const stopAt = system.currentTick + ticks;
     const current = performing.get(player.id);
@@ -110,7 +118,7 @@ function play(player: Player, ticks: number, piano: PianoRuntime, seated: boolea
         current.player = player;
         current.stopAt = current.piano === piano ? Math.max(current.stopAt, stopAt) : stopAt;
         if (current.piano !== piano) bindPiano(player.id, current, piano);
-        return;
+        return current;
     }
 
     const animation = seated ? "animation.pbe.performer.midi" : "animation.pbe.performer.play";
@@ -124,41 +132,57 @@ function play(player: Player, ticks: number, piano: PianoRuntime, seated: boolea
         if (current.piano !== piano) bindPiano(player.id, current, piano);
         current.stopAt = stopAt;
         current.seated = seated;
-        return;
+        return current;
     }
     const id = player.id;
-    const performance: Performance = { player, piano, stopAt, seated };
+    const performance: Performance = {
+        player,
+        piano,
+        stopAt,
+        seated,
+        leftPos: DEFAULT_LEFT_POS,
+        rightPos: DEFAULT_RIGHT_POS,
+    };
     performing.set(id, performance);
     bindPiano(id, performance, piano);
     scheduleCheck(id, performance, CHECK_INTERVAL);
+    return performance;
 }
 
-function signalNote(player: Player, mask: number) {
-    if (!mask) return;
-    // This animation writes press times and leaves the pose controller running.
-    const left = mask & 2 ? 2 : mask & 1 ? 1 : 0;
-    const right = mask & 8 ? 2 : mask & 4 ? 1 : 0;
-    player.playAnimation(`animation.pbe.performer.note.${left}${right}`, {
-        controller: "pbe:performer_notes",
-        stopExpression: "query.all_animations_finished",
-    });
+function signalNotes(performance: Performance, piano: PianoRuntime, localX: number, midis: readonly number[]) {
+    if (midis.length === 0) return;
+    const allocated = allocateHands(midis, localX, piano.hitModel.keyCenters, performance.leftPos, performance.rightPos);
+    if (allocated.left) {
+        performance.leftPos = allocated.left.pos;
+        performance.player.playAnimation(handTimelineClip("left", allocated.left), {
+            controller: "pbe:performer_left",
+            stopExpression: "query.all_animations_finished",
+        });
+    }
+    if (allocated.right) {
+        performance.rightPos = allocated.right.pos;
+        performance.player.playAnimation(handTimelineClip("right", allocated.right), {
+            controller: "pbe:performer_right",
+            stopExpression: "query.all_animations_finished",
+        });
+    }
 }
 
-export function animatePianoPress(player: Player, piano: PianoRuntime, hands: number) {
+export function animatePianoPress(player: Player, piano: PianoRuntime, midis: readonly number[]) {
     try {
         const position = playingPosition(player, piano);
         if (!position) return;
-        play(player, IDLE_TICKS, piano, position.seated);
-        signalNote(player, hands);
+        const performance = play(player, IDLE_TICKS, piano, position.seated);
+        if (performance) signalNotes(performance, piano, position.localX, midis);
     } catch (error) {
         reportPianoError("playerPerformance.manual", error);
     }
 }
 
-export function animateMidiPerformance(piano: PianoRuntime, hands: number) {
+export function animateMidiPerformance(piano: PianoRuntime, midis: readonly number[]) {
     try {
         const nearby = piano.location.dimension.getPlayers({ location: piano.center, maxDistance: 2 });
-        let performer: { player: Player; seated: boolean; distance: number } | undefined;
+        let performer: { player: Player; seated: boolean; distance: number; localX: number } | undefined;
         for (const player of nearby) {
             const position = playingPosition(player, piano);
             if (!position) continue;
@@ -168,9 +192,14 @@ export function animateMidiPerformance(piano: PianoRuntime, hands: number) {
             }
         }
         if (!performer) return;
-        play(performer.player, MIDI_PERFORMANCE_INTERVAL + 2, piano, performer.seated);
-        signalNote(performer.player, hands);
+        const performance = play(performer.player, MIDI_PERFORMANCE_INTERVAL + 2, piano, performer.seated);
+        if (performance) signalNotes(performance, piano, performer.localX, midis);
     } catch (error) {
         reportPianoError("playerPerformance.midi", error);
     }
+}
+
+export function clearPlayerPerformance(playerId: string) {
+    const active = performing.get(playerId);
+    if (active) stop(playerId, active);
 }
