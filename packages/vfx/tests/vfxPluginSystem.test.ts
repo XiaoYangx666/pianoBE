@@ -74,7 +74,7 @@ describe("VfxRegistry & plugin system", () => {
             { tick: 20, effect: "shockwave", color: "#FFE29A", level: 100, scale: 100, op: "flash" },
         ], 4);
         const engine = new VfxEngine(program);
-        expect(engine.update(0.5, 10, quietFeatures)).toEqual([]);
+        expect(engine.update(0.5, quietFeatures)).toEqual([]);
         expect(engine.activeSummary(0.5)).toEqual([]);
         expect(engine.keyParticleOverride(0.5)).toBeUndefined();
 
@@ -177,7 +177,7 @@ describe("VfxRegistry & plugin system", () => {
         expect(listPianoParticleStyles().some(s => s.style === "acme_sparkle" && s.value === 99)).toBe(true);
 
         const engine = new VfxEngine(createThemeProgram(getVfxTheme("acme_night")!, { seconds: 10 }));
-        const batches = engine.update(0, 0, quietFeatures);
+        const batches = engine.update(0, quietFeatures);
         expect(batches).toHaveLength(1);
         expect(batches[0].emitters[0].particles).toBe(4);
         expect(engine.keyParticleOverride(0)?.style).toBe("acme_sparkle");
@@ -373,7 +373,7 @@ describe("VfxRegistry & plugin system", () => {
 
         for (let i = 0; i < VFX_PLUGIN_MAX_CONSECUTIVE_ERRORS; i++) {
             const tick = i * 5;
-            const batches = engine.update(tick / 20, tick, quietFeatures);
+            const batches = engine.update(tick / 20, quietFeatures);
             // Healthy channel keeps emitting when its interval hits; update never throws.
             if (tick % 10 === 0) {
                 expect(batches).toHaveLength(1);
@@ -393,7 +393,7 @@ describe("VfxRegistry & plugin system", () => {
         expect(diag.lastError?.message).toContain("boom in plugin emit");
 
         // Disabled plugin is no longer invoked on future updates
-        engine.update(2.0, 40, quietFeatures);
+        engine.update(2.0, quietFeatures);
         expect(faultyEmitCalls).toBe(VFX_PLUGIN_MAX_CONSECUTIVE_ERRORS);
 
         // Re-enabling after recovery allows the plugin to run again
@@ -406,7 +406,7 @@ describe("VfxRegistry & plugin system", () => {
             "upright",
             reg,
         );
-        const recovered = singleEngine.update(0, 0, quietFeatures);
+        const recovered = singleEngine.update(0, quietFeatures);
         expect(recovered).toHaveLength(1);
         expect(faultyEmitCalls).toBe(VFX_PLUGIN_MAX_CONSECUTIVE_ERRORS + 1);
         expect(reg.getPluginDiagnostic("plugin.faulty")?.consecutiveErrors).toBe(0);

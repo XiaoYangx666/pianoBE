@@ -7,10 +7,12 @@ import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visu
 import {
     createPerformanceProgram, createSingleEffectProgram, createThemeProgram,
     getVfxTheme, hasAvailablePerformanceEffects, missingPerformanceResources, quietFeatures, simulatedVfxNotes,
+    addTimelineTicks, hostTickAt, timelineTickAt,
     VFX_MAX_PIANOS, VfxBudget, VfxEngine, VfxMusic,
-    type ActiveChannelSummary, type MusicFeatures, type PianoParticleOverride,
-    type SingleEffectConfig, type VfxInput, type VfxProgram, type VfxTheme,
+    type ActiveChannelSummary, type HostTick, type MusicFeatures, type PianoParticleOverride,
+    type SingleEffectConfig, type TimelineTick, type VfxInput, type VfxNoteEvent, type VfxProgram, type VfxTheme, type VfxTimeline,
 } from "@piano/vfx";
+import { midiVfxTimeline, sessionVfxTimeline } from "./timeline";
 import { inspectInstrument, instrumentDestroyed, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { isUnloadedChunkError } from "@platform/errors";
 import { vfxInstrumentFor } from "@domain/instrument/definition";
@@ -19,9 +21,9 @@ import { VfxPropRenderer } from "@platform/vfxProp";
 import { STAGE_PROP_REGISTRATIONS } from "./stagePropCatalog";
 
 export type AutoRequest = { auto: true; piano: PianoRuntime } & (
-    | { kind: "performance"; midi: MidiPlayer; performance: NonNullable<MidiPlayer["performance"]>; transport: PianoTransportEvent }
+    | { kind: "performance"; midi: MidiPlayer; performance: NonNullable<MidiPlayer["performance"]> }
     | { kind: "songTheme"; midi: MidiPlayer; theme: Exclude<PianoStageThemeId, "off"> }
-    | { kind: "manualTheme"; theme: Exclude<PianoStageThemeId, "off">; lastNoteAt: number; seedNote?: PianoVisualNote }
+    | { kind: "manualTheme"; theme: Exclude<PianoStageThemeId, "off">; lastNoteAt: HostTick; seedNote?: PianoVisualNote }
 );
 
 export type LabRequest =
@@ -36,14 +38,15 @@ export interface VfxSession {
     input: VfxInput;
     cleanup: () => void;
     ended: boolean;
-    start: number;
-    duration: number;
+    start: HostTick;
+    timeline: VfxTimeline;
+    nextFeatureTick?: TimelineTick;
+    durationSeconds: number;
     budget: VfxBudget;
     prop: VfxPropRenderer;
     features: Readonly<MusicFeatures>;
     isPerformance?: boolean;
-    midi?: MidiPlayer;
-    lastManualNoteAt?: number;
+    lastManualNoteAt?: HostTick;
 }
 
 const sessions = new Map<string, VfxSession>();
@@ -74,43 +77,50 @@ export function activeKeyParticleOverride(piano: PianoRuntime, songTime?: number
     const session = sessions.get(instrumentKey(piano.location.dimension, piano.location.pos));
     if (!session || session.ended || !session.engine) return undefined;
     if ("auto" in session.request && !(piano.settings ?? DEFAULT_PIANO_SETTINGS).stageKeyParticles) return undefined;
-    const timeSeconds = songTime ?? (session.midi ? session.midi.position : (system.currentTick - session.start) / 20);
-    return session.engine.keyParticleOverride(timeSeconds, session.features, session.input === "solo");
+    const positionSeconds = session.isPerformance && songTime !== undefined
+        ? songTime
+        : session.timeline.positionSeconds;
+    return session.engine.keyParticleOverride(positionSeconds, session.features, session.input === "solo");
 }
 
-function attachLiveMusic(piano: PianoRuntime, music: VfxMusic, session: VfxSession, resetOnTransport: boolean): () => void {
-    const cleanups = [
+type LiveVisualNote = Pick<PianoVisualNote, "midi" | "duration"> & Partial<PianoVisualNote>;
+
+function timelineNote(note: LiveVisualNote, timeline: VfxTimeline): VfxNoteEvent | undefined {
+    if (note.worldTick === undefined || note.velocity === undefined || !note.source || note.hasVelocity === undefined) return;
+    return {
+        midi: note.midi,
+        duration: note.soundDuration ?? note.duration,
+        timelineTick: timelineTickAt(timeline.positionSeconds),
+        velocity: note.velocity,
+        source: note.source,
+        hasVelocity: note.hasVelocity,
+        songTime: note.songTime,
+    };
+}
+
+function attachLiveMusic(
+    piano: PianoRuntime,
+    session: VfxSession,
+    resetOnTransport: boolean,
+): () => void {
+    const cleanups: (() => void)[] = [
         piano.noteSignal.subscribe(note => {
-            if (note.tick !== undefined && note.velocity !== undefined && note.source && note.hasVelocity !== undefined) {
-                music.note({
-                    midi: note.midi,
-                    duration: note.soundDuration ?? note.duration,
-                    // 曲目播放按歌曲时间轴记 tick，与 VfxEngine 的 gameTick 对齐；
-                    // 现场弹奏没有歌曲时间，沿用游戏刻。
-                    tick: note.songTime !== undefined ? Math.max(0, Math.round(note.songTime * 20)) : note.tick,
-                    velocity: note.velocity,
-                    source: note.source,
-                    hasVelocity: note.hasVelocity,
-                    songTime: note.songTime,
-                });
-            }
-        }),
-        piano.transportSignal.subscribe(event => {
-            music.transport(event);
-            if (event.type !== "resume" && event.type !== "start") {
-                session.budget.clearPending();
-                session.prop.clear();
-                if (resetOnTransport) {
-                    if (session.isPerformance && session.midi) {
-                        session.engine?.seek(event.position, true);
-                    } else {
-                        session.engine?.reset(Math.max(0, system.currentTick - session.start));
-                    }
-                }
-            }
+            const event = timelineNote(note, session.timeline);
+            if (event) session.music.note(event);
         }),
         piano.onDispose(() => stopSession(session)),
     ];
+    // Auto sessions are owned by syncSongVfx, which starts and stops them as one lifecycle.
+    if (!("auto" in session.request)) {
+        cleanups.push(piano.transportSignal.subscribe(event => {
+            session.music.transport(event);
+            if (event.type !== "resume" && event.type !== "start") {
+                session.budget.clearPending();
+                session.prop.clear();
+                if (resetOnTransport) session.engine?.seek(session.timeline.positionSeconds, true);
+            }
+        }));
+    }
     return () => {
         for (const fn of cleanups) {
             try { fn(); } catch { /* best effort cleanup */ }
@@ -122,9 +132,7 @@ function createProgramForSession(session: VfxSession): {
     program: VfxProgram;
     input: VfxInput;
     piano?: PianoRuntime;
-    midi?: MidiPlayer;
     isPerformance?: boolean;
-    seekSeconds?: number;
     resetOnTransport: boolean;
     seedNote?: PianoVisualNote;
 } | undefined {
@@ -136,9 +144,7 @@ function createProgramForSession(session: VfxSession): {
                 program,
                 input: "live",
                 piano: request.piano,
-                midi: request.midi,
                 isPerformance: true,
-                seekSeconds: request.transport.type !== "start" ? request.transport.position : undefined,
                 resetOnTransport: true,
             };
         }
@@ -177,18 +183,19 @@ function initializeSession(session: VfxSession): boolean {
     const built = createProgramForSession(session);
     if (!built) return false;
     const engine = new VfxEngine(built.program, vfxInstrumentFor(session.location.definition));
-    if (built.seekSeconds !== undefined) engine.seek(built.seekSeconds, true);
-    if (built.seedNote) session.music.note(built.seedNote);
+    const startPosition = session.timeline.positionSeconds;
+    if (startPosition > 0) engine.seek(startPosition, true);
+    if (built.seedNote) {
+        const seed = timelineNote(built.seedNote, session.timeline);
+        if (seed) session.music.note(seed);
+    }
 
     session.engine = engine;
     session.input = built.input;
-    session.midi = built.midi;
     session.isPerformance = built.isPerformance;
-    session.duration = Number.isFinite(built.program.durationSeconds)
-        ? Math.ceil(built.program.durationSeconds * 20)
-        : Infinity;
+    session.durationSeconds = built.program.durationSeconds;
     session.cleanup = built.piano
-        ? attachLiveMusic(built.piano, session.music, session, built.resetOnTransport)
+        ? attachLiveMusic(built.piano, session, built.resetOnTransport)
         : () => {};
     return true;
 }
@@ -202,7 +209,8 @@ function startSession(location: InstrumentLocation, request: LabRequest | AutoRe
     if (previous) stopSession(previous);
 
     const budget = previous?.budget ?? new VfxBudget();
-    const start = waitForDrain ? budget.nextAvailableTick(system.currentTick + 1) : system.currentTick;
+    const now = hostTickAt(system.currentTick);
+    const start = waitForDrain ? budget.nextAvailableTick(hostTickAt(system.currentTick + 1)) : now;
     const session: VfxSession = {
         location,
         request,
@@ -211,11 +219,16 @@ function startSession(location: InstrumentLocation, request: LabRequest | AutoRe
         cleanup: () => {},
         ended: false,
         start,
-        duration: Infinity,
+        timeline: "auto" in request && request.kind !== "manualTheme"
+            ? midiVfxTimeline(request.midi)
+            : sessionVfxTimeline(start),
+        durationSeconds: Infinity,
         budget,
         prop: new VfxPropRenderer(location, stageProps),
         features: quietFeatures,
-        lastManualNoteAt: "auto" in request && request.kind === "manualTheme" ? request.lastNoteAt : undefined,
+        lastManualNoteAt: "auto" in request && request.kind === "manualTheme"
+            ? request.lastNoteAt
+            : undefined,
     };
     sessions.set(key, session);
     if (!waitForDrain) {
@@ -240,7 +253,7 @@ function syncSongVfx(piano: PianoRuntime, transport: PianoTransportEvent) {
     const previous = getVfxSession(piano.location);
     const autoSession = previous && "auto" in previous.request ? previous : undefined;
     if (transport.type === "pause" || transport.type === "stop" || transport.type === "track") {
-        if (autoSession) stopSession(autoSession);
+        if (autoSession || previous?.input === "live") stopSession(previous!);
         return;
     }
     const midi = piano.getMidiPlayer();
@@ -255,7 +268,7 @@ function syncSongVfx(piano: PianoRuntime, transport: PianoTransportEvent) {
     }
     let request: AutoRequest | undefined;
     if (settings.stageChoreography && performance && hasAvailablePerformanceEffects(performance.cues)) {
-        request = { auto: true, kind: "performance", piano, midi, performance, transport };
+        request = { auto: true, kind: "performance", piano, midi, performance };
     } else if (settings.stageTheme !== "off") {
         request = { auto: true, kind: "songTheme", piano, midi, theme: settings.stageTheme };
     }
@@ -272,7 +285,7 @@ function wakeManualTheme(piano: PianoRuntime, theme: Exclude<PianoStageThemeId, 
     if (!previous && sessions.size >= VFX_MAX_PIANOS) return;
     startSession(
         piano.location,
-        { auto: true, kind: "manualTheme", piano, theme, lastNoteAt: system.currentTick, seedNote },
+        { auto: true, kind: "manualTheme", piano, theme, lastNoteAt: hostTickAt(system.currentTick), seedNote },
         false,
     );
 }
@@ -296,17 +309,18 @@ function refreshAutoVfx(piano: PianoRuntime) {
 }
 
 function updateTick() {
-    const tick = system.currentTick;
+    const hostTick = hostTickAt(system.currentTick);
     const started = Date.now();
     let calls = 0;
 
     for (const [key, session] of sessions) {
-        session.budget.expire(tick);
-        const elapsed = tick - session.start;
-        if (!session.ended && (elapsed === 0 || tick % 20 === 0) && inspectInstrument(session.location) !== "complete") {
+        session.budget.expire(hostTick);
+        const elapsed = hostTick - session.start;
+        if (!session.ended && (elapsed === 0 || hostTick % 20 === 0) && inspectInstrument(session.location) !== "complete") {
             stopSession(session);
         }
 
+        const positionSeconds = session.timeline.positionSeconds;
         if (!session.ended && elapsed >= 0) {
             try {
                 if (!session.engine && !initializeSession(session)) {
@@ -316,32 +330,29 @@ function updateTick() {
                 if (
                     "auto" in session.request &&
                     session.request.kind === "manualTheme" &&
-                    tick - (session.lastManualNoteAt ?? tick) >= 160
+                    hostTick - (session.lastManualNoteAt ?? hostTick) >= 160
                 ) {
                     stopSession(session);
-                } else if (!session.isPerformance && elapsed >= session.duration) {
+                } else if (!session.isPerformance && session.durationSeconds !== Infinity
+                    && positionSeconds >= session.durationSeconds) {
                     stopSession(session);
                 } else if (session.engine) {
+                    const timelineTick = timelineTickAt(positionSeconds);
                     if (session.input !== "live" && session.input !== "solo") {
-                        for (const note of simulatedVfxNotes(tick, elapsed, session.input)) session.music.note(note);
+                        for (const note of simulatedVfxNotes(timelineTick, session.input)) session.music.note(note);
                     }
-                    const timeSeconds = session.midi ? session.midi.position : elapsed / 20;
-                    // VFX 引擎的 gameTick 必须与 timeSeconds 同属歌曲时间轴：引擎 seek 后
-                    // 通道冷却以歌曲 tick 记录。传入会话经过的 tick 会在中途跳转后错位，
-                    // 持续通道会静默到实际播放时长追上歌曲进度。
-                    const vfxTick = session.midi ? Math.floor(timeSeconds * 20 + 1e-6) : elapsed;
-                    if (elapsed % 4 === 0) {
-                        session.features = session.input === "solo" ? quietFeatures : session.music.sample(vfxTick);
+                    if (session.nextFeatureTick === undefined || timelineTick >= session.nextFeatureTick) {
+                        session.features = session.input === "solo" ? quietFeatures : session.music.sample(timelineTick);
+                        session.nextFeatureTick = addTimelineTicks(timelineTick, 4);
                     }
                     const solo = session.input === "solo";
-                    const prop = session.engine.stageProp(timeSeconds, session.features, solo);
-                    const nativeStageProp = session.prop.render(prop, tick) ? prop?.channelKey : undefined;
+                    const prop = session.engine.stageProp(positionSeconds, session.features, solo);
+                    const nativeStageProp = session.prop.render(prop, hostTick) ? prop?.channelKey : undefined;
                     const before = session.budget.dropped;
                     const batches = session.engine.update(
-                        timeSeconds,
-                        vfxTick,
+                        positionSeconds,
                         session.features,
-                        session.music.recent(),
+                        session.music.recent(timelineTick),
                         { emitFlashes: true, solo, nativeStageProp },
                     );
                     session.budget.enqueue(batches);
@@ -355,10 +366,9 @@ function updateTick() {
         }
 
         try {
-            session.budget.dispatch(tick, emitter => {
+            session.budget.dispatch(hostTick, emitter => {
                 calls++;
-                const ageSeconds = session.midi ? session.midi.position : Math.max(0, elapsed) / 20;
-                spawnVfxEmitter(session.location, emitter, ageSeconds);
+                spawnVfxEmitter(session.location, emitter, positionSeconds);
                 sent++;
             });
         } catch (error) {
@@ -410,15 +420,16 @@ export function registerVfxRuntime() {
             const previous = getVfxSession(piano.location);
             if (previous && !previous.ended) {
                 if ("auto" in previous.request && previous.request.kind === "manualTheme") {
-                    previous.lastManualNoteAt = system.currentTick;
+                    previous.lastManualNoteAt = hostTickAt(system.currentTick);
                 }
                 return;
             }
-            const seed = note.tick !== undefined && note.velocity !== undefined && note.hasVelocity !== undefined
+            const seed = note.worldTick !== undefined && note.velocity !== undefined && note.hasVelocity !== undefined
                 ? {
                     midi: note.midi,
                     duration: note.duration,
-                    tick: note.tick,
+                    soundDuration: note.soundDuration,
+                    worldTick: note.worldTick,
                     velocity: note.velocity,
                     source: "manual" as const,
                     hasVelocity: note.hasVelocity,

@@ -14,6 +14,7 @@ import {
     type VfxEmitter,
 } from "../src";
 import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+import { tt } from "./helpers/time";
 
 ensureBuiltinPluginsRegistered();
 beforeEach(ensureBuiltinPluginsRegistered);
@@ -46,8 +47,8 @@ test("all performance JSON cues place finite variables through unified VfxEngine
         const source = JSON.parse(readFileSync(new URL(`../../../midis/performances/${id}.json`, import.meta.url), "utf8"));
         const engine = new VfxEngine(createPerformanceProgram(compilePerformanceSource(source, id), duration));
         for (let t = 0; t <= duration; t += step) {
-            const notes = [{ midi: 66, velocity: 0.8, duration: 0.8, tick: Math.round(t * 20) }];
-            const batches = engine.update(t, Math.round(t * 20), music, notes);
+            const notes = [{ midi: 66, velocity: 0.8, duration: 0.8, timelineTick: tt(Math.round(t * 20)), sequence: 1 }];
+            const batches = engine.update(t, music, notes);
             for (const batch of batches) {
                 for (const emitter of batch.emitters) check(`${id} ${emitter.group}/${emitter.particle}`, emitter, t, failures);
             }
@@ -74,8 +75,8 @@ test("all registered effects place finite variables across solo and music modes"
                         motion: "normal",
                     },
                     music,
-                    recentNotes: [{ midi: 48, velocity: 0.7, duration: 0.8, tick: 1 }],
-                    lastNoteTick: 0,
+                    recentNotes: [{ midi: 48, velocity: 0.7, duration: 0.8, timelineTick: tt(1), sequence: 1 }],
+                    lastNoteSequence: 0,
                     instrument: "upright",
                     phase,
                     solo,
@@ -95,7 +96,7 @@ test("all 7 stage themes place finite variables under unified VfxEngine", () => 
         const engine = new VfxEngine(createThemeProgram(theme, { seconds: 24 }));
         for (let t = 0; t < 20; t += 0.15) {
             const tick = Math.round(t * 20);
-            const batches = engine.update(t, tick, music, [{ midi: 60, velocity: 0.8, duration: 0.8, tick }]);
+            const batches = engine.update(t, music, [{ midi: 60, velocity: 0.8, duration: 0.8, timelineTick: tt(tick), sequence: 1 }]);
             for (const batch of batches) {
                 for (const emitter of batch.emitters) check(`${name} ${emitter.group}/${emitter.particle}`, emitter, t, failures);
             }
@@ -137,8 +138,8 @@ test("all parameterized effects remain finite and within per-piano particle budg
                     custom,
                 },
                 music,
-                recentNotes: [{ midi: 60, velocity: 1, duration: 1, tick: 1 }],
-                lastNoteTick: 0,
+                recentNotes: [{ midi: 60, velocity: 1, duration: 1, timelineTick: tt(1), sequence: 1 }],
+                lastNoteSequence: 0,
                 instrument: "grand",
                 phase: 17,
                 solo: false,

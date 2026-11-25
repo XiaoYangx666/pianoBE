@@ -46,6 +46,7 @@ import {
     vfxStageFrame,
 } from "../src";
 import { ensureBuiltinPluginsRegistered, readParticleDoc } from "./helpers/builtinPlugins";
+import { ht, tt } from "./helpers/time";
 
 ensureBuiltinPluginsRegistered();
 beforeEach(ensureBuiltinPluginsRegistered);
@@ -81,18 +82,18 @@ test("seeking into an in-flight transition reconstructs intensity, scale, dual R
         { tick: 320, effect: "shockwave", color: PERFORMANCE_PALETTES.gold, level: 100, scale: 100, op: "flash" },
     ], 11));
 
-    const first = engine.update(2, 40, quietFeatures);
+    const first = engine.update(2, quietFeatures);
     expect(first.flatMap(batch => batch.emitters).map(emitter => emitter.particle)).toContain("shock");
 
     engine.seek(2.5);
-    const midway = engine.update(2.5, 50, quietFeatures).flatMap(batch => batch.emitters);
+    const midway = engine.update(2.5, quietFeatures).flatMap(batch => batch.emitters);
     expect(midway.filter(e => e.particle === "draw_point")).toHaveLength(2);
     expect(midway[0].variables.opacity).toBeCloseTo(0.26 + 0.54 * 0.5, 3);
     expect(midway[0].variables.brush).toBe(POINT_BRUSH_INDEX.star);
     expect(midway[1].variables.brush).toBe(POINT_BRUSH_INDEX.petal);
 
     engine.seek(7.5);
-    const interpolated = engine.update(7.5, 150, quietFeatures).flatMap(batch => batch.emitters);
+    const interpolated = engine.update(7.5, quietFeatures).flatMap(batch => batch.emitters);
     const slot0 = interpolated[0];
     expect(slot0.transform?.scale).toBeCloseTo(1.2, 4);
     expect(slot0.variables.red).toBeCloseTo(160 / 255, 2);
@@ -102,12 +103,12 @@ test("seeking into an in-flight transition reconstructs intensity, scale, dual R
     expect(engine.activeSummary(7.5).map(item => `${item.effect}:${item.slot}`)).toEqual(["starfield:0", "starfield:1"]);
 
     engine.seek(8);
-    expect(engine.update(8, 160, quietFeatures).flatMap(batch => batch.emitters).map(emitter => emitter.particle))
+    expect(engine.update(8, quietFeatures).flatMap(batch => batch.emitters).map(emitter => emitter.particle))
         .not.toContain("shock");
     engine.seek(7.95);
-    expect(engine.update(8, 160, quietFeatures).flatMap(batch => batch.emitters).map(emitter => emitter.particle))
+    expect(engine.update(8, quietFeatures).flatMap(batch => batch.emitters).map(emitter => emitter.particle))
         .toContain("shock");
-    expect(engine.update(8, 160, quietFeatures)).toEqual([]);
+    expect(engine.update(8, quietFeatures)).toEqual([]);
 });
 
 test("all registered effects emit valid finite parameters and declared particle variables", () => {
@@ -118,10 +119,10 @@ test("all registered effects emit valid finite parameters and declared particle 
     const allBrushes = [...POINT_BRUSH_IDS, ...STROKE_BRUSH_IDS];
 
     const recentNotes = [
-        { midi: 36, velocity: 0.78, duration: 1.2, tick: 10 },
-        { midi: 52, velocity: 0.85, duration: 0.9, tick: 10 },
-        { midi: 67, velocity: 0.88, duration: 0.8, tick: 10 },
-        { midi: 84, velocity: 0.92, duration: 0.6, tick: 10 },
+        { midi: 36, velocity: 0.78, duration: 1.2, timelineTick: tt(10), sequence: 1 },
+        { midi: 52, velocity: 0.85, duration: 0.9, timelineTick: tt(10), sequence: 2 },
+        { midi: 67, velocity: 0.88, duration: 0.8, timelineTick: tt(10), sequence: 3 },
+        { midi: 84, velocity: 0.92, duration: 0.6, timelineTick: tt(10), sequence: 4 },
     ];
 
     for (const instrument of ["grand", "upright"] as const) {
@@ -156,7 +157,7 @@ test("all registered effects emit valid finite parameters and declared particle 
                     },
                     music: { ...quietFeatures, activity: 0.72, sustain: 0.75, pitch: 0.62, surge: 0.80, density: 0.68, chord: 0.5, onset: 1 },
                     recentNotes,
-                    lastNoteTick: 5,
+                    lastNoteSequence: 0,
                     instrument,
                     phase: 30,
                     solo: false,
@@ -199,13 +200,14 @@ test("all unified stage themes complete four staggered pianos with zero dropped 
             let callsThisTick = 0;
             for (const piano of pianos) {
                 const elapsed = tick - piano.start;
-                piano.budget.expire(tick);
+                piano.budget.expire(ht(tick));
                 if (elapsed < 0) continue;
-                for (const note of simulatedVfxNotes(tick, elapsed, "phrase")) piano.music.note(note);
-                const features = elapsed % 4 === 0 ? piano.music.sample(tick) : quietFeatures;
-                piano.budget.enqueue(piano.engine.update(elapsed / 20, elapsed, features, piano.music.recent()));
+                const timelineTick = tt(elapsed);
+                for (const note of simulatedVfxNotes(timelineTick, "phrase")) piano.music.note(note);
+                const features = elapsed % 4 === 0 ? piano.music.sample(timelineTick) : quietFeatures;
+                piano.budget.enqueue(piano.engine.update(elapsed / 20, features, piano.music.recent(timelineTick)));
                 let calls = 0;
-                piano.budget.dispatch(tick, () => calls++);
+                piano.budget.dispatch(ht(tick), () => calls++);
                 expect(calls).toBeLessThanOrEqual(VFX_EMITTERS_PER_TICK);
                 expect(piano.budget.reserved).toBeWithin(0, VFX_PARTICLES_PER_PIANO + 1);
                 expect(piano.budget.dropped).toBe(0);
@@ -253,7 +255,7 @@ test("VfxEngine interpolates key_style colors, switches explicit variant, and re
     expect(engine.keyParticleOverride(8.5)).toBeUndefined();
     expect(engine.keyParticleOverride(12)).toBeUndefined();
     // key_style must not reserve stage emitter budget
-    expect(engine.update(3, 60, quietFeatures)).toEqual([]);
+    expect(engine.update(3, quietFeatures)).toEqual([]);
 });
 
 function simulateSongPerformance(fileName: string, starts: readonly number[], registry?: VfxRegistry, nativeProps = false) {
@@ -286,25 +288,26 @@ function simulateSongPerformance(fileName: string, starts: readonly number[], re
         let totalCalls = 0;
         for (const piano of pianos) {
             const elapsed = tick - piano.start;
-            piano.budget.expire(tick);
+            piano.budget.expire(ht(tick));
             if (elapsed < 0) continue;
+            const timelineTick = tt(elapsed);
             for (const note of notes.get(elapsed) ?? []) {
                 piano.music.note({
                     midi: note.midi,
                     duration: note.duration,
-                    tick,
+                    timelineTick,
                     velocity: Math.round(note.velocity * 127),
                     source: "midi",
                     hasVelocity: true,
                     songTime: note.time,
                 });
             }
-            const features = elapsed % 4 === 0 ? piano.music.sample(tick) : quietFeatures;
+            const features = elapsed % 4 === 0 ? piano.music.sample(timelineTick) : quietFeatures;
             const time = elapsed / 20;
             const nativeStageProp = nativeProps && Boolean(piano.engine.stageProp(time, features));
-            piano.budget.enqueue(piano.engine.update(time, elapsed, features, piano.music.recent(), { nativeStageProp }));
+            piano.budget.enqueue(piano.engine.update(time, features, piano.music.recent(timelineTick), { nativeStageProp }));
             let count = 0;
-            piano.budget.dispatch(tick, emitter => {
+            piano.budget.dispatch(ht(tick), emitter => {
                 count++;
                 piano.counts.set(emitter.particle, (piano.counts.get(emitter.particle) ?? 0) + 1);
             });
@@ -362,7 +365,7 @@ test("Sinner's Finale lands the sword on the MIDI accent and clears the stage at
     expect(performance.some(cue => cue.effect === "sinner_authority_release" && cue.op === "flash" && cue.tick === 5390)).toBe(true);
     expect(performance.find(cue => cue.effect === "sinner_bubbles")?.tick).toBe(2850);
     const opening = new VfxEngine(createPerformanceProgram(performance, 169.2), "grand");
-    const firstFrame = opening.update(0, 0, quietFeatures, [], { nativeStageProp: true })
+    const firstFrame = opening.update(0, quietFeatures, [], { nativeStageProp: true })
         .flatMap(batch => batch.emitters);
     expect(firstFrame.map(emitter => emitter.particle)).toContain("sinner_spot_pool");
     expect(firstFrame.map(emitter => emitter.particle)).toContain("sinner_spot_beam");
@@ -417,7 +420,7 @@ test("Floral Sea leaves space for the orbit and finishes with a single farewell 
     const program = createPerformanceProgram(performance, 307.575, registry);
     const engine = new VfxEngine(program, "grand", registry);
     engine.seek(232.6);
-    const orbit = engine.update(232.65, 4653, quietFeatures).flatMap(batch => batch.emitters)
+    const orbit = engine.update(232.65, quietFeatures).flatMap(batch => batch.emitters)
         .filter(emitter => emitter.group === "floral_petal_phrase");
     expect(orbit).toHaveLength(6);
     expect(orbit.every(emitter => emitter.variables.omega > 0)).toBe(true);
@@ -426,7 +429,7 @@ test("Floral Sea leaves space for the orbit and finishes with a single farewell 
     expect(touch.style).toBe("floral_touch");
     expect(touch.emitters[0]).toMatchObject({ particle: "draw_point", variables: { count: 2 } });
     engine.seek(301.6);
-    const farewell = engine.update(301.65, 6033, quietFeatures).flatMap(batch => batch.emitters);
+    const farewell = engine.update(301.65, quietFeatures).flatMap(batch => batch.emitters);
     expect(farewell).toHaveLength(1);
     expect(farewell[0]).toMatchObject({ group: "floral_petal_phrase", particles: 1, lifetime: 5.8 });
 });
@@ -564,7 +567,7 @@ test("custom numeric params interpolate smoothly via set+fade, inherit active ch
     expect(decodedCues).toEqual(cues);
 
     const engine = new VfxEngine(createPerformanceProgram(decodedCues, 12));
-    const first = engine.update(0.5, 10, quietFeatures)[0].emitters[0];
+    const first = engine.update(0.5, quietFeatures)[0].emitters[0];
     expect(first.variables.radius).toBeCloseTo(1.2, 4);
     expect(first.variables.rise).toBeCloseTo(1.0, 4);
     expect(first.variables.omega).toBeCloseTo(90, 4);
@@ -572,7 +575,7 @@ test("custom numeric params interpolate smoothly via set+fade, inherit active ch
 
     // Seek to midpoint t = 4.0s: radius & angularSpeed interpolate to midpoint, height & particleSize inherit from active channel
     engine.seek(4.0, true);
-    const mid = engine.update(4.0, 80, quietFeatures)[0].emitters[0];
+    const mid = engine.update(4.0, quietFeatures)[0].emitters[0];
     expect(mid.variables.radius).toBeCloseTo(2.4, 4);
     expect(mid.variables.omega).toBeCloseTo(180, 4);
     expect(mid.variables.rise).toBeCloseTo(1.0, 4);
@@ -580,12 +583,12 @@ test("custom numeric params interpolate smoothly via set+fade, inherit active ch
 
     // At t = 7.0s (midway through level: 0 fade-out), radius remains 3.6 rather than snapping back to default
     engine.seek(7.0, true);
-    const fadingOut = engine.update(7.0, 140, quietFeatures)[0].emitters[0];
+    const fadingOut = engine.update(7.0, quietFeatures)[0].emitters[0];
     expect(fadingOut.variables.radius).toBeCloseTo(3.6, 4);
 
     // At t = 9.0s (restart from silence), unspecified params reset to defaults while height = 4.0
     engine.seek(9.0, true);
-    const restarted = engine.update(9.0, 180, quietFeatures)[0].emitters[0];
+    const restarted = engine.update(9.0, quietFeatures)[0].emitters[0];
     expect(restarted.variables.radius).toBeCloseTo(2.2, 4);
     expect(restarted.variables.rise).toBeCloseTo(4.0, 4);
     expect(restarted.variables.omega).toBeCloseTo(135, 4);
@@ -613,7 +616,7 @@ test("boolean and enum custom params switch immediately at cue time and control 
         },
     ], 5));
 
-    const fw = engine.update(1.0, 20, quietFeatures).flatMap(b => b.emitters);
+    const fw = engine.update(1.0, quietFeatures).flatMap(b => b.emitters);
     expect(fw.some(e => e.particle === "fountain")).toBe(false);
     const fwPoints = fw.filter(e => e.particle === "draw_point");
     expect(fwPoints).toHaveLength(3);
@@ -621,7 +624,7 @@ test("boolean and enum custom params switch immediately at cue time and control 
     expect(fwPoints[0].variables.radius_end).toBeCloseTo(2.8 + 0.35 * 0.9, 4);
     expect(fwPoints[0].variables.size).toBeCloseTo(0.12 + 0.025 * 0.9, 4);
 
-    const sw = engine.update(2.0, 40, quietFeatures).flatMap(b => b.emitters);
+    const sw = engine.update(2.0, quietFeatures).flatMap(b => b.emitters);
     const planes = sw.filter(e => e.particle === "draw_plane");
     expect(planes).toHaveLength(1);
     expect(planes[0].variables.radius_end).toBeCloseTo(4.0 + 0.65 * 0.9, 4);
@@ -657,7 +660,7 @@ test("custom parameter validation rejects invalid names/bounds while runtime res
         ],
     });
     const themeEngine = new VfxEngine(createThemeProgram(theme, { seconds: 10 }));
-    const themeEmitter = themeEngine.update(0, 0, quietFeatures)[0].emitters[0];
+    const themeEmitter = themeEngine.update(0, quietFeatures)[0].emitters[0];
     expect(themeEmitter.variables.radius).toBeCloseTo(3.2, 4);
     expect(themeEmitter.variables.rise).toBeCloseTo(3.4, 4);
 
@@ -671,7 +674,7 @@ test("custom parameter validation rejects invalid names/bounds while runtime res
         level: 90,
         params: { length: 4.5, split: false },
     }));
-    const cometEmitters = singleEngine.update(0, 0, quietFeatures)[0].emitters;
+    const cometEmitters = singleEngine.update(0, quietFeatures)[0].emitters;
     expect(cometEmitters.filter(e => e.particle === "draw_comet")).toHaveLength(1);
     expect(cometEmitters.find(e => e.particle === "draw_comet")!.variables.length).toBeCloseTo(4.5, 4);
 });
@@ -681,8 +684,8 @@ test("time_dial reverses pointer integration, window_beams switches group size, 
         { tick: 0, effect: "time_dial", color: "#E6B87A", level: 80, scale: 100, op: "set", fade: 0, params: { pointerSpeed: 30, tilt: 0 } },
         { tick: 40, effect: "time_dial", color: "#5E9EFF", level: 80, scale: 100, op: "set", fade: 0, params: { pointerSpeed: -120, tilt: 45 } },
     ], 4));
-    const fwd1 = dialEngine.update(0, 0, quietFeatures)[0].emitters;
-    const fwd2 = dialEngine.update(0.8, 16, quietFeatures)[0].emitters;
+    const fwd1 = dialEngine.update(0, quietFeatures)[0].emitters;
+    const fwd2 = dialEngine.update(0.8, quietFeatures)[0].emitters;
     const fwdHand1 = fwd1.filter(e => e.particle === "draw_stroke").at(-2)!;
     const fwdHand2 = fwd2.filter(e => e.particle === "draw_stroke").at(-2)!;
     // Clockwise forward (pointerSpeed > 0): 12 o'clock (tx=0, tz=1) rotates toward +x (tx > 0)
@@ -692,8 +695,8 @@ test("time_dial reverses pointer integration, window_beams switches group size, 
     expect(fwd1.some(e => e.particle === "draw_plane")).toBe(true);
     expect(fwd1.filter(e => e.particle === "draw_stroke")).toHaveLength(10);
 
-    const rev1 = dialEngine.update(1.6, 32, quietFeatures)[0].emitters;
-    const rev2 = dialEngine.update(2.4, 48, quietFeatures)[0].emitters;
+    const rev1 = dialEngine.update(1.6, quietFeatures)[0].emitters;
+    const rev2 = dialEngine.update(2.4, quietFeatures)[0].emitters;
     const revHand1 = rev1.filter(e => e.particle === "draw_stroke").at(-3)!;
     const revHand2 = rev2.filter(e => e.particle === "draw_stroke").at(-3)!;
     // Reverse (pointerSpeed < 0) at high tilt (45°): counter-clockwise toward -x, omits ground ring, adds ghost hand
@@ -708,7 +711,7 @@ test("time_dial reverses pointer integration, window_beams switches group size, 
             level: 70,
             params: { beams, angle: 35, length: 2.8 },
         }));
-        const emitters = wb.update(0, 0, quietFeatures)[0].emitters;
+        const emitters = wb.update(0, quietFeatures)[0].emitters;
         expect(emitters.filter(e => e.particle === "shaft")).toHaveLength(expectedCount);
     }
 
@@ -717,13 +720,13 @@ test("time_dial reverses pointer integration, window_beams switches group size, 
         color: "#6CC4FF",
         level: 80,
         params: { warp: 0.2, streakLength: 1.5 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
     const warpHigh = new VfxEngine(createSingleEffectProgram({
         effect: "time_warp",
         color: "#FFF3D1",
         level: 90,
         params: { warp: 0.9, streakLength: 2.6 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
     expect(warpLow.filter(e => e.particle === "draw_comet")).toHaveLength(2);
     expect(warpHigh.filter(e => e.particle === "draw_comet")).toHaveLength(4);
 
@@ -732,7 +735,7 @@ test("time_dial reverses pointer integration, window_beams switches group size, 
         color: "#E6B87A",
         level: 50,
         params: { driftY: -0.1, speed: 1.0 },
-    })).update(0, 0, quietFeatures)[0].emitters[0];
+    })).update(0, quietFeatures)[0].emitters[0];
     expect(sinkDust.particle).toBe("draw_point");
     expect(sinkDust.variables.vy).toBeCloseTo(-0.1, 4);
 });
@@ -744,20 +747,20 @@ test("hanabi_shell renders shellStyle variants and flattens side-view depth, and
         color2: "#FFE08A",
         level: 90,
         params: { shellStyle: "chrysanthemum", flatness: 0, tilt: 0, burstRadius: 2.0 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
     const flatShell = new VfxEngine(createSingleEffectProgram({
         effect: "hanabi_shell",
         color: "#6BE3FF",
         color2: "#FFD978",
         level: 90,
         params: { shellStyle: "willow", flatness: 0.9, tilt: 50, burstRadius: 2.4 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
     const peonyShell = new VfxEngine(createSingleEffectProgram({
         effect: "hanabi_shell",
         color: "#FFE08A",
         level: 85,
         params: { shellStyle: "peony", flatness: 0, tilt: 0 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
 
     expect(roundShell.filter(e => e.particle === "draw_stroke")).toHaveLength(12);
     expect(peonyShell.filter(e => e.particle === "draw_stroke")).toHaveLength(8);
@@ -771,14 +774,14 @@ test("hanabi_shell renders shellStyle variants and flattens side-view depth, and
         color2: "#8DB8FF",
         level: 60,
         params: { shimmer: 0.2, width: 2.8 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
     const brightSea = new VfxEngine(createSingleEffectProgram({
         effect: "sea_reflection",
         color: "#FFE08A",
         color2: "#FF8FB8",
         level: 85,
         params: { shimmer: 0.95, width: 4.0 },
-    })).update(0, 0, quietFeatures)[0].emitters;
+    })).update(0, quietFeatures)[0].emitters;
     expect(calmSea.filter(e => e.particle === "draw_stroke")).toHaveLength(6);
     expect(brightSea.at(-1)!.variables.twinkle).toBeGreaterThan(calmSea.at(-1)!.variables.twinkle);
 });

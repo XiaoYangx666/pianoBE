@@ -6,6 +6,8 @@ import {
     createSingleEffectProgram,
     createThemeProgram,
     DEFAULT_KEY_PARTICLE_SETTINGS,
+    hostTickAt,
+    timelineTickAt,
     getKeyParticleStyleLabel,
     keyParticleOrigin,
     hasAvailablePerformanceEffects,
@@ -24,6 +26,7 @@ import {
     type MusicFeatures,
     type ResolvedVfxStageProp,
     type SingleEffectConfig,
+    type TimelineTick,
     type VfxInstrument,
     type VfxNoteEvent,
     type VfxProgram,
@@ -37,7 +40,7 @@ import { loadStageProps } from "./stageProps";
 export type Direction = keyof typeof VFX_RIGHT_OFFSETS;
 export type View = "stage" | "performer" | "orbit";
 export interface Track {
-    notes: Map<number, VfxNoteEvent[]>;
+    notes: Map<TimelineTick, VfxNoteEvent[]>;
     duration: number;
     performance?: readonly PerformanceCue[];
 }
@@ -199,6 +202,8 @@ export async function createStage(canvas: HTMLCanvasElement) {
         if (rebuild) {
             particles.reset();
             music.clear();
+            // Web seek rebuilds the deterministic preview sandbox; the Addon keeps
+            // already-spawned particles alive on its real host clock instead.
             budget = new VfxBudget();
             features = quietFeatures;
             // 回看最近 ~11s 以重建进入当前时刻时仍在空中飘荡的粒子轨迹
@@ -218,8 +223,10 @@ export async function createStage(canvas: HTMLCanvasElement) {
             const tick = frame / 2;
             if (frame > 0) particles.step();
             if (Number.isInteger(tick)) {
-                budget.expire(tick);
-                const tickNotes = track.notes.get(tick) ?? [];
+                const timelineTick = timelineTickAt(tick / 20);
+                const hostTick = hostTickAt(tick);
+                budget.expire(hostTick);
+                const tickNotes = track.notes.get(timelineTick) ?? [];
                 for (const note of tickNotes) {
                     music.note(note);
                     if (showKeyParticles) {
@@ -231,11 +238,11 @@ export async function createStage(canvas: HTMLCanvasElement) {
                         }
                     }
                 }
-                if (tick % 4 === 0) features = music.sample(tick);
+                if (tick % 4 === 0) features = music.sample(timelineTick);
                 const prop = engine!.stageProp(tick / 20, features);
                 const nativeStageProp = renderableProp(prop) ? prop?.channelKey : undefined;
-                budget.enqueue(engine!.update(tick / 20, tick, features, music.recent(), { emitFlashes: true, nativeStageProp }));
-                budget.dispatch(tick, emitter => {
+                budget.enqueue(engine!.update(tick / 20, features, music.recent(timelineTick), { emitFlashes: true, nativeStageProp }));
+                budget.dispatch(hostTick, emitter => {
                     const placement = placeVfxEmitter(center, right, stage, emitter, tick / 20);
                     particles.spawn(emitter.group, emitter.particle, placement.position, placement.variables);
                     emissions.push({ tick, group: emitter.group });

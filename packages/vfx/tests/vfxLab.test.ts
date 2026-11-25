@@ -142,7 +142,7 @@ test("stage frame adapts to upright vs grand piano and emitters surround the ins
         color: "#68E4FF",
         level: 85,
     }));
-    const wave = waveEngine.update(0, 0, { ...quietFeatures, activity: 0.7 }).flatMap(batch => batch.emitters);
+    const wave = waveEngine.update(0, { ...quietFeatures, activity: 0.7 }).flatMap(batch => batch.emitters);
     expect(wave.some(emitter => emitter.offset.y > 0.5)).toBe(true);
 
     const wingRibbons = getVfxEffect("wing_ribbons")!;
@@ -150,7 +150,7 @@ test("stage frame adapts to upright vs grand piano and emitters surround the ins
         params: { color: "#90C8FF", color2: "#C58CFF", intensity: 0.8, scale: 1, zone: "stage", motion: "normal" },
         music: { ...quietFeatures, surge: 0.7, sustain: 0.6 },
         recentNotes: [],
-        lastNoteTick: -1,
+        lastNoteSequence: 0,
         instrument: "upright",
         phase: 0,
         solo: false,
@@ -164,7 +164,7 @@ test("stage frame adapts to upright vs grand piano and emitters surround the ins
         params: { color: "#68E4FF", color2: "#C58CFF", intensity: 0.8, scale: 1, zone: "stage", motion: "normal" },
         music: quietFeatures,
         recentNotes: [],
-        lastNoteTick: -1,
+        lastNoteSequence: 0,
         instrument: "grand",
         phase: 0,
         solo: false,

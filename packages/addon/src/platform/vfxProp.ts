@@ -1,7 +1,7 @@
 import type { Entity } from "@minecraft/server";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { vfxInstrumentFor } from "@domain/instrument/definition";
-import { placeVfxStageProp, vfxStageFrame, type Vec3, type VfxStageProp } from "@piano/vfx";
+import { hostTickAt, placeVfxStageProp, vfxStageFrame, type HostTick, type Vec3, type VfxStageProp } from "@piano/vfx";
 import type { StagePropRegistration } from "@piano/vfx/package";
 import { instrumentCenter } from "@platform/assembly";
 import type { InstrumentLocation } from "@platform/instrumentLocation";
@@ -13,7 +13,7 @@ export class VfxPropRenderer {
     private turn?: number;
     private position?: Vec3;
     private animation = 0;
-    private retryAt = 0;
+    private retryAt = hostTickAt(0);
     private failedId?: string;
 
     constructor(
@@ -21,7 +21,7 @@ export class VfxPropRenderer {
         private readonly registrations: ReadonlyMap<string, StagePropRegistration>,
     ) {}
 
-    render(prop: VfxStageProp | undefined, tick: number): boolean {
+    render(prop: VfxStageProp | undefined, hostTick: HostTick): boolean {
         const registration = prop && this.registrations.get(prop.id);
         const animation = prop?.animation === undefined ? 0 : (registration?.animations.indexOf(prop.animation) ?? -1) + 1;
         if (!prop || !registration || (prop.animation !== undefined && animation === 0)
@@ -29,7 +29,7 @@ export class VfxPropRenderer {
             this.clear();
             return false;
         }
-        if (registration.id === this.failedId && tick < this.retryAt) {
+        if (registration.id === this.failedId && hostTick < this.retryAt) {
             this.clear();
             return false;
         }
@@ -72,7 +72,7 @@ export class VfxPropRenderer {
             // Old templates and unloaded chunks can still render the particle version.
             this.clear();
             this.failedId = registration.id;
-            this.retryAt = tick + 40;
+            this.retryAt = hostTickAt(hostTick + 40);
             return false;
         }
     }

@@ -1,6 +1,7 @@
 import { TIME_SCALE } from "@piano/core";
 import { resolveEffectCustomParams } from "../domain/effects";
 import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
+import { addTimelineTicks, timelineTickAt, type TimelineTick } from "./time";
 import type { VfxProgram } from "./programs";
 import type { VfxInstrument } from "../spatial/instrument";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
@@ -8,8 +9,8 @@ import { stagePropId } from "../plugin/plugin";
 import type { PianoParticleOverride, VfxBatch, VfxEffectDefinition, VfxEffectParams, VfxStageProp } from "../types";
 
 interface ChannelRuntime {
-    nextTick: number;
-    lastNoteTick: number;
+    nextTick: TimelineTick;
+    lastNoteSequence: number;
     soloStep: number;
     effectState: unknown;
 }
@@ -37,7 +38,7 @@ export interface ActiveChannelSummary {
  */
 export class VfxEngine {
     private readonly runtimes = new Map<string, ChannelRuntime>();
-    private readonly yieldUntilByTag = new Map<string, number>();
+    private readonly yieldUntilByTag = new Map<string, TimelineTick>();
     private lastTimeSeconds = -Infinity;
     private lastTick40 = -1;
     private flashIndex = 0;
@@ -116,59 +117,57 @@ export class VfxEngine {
         }
     }
 
-    reset(gameTick = 0) {
+    reset(positionSeconds = 0) {
         this.runtimes.clear();
         this.yieldUntilByTag.clear();
         this.lastTimeSeconds = -Infinity;
         this.lastTick40 = -1;
         this.flashIndex = 0;
         this.manualFlashPending = false;
-        if (gameTick > 0) {
-            for (const channel of this.program.channels) {
-                const def = this.getActiveEffect(channel.effect);
-                this.runtimes.set(channel.key, {
-                    nextTick: gameTick,
-                    lastNoteTick: -1,
-                    soloStep: 0,
-                    effectState: this.safeCreateState(def),
-                });
-            }
+        if (positionSeconds > 0) {
+            this.initializeRuntimes(timelineTickAt(positionSeconds));
+            this.lastTick40 = positionSeconds * TIME_SCALE;
+            const next = this.program.flashes.findIndex(cue => cue.tick40 > this.lastTick40);
+            this.flashIndex = next < 0 ? this.program.flashes.length : next;
         }
     }
 
-    seek(timeSeconds: number, resetEmitters = true) {
-        this.lastTimeSeconds = timeSeconds;
-        this.lastTick40 = timeSeconds * TIME_SCALE;
-        const gameTick = Math.floor(this.lastTick40 / 2);
+    seek(positionSeconds: number, resetEmitters = true) {
+        this.lastTimeSeconds = positionSeconds;
+        this.lastTick40 = positionSeconds * TIME_SCALE;
         if (resetEmitters) {
             this.runtimes.clear();
             this.yieldUntilByTag.clear();
-            for (const channel of this.program.channels) {
-                const def = this.getActiveEffect(channel.effect);
-                this.runtimes.set(channel.key, {
-                    nextTick: gameTick,
-                    lastNoteTick: -1,
-                    soloStep: 0,
-                    effectState: this.safeCreateState(def),
-                });
-            }
+            this.initializeRuntimes(timelineTickAt(positionSeconds));
         }
         const next = this.program.flashes.findIndex(cue => cue.tick40 > this.lastTick40);
         this.flashIndex = next < 0 ? this.program.flashes.length : next;
+    }
+
+    private initializeRuntimes(timelineTick: TimelineTick) {
+        for (const channel of this.program.channels) {
+            const def = this.getActiveEffect(channel.effect);
+            this.runtimes.set(channel.key, {
+                nextTick: timelineTick,
+                lastNoteSequence: 0,
+                soloStep: 0,
+                effectState: this.safeCreateState(def),
+            });
+        }
     }
 
     triggerFlash() {
         this.manualFlashPending = true;
     }
 
-    activeSummary(timeSeconds: number, music: Readonly<MusicFeatures> = quietFeatures, solo = false): ActiveChannelSummary[] {
-        if (timeSeconds >= this.program.durationSeconds) return [];
-        const gameTick = Math.floor(timeSeconds * 20 + 1e-6);
+    activeSummary(positionSeconds: number, music: Readonly<MusicFeatures> = quietFeatures, solo = false): ActiveChannelSummary[] {
+        if (positionSeconds >= this.program.durationSeconds) return [];
+        const timelineTick = timelineTickAt(positionSeconds);
         const summary: ActiveChannelSummary[] = [];
         for (const channel of this.program.channels) {
             const def = this.getActiveEffect(channel.effect);
             if (!def || def.trigger === "control") continue;
-            const sample = channel.sample(timeSeconds, gameTick, music, solo);
+            const sample = channel.sample(positionSeconds, timelineTick, music, solo);
             if (!sample || sample.params.intensity < 0.005) continue;
             summary.push({
                 effect: def.id,
@@ -180,15 +179,15 @@ export class VfxEngine {
         return summary;
     }
 
-    keyParticleOverride(timeSeconds = 0, music: Readonly<MusicFeatures> = quietFeatures, solo = false): PianoParticleOverride | undefined {
-        if (timeSeconds < 0 || timeSeconds >= this.program.durationSeconds) return undefined;
-        const gameTick = Math.floor(timeSeconds * 20 + 1e-6);
+    keyParticleOverride(positionSeconds = 0, music: Readonly<MusicFeatures> = quietFeatures, solo = false): PianoParticleOverride | undefined {
+        if (positionSeconds < 0 || positionSeconds >= this.program.durationSeconds) return undefined;
+        const timelineTick = timelineTickAt(positionSeconds);
         let matchedSlot = -1;
         let matched: PianoParticleOverride | undefined;
         for (const channel of this.program.channels) {
             const def = this.getActiveEffect(channel.effect);
             if (!def || def.trigger !== "control" || !def.resolveKeyParticle) continue;
-            const sample = channel.sample(timeSeconds, gameTick, music, solo);
+            const sample = channel.sample(positionSeconds, timelineTick, music, solo);
             if (!sample || sample.params.intensity < 0.005) continue;
             if (channel.slot >= matchedSlot) {
                 const override = this.safeResolveKeyParticle(def, sample.params);
@@ -201,13 +200,13 @@ export class VfxEngine {
         return matched ?? this.program.staticKeyParticle;
     }
 
-    stageProp(timeSeconds: number, music: Readonly<MusicFeatures>, solo = false): ResolvedVfxStageProp | undefined {
-        if (timeSeconds < 0 || timeSeconds >= this.program.durationSeconds) return undefined;
-        const tick = Math.floor(timeSeconds * 20 + 1e-6);
+    stageProp(positionSeconds: number, music: Readonly<MusicFeatures>, solo = false): ResolvedVfxStageProp | undefined {
+        if (positionSeconds < 0 || positionSeconds >= this.program.durationSeconds) return undefined;
+        const tick = timelineTickAt(positionSeconds);
         for (const channel of this.program.channels) {
             const def = this.getActiveEffect(channel.effect);
             if (!def?.resolveStageProp) continue;
-            const sample = channel.sample(timeSeconds, tick, solo ? quietFeatures : music, solo);
+            const sample = channel.sample(positionSeconds, tick, solo ? quietFeatures : music, solo);
             if (!sample || sample.params.intensity < 0.005) continue;
             try {
                 const prop = def.resolveStageProp(this.resolvedParams(def, sample.params), this.instrument);
@@ -233,8 +232,8 @@ export class VfxEngine {
         let runtime = this.runtimes.get(key);
         if (!runtime) {
             runtime = {
-                nextTick: 0,
-                lastNoteTick: -1,
+                nextTick: timelineTickAt(0),
+                lastNoteSequence: 0,
                 soloStep: 0,
                 effectState: this.safeCreateState(def),
             };
@@ -243,14 +242,15 @@ export class VfxEngine {
         return runtime;
     }
 
-    private recordYield(def: VfxEffectDefinition, gameTick: number) {
+    private recordYield(def: VfxEffectDefinition, timelineTick: TimelineTick) {
         if (!def.yields) return;
-        const prev = this.yieldUntilByTag.get(def.yields.tag) ?? -Infinity;
-        this.yieldUntilByTag.set(def.yields.tag, Math.max(prev, gameTick + def.yields.ticks));
+        const until = addTimelineTicks(timelineTick, def.yields.ticks);
+        const prev = this.yieldUntilByTag.get(def.yields.tag);
+        this.yieldUntilByTag.set(def.yields.tag, prev !== undefined && prev > until ? prev : until);
     }
 
-    private isYielding(def: VfxEffectDefinition, gameTick: number): boolean {
-        return Boolean(def.tags?.some(tag => gameTick < (this.yieldUntilByTag.get(tag) ?? -Infinity)));
+    private isYielding(def: VfxEffectDefinition, timelineTick: TimelineTick): boolean {
+        return Boolean(def.tags?.some(tag => timelineTick < (this.yieldUntilByTag.get(tag) ?? -Infinity)));
     }
 
     private resolvedParams(def: VfxEffectDefinition, params: VfxEffectParams): VfxEffectParams {
@@ -263,7 +263,7 @@ export class VfxEngine {
         params: VfxEffectParams,
         music: Readonly<MusicFeatures>,
         recentNotes: readonly VfxKeyNote[],
-        lastNoteTick: number,
+        lastNoteSequence: number,
         phase: number,
         solo: boolean,
         state: unknown,
@@ -275,7 +275,7 @@ export class VfxEngine {
                 params: this.resolvedParams(def, params),
                 music,
                 recentNotes,
-                lastNoteTick,
+                lastNoteSequence,
                 instrument: this.instrument,
                 phase,
                 solo,
@@ -291,8 +291,7 @@ export class VfxEngine {
     }
 
     update(
-        timeSeconds: number,
-        gameTick: number,
+        positionSeconds: number,
         music: Readonly<MusicFeatures>,
         recentNotes: readonly VfxKeyNote[] = [],
         options: VfxEngineUpdateOptions = {},
@@ -300,11 +299,11 @@ export class VfxEngine {
         const emitFlashes = options.emitFlashes ?? true;
         const solo = options.solo ?? false;
 
-        if (timeSeconds < this.lastTimeSeconds) {
-            this.seek(timeSeconds, true);
+        if (positionSeconds < this.lastTimeSeconds) {
+            throw new Error("VFX engine timeline moved backwards; seek must reset the whole performance session");
         }
-
-        const tick40 = timeSeconds * TIME_SCALE;
+        const timelineTick = timelineTickAt(positionSeconds);
+        const tick40 = positionSeconds * TIME_SCALE;
         const batches: VfxBatch[] = [];
 
         while (this.flashIndex < this.program.flashes.length && this.program.flashes[this.flashIndex].tick40 <= tick40) {
@@ -317,26 +316,26 @@ export class VfxEngine {
                 cue.params,
                 music,
                 recentNotes,
-                -1,
+                0,
                 (cue.tick40 * 17) % 360,
                 solo,
                 this.safeCreateState(def),
             );
             if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
-            this.recordYield(def, gameTick);
+            this.recordYield(def, timelineTick);
         }
 
-        if (timeSeconds < this.program.durationSeconds) {
+        if (positionSeconds < this.program.durationSeconds) {
             for (const channel of this.program.channels) {
                 const def = this.getActiveEffect(channel.effect);
                 if (!def || def.trigger === "control") continue;
                 const runtime = this.runtimeFor(channel.key, def);
 
                 if (def.trigger === "instant") {
-                    const sample = channel.sample(timeSeconds, gameTick, solo ? quietFeatures : music, solo);
+                    const sample = channel.sample(positionSeconds, timelineTick, solo ? quietFeatures : music, solo);
                     if (!sample || sample.params.intensity < 0.005) continue;
                     const manual = this.manualFlashPending;
-                    const gatedPulse = !manual && gameTick >= runtime.nextTick && Boolean(sample.gated);
+                    const gatedPulse = !manual && timelineTick >= runtime.nextTick && Boolean(sample.gated);
                     if (!manual && !gatedPulse) continue;
                     if (manual) this.manualFlashPending = false;
                     const batch = this.emitChannel(
@@ -344,45 +343,45 @@ export class VfxEngine {
                         sample.params,
                         solo ? quietFeatures : music,
                         recentNotes,
-                        runtime.lastNoteTick,
-                        (gameTick * 17 + channel.slot * 41) % 360,
+                        runtime.lastNoteSequence,
+                        (timelineTick * 17 + channel.slot * 41) % 360,
                         solo,
                         runtime.effectState,
                     );
                     if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
-                    this.recordYield(def, gameTick);
-                    runtime.nextTick = gameTick + Math.max(1, sample.cooldownTicks ?? 45);
+                    this.recordYield(def, timelineTick);
+                    runtime.nextTick = addTimelineTicks(timelineTick, Math.max(1, sample.cooldownTicks ?? 45));
                     continue;
                 }
 
-                if (this.isYielding(def, gameTick)) continue;
-                if (gameTick < runtime.nextTick) continue;
+                if (this.isYielding(def, timelineTick)) continue;
+                if (timelineTick < runtime.nextTick) continue;
 
                 const effectiveMusic = solo ? quietFeatures : music;
-                const sample = channel.sample(timeSeconds, gameTick, effectiveMusic, solo);
+                const sample = channel.sample(positionSeconds, timelineTick, effectiveMusic, solo);
                 if (!sample || sample.params.intensity < 0.005) continue;
 
                 if (def.trigger === "note") {
-                    const hasFresh = recentNotes.some(note => note.tick > runtime.lastNoteTick);
+                    const hasFresh = recentNotes.some(note => note.sequence > runtime.lastNoteSequence);
                     if (!hasFresh && !solo) continue;
-                    const phase = hasFresh ? (gameTick * 9 + channel.slot * 41) % 360 : runtime.soloStep;
+                    const phase = hasFresh ? (timelineTick * 9 + channel.slot * 41) % 360 : runtime.soloStep;
                     const batch = this.emitChannel(
                         def,
                         sample.params,
                         effectiveMusic,
                         recentNotes,
-                        runtime.lastNoteTick,
+                        runtime.lastNoteSequence,
                         phase,
                         solo,
                         runtime.effectState,
                     );
                     if (hasFresh) {
                         for (const note of recentNotes) {
-                            if (note.tick > runtime.lastNoteTick) runtime.lastNoteTick = note.tick;
+                            if (note.sequence > runtime.lastNoteSequence) runtime.lastNoteSequence = note.sequence;
                         }
-                        runtime.nextTick = gameTick + Math.max(1, def.interval);
+                        runtime.nextTick = addTimelineTicks(timelineTick, Math.max(1, def.interval));
                     } else {
-                        runtime.nextTick = gameTick + 8;
+                        runtime.nextTick = addTimelineTicks(timelineTick, 8);
                         runtime.soloStep += 5;
                     }
                     if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
@@ -395,20 +394,20 @@ export class VfxEngine {
                     sample.params,
                     effectiveMusic,
                     recentNotes,
-                    runtime.lastNoteTick,
-                    (gameTick * 9 + channel.slot * 41) % 360,
+                    runtime.lastNoteSequence,
+                    (timelineTick * 9 + channel.slot * 41) % 360,
                     solo,
                     runtime.effectState,
                     options.nativeStageProp === true || options.nativeStageProp === channel.key,
                 );
                 const interval = this.safeNextInterval(def, sample.params, runtime.effectState);
-                runtime.nextTick = gameTick + Math.max(1, interval);
-                this.recordYield(def, gameTick);
+                runtime.nextTick = addTimelineTicks(timelineTick, Math.max(1, interval));
+                this.recordYield(def, timelineTick);
                 if (batch && Array.isArray(batch.emitters) && batch.emitters.length) batches.push(batch);
             }
         }
 
-        this.lastTimeSeconds = timeSeconds;
+        this.lastTimeSeconds = positionSeconds;
         this.lastTick40 = tick40;
         return batches.sort((a, b) => b.priority - a.priority);
     }

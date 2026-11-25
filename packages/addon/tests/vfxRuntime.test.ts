@@ -1,6 +1,6 @@
 import { expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { compilePerformanceSource, orderVfxPlugins, registerVfxPlugin, vfxRegistry, type PerformanceCue } from "@piano/vfx";
+import { compilePerformanceSource, orderVfxPlugins, registerVfxPlugin, timelineTickAt, vfxRegistry, type PerformanceCue } from "@piano/vfx";
 import { BUILTIN_PLUGINS } from "@piano/plugins";
 
 let currentTick = 1000;
@@ -61,7 +61,7 @@ mock.module("../src/app/PianoWorld", () => ({
     },
 }));
 
-const { registerVfxRuntime } = await import("../src/app/vfx/runtime");
+const { getVfxSession, registerVfxRuntime } = await import("../src/app/vfx/runtime");
 
 for (const plugin of orderVfxPlugins(BUILTIN_PLUGINS)) {
     if (!vfxRegistry.hasPlugin(plugin.manifest.id)) registerVfxPlugin(plugin);
@@ -81,6 +81,7 @@ function flushTicks(count: number, startSongTime: number) {
 let playing = true;
 let position = 0;
 const transportListeners: Listener<{ type: string; position: number }>[] = [];
+const noteListeners: Listener<Record<string, unknown>>[] = [];
 const midi = {
     get performance() {
         return { cues, duration: 390 };
@@ -94,10 +95,19 @@ const midi = {
 const piano = {
     location: { dimension: { id: "overworld", isChunkLoaded: () => true }, pos: { x: 0, y: 0, z: 0 }, definition: {}, direction: "south" },
     settings: { stageChoreography: true, stageTheme: "off", stageKeyParticles: true },
-    noteSignal: { subscribe: () => () => {} },
+    noteSignal: { subscribe: (listener: Listener<Record<string, unknown>>) => {
+        noteListeners.push(listener);
+        return () => {
+            const index = noteListeners.indexOf(listener);
+            if (index >= 0) noteListeners.splice(index, 1);
+        };
+    } },
     transportSignal: { subscribe: (listener: Listener<{ type: string; position: number }>) => {
         transportListeners.push(listener);
-        return () => {};
+        return () => {
+            const index = transportListeners.indexOf(listener);
+            if (index >= 0) transportListeners.splice(index, 1);
+        };
     } },
     settingsSignal: { subscribe: () => () => {} },
     onDispose: () => () => {},
@@ -126,4 +136,65 @@ test("performance keeps emitting after seeking to the middle of the song", () =>
 
     playing = false;
     emitTransport("stop", position);
+});
+
+test("manual notes during a performance enter the song timeline, never the host tick", () => {
+    playing = true;
+    piano.settings = { stageChoreography: true, stageTheme: "off", stageKeyParticles: true };
+    emitTransport("start", 0);
+    flushTicks(20, 12.5);
+
+    const session = getVfxSession(piano.location)!;
+    const timelineTick = timelineTickAt(session.timeline.positionSeconds);
+    for (const listener of noteListeners) listener({
+        midi: 64,
+        duration: 0.2,
+        soundDuration: 0.2,
+        velocity: 100,
+        source: "manual",
+        hasVelocity: true,
+        worldTick: currentTick,
+    });
+
+    const recent = session.music.recent(timelineTick);
+    expect(recent.at(-1)?.timelineTick).toBe(timelineTick);
+    expect(recent.at(-1)?.timelineTick).not.toBe(currentTick);
+
+    playing = false;
+    emitTransport("stop", position);
+});
+
+test("song themes follow the MIDI timeline through seek, pause and resume", () => {
+    playing = true;
+    piano.settings = { stageChoreography: false, stageTheme: "galaxy", stageKeyParticles: true };
+    emitTransport("start", 0);
+    flushTicks(20, 40);
+
+    const beforeSeek = getVfxSession(piano.location)!;
+    expect(beforeSeek.timeline.positionSeconds).toBeGreaterThan(40);
+
+    emitTransport("seek", 120);
+    const afterSeek = getVfxSession(piano.location)!;
+    expect(afterSeek.timeline.positionSeconds).toBeCloseTo(120, 5);
+
+    const spawnedBefore = spawned.length;
+    flushTicks(20, 120);
+    expect(spawned.length).toBeGreaterThan(spawnedBefore);
+
+    const pausedAt = afterSeek.timeline.positionSeconds;
+    playing = false;
+    emitTransport("pause", pausedAt);
+    expect(afterSeek.ended).toBe(true);
+
+    playing = true;
+    emitTransport("resume", pausedAt);
+    const resumed = getVfxSession(piano.location)!;
+    expect(resumed.timeline.positionSeconds).toBeCloseTo(pausedAt, 5);
+    const resumedBefore = spawned.length;
+    flushTicks(20, pausedAt);
+    expect(spawned.length).toBeGreaterThan(resumedBefore);
+
+    playing = false;
+    emitTransport("stop", position);
+    piano.settings = { stageChoreography: true, stageTheme: "off", stageKeyParticles: true };
 });

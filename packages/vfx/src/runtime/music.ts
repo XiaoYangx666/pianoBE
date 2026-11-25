@@ -1,15 +1,17 @@
+import { addTimelineTicks, type TimelineTick } from "./time";
+
 export const clampUnit = (value: number) => Math.max(0, Math.min(1, value));
 export const mix = (from: number, to: number, weight: number) => from + (to - from) * weight;
 
-/** Minimal note contract shared by Bedrock notes and the Web preview. */
+/** A note already normalized onto the current performance timeline by the host adapter. */
 export interface VfxNoteEvent {
     midi: number;
     duration: number;
     velocity: number;
-    tick: number;
+    timelineTick: TimelineTick;
     source: "manual" | "midi" | "simulation";
     hasVelocity: boolean;
-    /** Song-internal seconds, used for cue-aware particle lookups in the preview. */
+    /** Original song position; only song-specific choreography may use it for exact cue lookups. */
     songTime?: number;
 }
 
@@ -42,34 +44,54 @@ export interface VfxKeyNote {
     midi: number;
     velocity: number;
     duration: number;
-    tick: number;
+    timelineTick: TimelineTick;
+    /** Monotonic within one music session; unlike ticks, this also orders notes arriving in the same tick. */
+    sequence: number;
 }
 
-/** 每架启用钢琴对应一个音乐特征聚合器。状态受 MIDI 键域与游戏刻窗口限制。 */
+/** 每架启用钢琴对应一个音乐特征聚合器。所有窗口和持续音只使用演出时间。 */
 export class VfxMusic {
-    private readonly keys = new Map<number, { until: number; duration: number; velocity: number; source: VfxNoteEvent["source"] }>();
+    private readonly keys = new Map<number, { until: TimelineTick; duration: number; velocity: number; source: VfxNoteEvent["source"] }>();
     private readonly recentNotes: VfxKeyNote[] = [];
-    private readonly window = new Map<number, number>();
+    private readonly window = new Map<TimelineTick, number>();
     private readonly chordKeys = new Set<number>();
-    private chordStart = -Infinity;
+    private chordStart: TimelineTick | undefined;
     private chordSize = 0;
     private hits = 0;
     private measured = 0;
     private velocitySum = 0;
-    private lastTick: number | undefined;
+    private lastTick: TimelineTick | undefined;
+    private newestNoteTick: TimelineTick | undefined;
+    private nextNoteSequence = 1;
     private values = { ...quietFeatures };
 
     note(event: VfxNoteEvent) {
-        const { midi, tick } = event;
+        const { midi, timelineTick } = event;
         if (!Number.isInteger(midi) || midi < 21 || midi > 108) return;
+        if ((this.lastTick !== undefined && timelineTick < this.lastTick)
+            || (this.newestNoteTick !== undefined && timelineTick < this.newestNoteTick)) {
+            throw new Error("VFX music received a backwards timeline note; reset the session on seek");
+        }
+        this.newestNoteTick = timelineTick;
         const velocity = event.hasVelocity ? clampUnit(event.velocity / 127) : quietFeatures.velocity;
         const duration = Math.max(0.05, Math.min(30, event.duration));
-        this.keys.set(midi, { until: tick + Math.ceil(duration * 20), duration, velocity, source: event.source });
-        this.recentNotes.push({ midi, velocity, duration, tick });
+        this.keys.set(midi, {
+            until: addTimelineTicks(timelineTick, Math.ceil(duration * 20)),
+            duration,
+            velocity,
+            source: event.source,
+        });
+        this.recentNotes.push({
+            midi,
+            velocity,
+            duration,
+            timelineTick,
+            sequence: this.nextNoteSequence++,
+        });
         if (this.recentNotes.length > 48) this.recentNotes.shift();
-        this.window.set(tick, Math.min(64, (this.window.get(tick) ?? 0) + 1));
-        if (tick - this.chordStart >= 3) {
-            this.chordStart = tick;
+        this.window.set(timelineTick, Math.min(64, (this.window.get(timelineTick) ?? 0) + 1));
+        if (this.chordStart === undefined || timelineTick - this.chordStart >= 3) {
+            this.chordStart = timelineTick;
             this.chordKeys.clear();
         }
         this.chordKeys.add(midi);
@@ -81,36 +103,39 @@ export class VfxMusic {
         }
     }
 
-    recent(withinTicks = 24): readonly VfxKeyNote[] {
-        const latest = this.recentNotes.at(-1)?.tick;
-        if (latest === undefined) return [];
-        const cutoff = latest - withinTicks;
-        return this.recentNotes.filter((note) => note.tick >= cutoff);
+    recent(timelineTick: TimelineTick, withinTicks = 24): readonly VfxKeyNote[] {
+        const cutoff = timelineTick - withinTicks;
+        return this.recentNotes.filter(note => note.timelineTick >= cutoff && note.timelineTick <= timelineTick);
     }
 
     transport(event: VfxTransportEvent) {
-        if (event.type === "resume") return;
-        for (const [midi, key] of this.keys) if (key.source === "midi") this.keys.delete(midi);
-        this.recentNotes.length = 0;
-        this.clearAttacks();
-        this.window.clear();
-        this.chordKeys.clear();
-        this.chordStart = -Infinity;
-        if (event.type === "seek" || event.type === "track") this.values = { ...quietFeatures };
+        if (event.type !== "resume") this.clear();
     }
 
     clear() {
         this.keys.clear();
-        this.transport({ type: "seek", position: 0 });
+        this.recentNotes.length = 0;
+        this.window.clear();
+        this.chordKeys.clear();
+        this.chordStart = undefined;
+        this.lastTick = undefined;
+        this.newestNoteTick = undefined;
+        // Sequence is event identity, not timeline state. Keep it monotonic even when
+        // transients are cleared so an existing engine can never see a reused note id.
+        this.values = { ...quietFeatures };
+        this.clearAttacks();
     }
 
-    sample(tick: number): Readonly<MusicFeatures> {
-        const delta = Math.max(1, tick - (this.lastTick ?? tick - 4)) / 20;
-        this.lastTick = tick;
+    sample(timelineTick: TimelineTick): Readonly<MusicFeatures> {
+        if (this.lastTick !== undefined && timelineTick < this.lastTick) {
+            throw new Error("VFX music sampled a backwards timeline; reset the session on seek");
+        }
+        const delta = this.lastTick === undefined ? 4 / 20 : (timelineTick - this.lastTick) / 20;
+        this.lastTick = timelineTick;
         let count = 0;
         for (const [time, added] of this.window) {
-            if (time <= tick - 20) this.window.delete(time);
-            else count += added;
+            if (time <= timelineTick - 20) this.window.delete(time);
+            else if (time <= timelineTick) count += added;
         }
 
         let weight = 0;
@@ -122,7 +147,7 @@ export class VfxMusic {
         let activeVelocity = 0;
         let activeCount = 0;
         for (const [midi, key] of this.keys) {
-            if (key.until <= tick) { this.keys.delete(midi); continue; }
+            if (key.until <= timelineTick) { this.keys.delete(midi); continue; }
             const w = 0.35 + 0.65 * key.velocity;
             weight += w;
             pitch += w * (midi - 21) / 87;
@@ -161,11 +186,11 @@ export class VfxMusic {
     }
 }
 
-/** 固定测试乐句：休止、琶音、长音、和弦与密集段。 */
-export function simulatedVfxNotes(tick: number, elapsed: number, mode: "phrase" | "note" | "chord" | "dense"): VfxNoteEvent[] {
-    const time = elapsed % 240;
+/** 固定测试乐句：休止、琶音、长音、和弦与密集段。输入和输出共享同一演出 tick。 */
+export function simulatedVfxNotes(timelineTick: TimelineTick, mode: "phrase" | "note" | "chord" | "dense"): VfxNoteEvent[] {
+    const time = ((timelineTick % 240) + 240) % 240;
     const notes = (keys: number[], velocity: number, duration: number): VfxNoteEvent[] =>
-        keys.map(midi => ({ midi, velocity, duration, tick, source: "simulation", hasVelocity: true }));
+        keys.map(midi => ({ midi, velocity, duration, timelineTick, source: "simulation", hasVelocity: true }));
     if (mode === "note") return time % 40 === 0 ? notes([48 + 7 * Math.floor(time / 40)], 78, 1.3) : [];
     if (mode === "chord") return time % 40 === 0 ? notes([43, 55, 59, 62, 67], 98, 0.8) : [];
     if (mode === "dense") return time >= 40 && time < 168 && time % 4 === 0 ? notes([48 + (time % 36), 72], 104, 0.24) : [];

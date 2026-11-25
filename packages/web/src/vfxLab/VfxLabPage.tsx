@@ -36,12 +36,15 @@ import {
     registerVfxPlugin,
     simulatedVfxNotes,
     STROKE_BRUSHES,
+    timelineTickAt,
     unregisterVfxPlugin,
     validateVfxTheme,
     vfxRegistry,
     VFX_PARTICLES_PER_PIANO,
     type MusicFeatures,
     type SingleEffectConfig,
+    type TimelineTick,
+    type VfxNoteEvent,
     type VfxPluginModule,
     type VfxTheme,
     type VfxThemeLayer,
@@ -180,9 +183,12 @@ async function loadSecret(): Promise<LabSong> {
 }
 
 function makeFixture(mode: Fixture): NoteEvent[] {
-    return Array.from({ length: 240 }, (_, tick) => simulatedVfxNotes(tick, tick, mode).map(note => ({
-        midi: note.midi, time: tick / 20, duration: note.duration, velocity: note.velocity / 127,
-    }))).flat();
+    return Array.from({ length: 240 }, (_, tick) => {
+        const timelineTick = timelineTickAt(tick / 20);
+        return simulatedVfxNotes(timelineTick, mode).map(note => ({
+            midi: note.midi, time: timelineTick / 20, duration: note.duration, velocity: note.velocity / 127,
+        }));
+    }).flat();
 }
 
 function toTrack(
@@ -191,20 +197,21 @@ function toTrack(
     source: "midi" | "simulation",
     performance?: readonly PerformanceCue[],
 ): Track {
-    const notes = new Map<number, NonNullable<ReturnType<Track["notes"]["get"]>>[number][]>();
+    const notes = new Map<TimelineTick, VfxNoteEvent[]>();
     for (const note of events) {
-        const tick = source === "midi" ? Math.floor(note.time * 20 + 0.500001) : Math.ceil(note.time * 20 - 1e-7);
-        const bucket = notes.get(tick) ?? [];
+        const rawTick = source === "midi" ? Math.floor(note.time * 20 + 0.500001) : Math.ceil(note.time * 20 - 1e-7);
+        const timelineTick = timelineTickAt(rawTick / 20);
+        const bucket = notes.get(timelineTick) ?? [];
         bucket.push({
             midi: note.midi,
             duration: note.duration,
             velocity: Math.round(note.velocity * 127),
             hasVelocity: true,
             source,
-            tick,
+            timelineTick,
             songTime: note.time,
         });
-        notes.set(tick, bucket);
+        notes.set(timelineTick, bucket);
     }
     return { notes, duration, performance };
 }

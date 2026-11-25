@@ -51,3 +51,18 @@ plugins/* (内置与第三方 VFX 插件)          │
 2. **显式触发语义与标签协作**：特效触发由 `trigger`（`continuous` | `note` | `instant` | `control`）决定，而非依赖分类名 `category`；持续跨帧状态由特效定义自带 `createState()` 维护并随 `reset()` / `seek()` 自动清理；特效间让步由通用 `tags` 与 `yields` 声明，不在引擎中特判具体特效名称。
 3. **语义正交**：`effect` 决定视觉行为，`brush` 仅决定粒子/笔画贴图材质，`variant` 由具体特效解释（包含 `key_style` 的显式弹奏粒子样式，如 `stardust`、`snow`、`glimmer`、`none`）。
 4. **生命周期闭环**：暂停、跳转、切歌、拆琴、卸载或异常时统一调用 `stopSession` / `budget.clearPending()` / `music.clear()`；`VfxBudget` 仅退还尚未发往客户端的待发批次，已发出的粒子继续保留预算直到客户端寿命自然过期。
+
+## 5. 时间模型
+
+VFX 只允许两种时间域，并通过类型与入口强制隔离：
+
+| 时间域 | 类型 | 用途 | 推进规则 |
+| --- | --- | --- | --- |
+| 演出时间 | `TimelineTick` / `positionSeconds` | 编排、音乐特征、音符事件、通道冷却、特效相位 | 可暂停、跳转、重置；由会话的 `VfxTimeline` 提供 |
+| 宿主时间 | `HostTick` | 派发限速、资源过期、实体清理、会话超时 | 始终前进；只在平台适配层产生 |
+
+- 歌曲专属编排与通用歌曲主题都从 `MidiPlayer.position` 取演出位置，暂停、恢复和 Seek 不会另造第二套计时。
+- 手动弹奏、模拟演奏和 Web 预览使用各自的会话语义，但进入 VFX 前都会转换为当前演出位置。
+- `VfxEngine.update()` 只接受 `positionSeconds`，并在内部用唯一转换函数派生 `TimelineTick`；不再允许调用方另行传入 tick。
+- 所有音符以当前 `TimelineTick` 进入 `VfxMusic`，同时携带会话内单调 `sequence`，因此同一 tick 内后到的音符也不会被误判为旧音符。
+- Seek 是显式会话生命周期：必须重置引擎、音乐瞬态和待发队列，但不得清除已经真实发射的宿主预算。Web 预览的 Seek 会重建整个确定性沙箱，这是宿主适配层的明确特例。

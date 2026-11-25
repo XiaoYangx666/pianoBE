@@ -7,6 +7,7 @@ import {
     VfxEngine,
 } from "../src";
 import { ensureBuiltinPluginsRegistered } from "./helpers/builtinPlugins";
+import { ht, tt } from "./helpers/time";
 
 ensureBuiltinPluginsRegistered();
 beforeEach(ensureBuiltinPluginsRegistered);
@@ -19,7 +20,7 @@ test("unknown effects and unknown brushes in performance cues degrade safely wit
     ], 5);
 
     const engine = new VfxEngine(program);
-    const batches = engine.update(0.1, 2, quietFeatures);
+    const batches = engine.update(0.1, quietFeatures);
     expect(batches.length).toBe(1);
     expect(batches[0].emitters.some(emitter => emitter.particle === "dust" || emitter.particle === "draw_point")).toBe(true);
     expect(engine.activeSummary(0.1).map(channel => channel.effect)).toEqual(["starfield"]);
@@ -32,19 +33,25 @@ test("note-triggered effects only consume fresh notes based on trigger mode", ()
         level: 85,
     }));
 
-    expect(engine.update(0, 0, quietFeatures, [])).toEqual([]);
-    const noteBatch = engine.update(0.05, 1, quietFeatures, [
-        { midi: 60, velocity: 0.9, duration: 0.6, tick: 1 },
+    expect(engine.update(0, quietFeatures, [])).toEqual([]);
+    const noteBatch = engine.update(0.05, quietFeatures, [
+        { midi: 60, velocity: 0.9, duration: 0.6, timelineTick: tt(1), sequence: 1 },
     ]);
     expect(noteBatch.length).toBe(1);
     // 同 tick 的旧音符已被消费，未出现新音符前不重复发射
-    expect(engine.update(0.25, 5, quietFeatures, [
-        { midi: 60, velocity: 0.9, duration: 0.6, tick: 1 },
+    expect(engine.update(0.25, quietFeatures, [
+        { midi: 60, velocity: 0.9, duration: 0.6, timelineTick: tt(1), sequence: 1 },
     ])).toEqual([]);
-    // 新 tick 音符到达后恢复触发
-    const nextBatch = engine.update(0.30, 6, quietFeatures, [
-        { midi: 60, velocity: 0.9, duration: 0.6, tick: 1 },
-        { midi: 64, velocity: 0.9, duration: 0.6, tick: 6 },
+    // 同一演出 tick 内后到的新音符也必须按序列消费，而不能被 tick 判旧
+    const sameTickBatch = engine.update(0.30, quietFeatures, [
+        { midi: 60, velocity: 0.9, duration: 0.6, timelineTick: tt(1), sequence: 1 },
+        { midi: 64, velocity: 0.9, duration: 0.6, timelineTick: tt(1), sequence: 2 },
+    ]);
+    expect(sameTickBatch.length).toBe(1);
+    const nextBatch = engine.update(0.35, quietFeatures, [
+        { midi: 60, velocity: 0.9, duration: 0.6, timelineTick: tt(1), sequence: 1 },
+        { midi: 64, velocity: 0.9, duration: 0.6, timelineTick: tt(1), sequence: 2 },
+        { midi: 67, velocity: 0.9, duration: 0.6, timelineTick: tt(7), sequence: 3 },
     ]);
     expect(nextBatch.length).toBe(1);
 });
@@ -55,22 +62,27 @@ test("seek and reset cleanly clear per-channel effect state and flash cursor", (
         { tick: 20, effect: "shockwave", color: "#FFE29A", level: 100, scale: 100, op: "flash" },
     ], 10));
 
-    const atLow = engine.update(0, 0, { ...quietFeatures, pitch: 0.1 }).flatMap(batch => batch.emitters)[0];
-    const atHigh = engine.update(1.5, 30, { ...quietFeatures, pitch: 0.9 }).flatMap(batch => batch.emitters);
+    const atLow = engine.update(0, { ...quietFeatures, pitch: 0.1 }).flatMap(batch => batch.emitters)[0];
+    const atHigh = engine.update(1.5, { ...quietFeatures, pitch: 0.9 }).flatMap(batch => batch.emitters);
     const beamHigh = atHigh.find(emitter => emitter.particle === "beam")!;
     expect(beamHigh.variables.height_delta).not.toBe(0);
     expect(atHigh.some(emitter => emitter.particle === "shock")).toBe(true);
 
     // seek 后清除旧高度连续性状态，首个发射帧的 height_delta 归零，且不再重复触发已越过的 flash
     engine.seek(0.75, true);
-    const afterSeek = engine.update(0.8, 16, { ...quietFeatures, pitch: 0.9 }).flatMap(batch => batch.emitters);
+    const afterSeek = engine.update(0.8, { ...quietFeatures, pitch: 0.9 }).flatMap(batch => batch.emitters);
     expect(afterSeek.find(emitter => emitter.particle === "beam")!.variables.height_delta).toBeCloseTo(0, 5);
     expect(afterSeek.some(emitter => emitter.particle === "shock")).toBe(false);
 
-    // backward timestamp automatically resets flash cursor to replay cues after rewind target
+    // reset at zero replays cues after the rewind target
     engine.reset(0);
-    const replayed = engine.update(0.6, 12, quietFeatures).flatMap(batch => batch.emitters);
+    const replayed = engine.update(0.6, quietFeatures).flatMap(batch => batch.emitters);
     expect(replayed.some(emitter => emitter.particle === "shock")).toBe(true);
+
+    // reset at a later position must skip every cue already behind it
+    engine.reset(2);
+    const afterMidReset = engine.update(2.1, quietFeatures).flatMap(batch => batch.emitters);
+    expect(afterMidReset.some(emitter => emitter.particle === "shock")).toBe(false);
 });
 
 test("VfxBudget.clearPending discards un-dispatched emitters while keeping live client particles reserved", () => {
@@ -92,7 +104,7 @@ test("VfxBudget.clearPending discards un-dispatched emitters while keeping live 
 
     // 首刻最多派发 6 个发射器（60 粒子进入客户端存活队列），剩余 2 个在 pending 中
     let dispatched = 0;
-    budget.dispatch(10, () => dispatched++);
+    budget.dispatch(ht(10), () => dispatched++);
     expect(dispatched).toBe(6);
     expect(budget.active).toBe(6);
     expect(budget.reserved).toBe(80);
@@ -102,7 +114,7 @@ test("VfxBudget.clearPending discards un-dispatched emitters while keeping live 
     expect(budget.reserved).toBe(60);
     expect(budget.active).toBe(6);
 
-    budget.expire(10 + 20 + 2);
+    budget.expire(ht(10 + 20 + 2));
     expect(budget.active).toBe(0);
     expect(budget.reserved).toBe(0);
 });

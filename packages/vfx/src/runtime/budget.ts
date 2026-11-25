@@ -1,21 +1,22 @@
+import { hostTickAt, type HostTick } from "./time";
 import type { VfxBatch, VfxEmitter } from "../types";
 
 export const VFX_MAX_PIANOS = 4;
 export const VFX_PARTICLES_PER_PIANO = 275;
 export const VFX_EMITTERS_PER_TICK = 6;
 
-/** 预算预留覆盖每个 Bedrock 发射器从排队到自然消亡的完整生命周期。 */
+/** 预算只使用宿主时间，覆盖每个 Bedrock 发射器从排队到自然消亡的完整生命周期。 */
 export class VfxBudget {
     private readonly pending: (VfxBatch & { index: number })[] = [];
-    private live: { expires: number; emitter: VfxEmitter }[] = [];
+    private live: { expires: HostTick; emitter: VfxEmitter }[] = [];
     reserved = 0;
     dropped = 0;
 
     get active() { return this.live.length; }
 
-    expire(tick: number) {
+    expire(hostTick: HostTick) {
         this.live = this.live.filter(({ expires, emitter }) => {
-            if (expires > tick) return true;
+            if (expires > hostTick) return true;
             this.reserved -= emitter.particles;
             return false;
         });
@@ -28,8 +29,8 @@ export class VfxBudget {
         this.pending.length = 0;
     }
 
-    nextAvailableTick(tick: number) {
-        return this.live.reduce((latest, { expires }) => Math.max(latest, expires), tick);
+    nextAvailableTick(hostTick: HostTick): HostTick {
+        return this.live.reduce((latest, { expires }) => expires > latest ? expires : latest, hostTick);
     }
 
     enqueue(candidates: readonly VfxBatch[]) {
@@ -51,14 +52,17 @@ export class VfxBudget {
         if (candidates.length) this.pending.sort((a, b) => b.priority - a.priority);
     }
 
-    dispatch(tick: number, spawn: (emitter: VfxEmitter) => void) {
+    dispatch(hostTick: HostTick, spawn: (emitter: VfxEmitter) => void) {
         for (let count = 0; count < VFX_EMITTERS_PER_TICK && this.pending.length; count++) {
             const batch = this.pending[0];
             const emitter = batch.emitters[batch.index];
             spawn(emitter);
             batch.index++;
             if (batch.index === batch.emitters.length) this.pending.shift();
-            this.live.push({ expires: tick + Math.ceil(emitter.lifetime * 20) + 2, emitter });
+            this.live.push({
+                expires: hostTickAt(hostTick + Math.ceil(emitter.lifetime * 20) + 2),
+                emitter,
+            });
         }
     }
 

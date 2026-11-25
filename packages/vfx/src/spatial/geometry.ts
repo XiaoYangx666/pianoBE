@@ -1,5 +1,6 @@
 import type { PerformanceMotion, PerformanceZone } from "@piano/core";
 import { mix, type VfxKeyNote } from "../runtime/music";
+import { timelineTickAt } from "../runtime/time";
 
 export type Point3 = readonly [number, number, number];
 export type Segment3 = { point: Point3; tangent: Point3; spacing: number; u: number };
@@ -35,12 +36,12 @@ export function motionFactors(motion: PerformanceMotion | undefined): {
 
 export function pickRecentKeys(
     recentNotes: readonly VfxKeyNote[] | undefined,
-    lastNoteTick: number,
+    lastNoteSequence: number,
     phase: number,
     solo: boolean,
     maxCount: number,
 ): VfxKeyNote[] {
-    const fresh = (recentNotes ?? []).filter(note => note.tick > lastNoteTick).sort((a, b) => a.midi - b.midi);
+    const fresh = (recentNotes ?? []).filter(note => note.sequence > lastNoteSequence).sort((a, b) => a.midi - b.midi);
     let candidates: VfxKeyNote[];
     if (fresh.length) {
         if (maxCount <= 2) {
@@ -52,14 +53,14 @@ export function pickRecentKeys(
         const base = 44 + Math.round(phase % 20);
         candidates = maxCount <= 2
             ? [
-                { midi: base, velocity: 0.78, duration: 0.8, tick: 0 },
-                { midi: base + 20, velocity: 0.88, duration: 0.9, tick: 0 },
+                { midi: base, velocity: 0.78, duration: 0.8, timelineTick: timelineTickAt(0), sequence: 0 },
+                { midi: base + 20, velocity: 0.88, duration: 0.9, timelineTick: timelineTickAt(0), sequence: 0 },
             ]
             : [
-                { midi: base, velocity: 0.75, duration: 0.8, tick: 0 },
-                { midi: base + 7, velocity: 0.82, duration: 0.8, tick: 0 },
-                { midi: base + 12, velocity: 0.86, duration: 0.9, tick: 0 },
-                { midi: base + 19, velocity: 0.92, duration: 0.9, tick: 0 },
+                { midi: base, velocity: 0.75, duration: 0.8, timelineTick: timelineTickAt(0), sequence: 0 },
+                { midi: base + 7, velocity: 0.82, duration: 0.8, timelineTick: timelineTickAt(0), sequence: 0 },
+                { midi: base + 12, velocity: 0.86, duration: 0.9, timelineTick: timelineTickAt(0), sequence: 0 },
+                { midi: base + 19, velocity: 0.92, duration: 0.9, timelineTick: timelineTickAt(0), sequence: 0 },
             ];
     } else {
         return [];

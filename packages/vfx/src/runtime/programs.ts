@@ -6,6 +6,7 @@ import {
 import { deriveAccentHex, rgbToHex } from "../spatial/color";
 import { getVfxEffect, resolveEffectCustomParams } from "../domain/effects";
 import { clampUnit, mix, type MusicFeatures } from "./music";
+import type { TimelineTick } from "./time";
 import { interpolateSchemaParams } from "../plugin/parameters";
 import { vfxRegistry, type VfxRegistry } from "../plugin/registry";
 import type { VfxTheme } from "../domain/themes";
@@ -21,7 +22,7 @@ export interface ProgramChannel {
     key: string;
     effect: string;
     slot: number;
-    sample(timeSeconds: number, gameTick: number, music: Readonly<MusicFeatures>, solo: boolean): ProgramChannelSample | undefined;
+    sample(timeSeconds: number, timelineTick: TimelineTick, music: Readonly<MusicFeatures>, solo: boolean): ProgramChannelSample | undefined;
 }
 
 export interface ProgramFlash {
@@ -230,9 +231,9 @@ export function createThemeProgram(
             key: `layer:${index}:${layer.effect}:${slot}`,
             effect: layer.effect,
             slot,
-            sample(_timeSeconds, gameTick, music, solo) {
+            sample(_timeSeconds, timelineTick, music, solo) {
                 const envelope = Number.isFinite(durationTicks)
-                    ? clampUnit((gameTick + 4) / (fadeInTicks || 1)) * clampUnit((durationTicks - gameTick) / (fadeOutTicks || 1))
+                    ? clampUnit((timelineTick + 4) / (fadeInTicks || 1)) * clampUnit((durationTicks - timelineTick) / (fadeOutTicks || 1))
                     : 1;
                 const rawLevel = typeof layer.level === "number"
                     ? layer.level

@@ -252,8 +252,8 @@ const EFFECTS: readonly VfxEffectDefinition[] = [
         trigger: "note",
         interval: 9,
         priority: 2,
-        emit({ params, instrument, recentNotes, lastNoteTick, phase, solo }) {
-            const note = pickRecentKeys(recentNotes, lastNoteTick, phase, solo, 2).at(-1);
+        emit({ params, instrument, recentNotes, lastNoteSequence, phase, solo }) {
+            const note = pickRecentKeys(recentNotes, lastNoteSequence, phase, solo, 2).at(-1);
             if (!note || (note.midi < 72 && !solo)) return null;
             const offset = keyOriginFor(note.midi, instrument);
             if (!offset) return null;

@@ -127,7 +127,7 @@ export interface VfxEmitContext<TState = unknown> {
     params: VfxEffectParams;
     music: Readonly<MusicFeatures>;
     recentNotes: readonly VfxKeyNote[];
-    lastNoteTick: number;
+    lastNoteSequence: number;
     instrument: VfxInstrument;
     phase: number;
     solo: boolean;

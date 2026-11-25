@@ -359,7 +359,7 @@ export class PianoRuntime {
         // keyDuration 是 PBE3 里独立存储的琴键实际按下时长，不再用踏板延音。
         const visualDuration = Math.max(0, keyDuration);
         this.display?.strike(note.midi, visualDuration);
-        this.noteSignal.publish({ midi: note.midi, duration: visualDuration, soundDuration, velocity, tick: system.currentTick,
+        this.noteSignal.publish({ midi: note.midi, duration: visualDuration, soundDuration, velocity, worldTick: system.currentTick,
             source: manual ? "manual" : "midi", songTime, hasVelocity });
         this.activate();
         if (settings.particles) {

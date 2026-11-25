@@ -147,10 +147,10 @@ const KEY_EFFECTS: readonly VfxEffectDefinition[] = [
         interval: 1,
         priority: 5,
         defaultBrush: "note",
-        emit({ params, music, recentNotes, lastNoteTick, instrument, phase, solo }) {
+        emit({ params, music, recentNotes, lastNoteSequence, instrument, phase, solo }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
             const m = motionFactors(motion);
-            const targets = pickRecentKeys(recentNotes, lastNoteTick, phase, solo, 2);
+            const targets = pickRecentKeys(recentNotes, lastNoteSequence, phase, solo, 2);
             const resolvedBrush = resolvePointBrush(brush, "note");
             const yShift = ZONE_Y_OFFSET[zone] * 0.4;
             const emitters: VfxEmitter[] = [];
@@ -192,10 +192,10 @@ const KEY_EFFECTS: readonly VfxEffectDefinition[] = [
         interval: 2,
         priority: 4,
         defaultBrush: "spark",
-        emit({ params, recentNotes, lastNoteTick, instrument, phase, solo }) {
+        emit({ params, recentNotes, lastNoteSequence, instrument, phase, solo }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
             const m = motionFactors(motion);
-            const targets = pickRecentKeys(recentNotes, lastNoteTick, phase, solo, 2);
+            const targets = pickRecentKeys(recentNotes, lastNoteSequence, phase, solo, 2);
             const resolvedBrush = resolvePointBrush(brush, "spark");
             const yShift = ZONE_Y_OFFSET[zone] * 0.4;
             const emitters: VfxEmitter[] = [];
@@ -239,10 +239,10 @@ const KEY_EFFECTS: readonly VfxEffectDefinition[] = [
         priority: 4,
         defaultBrush: "star",
         defaultStroke: "laser",
-        emit({ params, recentNotes, lastNoteTick, instrument, phase, solo }) {
+        emit({ params, recentNotes, lastNoteSequence, instrument, phase, solo }) {
             const { color, color2, intensity, scale, brush, zone, motion } = params;
             const m = motionFactors(motion);
-            const targets = pickRecentKeys(recentNotes, lastNoteTick, phase, solo, 4);
+            const targets = pickRecentKeys(recentNotes, lastNoteSequence, phase, solo, 4);
             if (!targets.length) return { priority: 4, emitters: [] };
             const yShift = ZONE_Y_OFFSET[zone] * 0.5;
             const resolvedBrush = resolvePointBrush(brush, "star");

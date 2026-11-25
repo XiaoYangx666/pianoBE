@@ -4,6 +4,7 @@ export * from "./plugin/registry";
 export * from "./plugin/parameters";
 export * from "./spatial/brushes";
 export * from "./spatial/color";
+export * from "./runtime/time";
 export * from "./runtime/music";
 export * from "./runtime/budget";
 export * from "./spatial/instrument";

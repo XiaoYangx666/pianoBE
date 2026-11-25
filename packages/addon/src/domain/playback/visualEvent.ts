@@ -3,7 +3,8 @@ export interface PianoVisualNote {
     duration: number;
     soundDuration?: number;
     velocity: number;
-    tick: number;
+    /** Host-domain tick when the note actually sounded. Never used as VFX performance time. */
+    worldTick: number;
     source: "manual" | "midi" | "simulation";
     songTime?: number;
     /** False when the PBE3 decoder supplied its fixed default velocity. */
