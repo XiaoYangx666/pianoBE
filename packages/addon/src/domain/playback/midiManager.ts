@@ -206,7 +206,7 @@ export class MidiManager {
         return meta;
     }
 
-    /** 登记单条元信息（已存在则更新名称/时长；includeInList 控制是否进入主列表） */
+    /** 登记单条元信息（已存在则合并更新；includeInList 控制是否进入主列表） */
     private register(meta: MidiSongMeta, includeInList = false): void {
         const current = this.metaMap.get(meta.id);
         if (current) {
@@ -214,6 +214,11 @@ export class MidiManager {
             current.duration = meta.duration;
             if (meta.noteCount !== undefined) current.noteCount = meta.noteCount;
             if (meta.bytes !== undefined) current.bytes = meta.bytes;
+            // 远程分页拿到的演出摘要只在这里出现一次；不合并会导致详情页
+            // 只剩 PBE3 内嵌的默认演出。
+            if (meta.performanceEntries !== undefined) current.performanceEntries = meta.performanceEntries;
+            if (meta.performances !== undefined) current.performances = meta.performances;
+            if (meta.libraries !== undefined) current.libraries = meta.libraries;
             return;
         }
         this.metaMap.set(meta.id, meta);
@@ -292,7 +297,10 @@ export class MidiManager {
             remaining -= slice.items.length;
             cursor = 0;
         }
-        return { items: items.slice(0, size), total };
+        const pageItems = items.slice(0, size);
+        // 远程来源没有全量 list，分页结果必须登记，详情页才能读到演出摘要。
+        this.registerAll(pageItems, false);
+        return { items: pageItems, total };
     }
 
     /** 批量取全部（远程源后端过滤；本地源内存过滤），"一键添加"等批量操作用 */
@@ -305,6 +313,7 @@ export class MidiManager {
             }
             all.push(...this.filter(await source.list(), q, libraryId));
         }
+        this.registerAll(all, false);
         return all;
     }
 

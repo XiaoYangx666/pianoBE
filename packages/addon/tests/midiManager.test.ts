@@ -86,6 +86,28 @@ describe("MidiManager 公共附加来源", () => {
         expect(await manager.read(worldId)).toEqual(worldBytes);
     });
 
+    test("远程分页结果登记演出摘要，详情页可读取附加演出", async () => {
+        const entry = {
+            id: "pianobe.pack.featured:r1",
+            name: "精选演出",
+            songId: "r1",
+            requiredEffects: ["starfield"],
+        };
+        const item = { ...meta("r1", "雨过见青"), performanceEntries: [entry] };
+        const manager = new MidiManager({
+            list: () => [],
+            async get() { return undefined; },
+            async page() { return { items: [item], total: 1 }; },
+        });
+
+        // 远程来源 list() 为空，分页是唯一元信息来源。
+        expect(manager.performanceEntries("r1")).toEqual([]);
+        await manager.page(1, 10);
+
+        expect(manager.getInfo("r1")?.performanceEntries).toEqual([entry]);
+        expect(manager.performanceEntries("r1")).toEqual([entry]);
+    });
+
     test("EmbeddedMidiSource 暴露内嵌曲库列表并支持按 libraryId 过滤", async () => {
         const { EmbeddedMidiSource } = await import("../src/data/midiSource/embedded");
         const src = new EmbeddedMidiSource(

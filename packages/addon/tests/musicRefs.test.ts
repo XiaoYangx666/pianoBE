@@ -8,6 +8,8 @@ mock.module("@app/midiManager", () => ({
         acquire: async () => undefined,
         getInfo: () => undefined,
         read: async () => undefined,
+        performanceEntries: () => [],
+        performances: () => [],
     },
 }));
 
@@ -144,6 +146,43 @@ describe("钢琴音乐读取（PianoMusic）", () => {
 
         const bad = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: "00000000" });
         expect(bad).toBeUndefined();
+    });
+
+    test("索引未登记时，公共曲库引用自带的演出摘要仍可读取", () => {
+        const source = new PianoMusic(() => undefined, () => undefined);
+        const entry = {
+            id: "pianobe.pack.featured:abc",
+            name: "精选演出",
+            songId: "abc",
+            requiredEffects: ["starfield"],
+        };
+        const ref: MusicRef = {
+            id: "abc",
+            name: "花海",
+            duration: 40,
+            source: "library",
+            performanceEntries: [entry],
+        };
+        expect(source.performanceEntries(ref)).toEqual([entry]);
+        expect(source.performances(ref)).toEqual([]);
+    });
+
+    test("引用自带演出 cues 时直接解析，不再依赖索引", async () => {
+        const source = new PianoMusic(() => undefined, () => undefined);
+        const cues = [{ tick: 0, op: "flash" as const, effect: "starfield", color: "#FFFFFF", level: 80, scale: 100 }];
+        const ref: MusicRef = {
+            id: "abc",
+            name: "花海",
+            duration: 40,
+            source: "library",
+            performanceEntries: [{
+                id: "pianobe.pack.featured:abc",
+                name: "精选演出",
+                songId: "abc",
+                cues,
+            }],
+        };
+        expect(await source.resolvePerformanceCues(ref, "pianobe.pack.featured:abc")).toEqual(cues);
     });
 
     test("存储卡被取走或被替换后，卡来源的队列条目不可用", () => {
