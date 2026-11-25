@@ -71,4 +71,24 @@ describe("embedded MIDI build layout", () => {
             .toContain(`bp/${timbresModule}`);
     });
 
+    /**
+     * 占位入口是编译期的导出契约：Rolldown 会把 `import * as midiIndex` 降级成
+     * 具名导入（preserve-modules 分块），随后构建钩子用生成器产物覆写输出目录里的
+     * 同一个 index.js。两边导出名必须完全一致，否则游戏内模块链接直接报"未导出"。
+     */
+    test("generated MIDI entry exports exactly what the source placeholder declares", async () => {
+        const { metasToAddonIndex } = await import("@piano/core");
+        const placeholder = fs.readFileSync(midiEntrySource, "utf8");
+        const placeholderExports = [...placeholder.matchAll(/export\s+const\s+([A-Za-z_$][\w$]*)/g)]
+            .map((match) => match[1])
+            .sort();
+        const generated = metasToAddonIndex([], []);
+        const generatedExports = [...generated.matchAll(/export\s+const\s+([A-Za-z_$][\w$]*)/g)]
+            .map((match) => match[1])
+            .sort();
+
+        expect(placeholderExports).toEqual(["libraries", "midis"]);
+        expect(generatedExports).toEqual(placeholderExports);
+    });
+
 });

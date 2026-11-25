@@ -272,4 +272,26 @@ describe("@piano/assembly", () => {
         expect(strippedJs).toContain('["piano"]');
         expect(strippedJs).not.toContain("classic_grand");
     }, 30000);
+
+    /**
+     * 回归：本地构建/零曲库装配时生成器曾省略 `export const libraries`，
+     * 而编译产物里的 midiManager.js 是 `import { libraries, midis } from ".../index.js"`，
+     * 导致游戏内 QuickJS 在模块链接阶段报"未导出"。
+     */
+    test("zero-library assembly still exports libraries for the compiled named import", async () => {
+        if (!existsSync(bareTemplatePath)) return;
+        const info = await loadAddonTemplate(new Uint8Array(readFileSync(bareTemplatePath)));
+        const bytes = await assembleAddonBytes(info, [], {
+            name: "零曲库装配",
+            plugins: [],
+            embedSongs: true,
+        });
+        const reloaded = await loadAddonTemplate(zipSync(unzipSync(bytes), { level: 0 }));
+        const indexJs = reloaded.addon.readTextSync(`${reloaded.bpPath}scripts/packages/addon/src/midis/index.js`) ?? "";
+
+        expect(indexJs).toContain("export const midis=");
+        expect(indexJs).toContain("export const libraries=[];");
+        expect(reloaded.addon.readTextSync(`${reloaded.bpPath}scripts/midiManager.js`) ?? "")
+            .toContain('import { libraries, midis }');
+    }, 30000);
 });

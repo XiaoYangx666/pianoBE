@@ -42,8 +42,6 @@ export function metasToAddonIndex(
             `},`;
     }
     content += "];";
-    if (libraries && libraries.length > 0) {
-        content += `export const libraries=${JSON.stringify(libraries.map((l) => ({ id: l.id, name: l.name })))};`;
-    }
+    content += `export const libraries=${JSON.stringify((libraries ?? []).map((l) => ({ id: l.id, name: l.name })))};`;
     return content;
 }

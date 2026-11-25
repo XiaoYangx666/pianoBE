@@ -141,6 +141,7 @@ if (fs.existsSync(builtManager)) {
     if (mode === "client") {
         const generated = read(entry);
         check(generated.includes('id:"'), "client embedded library is not empty");
+        check(generated.includes("export const libraries="), "client embedded library exports libraries");
         check(fs.readdirSync(path.dirname(entry)).length > 1, "client generated MIDI modules exist");
 
         check(!fs.existsSync(path.join(scripts, "serverAdmin.js")), "client output has no serverAdmin.js");
