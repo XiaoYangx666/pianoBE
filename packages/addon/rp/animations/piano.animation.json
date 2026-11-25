@@ -15,9 +15,9 @@
 			"loop": true,
 			"bones": {
 				"piano": {
-					"rotation": [172.5, -15, -180],
-					"position": [10, 17, -6.5],
-					"scale": 0.5
+					"rotation": [13.3725, -3.4841, -3.7075],
+					"position": [0, 16.13, -6.6],
+					"scale": 0.55
 				}
 			}
 		}

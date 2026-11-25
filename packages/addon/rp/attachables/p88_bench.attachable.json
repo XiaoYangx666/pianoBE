@@ -1,0 +1,34 @@
+{
+    "format_version": "1.26.0",
+    "minecraft:attachable": {
+        "description": {
+            "identifier": "pbe:p88_bench_item",
+            "render_controllers": ["controller.render.item_default"],
+            "materials": {
+                "default": "entity_alphatest",
+                "enchanted": "entity_alphatest_glint"
+            },
+            "textures": {
+                "default": "textures/blocks/piano_bench",
+                "enchanted": "textures/blocks/piano_bench"
+            },
+            "geometry": {
+                "default": "geometry.p88_bench_item"
+            },
+            "animations": {
+                "hold_first_person": "animation.pbe.p88_bench_item.first_person",
+                "hold_third_person": "animation.pbe.p88_bench_item.third_person"
+            },
+            "scripts": {
+                "animate": [
+                    {
+                        "hold_first_person": "context.is_first_person == 1.0"
+                    },
+                    {
+                        "hold_third_person": "context.is_first_person == 0.0"
+                    }
+                ]
+            }
+        }
+    }
+}

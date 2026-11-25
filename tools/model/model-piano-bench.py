@@ -190,6 +190,32 @@ def make_p88_models():
             add(f"foot {side} {z}", [x - .57, 0, z - .55], [x + .57, .31, z + .55], "foot")
 
     assert all(-8 <= cube["from"][2] < cube["to"][2] <= 8 for cube in cubes)
+
+    # Hand-held model: the same bench before the block-grid cut, with the seat
+    # recentred on the origin so the attachable pivots around the middle.
+    held = []
+    for cube in cubes:
+        piece = json.loads(json.dumps(cube))
+        for field in ("from", "to"):
+            x, y, z = piece[field]
+            piece[field] = [x, y, round(z - P88_BENCH_FORWARD, 4)]
+        held.append(piece)
+    item_geometry = cutter["native_geometry"]({
+        "elements": held, "model_identifier": "p88_bench_item",
+        "resolution": dict(zip(("width", "height"), ATLAS_SIZE)),
+    })
+    # Held models sit away from the entity origin once the pose is applied; a
+    # small visible bound culls the whole bench in first person.
+    item_geometry["minecraft:geometry"][0]["description"].update({
+        "visible_bounds_width": 4, "visible_bounds_height": 3, "visible_bounds_offset": [0, 1, 0],
+    })
+    # Bind the root bone to the item slot: without it the game draws the model
+    # relative to the player entity instead of the hand, which also hides it in
+    # first person.
+    item_geometry["minecraft:geometry"][0]["bones"][0]["binding"] = "q.item_slot_to_bone_name(context.item_slot)"
+    (RP / "models/entity/p88_bench_item.geo.json").write_text(
+        json.dumps(item_geometry, separators=(",", ":")) + "\n", encoding="utf-8")
+
     for half, low_x, high_x in (("left", 0, 16), ("right", -16, 0)):
         identifier = f"p88_bench_{half}"
         center = (low_x + high_x) / 2
