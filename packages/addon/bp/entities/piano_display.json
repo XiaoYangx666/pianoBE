@@ -119,6 +119,14 @@
           }
         ]
       },
+      "minecraft:mob_effect_immunity": {
+        "mob_effects": [
+          "poison",
+          "fatal_poison",
+          "wither",
+          "instant_damage"
+        ]
+      },
       "minecraft:fire_immune": {},
       "minecraft:persistent": {},
       "minecraft:inventory": {
