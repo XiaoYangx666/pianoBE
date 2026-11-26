@@ -52,7 +52,6 @@
 | 脚本 | 用途 | npm 入口 |
 |---|---|---|
 | `pack-tabletop.mjs` | 打包私有 `@begame/tabletop` | `npm run vendor:tabletop` |
-| `sync-sapipro.mjs` | 构建/打包本地 SAPI-Pro | `npm run vendor:sapipro` |
 
 ## `build/` — 构建辅助
 
@@ -66,4 +65,4 @@
 - `piano_timbres_source/` — 各音色下载/渲染缓存 + `calibration.json`（gitignore；删后无法重建音色/响度校准）
 - `*-report.md`、`loudness-verification.md` — 分析结论文档（保留在此，被 README 引用）
 
-> Audio Lab 的 VCSL 原始 WAV 缓存（`audio_lab_source/`）属临时数据，构建产物已在 `packages/web/public/lab/vcsl/`（入库），缓存可随时删除并由 `audio-lab:assets` 重新下载。
+> Audio Lab 的 VCSL 原始 WAV 缓存（`audio_lab_source/`）属临时数据，构建产物已在 `packages/web/public/lab/vcsl/`（入库），缓存可随时删除并由 `npm run audio-lab -- assets` 重新下载。
