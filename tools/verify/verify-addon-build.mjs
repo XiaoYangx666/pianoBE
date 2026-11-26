@@ -82,32 +82,32 @@ const templatePath = path.join(addon, "dist/template.mcaddon");
 const propRoot = "bp/entities/pbe_stage_props";
 const propCatalog = "bp/scripts/vfx/stagePropCatalog.js";
 
-function hasFloatingPropSizeRange(source) {
-    if (!source) return false;
-    const size = JSON.parse(source)["minecraft:entity"]?.description?.properties?.["pbe:vfx_size"];
-    // Bedrock distinguishes integer and float JSON tokens. Non-integer bounds survive reserialization.
-    return size?.type === "float"
-        && Array.isArray(size.range)
-        && size.range.length === 2
-        && size.range.every(value => Number.isFinite(value) && !Number.isInteger(value));
-}
-
-const propFiles = walk(path.join(addon, propRoot));
-check(propFiles.length >= 2 && propFiles.every(file => hasFloatingPropSizeRange(read(file))),
-    "built-in stage props use float scale bounds");
+const propFiles = fs.existsSync(path.join(addon, propRoot)) ? walk(path.join(addon, propRoot)) : [];
+check(propFiles.length === 0,
+    "zero-plugin base addon contains no built-in stage props");
 if (fs.existsSync(templatePath)) {
     const template = await readAddonFile(templatePath);
     check(template.has(timbresModule), `template includes ${timbresModule}`);
+    check(!template.entries().some(entry => entry.path.startsWith("bp/scripts/plugins/")),
+        "template contains no built-in plugin scripts");
 }
 
 // --- 实际产物 ---
 check(fs.existsSync(scripts), "bp/scripts exists (run a build first)");
 const catalogSource = read(path.join(addon, propCatalog));
-check(propFiles.every(file => catalogSource.includes(JSON.parse(read(file))["minecraft:entity"].description.identifier)),
-    "built-in catalog registers every generated stage prop entity");
+check(catalogSource.includes("STAGE_PROP_REGISTRATIONS"),
+    "stagePropCatalog.js exports STAGE_PROP_REGISTRATIONS");
 const runtimePath = path.join(scripts, "vfx/runtime.js");
 check(read(runtimePath).includes('from "./stagePropCatalog.js"'),
     "VFX runtime imports the assembled stage prop catalog");
+const vfxPluginsPath = path.join(scripts, "vfx/plugins.js");
+check(fs.existsSync(vfxPluginsPath) && !read(vfxPluginsPath).includes("plugins/dist"),
+    "built vfx/plugins.js is zero-plugin (does not import @piano/plugins)");
+check(!fs.existsSync(path.join(scripts, "plugins")),
+    "built bp/scripts/plugins does not exist in zero-plugin base");
+const vfxIndexPath = path.join(scripts, "vfx/index.js");
+check(fs.existsSync(vfxIndexPath) && read(vfxIndexPath).includes("registerVfxPlugins"),
+    "built vfx/index.js retains registerVfxPlugins call");
 
 const seat = JSON.parse(read(path.join(addon, "bp/entities/piano_bench_seat.json")))["minecraft:entity"];
 const rideHeight = seat.components["minecraft:rideable"]?.seats?.[0]?.position?.[1];

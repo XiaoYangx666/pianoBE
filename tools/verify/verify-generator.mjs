@@ -34,7 +34,7 @@ import {
 } from "@piano/assembly";
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
-const BARE_TEMPLATE = "packages/addon/dist/template-bare.mcaddon";
+const BARE_TEMPLATE = TEMPLATE;
 const MIDI_A = "midis/files/Beyond - 海阔天空.mid";
 const MIDI_B = "midis/files/ChiliChill - 让风告诉你.mid";
 
@@ -279,7 +279,7 @@ async function inspectZip(blob) {
     );
 }
 
-// 13. 多插件统一装配到基础模板（template-bare.mcaddon）
+// 13. 多插件统一装配到基础模板（template.mcaddon）
 const bareTpl = await loadAddonTemplate(await storedZip(readFileSync(BARE_TEMPLATE)));
 {
     const selectedArchives = [

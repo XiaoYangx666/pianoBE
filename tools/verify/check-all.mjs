@@ -101,8 +101,8 @@ async function main() {
             },
             async () => {
                 await Promise.all([
-                    runStep("Sync VFX assets", "node", ["tools/assets/sync-vfx-assets.mjs"]),
-                    runStep("Sync stage props", "bun", ["tools/assets/sync-stage-props.mjs"]),
+                    runStep("Sync VFX assets (host-only)", "node", ["tools/assets/sync-vfx-assets.mjs", "--host-only"]),
+                    runStep("Sync stage props (host-only)", "bun", ["tools/assets/sync-stage-props.mjs", "--host-only"]),
                 ]);
                 await runStep(
                     "Build addon template",
@@ -110,11 +110,10 @@ async function main() {
                     ["build", "--skip-copy", "--pack", "--mode", "template"],
                     addonDir,
                 );
-                await runStep("Strip template VFX (bare)", "bun", ["tools/build/strip-template-vfx.mjs"]);
                 await runStep(
                     "Build server addon",
                     bepackBin,
-                    ["build", "--config", "bepack.server.config.ts", "--skip-copy"],
+                    ["build", "--config", "bepack.server.config.ts", "--skip-copy", "--pack"],
                     addonDir,
                 );
                 await runStep(

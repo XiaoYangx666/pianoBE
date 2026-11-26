@@ -16,7 +16,7 @@ import {
 } from "../src/index";
 
 const root = join(import.meta.dir, "..", "..", "..");
-const bareTemplatePath = join(root, "packages/addon/dist/template-bare.mcaddon");
+const templatePath = join(root, "packages/addon/dist/template.mcaddon");
 
 describe("@piano/assembly", () => {
     test("packLibraryAsPlugin packs songs and performances into a valid .pbeplugin", () => {
@@ -170,8 +170,8 @@ describe("@piano/assembly", () => {
     });
 
     test("assembleAddonTemplate supports embedSongs=false and pure-song plugin embedding", async () => {
-        if (!existsSync(bareTemplatePath)) return;
-        const rawTpl = new Uint8Array(readFileSync(bareTemplatePath));
+        if (!existsSync(templatePath)) return;
+        const rawTpl = new Uint8Array(readFileSync(templatePath));
         const tplBytes = zipSync(unzipSync(rawTpl), { level: 0 });
         const info = await loadAddonTemplate(tplBytes);
 
@@ -279,8 +279,8 @@ describe("@piano/assembly", () => {
      * 导致游戏内 QuickJS 在模块链接阶段报"未导出"。
      */
     test("zero-library assembly still exports libraries for the compiled named import", async () => {
-        if (!existsSync(bareTemplatePath)) return;
-        const info = await loadAddonTemplate(new Uint8Array(readFileSync(bareTemplatePath)));
+        if (!existsSync(templatePath)) return;
+        const info = await loadAddonTemplate(new Uint8Array(readFileSync(templatePath)));
         const bytes = await assembleAddonBytes(info, [], {
             name: "零曲库装配",
             plugins: [],

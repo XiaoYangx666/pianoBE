@@ -46,10 +46,8 @@ describe("piano timbre settings", () => {
         expect(DEFAULT_PIANO_SETTINGS.timbre).toBe(PIANO_TIMBRES[0].value);
     });
 
-    test("开发构建默认启用全部音色", () => {
-        expect(AVAILABLE_PIANO_TIMBRES.map((t) => t.id)).toEqual(
-            PIANO_TIMBRES.map((t) => t.id)
-        );
+    test("零插件基础底包默认仅启用标准钢琴，其余音色由插件按需装配", () => {
+        expect(AVAILABLE_PIANO_TIMBRES.map((t) => t.id)).toEqual(["piano"]);
     });
 
     test("生成器裁剪后只显示实际启用的音色，且至少保留默认音色", () => {
@@ -61,9 +59,10 @@ describe("piano timbre settings", () => {
         expect(availablePianoTimbres([]).map((t) => t.id)).toEqual(["piano"]);
     });
 
-    test("已知音色编号会保留", () => {
-        for (const timbre of PIANO_TIMBRES) {
-            expect(normalizePianoSettings({ timbre: timbre.value }).timbre).toBe(timbre.value);
+    test("基础底包只保留已启用音色编号，未装配的音色回退到默认值", () => {
+        expect(normalizePianoSettings({ timbre: PIANO_TIMBRES[0].value }).timbre).toBe(PIANO_TIMBRES[0].value);
+        for (const timbre of PIANO_TIMBRES.slice(1)) {
+            expect(normalizePianoSettings({ timbre: timbre.value }).timbre).toBe(DEFAULT_PIANO_SETTINGS.timbre);
         }
     });
 

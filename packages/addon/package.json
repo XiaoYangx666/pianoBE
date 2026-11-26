@@ -6,14 +6,15 @@
     "license": "UNLICENSED",
     "private": true,
     "scripts": {
-        "pack": "npm run sync:assets && bepack build --skip-copy --pack",
-        "sync:assets": "npm run build -w @piano/core && npm run build -w @piano/vfx && npm run build -w @piano/plugins && node ../../tools/assets/sync-vfx-assets.mjs && bun ../../tools/assets/sync-stage-props.mjs",
+        "pack": "npm run build:template && bun ../../tools/build/assemble-dev-addon.mjs --pack",
+        "sync:assets": "npm run build -w @piano/core && npm run build -w @piano/vfx && node ../../tools/assets/sync-vfx-assets.mjs --host-only && bun ../../tools/assets/sync-stage-props.mjs --host-only",
         "dev": "npm run sync:assets && bepack dev",
-        "build": "npm run sync:assets && bepack build",
-        "copy": "npm run sync:assets && bepack copy",
+        "build:base": "npm run sync:assets && bepack build --skip-copy",
+        "build": "npm run build:template && bun ../../tools/build/assemble-dev-addon.mjs --copy",
+        "copy": "bun ../../tools/build/assemble-dev-addon.mjs --copy",
         "build:template": "npm run sync:assets && bepack build --skip-copy --pack --mode template",
         "build:server": "npm run sync:assets && bepack build --config bepack.server.config.ts --skip-copy --pack",
-        "verify:build": "npm run sync:assets && bepack build --skip-copy && node ../../tools/verify/verify-addon-build.mjs client && bepack build --config bepack.server.config.ts --skip-copy && node ../../tools/verify/verify-addon-build.mjs server",
+        "verify:build": "npm run sync:assets && bepack build --skip-copy && node ../../tools/verify/verify-addon-build.mjs client && bepack build --config bepack.server.config.ts --skip-copy --pack && node ../../tools/verify/verify-addon-build.mjs server",
         "test": "bun test --isolate"
     },
     "dependencies": {
@@ -24,11 +25,11 @@
         "@minecraft/server-ui": "2.3.0",
         "@minecraft/vanilla-data": "1.26.50",
         "@piano/core": "file:../core",
-        "@piano/plugins": "file:../../plugins",
         "@piano/vfx": "file:../vfx",
         "sapi-pro": "0.4.4-stable"
     },
     "devDependencies": {
-        "@bepack/cli": "^0.1.0-beta.9"
+        "@bepack/cli": "^0.1.0-beta.9",
+        "@piano/plugins": "file:../../plugins"
     }
 }
