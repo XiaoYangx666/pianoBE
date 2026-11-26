@@ -31,11 +31,19 @@ import type { ServerConfig } from "../config.js";
 import type { SqliteSongPort } from "../drivers/sqlitePorts.js";
 import type { PluginService } from "./plugins.js";
 
+export type BdsPackMode = "development" | "release";
+
 export interface BdsConfig {
     bdsDir?: string;
     bdsWorld?: string;
     bdsBpName: string;
     bdsRpName: string;
+    /** development = development_behavior_packs / development_resource_packs；release = behavior_packs / resource_packs */
+    bdsPackMode: BdsPackMode;
+    /** 自定义 manifest 包名；空则沿用模板 */
+    packName?: string;
+    /** 自定义 manifest 描述；空则沿用模板 */
+    packDescription?: string;
 }
 
 export interface ServerScoreMeta {
@@ -64,6 +72,7 @@ export interface AddonDeploymentStatus {
     availableTimbres: TimbreIndexEntry[];
     scores: ServerScoreMeta[];
     issues: string[];
+    warnings: string[];
 }
 
 export class DeploymentService {
@@ -83,6 +92,13 @@ export class DeploymentService {
                     bdsWorld: parsed.bdsWorld || this.config.bdsWorld,
                     bdsBpName: parsed.bdsBpName || this.config.bdsBpName,
                     bdsRpName: parsed.bdsRpName || this.config.bdsRpName,
+                    bdsPackMode: parsed.bdsPackMode === "release" ? "release" : parsed.bdsPackMode === "development"
+                        ? "development"
+                        : this.config.bdsPackMode,
+                    packName: typeof parsed.packName === "string" ? parsed.packName : this.config.packName,
+                    packDescription: typeof parsed.packDescription === "string"
+                        ? parsed.packDescription
+                        : this.config.packDescription,
                 };
             } catch { /* fallback */ }
         }
@@ -91,6 +107,9 @@ export class DeploymentService {
             bdsWorld: this.config.bdsWorld,
             bdsBpName: this.config.bdsBpName,
             bdsRpName: this.config.bdsRpName,
+            bdsPackMode: this.config.bdsPackMode,
+            packName: this.config.packName,
+            packDescription: this.config.packDescription,
         };
     }
 
@@ -101,9 +120,34 @@ export class DeploymentService {
             bdsWorld: next.bdsWorld !== undefined ? next.bdsWorld.trim() || undefined : current.bdsWorld,
             bdsBpName: next.bdsBpName?.trim() || current.bdsBpName,
             bdsRpName: next.bdsRpName?.trim() || current.bdsRpName,
+            bdsPackMode: next.bdsPackMode === undefined
+                ? current.bdsPackMode
+                : next.bdsPackMode === "release"
+                  ? "release"
+                  : "development",
+            packName: next.packName !== undefined ? next.packName.trim() : current.packName,
+            packDescription: next.packDescription !== undefined
+                ? next.packDescription.trim()
+                : current.packDescription,
         };
+        if (!isSafeFolderName(merged.bdsBpName) || !isSafeFolderName(merged.bdsRpName)) {
+            throw new Error("行为包/资源包目录名不能为空，且不能包含路径分隔符");
+        }
         this.songPort.setState("bds_config", JSON.stringify(merged));
         return merged;
+    }
+
+    /** 传给装配器的自定义 manifest 名称；空值表示沿用模板。 */
+    private packIdentityOptions(): { name?: string; desc?: string } {
+        const bds = this.getBdsConfig();
+        const name = bds.packName?.trim() || undefined;
+        const desc = bds.packDescription?.trim() || undefined;
+        return { ...(name ? { name } : {}), ...(desc ? { desc } : {}) };
+    }
+
+    getDownloadFileName(): string {
+        const name = this.getBdsConfig().packName?.trim() || "pianobe-server";
+        return `${name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")}.mcaddon`;
     }
 
     private customTemplatePath(): string {
@@ -416,10 +460,15 @@ export class DeploymentService {
         const scoreSpecs = customScores.length
             ? customScores.map((s) => `${s.id}:${s.pages.join(",")}`).sort()
             : undefined;
+        const identity = this.packIdentityOptions();
         const payload = JSON.stringify({
             plugins: pluginSpecs,
             timbres: timbreSpecs,
             embedSongs: false,
+            pack: {
+                name: identity.name ?? "",
+                description: identity.desc ?? "",
+            },
             ...(scoreSpecs ? { scores: scoreSpecs } : {}),
         });
         const hash = crc32Hex(encodeUtf8(payload)).padStart(8, "0");
@@ -453,13 +502,23 @@ export class DeploymentService {
         const loadedAtRaw = this.songPort.getState("loaded_at");
         const deployedPlugins = parseList(this.songPort.getState("deployed_plugins_json"));
         const loadedPlugins = parseList(this.songPort.getState("loaded_plugins_json"));
+        const deployedTarget = parseTarget(this.songPort.getState("deployed_target_json"));
+        const targetChanged =
+            !deployedTarget ||
+            deployedTarget.mode !== bdsConfig.bdsPackMode ||
+            deployedTarget.bpName !== bdsConfig.bdsBpName ||
+            deployedTarget.rpName !== bdsConfig.bdsRpName;
 
         let status: ResourceDeployStatus;
         if (!templatePath || issues.length > 0) {
             status = "unavailable";
-        } else if (deployedConfigHash === targetConfigHash && loadedConfigHash === targetConfigHash) {
+        } else if (
+            deployedConfigHash === targetConfigHash &&
+            !targetChanged &&
+            loadedConfigHash === targetConfigHash
+        ) {
             status = "active";
-        } else if (deployedConfigHash === targetConfigHash) {
+        } else if (deployedConfigHash === targetConfigHash && !targetChanged) {
             status = "pending_restart";
         } else {
             status = "pending_deploy";
@@ -484,7 +543,26 @@ export class DeploymentService {
             availableTimbres: this.getAvailableTimbres(),
             scores: this.listScores(),
             issues,
+            warnings: this.collectWarnings(bdsConfig),
         };
+    }
+
+    /** 部署时的提示信息（例如旧目录已归档），与阻塞部署的 issues 分开。 */
+    private collectWarnings(bds: BdsConfig): string[] {
+        const warnings = parseList(this.songPort.getState("deploy_warnings_json"));
+        if (!bds.bdsDir) return warnings;
+        const roots = resolvePackRoots(bds.bdsDir, bds.bdsPackMode);
+        const legacy = [
+            ["行为包", roots.legacyBpRoot, bds.bdsBpName],
+            ["资源包", roots.legacyRpRoot, bds.bdsRpName],
+        ] as const;
+        for (const [label, root, name] of legacy) {
+            const dir = join(root, name);
+            if (!existsSync(dir)) continue;
+            const message = `检测到旧目录 ${dir} 仍存在同名${label}，可能被 BDS 重复加载；请在重启 BDS 前删除或移走该目录`;
+            if (!warnings.includes(message)) warnings.push(message);
+        }
+        return warnings;
     }
 
     private async prepareAssembledTemplate() {
@@ -502,9 +580,10 @@ export class DeploymentService {
 
     async buildDownloadBytes(): Promise<Uint8Array> {
         const { info, archives, timbres, scores } = await this.prepareAssembledTemplate();
+        const identity = this.packIdentityOptions();
         return assembleAddonBytes(info, [], {
-            name: info.bpManifest.header?.name ?? "钢琴(服务器版)",
-            desc: info.bpManifest.header?.description ?? "PianoBE 服务器附加包",
+            name: identity.name,
+            desc: identity.desc,
             randomUuid: false,
             plugins: archives,
             ...(timbres ? { timbres } : {}),
@@ -523,9 +602,10 @@ export class DeploymentService {
         }
 
         const { info, archives, timbres, scores } = await this.prepareAssembledTemplate();
+        const identity = this.packIdentityOptions();
         const assembled = assembleAddonTemplate(info, [], {
-            name: info.bpManifest.header?.name ?? "钢琴(服务器版)",
-            desc: info.bpManifest.header?.description ?? "PianoBE 服务器附加包",
+            name: identity.name,
+            desc: identity.desc,
             randomUuid: false,
             plugins: archives,
             ...(timbres ? { timbres } : {}),
@@ -534,8 +614,9 @@ export class DeploymentService {
         });
         const { bpFiles, rpFiles } = extractPackFiles(assembled.addon, assembled.bpPath, assembled.rpPath);
 
-        const bpRoot = join(bdsConfig.bdsDir, "behavior_packs");
-        const rpRoot = join(bdsConfig.bdsDir, "resource_packs");
+        const roots = resolvePackRoots(bdsConfig.bdsDir, bdsConfig.bdsPackMode);
+        const bpRoot = roots.bpRoot;
+        const rpRoot = roots.rpRoot;
         mkdirSync(bpRoot, { recursive: true });
         mkdirSync(rpRoot, { recursive: true });
 
@@ -546,6 +627,16 @@ export class DeploymentService {
 
         const bpManifest = JSON.parse(new TextDecoder().decode(bpFiles.get("manifest.json")!));
         const rpManifest = JSON.parse(new TextDecoder().decode(rpFiles.get("manifest.json")!));
+
+        // 旧目录里同名、同 UUID 的包会和开发目录冲突，成功写入后归档到隐藏目录（不直接删除）。
+        const warnings: string[] = [];
+        const archived = [
+            ...this.archiveLegacyPack(roots.legacyBpRoot, bdsConfig.bdsBpName, bpManifest.header.uuid),
+            ...this.archiveLegacyPack(roots.legacyRpRoot, bdsConfig.bdsRpName, rpManifest.header.uuid),
+        ];
+        if (archived.length > 0) {
+            warnings.push(`已归档旧目录中的同名附加包：${archived.join("、")}（可确认新包生效后手动删除）`);
+        }
 
         const worldDir = resolveTargetWorldDir(bdsConfig.bdsDir, bdsConfig.bdsWorld);
         if (worldDir) {
@@ -561,6 +652,15 @@ export class DeploymentService {
             );
         }
 
+        this.songPort.setState("deploy_warnings_json", JSON.stringify(warnings));
+        this.songPort.setState(
+            "deployed_target_json",
+            JSON.stringify({
+                mode: bdsConfig.bdsPackMode,
+                bpName: bdsConfig.bdsBpName,
+                rpName: bdsConfig.bdsRpName,
+            }),
+        );
         this.songPort.setState("deployed_config_hash", assembled.configHash);
         this.songPort.setState("deployed_plugins_json", JSON.stringify(assembled.installedPlugins));
         this.songPort.setState("deployed_at", String(Date.now()));
@@ -628,6 +728,29 @@ export class DeploymentService {
         this.songPort.setState("deploy_seq", String(sequence));
     }
 
+    /**
+     * 把旧部署目录（例如从 behavior_packs 切到 development_behavior_packs）中的同名包
+     * 归档到隐藏目录，避免同 UUID 的包被 BDS 重复加载；UUID 不同则不碰。
+     */
+    private archiveLegacyPack(root: string, folderName: string, expectedUuid: string): string[] {
+        const dir = join(root, folderName);
+        if (!existsSync(dir)) return [];
+        let uuid: string | undefined;
+        try {
+            uuid = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"))?.header?.uuid;
+        } catch {
+            return [];
+        }
+        if (!uuid || uuid.toLowerCase() !== expectedUuid.toLowerCase()) return [];
+        const target = join(root, `.${folderName}.legacy_${Date.now()}`);
+        try {
+            renameSync(dir, target);
+            return [target];
+        } catch {
+            return [];
+        }
+    }
+
     reportLoaded(input: { configHash?: string; installedPlugins?: string[] }): AddonDeploymentStatus {
         if (input.configHash) {
             this.songPort.setState("loaded_config_hash", input.configHash);
@@ -638,6 +761,38 @@ export class DeploymentService {
         this.songPort.setState("loaded_at", String(Date.now()));
         return this.getStatus();
     }
+}
+
+function isSafeFolderName(name: string): boolean {
+    return Boolean(name) && name !== "." && name !== ".." && !/[\\/]/.test(name);
+}
+
+interface PackRoots {
+    bpRoot: string;
+    rpRoot: string;
+    legacyBpRoot: string;
+    legacyRpRoot: string;
+}
+
+/**
+ * development 模式使用 development_behavior_packs / development_resource_packs，
+ * release 模式使用传统的 behavior_packs / resource_packs。
+ */
+function resolvePackRoots(bdsDir: string, mode: BdsPackMode): PackRoots {
+    if (mode === "release") {
+        return {
+            bpRoot: join(bdsDir, "behavior_packs"),
+            rpRoot: join(bdsDir, "resource_packs"),
+            legacyBpRoot: join(bdsDir, "development_behavior_packs"),
+            legacyRpRoot: join(bdsDir, "development_resource_packs"),
+        };
+    }
+    return {
+        bpRoot: join(bdsDir, "development_behavior_packs"),
+        rpRoot: join(bdsDir, "development_resource_packs"),
+        legacyBpRoot: join(bdsDir, "behavior_packs"),
+        legacyRpRoot: join(bdsDir, "resource_packs"),
+    };
 }
 
 function writePackDirAtomic(parentDir: string, folderName: string, files: ReadonlyMap<string, Uint8Array>): void {
@@ -720,4 +875,19 @@ function parseList(raw?: string): string[] {
     } catch {
         return [];
     }
+}
+
+function parseTarget(raw?: string): { mode: BdsPackMode; bpName: string; rpName: string } | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = JSON.parse(raw) as Partial<{ mode: BdsPackMode; bpName: string; rpName: string }>;
+        if (
+            (parsed.mode === "development" || parsed.mode === "release") &&
+            typeof parsed.bpName === "string" &&
+            typeof parsed.rpName === "string"
+        ) {
+            return { mode: parsed.mode, bpName: parsed.bpName, rpName: parsed.rpName };
+        }
+    } catch { /* ignore */ }
+    return undefined;
 }

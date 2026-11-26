@@ -329,6 +329,18 @@ describe("PianoBE Server Studio API：PBE3、曲库、插件与 BDS 部署", () 
         };
         expect(beforeStatus.status).toBe("pending_deploy");
 
+        const configRes = await req("/api/addon/config", {
+            token: ADMIN,
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                bdsPackMode: "development",
+                packName: "自定义钢琴包",
+                packDescription: "自定义服务器描述",
+            }),
+        });
+        expect(configRes.status).toBe(200);
+
         const deployRes = await req("/api/addon/deploy", { token: ADMIN, method: "POST" });
         expect(deployRes.status).toBe(200);
         const afterDeploy = (await deployRes.json()) as {
@@ -339,11 +351,29 @@ describe("PianoBE Server Studio API：PBE3、曲库、插件与 BDS 部署", () 
         expect(afterDeploy.status).toBe("pending_restart");
         expect(afterDeploy.deployedConfigHash).toBe(afterDeploy.targetConfigHash);
 
-        expect(existsSync(join(bdsDir, "behavior_packs", "pianoServerBP", "manifest.json"))).toBe(true);
-        expect(existsSync(join(bdsDir, "resource_packs", "pianoServerRP", "manifest.json"))).toBe(true);
-        expect(existsSync(join(bdsDir, "behavior_packs", "pianoServerBP", "scripts", "vfx", "deploymentInfo.js"))).toBe(
-            true,
-        );
+        expect(existsSync(join(bdsDir, "development_behavior_packs", "pianoServerBP", "manifest.json"))).toBe(true);
+        expect(existsSync(join(bdsDir, "development_resource_packs", "pianoServerRP", "manifest.json"))).toBe(true);
+        expect(
+            existsSync(
+                join(bdsDir, "development_behavior_packs", "pianoServerBP", "scripts", "vfx", "deploymentInfo.js"),
+            ),
+        ).toBe(true);
+
+        const bpManifest = JSON.parse(
+            readFileSync(
+                join(bdsDir, "development_behavior_packs", "pianoServerBP", "manifest.json"),
+                "utf8",
+            ),
+        ) as { header: { name: string; description: string } };
+        const rpManifest = JSON.parse(
+            readFileSync(
+                join(bdsDir, "development_resource_packs", "pianoServerRP", "manifest.json"),
+                "utf8",
+            ),
+        ) as { header: { name: string; description: string } };
+        expect(bpManifest.header.name).toBe("自定义钢琴包");
+        expect(bpManifest.header.description).toBe("自定义服务器描述");
+        expect(rpManifest.header.name).toBe("自定义钢琴包 (RP)");
 
         const worldBps = JSON.parse(
             readFileSync(join(bdsDir, "worlds", "MyWorld", "world_behavior_packs.json"), "utf8"),

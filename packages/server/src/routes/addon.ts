@@ -20,17 +20,26 @@ export function addonRoutes(
         if (!body || typeof body !== "object") {
             return c.json({ error: "配置格式无效" }, 400);
         }
-        const config = deploymentService.updateBdsConfig({
-            bdsDir: typeof body.bdsDir === "string" ? body.bdsDir : undefined,
-            bdsWorld: typeof body.bdsWorld === "string" ? body.bdsWorld : undefined,
-            bdsBpName: typeof body.bdsBpName === "string" ? body.bdsBpName : undefined,
-            bdsRpName: typeof body.bdsRpName === "string" ? body.bdsRpName : undefined,
-        });
-        if (Array.isArray(body.enabledTimbres)) {
-            const ids = body.enabledTimbres.filter((item: unknown): item is string => typeof item === "string");
-            deploymentService.updateEnabledTimbres(ids);
+        try {
+            const config = deploymentService.updateBdsConfig({
+                bdsDir: typeof body.bdsDir === "string" ? body.bdsDir : undefined,
+                bdsWorld: typeof body.bdsWorld === "string" ? body.bdsWorld : undefined,
+                bdsBpName: typeof body.bdsBpName === "string" ? body.bdsBpName : undefined,
+                bdsRpName: typeof body.bdsRpName === "string" ? body.bdsRpName : undefined,
+                bdsPackMode: body.bdsPackMode === "release" || body.bdsPackMode === "development"
+                    ? body.bdsPackMode
+                    : undefined,
+                packName: typeof body.packName === "string" ? body.packName : undefined,
+                packDescription: typeof body.packDescription === "string" ? body.packDescription : undefined,
+            });
+            if (Array.isArray(body.enabledTimbres)) {
+                const ids = body.enabledTimbres.filter((item: unknown): item is string => typeof item === "string");
+                deploymentService.updateEnabledTimbres(ids);
+            }
+            return c.json({ bdsConfig: config, status: deploymentService.getStatus() });
+        } catch (error) {
+            return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
         }
-        return c.json({ bdsConfig: config, status: deploymentService.getStatus() });
     });
 
     app.get("/scores", readRole(), (c) => {
@@ -96,11 +105,12 @@ export function addonRoutes(
     app.get("/download", adminRole(), async (c) => {
         try {
             const bytes = await deploymentService.buildDownloadBytes();
+            const fileName = deploymentService.getDownloadFileName();
             return new Response(Uint8Array.from(bytes), {
                 status: 200,
                 headers: {
                     "content-type": "application/octet-stream",
-                    "content-disposition": 'attachment; filename="pianobe-server.mcaddon"',
+                    "content-disposition": `attachment; filename="pianobe-server.mcaddon"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
                 },
             });
         } catch (error) {

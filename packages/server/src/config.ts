@@ -18,6 +18,12 @@ export interface ServerConfig {
     bdsBpName: string;
     /** BDS 资源包目录名 */
     bdsRpName: string;
+    /** 部署到 development_* 目录（开发包，默认）还是 behavior_packs/resource_packs（正式目录） */
+    bdsPackMode: "development" | "release";
+    /** 自定义 manifest 包名；空则沿用模板 */
+    packName?: string;
+    /** 自定义 manifest 描述；空则沿用模板 */
+    packDescription?: string;
     /** 管理员引导令牌；未设置时首次启动自动生成并打印 */
     bootstrapToken?: string;
     /** 为 true 时公开读接口（曲目列表/曲目内容）无需令牌 */
@@ -68,6 +74,9 @@ export function loadConfig(
         bdsWorld: env.BDS_WORLD || undefined,
         bdsBpName: env.BDS_BP_NAME || "pianoServerBP",
         bdsRpName: env.BDS_RP_NAME || "pianoServerRP",
+        bdsPackMode: env.BDS_PACK_MODE === "release" ? "release" : "development",
+        packName: env.BDS_PACK_NAME || undefined,
+        packDescription: env.BDS_PACK_DESCRIPTION || undefined,
         bootstrapToken: env.BOOTSTRAP_TOKEN || undefined,
         allowPublicRead: env.ALLOW_PUBLIC_READ === "true",
         webRoot: env.WEB_ROOT || undefined,

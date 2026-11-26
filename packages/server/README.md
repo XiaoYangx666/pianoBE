@@ -68,6 +68,24 @@ docker compose -f docker-compose.dev.yml up
 | `AMT_ECO` | `false` | `true` 时使用单线程低负载模式 |
 | `AMT_TIMEOUT_MS` | `600000` | 单次转录超时（毫秒） |
 | `BILI_SESSDATA` | 无 | B 站登录 Cookie；普通 64K/132K/192K 音轨不需要 |
+| `BDS_DIR` | 无 | BDS 根目录；配置后可在管理页一键部署 BP/RP |
+| `BDS_WORLD` | `server.properties` 的 `level-name` | 目标世界目录名 |
+| `BDS_BP_NAME` | `pianoServerBP` | 行为包部署目录名 |
+| `BDS_RP_NAME` | `pianoServerRP` | 资源包部署目录名 |
+| `BDS_PACK_MODE` | `development` | `development` 部署到 `development_behavior_packs` / `development_resource_packs`；`release` 部署到 `behavior_packs` / `resource_packs` |
+| `BDS_PACK_NAME` | 模板名 | 自定义 manifest 包名（管理页可改） |
+| `BDS_PACK_DESCRIPTION` | 模板描述 | 自定义 manifest 描述（管理页可改） |
+
+## BDS 附加包部署
+
+管理页「BDS 部署与校验」会把模板与已启用的插件/音色/曲谱重新装配，并写入 BDS：
+
+- 默认写入 `development_behavior_packs/<BDS_BP_NAME>` 与 `development_resource_packs/<BDS_RP_NAME>`；
+  需要正式目录时把 `BDS_PACK_MODE` 设为 `release`（或直接在页面切换）。
+- 切换目录后，旧目录里同名且 UUID 相同的包会被移动到隐藏目录
+  （`.<name>.legacy_<时间戳>`），不会直接删除；不同 UUID 的目录不会被触碰。
+- `world_behavior_packs.json` / `world_resource_packs.json` 会同步更新到新版本。
+- 包名与描述可在页面自定义；留空则沿用模板 manifest 的值。
 
 ## 令牌与角色
 

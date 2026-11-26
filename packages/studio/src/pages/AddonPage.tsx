@@ -145,6 +145,9 @@ export function AddonPage() {
     const [bdsWorld, setBdsWorld] = useState("");
     const [bdsBpName, setBdsBpName] = useState("");
     const [bdsRpName, setBdsRpName] = useState("");
+    const [bdsPackMode, setBdsPackMode] = useState<"development" | "release">("development");
+    const [packName, setPackName] = useState("");
+    const [packDescription, setPackDescription] = useState("");
 
     const [tokens, setTokens] = useState<StudioTokenInfo[]>([]);
     const [tokenForbidden, setTokenForbidden] = useState(false);
@@ -162,6 +165,9 @@ export function AddonPage() {
         setBdsWorld(deploymentStatus.bdsConfig.bdsWorld);
         setBdsBpName(deploymentStatus.bdsConfig.bdsBpName);
         setBdsRpName(deploymentStatus.bdsConfig.bdsRpName);
+        setBdsPackMode(deploymentStatus.bdsConfig.bdsPackMode);
+        setPackName(deploymentStatus.bdsConfig.packName);
+        setPackDescription(deploymentStatus.bdsConfig.packDescription);
     }, [deploymentStatus]);
 
     useEffect(() => {
@@ -916,6 +922,11 @@ export function AddonPage() {
                                                     {deploymentStatus.issues.join("；")}
                                                 </div>
                                             )}
+                                            {deploymentStatus.warnings.length > 0 && (
+                                                <div className="mt-1 text-[11.5px] text-[color:var(--pb-warning)]">
+                                                    {deploymentStatus.warnings.join("；")}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -975,6 +986,25 @@ export function AddonPage() {
                                         if (typeof t?.value === "string") setBdsWorld(t.value);
                                     }}
                                 />
+                                <div className="flex flex-col gap-2 sm:col-span-2">
+                                    <div className="text-[12px] text-ore-dim">部署目录</div>
+                                    <Segmented
+                                        value={bdsPackMode}
+                                        onChange={(value) =>
+                                            setBdsPackMode(value as "development" | "release")
+                                        }
+                                        options={[
+                                            {
+                                                value: "development",
+                                                label: "开发目录 (development_*)",
+                                            },
+                                            { value: "release", label: "正式目录 (behavior_packs)" },
+                                        ]}
+                                    />
+                                    <div className="text-[11.5px] text-ore-dimmer">
+                                        推荐使用开发目录：切换后旧的同名包会自动归档，不会删除。
+                                    </div>
+                                </div>
                                 <Textfield
                                     label="行为包目录名"
                                     placeholder="pianoServerBP"
@@ -991,6 +1021,24 @@ export function AddonPage() {
                                     onInput={(e) => {
                                         const t = e.target as unknown as { value?: unknown };
                                         if (typeof t?.value === "string") setBdsRpName(t.value);
+                                    }}
+                                />
+                                <Textfield
+                                    label="包名（manifest name，留空沿用模板）"
+                                    placeholder="钢琴(服务器版)"
+                                    value={packName}
+                                    onInput={(e) => {
+                                        const t = e.target as unknown as { value?: unknown };
+                                        if (typeof t?.value === "string") setPackName(t.value);
+                                    }}
+                                />
+                                <Textfield
+                                    label="包描述（manifest description，留空沿用模板）"
+                                    placeholder="PianoBE 服务器附加包"
+                                    value={packDescription}
+                                    onInput={(e) => {
+                                        const t = e.target as unknown as { value?: unknown };
+                                        if (typeof t?.value === "string") setPackDescription(t.value);
                                     }}
                                 />
                                 <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
@@ -1040,6 +1088,9 @@ export function AddonPage() {
                                                 bdsWorld,
                                                 bdsBpName,
                                                 bdsRpName,
+                                                bdsPackMode,
+                                                packName,
+                                                packDescription,
                                             })
                                         }
                                     >

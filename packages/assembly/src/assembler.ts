@@ -54,6 +54,7 @@ function computeConfigHash(
     timbres: TimbreExportSelection | undefined,
     embedSongs: boolean,
     scores?: readonly AssemblyScoreEntry[],
+    identity?: { name?: string; description?: string },
 ): string {
     const pluginSpecs = (plugins ?? [])
         .map((archive) => `${archive.manifest.id}@${archive.manifest.version}:${crc32Hex(archive.bytes)}`)
@@ -67,6 +68,10 @@ function computeConfigHash(
         plugins: pluginSpecs,
         timbres: timbreSpecs,
         embedSongs,
+        pack: {
+            name: identity?.name ?? "",
+            description: identity?.description ?? "",
+        },
         ...(scoreSpecs ? { scores: scoreSpecs } : {}),
     });
     return crc32Hex(encodeUtf8(payload)).padStart(8, "0");
@@ -262,7 +267,10 @@ export function assembleAddonTemplate(
         installedPlugins = applyVfxPlugins(addon, bpPath, rpPath, opts.plugins);
     }
 
-    const configHash = computeConfigHash(opts.plugins, opts.timbres, embedSongs, opts.scores);
+    const configHash = computeConfigHash(opts.plugins, opts.timbres, embedSongs, opts.scores, {
+        name: opts.name ?? "",
+        description: opts.desc ?? "",
+    });
     addon.writeText(
         `${bpPath}${DEPLOYMENT_INFO_SCRIPT}`,
         `export const DEPLOYMENT_INFO = ${JSON.stringify({

@@ -109,6 +109,9 @@ export interface AddonSlice {
         bdsWorld?: string;
         bdsBpName?: string;
         bdsRpName?: string;
+        bdsPackMode?: "development" | "release";
+        packName?: string;
+        packDescription?: string;
     }) => Promise<void>;
     deployServerToBds: () => Promise<void>;
     downloadServerAddon: () => Promise<void>;

@@ -67,6 +67,8 @@ npm run build:server   # 产出 packages/addon/dist/server.mcaddon
 
 后端日志默认写入 `packages/server/data/logs/server.log`（单文件 5 MB，轮转保留 `.1`～`.3`），同时输出到控制台；`LOG_FILE=off` 可关闭文件日志，路径也可用 `LOG_FILE` 自定义。
 
+管理页的「BDS 部署」默认把行为包/资源包写入 `development_behavior_packs` / `development_resource_packs`，切换目录时旧的同名包会归档到隐藏目录；manifest 的包名/描述也可以在页面自定义。
+
 只有服务器专用构建会在启动后动态 `import()` `serverAdmin`；该模块静态导入 `@minecraft/server-admin`（读配置）与 `@minecraft/server-net`（拉曲目），依赖由服务器包 manifest 声明。客户端构建会整体裁掉这个分支，继续使用内嵌曲库；服务器专用构建**不打包内嵌曲库**，配置不可用时没有任何曲目。详见 `packages/addon/README.md`。
 
 ---

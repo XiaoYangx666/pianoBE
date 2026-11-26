@@ -280,6 +280,9 @@ export const serverApi = {
         bdsWorld?: string;
         bdsBpName?: string;
         bdsRpName?: string;
+        bdsPackMode?: "development" | "release";
+        packName?: string;
+        packDescription?: string;
         enabledTimbres?: string[];
     }) {
         return req<{ bdsConfig: StudioDeploymentStatus["bdsConfig"]; status: ServerAddonStatusRaw }>(
@@ -505,12 +508,16 @@ export interface ServerAddonStatusRaw {
     availableTimbres?: TimbreIndexEntry[];
     scores?: ServerScoreMeta[];
     issues?: string[];
+    warnings?: string[];
     status: "active" | "pending_deploy" | "pending_restart" | "unavailable";
     bdsConfig: {
         bdsDir?: string;
         bdsWorld?: string;
         bdsBpName: string;
         bdsRpName: string;
+        bdsPackMode?: "development" | "release";
+        packName?: string;
+        packDescription?: string;
     };
 }
 
@@ -573,11 +580,15 @@ export function normalizeServerDeployment(raw: ServerAddonStatusRaw): StudioDepl
         availableTimbres: raw.availableTimbres ?? [],
         scores: raw.scores ?? [],
         issues: raw.issues ?? [],
+        warnings: raw.warnings ?? [],
         bdsConfig: {
             bdsDir: raw.bdsConfig?.bdsDir ?? "",
             bdsWorld: raw.bdsConfig?.bdsWorld ?? "",
             bdsBpName: raw.bdsConfig?.bdsBpName ?? "pianoServerBP",
             bdsRpName: raw.bdsConfig?.bdsRpName ?? "pianoServerRP",
+            bdsPackMode: raw.bdsConfig?.bdsPackMode === "release" ? "release" : "development",
+            packName: raw.bdsConfig?.packName ?? "",
+            packDescription: raw.bdsConfig?.packDescription ?? "",
         },
     };
 }

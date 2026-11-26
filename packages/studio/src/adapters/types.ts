@@ -115,11 +115,15 @@ export interface StudioDeploymentStatus {
     availableTimbres: TimbreIndexEntry[];
     scores: ServerScoreMeta[];
     issues: string[];
+    warnings: string[];
     bdsConfig: {
         bdsDir: string;
         bdsWorld: string;
         bdsBpName: string;
         bdsRpName: string;
+        bdsPackMode: "development" | "release";
+        packName: string;
+        packDescription: string;
     };
 }
 
