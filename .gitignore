@@ -48,3 +48,6 @@ __pycache__/
 /logs/
 packages/studio/public-server
 packages/studio/dist-server
+
+# 外置运行模型的默认日志目录
+packages/server/logs/
