@@ -28,6 +28,30 @@ import type { ServerConfig } from "../config.js";
 import type { SqliteSongPort } from "../drivers/sqlitePorts.js";
 import type { PluginService } from "./plugins.js";
 
+// 内置服务器底包的运行期位置：单文件产物由构建脚本注入（$bunfs/root/addon/dist），
+// 仓库运行固定在 packages/addon/dist（本文件在 packages/server/src/services，需上三级）。
+declare const __PIANOBE_TEMPLATE__: string | undefined;
+
+const BUILTIN_TEMPLATE =
+    typeof __PIANOBE_TEMPLATE__ !== "undefined"
+        ? resolve(import.meta.dir, __PIANOBE_TEMPLATE__)
+        : resolve(import.meta.dir, "../../../addon/dist/server.mcaddon");
+
+export type ServerTemplateSource = "uploaded" | "env" | "builtin";
+
+/** 服务器底包来源：管理页上传 > SERVER_TEMPLATE_PATH > 内置 */
+export function resolveServerTemplate(
+    config: Pick<ServerConfig, "dataDir" | "serverTemplatePath">,
+): { path?: string; source?: ServerTemplateSource } {
+    const uploaded = join(config.dataDir, "server-template.mcaddon");
+    if (existsSync(uploaded)) return { path: uploaded, source: "uploaded" };
+    if (config.serverTemplatePath && existsSync(config.serverTemplatePath)) {
+        return { path: config.serverTemplatePath, source: "env" };
+    }
+    if (existsSync(BUILTIN_TEMPLATE)) return { path: BUILTIN_TEMPLATE, source: "builtin" };
+    return {};
+}
+
 export type BdsPackMode = "development" | "release";
 
 export interface BdsConfig {
@@ -158,19 +182,7 @@ export class DeploymentService {
     }
 
     resolveTemplatePath(): string | undefined {
-        const candidates = [
-            this.customTemplatePath(),
-            this.config.serverTemplatePath,
-            resolve(import.meta.dir, "server.mcaddon"),
-            resolve(import.meta.dir, "../server.mcaddon"),
-            resolve(import.meta.dir, "../../server.mcaddon"),
-            resolve(import.meta.dir, "../../../server.mcaddon"),
-            resolve(import.meta.dir, "../../addon/dist/server.mcaddon"),
-            resolve(import.meta.dir, "../../../addon/dist/server.mcaddon"),
-            resolve(import.meta.dir, "../../addon/dist/template.mcaddon"),
-            resolve(import.meta.dir, "../../../addon/dist/template.mcaddon"),
-        ];
-        return candidates.find((p): p is string => Boolean(p && existsSync(p)));
+        return resolveServerTemplate(this.config).path;
     }
 
     getAvailableTimbres(): TimbreIndexEntry[] {

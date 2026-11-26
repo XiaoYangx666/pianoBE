@@ -14,6 +14,12 @@ RUN bun run --filter @piano/plugins build
 RUN bun run --filter @piano/assembly build
 RUN bun run pack:plugins
 RUN bun run --filter @piano/studio build
+# 服务器底包（零插件 server.mcaddon）：镜像内置，管理页不需要先上传模板。
+# 只用 bun 直接跑，避免依赖镜像里没有的 node/npm。
+RUN cd packages/addon \
+    && bun ../../tools/assets/sync-vfx-assets.mjs --host-only \
+    && bun ../../tools/assets/sync-stage-props.mjs --host-only \
+    && bun x bepack build --config bepack.server.config.ts --skip-copy --pack
 
 # ---- 运行阶段 ----
 # 用 Debian（glibc）而不是 Alpine：AMT 官方的 amt-cli / libonnxruntime.so 是 glibc 构建
@@ -48,6 +54,8 @@ COPY --from=builder /app/packages/assembly/dist packages/assembly/dist
 COPY --from=builder /app/packages/assembly/package.json packages/assembly/
 COPY --from=builder /app/packages/assembly/src packages/assembly/src
 COPY --from=builder /app/packages/studio/dist packages/studio/dist
+# 内置服务器底包：deployment 在 src/services 下按 ../../../addon/dist/server.mcaddon 找
+COPY --from=builder /app/packages/addon/dist/server.mcaddon packages/addon/dist/server.mcaddon
 COPY --from=builder /app/build/plugins build/plugins
 
 # 运行阶段没有 plugins/ 源码目录；补一个占位 workspace，避免 bun 报 "Workspace not found"

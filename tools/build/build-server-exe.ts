@@ -85,6 +85,7 @@ try {
         define: {
             __PIANOBE_WEB__: JSON.stringify("../../web"),
             __PIANOBE_VERSION__: JSON.stringify(version),
+            __PIANOBE_TEMPLATE__: JSON.stringify("../../../addon/dist/server.mcaddon"),
         },
         compile: {
             outfile,
@@ -104,19 +105,21 @@ const size = statSync(outfile).size;
 console.log(`✔ ${outfile}`);
 console.log(`  v${version} · ${(size / 1024 / 1024).toFixed(1)} MiB（${size} 字节）`);
 
-// 立即自检内嵌前端：布局写错（Bun 改了 $bunfs 结构、assets 目录改名）就在构建阶段失败，
-// 而不是部署后才白屏。在空目录里跑，确保不读到仓库里的前端。
-const checkDir = mkdtempSync(join(tmpdir(), "pianobe-web-check-"));
+// 立即自检内嵌资源（前端 + 服务器底包）：布局写错（Bun 改了 $bunfs 结构、assets 改名）
+// 就在构建阶段失败，而不是部署后才白屏/装不出包。在空目录里跑，确保不读到仓库里的文件。
+const checkDir = mkdtempSync(join(tmpdir(), "pianobe-assets-check-"));
 try {
-    const check = spawnSync(outfile, ["--check-web"], {
+    const check = spawnSync(outfile, ["--check-assets"], {
         cwd: checkDir,
         env: { ...process.env, WEB_ROOT: "" },
         encoding: "utf8",
     });
     if (check.status !== 0) {
-        throw new Error(`内嵌前端自检失败：${(check.stderr || check.stdout).trim()}`);
+        throw new Error(
+            `内嵌资源自检失败：${(check.stderr || check.stdout).trim() || `exit ${check.status}`}`,
+        );
     }
-    console.log(`  内嵌前端自检通过：${check.stdout.trim()}`);
+    console.log(check.stdout.trim().replace(/^/gm, "  "));
 } finally {
     rmSync(checkDir, { recursive: true, force: true });
 }

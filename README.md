@@ -55,7 +55,8 @@ FluidR3 GM，各音色的来源与授权见 `packages/addon/rp/THIRD_PARTY_NOTIC
 # 启动后端（Docker，根目录 compose；镜像内含 core/web 构建产物）
 docker compose up -d
 # 管理页 http://<host>:35050 登录 → 上传曲目、生成导入码、签发令牌
-# （不设 BOOTSTRAP_TOKEN 时首次启动会自动生成随机管理员令牌，打印在 docker logs 里）
+# （不设 BOOTSTRAP_TOKEN 时首次启动自动生成，写入容器 data/bootstrap-token.txt，
+#   对应宿主机 ./packages/server/data/bootstrap-token.txt）
 
 # 构建并直接部署到 BDS（本机后端直接写文件，不上传、不需要令牌）
 npm run deploy:bds

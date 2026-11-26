@@ -20,7 +20,7 @@ bun src/index.ts --dir ./run
 > 配置读取运行目录 `.env`（或环境变量，见仓库根 `.env.example`），bun 启动时自动加载。
 > 首次启动未设置 `BOOTSTRAP_TOKEN` 时，会自动生成一个管理员令牌并写入 `data/bootstrap-token.txt`（权限 600）；
 > 有 TTY 时同时打印到控制台。登录后在管理页重置令牌并删除该文件。
-> 查看版本：`./pianobe-server --version`；确认前端目录：`./pianobe-server --check-web`。
+> 查看版本：`./pianobe-server --version`；确认内嵌资源：`./pianobe-server --check-assets`（输出前端目录与服务器底包）。
 > 用该令牌登录管理页（或直接作为 `Authorization: Bearer <token>` 调用 API）。
 
 ## 运行目录模型（MC Server 风格）
@@ -58,8 +58,9 @@ docker compose -f docker-compose.dev.yml up
 > 只是转录接口会返回「AMT 不可用」。
 > 构建时 apt 默认走南大镜像（替换 `deb.debian.org`），海外机器可用
 > `docker build --build-arg DEBIAN_MIRROR=https://deb.debian.org` 还原。
-> 镜像只包含后端依赖树（core / server / web）：addon 是预构建产物，不进入
-> 镜像，sapi-pro、@minecraft/* 等 addon 依赖也不会被安装。
+> 镜像只包含后端依赖树（core / server / web）和零插件服务器底包 `server.mcaddon`
+> （构建阶段用 bepack 现场生成，管理页无需先上传模板）；addon 源码与 sapi-pro、
+> `@minecraft/*` 等仅在构建阶段使用，不进入运行镜像。
 
 ## 数据存储
 
@@ -80,6 +81,7 @@ docker compose -f docker-compose.dev.yml up
 | `DB_PATH` | `<data>/piano.db` | SQLite 文件路径（曲目 meta/内容/令牌） |
 | `PLUGINS_DIR` | `<home>/plugins` | 外置插件目录（`.pbeplugin`） |
 | `PLUGIN_REGISTRY_URL` | 无 | 可选远程插件清单 URL（如 `https://.../plugins/index.json`） |
+| `SERVER_TEMPLATE_PATH` | 无 | 自定义服务器底包 `server.mcaddon` 路径；优先于内置模板，低于管理页上传 |
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌；未设置时首次启动生成并写入 `data/bootstrap-token.txt`（600） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
 | `WEB_ROOT` | 见下 | 前端构建产物目录；相对路径按当前工作目录解析，设了但无 `index.html` 会直接退出 |
@@ -113,6 +115,13 @@ docker compose -f docker-compose.dev.yml up
 - 设了 `WEB_ROOT`：就用它；目录里没有 `index.html` 直接退出（配置错了不静默降级）
 - 单文件产物：构建时注入内嵌的 `web/`（产物内 `$bunfs/root/web`）
 - 仓库内直接运行：固定 `packages/studio/dist`，没构建就只有 API、页面 404
+
+服务器底包（`server.mcaddon`）同理，只有三个来源，按优先级：
+
+1. 管理页上传的 `<data>/server-template.mcaddon`
+2. `SERVER_TEMPLATE_PATH` 指定的文件
+3. 内置：单文件产物内嵌、仓库 `packages/addon/dist/server.mcaddon`、Docker 镜像内置
+   （源码镜像构建时会跑 `bepack` 生成，不需要先上传；缺失时启动日志会明确告警）
 
 ## 开发与生产
 

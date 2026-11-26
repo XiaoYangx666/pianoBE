@@ -1,16 +1,11 @@
 node_modules
+**/node_modules
 .git
 .gitignore
-bp/scripts
-# 只把 addon 的采样保留在构建上下文里：web 的 /piano 静态目录由
-# tools/assets/sync-web-samples.mjs 从这里生成（其余 addon 内容无需进镜像）。
-packages/addon/*
-!packages/addon/rp
-packages/addon/rp/*
-!packages/addon/rp/sounds
-# 可选音色采样：pack:plugins 打 pianobe.timbre.* 时需要
-!packages/addon/timbre-samples
+# addon 源码进构建上下文：镜像内要构建服务器底包 server.mcaddon（管理页无需先上传模板）。
+# 构建产物与脚本缓存不必进上下文，镜像里会重新生成。
 packages/addon/dist
+packages/addon/bp/scripts
 packages/server/dist
 packages/server/data
 midis/files

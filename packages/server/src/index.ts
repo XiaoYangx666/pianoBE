@@ -10,7 +10,7 @@ import { createApp } from "./app.js";
 import { AmtService } from "./services/amt.js";
 import { TranscribeJobStore } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
-import { DeploymentService } from "./services/deployment.js";
+import { DeploymentService, resolveServerTemplate } from "./services/deployment.js";
 
 // 版本号：单文件产物由构建脚本注入；源码运行读 packages/server/package.json
 declare const __PIANOBE_VERSION__: string | undefined;
@@ -38,9 +38,9 @@ const config = loadConfig(process.env, argv);
 //   1. WEB_ROOT（环境变量 / .env）：显式指定，Docker 与本地源码部署都用这个
 //   2. 单文件产物：构建脚本 __PIANOBE_WEB__ 注入内嵌目录（$bunfs/root/web）
 //   3. 仓库内直接运行：固定为 packages/studio/dist
-// 这段放在建日志器之前，好让 --check-web 只输出一行路径供构建脚本自检。
+// 这段放在建日志器之前，好让 --check-assets 只输出结果供构建脚本自检。
 declare const __PIANOBE_WEB__: string | undefined;
-const checkWebOnly = argv.includes("--check-web");
+const checkAssets = argv.includes("--check-assets") || argv.includes("--check-web");
 const explicitWebRoot = config.webRoot;
 if (explicitWebRoot) {
     config.webRoot = resolve(explicitWebRoot);
@@ -52,20 +52,26 @@ if (explicitWebRoot) {
 }
 const resolvedWebRoot = config.webRoot;
 let webNote = `前端目录: ${resolvedWebRoot}${explicitWebRoot ? "（WEB_ROOT）" : ""}`;
+let webError: string | undefined;
 if (!existsSync(resolve(resolvedWebRoot, "index.html"))) {
-    const message = explicitWebRoot
+    webError = explicitWebRoot
         ? `WEB_ROOT 无效：${resolvedWebRoot} 下没有 index.html`
         : `前端未构建：${resolvedWebRoot} 下没有 index.html（先 npm run build:studio，或用 WEB_ROOT 指定）`;
-    if (explicitWebRoot || checkWebOnly) {
-        console.error(message);
+    if (explicitWebRoot && !checkAssets) {
+        console.error(webError);
         process.exit(1);
     }
-    webNote = message;
-    config.webRoot = undefined;
+    if (!checkAssets) {
+        webNote = webError;
+        config.webRoot = undefined;
+    }
 }
-if (checkWebOnly) {
-    console.log(config.webRoot);
-    process.exit(0);
+if (checkAssets) {
+    const template = resolveServerTemplate(config);
+    console.log(`web=${config.webRoot ?? "missing"}${webError ? " (invalid)" : ""}`);
+    console.log(`template=${template.path ?? "missing"}${template.source ? ` (${template.source})` : ""}`);
+    if (webError) console.error(webError);
+    process.exit(webError || !template.path ? 1 : 0);
 }
 
 const log = createLogger({
@@ -123,6 +129,12 @@ const songPort = new SqliteSongPort(db, log.scope("db"));
 const pluginService = new PluginService(songPort, config, log.scope("plugins"));
 pluginService.syncDirectory();
 const deploymentService = new DeploymentService(songPort, pluginService, config);
+const template = resolveServerTemplate(config);
+if (template.path) {
+    log.info(`服务器底包: ${template.path}（${template.source}）`);
+} else {
+    log.warn("未找到服务器底包 server.mcaddon：请先构建模板或从管理页上传，否则无法装配部署包");
+}
 const amt = new AmtService(config);
 const amtStatus = amt.status();
 if (amtStatus.available) {
