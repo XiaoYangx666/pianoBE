@@ -395,7 +395,7 @@ export function TranscribePage() {
                     <div className="font-semibold">服务端 AMT 不可用</div>
                     <div className="mt-1 text-ore-dim">
                         {status.message ??
-                            "请运行 npm run sync:amt 同步 amt-cli 与模型，或通过 AMT_CLI / AMT_MODEL 指定路径。"}
+                            "请确认已安装 amt-cli 依赖（npm install），或通过 AMT_CLI / AMT_MODEL 指定路径。"}
                     </div>
                 </div>
             )}

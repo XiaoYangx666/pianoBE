@@ -23,9 +23,8 @@ bun src/index.ts
 
 ```bash
 # 根目录 compose（Dockerfile / docker-compose.yml / .env 均在仓库根）。
-# 镜像构建时在容器内编译 core/web 产物，无需本地预构建。
-# 需要音频转录时，先同步 Linux 版 AMT（见下方「音频转 MIDI」）：
-AMT_PLATFORM=linux npm run sync:amt -w @piano/server
+# 镜像构建时在容器内编译 core/web 产物，无需本地预构建；
+# AMT（音频转录）由 npm 依赖 amt-cli 在构建时自动下载，无需预先同步。
 docker compose up -d
 # 访问 http://<host>:35050（对外映射 35050 → 容器内 3000）
 # 数据落在 ./packages/server/data/（挂载卷），忘记令牌改 .env 重启即可重置
@@ -34,8 +33,11 @@ docker compose up -d
 docker compose -f docker-compose.dev.yml up
 ```
 
-> 运行阶段是 Debian（glibc），已包含 Linux 版 `amt-cli`、`libonnxruntime.so` 与
-> int8 模型；未同步 AMT 时镜像仍可构建，只是转录接口会返回「AMT 不可用」。
+> 运行阶段是 Debian（glibc），`bun install --production` 会安装 `amt-cli`
+> （Linux x64 二进制 + `libonnxruntime.so` + int8 模型）；安装失败时镜像仍可构建，
+> 只是转录接口会返回「AMT 不可用」。
+> 构建时 apt 默认走南大镜像（替换 `deb.debian.org`），海外机器可用
+> `docker build --build-arg DEBIAN_MIRROR=https://deb.debian.org` 还原。
 > 镜像只包含后端依赖树（core / server / web）：addon 是预构建产物，不进入
 > 镜像，sapi-pro、@minecraft/* 等 addon 依赖也不会被安装。
 
@@ -57,8 +59,8 @@ docker compose -f docker-compose.dev.yml up
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
 | `WEB_ROOT` | 无 | 前端构建产物目录（不存在则不托管） |
-| `AMT_CLI` | `./amt/amt-cli[.exe]` | AMT Rust CLI 路径（也可在 PATH 中查找） |
-| `AMT_MODEL` | `./amt/run4_int8.onnx` | ONNX 模型路径（找不到 int8 时回退 `run4_best.onnx`） |
+| `AMT_CLI` | npm 包 `amt-cli` | AMT Rust CLI 路径（默认用依赖内置的当前平台二进制，也可在 PATH 中查找） |
+| `AMT_MODEL` | 包内 `models/run4_int8.onnx` | ONNX 模型路径 |
 | `AMT_DECODER` | `native` | `native` 内置解码（mp3/m4a/flac/wav/ogg）；`ffmpeg` 外部解码 |
 | `AMT_THREADS` | `4` | 转录线程数 |
 | `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
@@ -145,30 +147,26 @@ MIDI 暂存在临时目录，管理页可试听、改名、生成导入码，确
 任务 30 分钟无更新自动清理。进度来自 `amt-cli --events` 的实时音符事件，
 按「已解码音频时间 / 总时长」估算百分比（总时长未知时显示不确定进度）。
 
-```bash
-# 同步 CLI + ONNX Runtime + int8 模型到 packages/server/amt/（按当前平台自动选 Windows/Linux）
-# PowerShell:
-$env:AMT_DIR="E:\Project\muscriptor\Automated-Music-Transcription"; npm run sync:amt -w @piano/server
-# bash:
-AMT_DIR=/path/to/Automated-Music-Transcription npm run sync:amt -w @piano/server
+CLI、ONNX Runtime 与 int8 模型都来自 npm 包
+[`amt-cli`](https://www.npmjs.com/package/amt-cli)（`@piano/server` 的依赖），
+`npm install` / `bun install` 后即自动就绪，不再需要 `AMT_DIR` 或同步脚本：
 
-# 交叉准备 Linux 版（在 Windows 上为 Docker 打包；会自动解压 dist/*-linux-x64.tar.gz）
-$env:AMT_PLATFORM="linux"; npm run sync:amt -w @piano/server
+```bash
+npm install     # 安装依赖（含 amt-cli 与当前平台二进制，约 40 MB）
+npm run start:server
 ```
 
-同步脚本优先使用 `models/run4_int8.onnx`（3.9 MB，同 chunk 约快 1.3×、内存更低），
-缺失时回退 `run4_best.onnx`；二进制优先取 `rust/target/release`，其次取
-`dist/amt-cli-*-{win,linux}-x64/` 预编译包。Windows 拷 `onnxruntime.dll`，
-Linux 拷 `libonnxruntime.so*` 并自动补 `libonnxruntime.so` 别名。
+解析顺序为 `AMT_CLI` → 依赖包内 `${platform}-${arch}/` 二进制 → `PATH`；模型优先
+`models/run4_int8.onnx`。npm tarball 不带执行位，服务启动解析时会自动 `chmod +x`。
 
 B 站解析流程：`finger/spi` 取匿名 buvid → `view` 取 cid/title → `playurl`（DASH）
 选最高码率音轨 → 带 Referer 下载 fMP4（`.m4s`）→ 直接交给 `amt-cli`。
 普通音轨无需登录；杜比 / Hi-Res 需 `BILI_SESSDATA`。接口请求在进程内串行并限速
 1 秒/次，转录任务默认排队串行执行（内存占用约 150 MB/任务）。
 
-> Docker 镜像已改用 Debian（glibc）运行阶段并内置 Linux 版 AMT；构建前先执行
-> `AMT_PLATFORM=linux npm run sync:amt -w @piano/server`。服务端会自动跳过平台
-> 不匹配的二进制并给出提示，Windows 版 `.exe` 不会在容器里被误用。
+> Docker 镜像的运行阶段是 Debian（glibc），`bun install --production` 会从 npm
+> 安装当前平台（linux-x64）的 `amt-cli`、`libonnxruntime.so` 与 int8 模型；
+> Windows 版文件不会进入运行环境。
 
 ## 一致性设计
 

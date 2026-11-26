@@ -30,9 +30,9 @@ export interface ServerConfig {
     allowPublicRead: boolean;
     /** web 构建产物静态目录（不存在则不托管） */
     webRoot?: string;
-    /** amt-cli 可执行文件路径；默认在 ./amt/ 与 PATH 中查找 */
+    /** amt-cli 可执行文件路径；留空时使用 npm 依赖 amt-cli 内置的当前平台二进制 */
     amtCli?: string;
-    /** AMT ONNX 模型路径；默认在 amt-cli 同目录与 ./amt/ 中查找 */
+    /** AMT ONNX 模型路径；留空时使用 amt-cli 包内的 run4_int8.onnx */
     amtModel?: string;
     /** amt-cli 解码器：native（纯 Rust，默认）或 ffmpeg（外部 ffmpeg） */
     amtDecoder: "native" | "ffmpeg";

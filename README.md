@@ -158,28 +158,17 @@ npm run start:server                   # http://127.0.0.1:3000，日志在 packa
 
 ### 音频转 MIDI（AMT）资源
 
-音频转录（生成器浏览器端 + server 端 Rust CLI）依赖 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription) 的模型与运行时。这些文件体积较大且模型为 CC BY-NC 4.0，不随仓库提交：
+服务端转录依赖 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription) 的运行时，现已发布为 npm 包 [`amt-cli`](https://www.npmjs.com/package/amt-cli)：主包（启动器 + int8 模型）通过 `optionalDependencies` 按平台拉取 `@xiaoyangx666/amt-cli-{linux,win32}-x64`，只下载当前平台的二进制与 ONNX Runtime（解压后约 40 MB）。`@piano/server` 直接声明该依赖，`npm install` 后即可用，不需要再单独同步：
 
 ```bash
-# 指向本地 AMT 仓库（Windows 需已 cargo build --release；Linux 可用上游 dist 预编译包）
-# PowerShell:
-$env:AMT_DIR="E:\Project\muscriptor\Automated-Music-Transcription"
-# bash:
-export AMT_DIR=/path/to/Automated-Music-Transcription
-
-npm run sync:amt
-# 生成器 → packages/generator/public/amt/（模型 + ONNX Runtime WASM，浏览器端不变）
-# 后端   → packages/server/amt/（amt-cli + onnxruntime.dll/.so + int8 模型）
-
-# 为 Docker / Linux 准备（在 Windows 上交叉同步 Linux 版，自动解压 dist tar.gz）
-$env:AMT_PLATFORM="linux"; npm run sync:amt -w @piano/server   # PowerShell
-# AMT_PLATFORM=linux npm run sync:amt -w @piano/server          # bash
+npm install            # 安装 workspace 依赖（含 amt-cli）
+npm run build:core
+npm run start:server
 ```
 
-后端按当前平台自动选 `amt-cli` / `amt-cli.exe` 与 `.dll` / `.so`，模型优先
-`run4_int8.onnx`（约 3.9 MB），缺失时回退 `run4_best.onnx`；平台不匹配的二进制
-会被跳过并在状态接口里提示。未同步时两个页面会显示「AMT 不可用」，其他功能不受影响。
-服务器端也可用 `AMT_CLI` / `AMT_MODEL` 直接指定二进制与模型路径。
+后端按 `process.platform-process.arch` 自动选择包内二进制（`linux-x64` / `win32-x64`）与 `models/run4_int8.onnx`；npm tarball 不保留普通文件的执行位，首次解析时会自动补 `chmod +x`。也可用 `AMT_CLI` / `AMT_MODEL` 覆盖（例如指向本地 cargo 构建的二进制）。Docker 镜像构建时由 `bun install --production` 自动下载，无需预置任何文件。
+
+浏览器端转录使用 `packages/studio/public/amt/` 下的 fp16 模型与 ONNX Runtime WASM，仍由 `packages/studio/scripts/sync.mjs` 从本地 AMT 仓库（`AMT_DIR`）复制；缺失时页面只显示「AMT 不可用」，不影响其他功能。
 
 > 模型权重来自 gityag/AMT，为 **CC BY-NC 4.0，仅限非商业使用**。随 release 或镜像
 > 分发模型时，请一并提供 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 中的署名

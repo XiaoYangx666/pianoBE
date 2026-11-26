@@ -10,13 +10,13 @@
         "dev": "bun --watch src/index.ts",
         "debug": "bun --inspect src/index.ts",
         "test": "bun test",
-        "typecheck": "tsc --noEmit",
-        "sync:amt": "node scripts/sync-amt.mjs"
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@piano/assembly": "file:../assembly",
         "@piano/core": "file:../core",
         "@piano/vfx": "file:../vfx",
+        "amt-cli": "^0.1.1",
         "hono": "^4.6.0"
     },
     "devDependencies": {

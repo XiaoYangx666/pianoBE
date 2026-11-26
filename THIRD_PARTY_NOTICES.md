@@ -8,7 +8,7 @@
 
 - 来源：[gityag/Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription)
 - 许可：[Creative Commons Attribution-NonCommercial 4.0 International](https://creativecommons.org/licenses/by-nc/4.0/)
-- 涉及文件（不随仓库提交，通过 release / `npm run sync:amt` 获取）：
+- 涉及文件（不随仓库提交；服务端通过 npm 依赖 `amt-cli` 获取，浏览器端由构建脚本生成）：
   - `run4_best.onnx` — 原始 fp32 权重
   - `run4_int8.onnx` — 对 `run4_best.onnx` 做 QDQ 静态量化得到（修改版本）
   - `run4_best_fp16.onnx` — 浏览器端 fp16 版本（修改版本）

@@ -1,5 +1,6 @@
 import {
     accessSync,
+    chmodSync,
     closeSync,
     constants,
     existsSync,
@@ -54,10 +55,7 @@ interface AmtRuntime {
     model: string;
 }
 
-const PACKAGE_ROOT = resolve(import.meta.dir, "../..");
-
-/** 模型优先级：静态 int8（约 3.9 MB，默认）→ fp32 回退（约 15 MB） */
-const AMT_MODEL_NAMES = ["run4_int8.onnx", "run4_best.onnx"] as const;
+/** 模型优先级：静态 int8（约 3.9 MB，默认）→ fp32 回退（约 15 MB） */const AMT_MODEL_NAMES = ["run4_int8.onnx", "run4_best.onnx"] as const;
 
 function firstExisting(paths: Array<string | undefined>): string | undefined {
     for (const p of paths) {
@@ -111,51 +109,150 @@ interface AmtResolution {
     message?: string;
 }
 
-/** 解析 CLI 与模型路径（支持环境变量、包内 amt/ 目录、vendor/ 和 PATH） */
+/** 手动按 node_modules 向上查找，编译成单文件后 require.resolve 不可用 */
+function findPackagePath(spec: string): string | undefined {
+    for (const start of [process.cwd(), dirname(process.execPath), import.meta.dir]) {
+        let dir = start;
+        for (;;) {
+            const candidate = join(dir, "node_modules", spec);
+            if (existsSync(candidate)) return candidate;
+            const parent = dirname(dir);
+            if (parent === dir) break;
+            dir = parent;
+        }
+    }
+    return undefined;
+}
+
+/** npm tarball 不保留普通文件的执行位，首次运行时补上（只读安装则留待权限检查报错）。 */
+function ensureExecutable(file: string): void {
+    if (process.platform === "win32" || isExecutable(file)) return;
+    try {
+        chmodSync(file, 0o755);
+    } catch {
+        // 只读安装（全局 prefix 等）可能失败，交由调用方检查
+    }
+}
+
+/** 读取已安装包的 package.json（用于发现分平台可选依赖），失败返回 undefined */
+function readPackageJson(file: string): { optionalDependencies?: Record<string, string> } | undefined {
+    try {
+        return JSON.parse(readFileSync(file, "utf8")) as { optionalDependencies?: Record<string, string> };
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * 从 npm 依赖 amt-cli 解析二进制与模型。
+ * 0.1.1+：二进制放在分平台 optionalDependency（如 @xiaoyangx666/amt-cli-linux-x64），
+ * 模型仍由 amt-cli 主包提供；0.1.0 的包内 `${platform}-${arch}/` 目录作为回退。
+ */
+function resolveNpmPackage(config: ServerConfig): AmtResolution {
+    const pkgJson = findPackagePath("amt-cli/package.json");
+    if (!pkgJson) return {};
+    const root = dirname(pkgJson);
+    const target = `${process.platform}-${process.arch}`;
+    const exe = process.platform === "win32" ? "amt-cli.exe" : "amt-cli";
+
+    // 分平台包名从 optionalDependencies 里取，避免服务端硬编码发布者的 scope
+    const optional = readPackageJson(pkgJson)?.optionalDependencies ?? {};
+    const platformPkg = Object.keys(optional).find((name) => name.endsWith(`amt-cli-${target}`));
+
+    let cli: string;
+    if (platformPkg) {
+        try {
+            const platformJson = findPackagePath(`${platformPkg}/package.json`);
+            if (!platformJson) throw new Error("missing");
+            cli = join(dirname(platformJson), exe);
+        } catch {
+            return {
+                message: `未安装 amt-cli 的当前平台可选依赖 ${platformPkg}（${target}）：请重新 npm install，且不要使用 --omit=optional`,
+            };
+        }
+        if (!existsSync(cli)) {
+            return { message: `可选依赖 ${platformPkg} 缺少二进制：${cli}` };
+        }
+    } else {
+        // 0.1.0 的包内布局：amt-cli/${platform}-${arch}/${exe}
+        cli = join(root, target, exe);
+        if (!existsSync(cli)) {
+            return { message: `amt-cli 依赖不含当前平台（${target}）的二进制：${cli}` };
+        }
+    }
+
+    const model = firstExisting([
+        config.amtModel ? resolve(config.amtModel) : undefined,
+        ...AMT_MODEL_NAMES.map((name) => join(root, "models", name)),
+    ]);
+    if (!model) {
+        return { message: `amt-cli 依赖缺少模型（${AMT_MODEL_NAMES.join(" / ")}）：${join(root, "models")}` };
+    }
+    ensureExecutable(cli);
+    return { runtime: { cli, model } };
+}
+
+/** 手工指定（AMT_CLI）时的模型查找：同目录、models/ 子目录与上级 models/ */
+function findModel(config: ServerConfig, cli: string): string | undefined {
+    return firstExisting([
+        config.amtModel ? resolve(config.amtModel) : undefined,
+        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), name)),
+        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), "models", name)),
+        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), "..", "models", name)),
+    ]);
+}
+
+/** 解析 CLI 与模型路径：AMT_CLI > npm 依赖 amt-cli > PATH */
 function resolveRuntime(config: ServerConfig): AmtResolution {
     const exeNames = process.platform === "win32" ? ["amt-cli.exe", "amt-cli"] : ["amt-cli"];
-    const autoCandidates = [
-        ...exeNames.map((name) => join(PACKAGE_ROOT, "amt", name)),
-        ...exeNames.map((name) => join(PACKAGE_ROOT, "..", "..", "vendor", "amt", name)),
-        ...pathCandidates(exeNames),
-    ];
 
-    let cli: string | undefined;
     if (config.amtCli) {
-        cli = resolve(config.amtCli);
+        const cli = resolve(config.amtCli);
         if (!existsSync(cli)) {
             return { message: `AMT_CLI 指向的文件不存在：${cli}` };
         }
         if (!platformMatches(cli)) {
             return { message: `AMT_CLI 与本机平台不匹配（当前 ${process.platform}）：${cli}` };
         }
-    } else {
-        cli = autoCandidates.find((p) => existsSync(p) && platformMatches(p));
-        if (!cli) {
-            const wrong = autoCandidates.find((p) => existsSync(p) && !platformMatches(p));
+        if (!isExecutable(cli)) {
+            return { message: `amt-cli 缺少执行权限：chmod +x ${cli}` };
+        }
+        const model = findModel(config, cli);
+        if (!model) {
             return {
-                message: wrong
-                    ? `找到的 amt-cli 与本机平台不匹配（当前 ${process.platform}）：${wrong}；请重新运行 npm run sync:amt（Docker 用 AMT_PLATFORM=linux）`
-                    : "未找到 amt-cli：请运行 npm run sync:amt，或设置 AMT_CLI",
+                message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：请设置 AMT_MODEL`,
             };
         }
+        return { runtime: { cli, model } };
+    }
+
+    const fromNpm = resolveNpmPackage(config);
+    if (fromNpm.runtime) {
+        if (!isExecutable(fromNpm.runtime.cli)) {
+            return { message: `amt-cli 缺少执行权限：chmod +x ${fromNpm.runtime.cli}` };
+        }
+        return fromNpm;
+    }
+
+    const autoCandidates = pathCandidates(exeNames);
+    const cli = autoCandidates.find((p) => existsSync(p) && platformMatches(p));
+    if (!cli) {
+        const wrong = autoCandidates.find((p) => existsSync(p) && !platformMatches(p));
+        return {
+            message: wrong
+                ? `找到的 amt-cli 与本机平台不匹配（当前 ${process.platform}）：${wrong}`
+                : (fromNpm.message ?? "未找到 amt-cli：请安装 amt-cli 依赖（npm install），或设置 AMT_CLI"),
+        };
     }
 
     if (!isExecutable(cli)) {
         return { message: `amt-cli 缺少执行权限：chmod +x ${cli}` };
     }
 
-    const model = firstExisting([
-        config.amtModel ? resolve(config.amtModel) : undefined,
-        ...AMT_MODEL_NAMES.map((name) => join(PACKAGE_ROOT, "amt", name)),
-        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), name)),
-        ...AMT_MODEL_NAMES.map((name) => join(PACKAGE_ROOT, "amt", "models", name)),
-        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), "models", name)),
-        ...AMT_MODEL_NAMES.map((name) => join(dirname(cli), "..", "models", name)),
-    ]);
+    const model = findModel(config, cli);
     if (!model) {
         return {
-            message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：请运行 npm run sync:amt，或设置 AMT_MODEL`,
+            message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：请安装 amt-cli 依赖，或设置 AMT_MODEL`,
         };
     }
 
@@ -182,7 +279,7 @@ export class AmtService {
             eco: this.config.amtEco,
             message: this.runtime
                 ? undefined
-                : (this.resolutionMessage ?? "未找到 amt-cli 或 ONNX 模型：请运行 npm run sync:amt，或设置 AMT_CLI / AMT_MODEL"),
+                : (this.resolutionMessage ?? "未找到 amt-cli 或 ONNX 模型：请安装 amt-cli 依赖（npm install），或设置 AMT_CLI / AMT_MODEL"),
         };
     }
 

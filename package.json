@@ -56,7 +56,6 @@
         "build:studio": "npm run build -w @piano/studio",
         "sync:samples": "node tools/assets/sync-web-samples.mjs",
         "build:timbres": "node tools/audio/build-piano-timbres.mjs",
-        "sync:amt": "npm run sync:amt -w @piano/server",
         "verify:timbres": "bun tools/verify/verify-timbres.mjs",
         "audio-lab:assets": "node tools/audio/build-audio-lab-assets.mjs",
         "audio-lab:render": "node tools/audio/audio-lab-render.mjs",
