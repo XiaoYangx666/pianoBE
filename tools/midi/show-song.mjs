@@ -6,7 +6,7 @@ import path from "node:path";
 const libDir = path.resolve("./midis/library");
 const indexPath = path.join(libDir, "index.json");
 if (!fs.existsSync(indexPath)) {
-    console.error("❌ 曲库不存在，请先 run npm run convert");
+    console.error("❌ 曲库不存在，请先运行 npm run midi -- convert");
     process.exit(1);
 }
 const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));

@@ -148,6 +148,7 @@ npm run build:dev           # 开发包（基于 template.mcaddon 自动装入�
 npm run build               # 一键装配满血开发包并复制到本地 Minecraft 开发目录
 npm run build:server:exe    # 单文件服务端（仅含后端 + 精简管理页 + 零插件 server.mcaddon）
 npm run build:web           # VFX Lab 开发预览工具
+npm run docker:single       # 编译单文件二进制并构建 Docker 镜像
 
 # Studio 两种构建（玩家网页版 / 服务器管理版）
 npm run build:studio        # dist/：面向普通玩家（零插件底包、官方插件、浏览器转录 AMT）
@@ -251,19 +252,19 @@ docker compose -f docker-compose.dev.yml up
 | `packages/addon/bp/scripts/packages/addon/src/midis/` | 客户端构建直接从公共曲库生成的运行时模块 | 不入库 |
 | `midis/library/` | PBE3 曲库 `<id>.pbe3` + `index.json` + 人工分类表 `genres.json` | **入库**（生成器数据源） |
 
-原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
+原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run midi -- convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
 
 ### 添加歌曲
 
 ```bash
 # 单首
-npm run add-song -- <歌曲.mid>
+npm run midi -- add-song <歌曲.mid>
 
 # 批量（多个文件或整个目录）
-npm run add-song -- ./目录A/ ./目录B/歌曲.mid
+npm run midi -- add-song ./目录A/ ./目录B/歌曲.mid
 
 # 查看入库结果（按曲名关键词或 ID 搜索）
-npm run show-song -- <关键词>
+npm run midi -- show-song <关键词>
 ```
 
 命令说明：
@@ -280,13 +281,13 @@ npm run show-song -- <关键词>
 - addon 只解压一次并在 `SongCache` 中共享；每架钢琴持有独立 `Pbe3EventCursor`，跳转使用 5 秒稀疏索引。
 - 在线生成器曲目条目上的「码」按钮可导出分段导入码；游戏内钢琴面板 →「导入 MIDI」逐段粘贴。
 - 普通玩家导入权限由管理员命令 `/pbe:pbe_setting` 控制（默认关闭，管理员始终允许）。
-- 基准：`npm run bench:pbe3`。
+- 基准：`npm run midi -- bench`。
 
 ### 全量重建（本地维护）
 
 ```bash
-npm run convert           # 以 midis/files 全量重建曲库与 addon 模块
-npm run convert -- --force  # 输入数量少于现有曲库时的保护需显式确认
+npm run midi -- convert           # 以 midis/files 全量重建曲库与 addon 模块
+npm run midi -- convert --force  # 输入数量少于现有曲库时的保护需显式确认
 ```
 
 全量转换在输入文件数少于现有曲库时拒绝执行（防止误清空），确认重建需追加 `--force`。

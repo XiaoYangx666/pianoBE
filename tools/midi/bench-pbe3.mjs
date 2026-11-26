@@ -1,5 +1,5 @@
 // PBE3 全曲库性能基准：编码体积、解压/索引耗时、SongCache 常驻内存、多钢琴共享。
-// 用法：npm run bench:pbe3
+// 用法：npm run midi -- bench
 import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";

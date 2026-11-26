@@ -21,7 +21,7 @@ node tools/assets/build-vfx-lab.mjs --check
 npm run sync:vfx-assets
 
 # 导出演出曲目的 PBE3 v3 演出区块
-npm run export:performance
+npm run midi -- export-performance
 
 # 构建与打包校验内置 .pbeplugin 插件包
 npm run build:plugins

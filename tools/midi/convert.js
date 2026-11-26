@@ -12,8 +12,8 @@ import { midiBufferToSong } from "@piano/core/convert";
 // 用法：
 //   node tools/convert.js [--force]           # 全量重建：midis/files → midis/js + midis/library
 //   （注意：全量会清空重建曲库！只用于本地拥有完整 midis/files 的情况；
-//     增量添加单首/批量请用 npm run add-song）
-// const 单文件参数不再支持：请用 npm run add-song -- <xx.mid>
+//     增量添加单首/批量请用 npm run midi -- add-song）
+// const 单文件参数不再支持：请用 npm run midi -- add-song <xx.mid>
 const positionalArgs = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 const inputArg = positionalArgs[0] || "./midis/files";
 const force = process.argv.includes("--force");
@@ -23,7 +23,7 @@ const libDir = path.resolve(process.argv[4] || "./midis/library");
 const inputPath = path.resolve(inputArg);
 const inputIsDir = fs.statSync(inputPath).isDirectory();
 if (!inputIsDir) {
-    console.error(`❌ 单文件模式已移除：请用 npm run add-song -- ${inputArg}`);
+    console.error(`❌ 单文件模式已移除：请用 npm run midi -- add-song ${inputArg}`);
     process.exit(1);
 }
 const inputDir = inputPath;
@@ -33,7 +33,7 @@ const files = fs
     .sort((a, b) => a.localeCompare(b, "zh"));
 if (files.length === 0) {
     console.error(`❌ 没有可转换的 .mid/.midi 文件: ${inputPath}`);
-    console.error("   增量添加请用: npm run add-song -- <xx.mid>");
+    console.error("   增量添加请用: npm run midi -- add-song <xx.mid>");
     process.exit(1);
 }
 
@@ -46,7 +46,7 @@ if (fs.existsSync(indexPath) && !force) {
         console.error(
             `❌ 保护：midis/files 只有 ${files.length} 个文件，现有曲库 ${existing} 首。\n` +
                 `   全量重建会把曲库清空成 ${files.length} 首！\n` +
-                `   · 只想添加新歌 → 用 npm run add-song -- <xx.mid>\n` +
+                `   · 只想添加新歌 → 用 npm run midi -- add-song <xx.mid>\n` +
                 `   · 确认要全量重建 → 加 --force 重试`
         );
         process.exit(1);

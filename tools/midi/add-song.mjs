@@ -1,8 +1,8 @@
 // 增量添加曲目到公共曲库。
 // 用法:
-//   npm run add-song -- <文件或目录> [<文件或目录>...]
-//   例: npm run add-song -- ~/Desktop/新歌.mid
-//       npm run add-song -- ./my-midis/ ./one.mid ./two.mid
+//   npm run midi -- add-song <文件或目录> [<文件或目录>...]
+//   例: npm run midi -- add-song ~/Desktop/新歌.mid
+//       npm run midi -- add-song ./my-midis/ ./one.mid ./two.mid
 // 按播放内容归并并保留已有曲目。编排通过独立演出文件交付。
 import fs from "node:fs";
 import path from "node:path";
@@ -20,7 +20,7 @@ const libDir = path.resolve("./midis/library");
 // ---------- 1. 收集待转换文件 ----------
 const args = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 if (args.length === 0) {
-    console.error("用法: npm run add-song -- <文件或目录> [<文件或目录>...]");
+    console.error("用法: npm run midi -- add-song <文件或目录> [<文件或目录>...]");
     process.exit(1);
 }
 const files = new Set();
@@ -83,4 +83,4 @@ fs.writeFileSync(indexPath, JSON.stringify(index, null, 1) + "\n", "utf-8");
 console.log(`\n✅ 完成：新增 ${added} · 跳过(重复) ${skipped} · 曲库现有 ${index.length} 首`);
 console.log("💾 提交（只提交曲库，原始 midi 不入库）:");
 console.log("   git add midis/library && git commit -m \"曲库: 新增歌曲\"");
-console.log("📋 可选检查: npm run show-song -- <曲名关键词>");
+console.log("📋 可选检查: npm run midi -- show-song <曲名关键词>");

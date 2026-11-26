@@ -7,11 +7,11 @@
 
 | 脚本 | 用途 | npm 入口 |
 |---|---|---|
-| `add-song.mjs` | 增量添加/更新曲目（内容 CRC32 去重，贡献者主入口） | `npm run add-song -- <文件或目录>` |
-| `convert.js` | 全量重建 `midis/js` + `midis/library`（需完整源文件） | `npm run convert` |
-| `show-song.mjs` | 按关键词查曲目信息 | `npm run show-song -- <关键词>` |
-| `import-midis.mjs` | 批量上传到 BDS 后端曲库 | `npm run import:midis` |
-| `bench-pbe3.mjs` | PBE3 体积 / SongCache 性能基准 | `npm run bench:pbe3` |
+| `add-song.mjs` | 增量添加/更新曲目（内容 CRC32 去重，贡献者主入口） | `npm run midi -- add-song <文件或目录>` |
+| `convert.js` | 全量重建 `midis/js` + `midis/library`（需完整源文件） | `npm run midi -- convert` |
+| `show-song.mjs` | 按关键词查曲目信息 | `npm run midi -- show-song <关键词>` |
+| `import-midis.mjs` | 批量上传到 BDS 后端曲库 | `npm run midi -- import-midis` |
+| `bench-pbe3.mjs` | PBE3 体积 / SongCache 性能基准 | `npm run midi -- bench` |
 
 ## `model/` — 模型与资源生成
 
@@ -33,11 +33,11 @@
 | 脚本 | 用途 | npm 入口 |
 |---|---|---|
 | `build-piano-timbres.mjs` | 从源采样构建各音色包（addon + web） | `npm run build:timbres` |
-| `build-audio-lab-assets.mjs` | 生成 Audio Lab 试听素材 | `npm run audio-lab:assets` |
-| `audio-lab-render.mjs` | 渲染音色对比音频 | `npm run audio-lab:render` |
-| `audio-lab-analyze.py` | Audio Lab 客观分析 + 报告 | `npm run audio-lab:report` |
+| `build-audio-lab-assets.mjs` | 生成 Audio Lab 试听素材 | `npm run audio-lab -- assets` |
+| `audio-lab-render.mjs` | 渲染音色对比音频 | `npm run audio-lab -- render` |
+| `audio-lab-analyze.py` | Audio Lab 客观分析 + 报告 | `npm run audio-lab -- report` |
 | `loudness_check.py` | 响度校准验证 + A/B 试听生成 | — |
-| `analyze-voice-load.mjs` | 离线声部负载模拟 | `npm run analyze:voices` |
+| `analyze-voice-load.mjs` | 离线声部负载模拟 | `npm run audio-lab -- voices` |
 
 ## `verify/` — 构建与端到端验证
 

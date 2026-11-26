@@ -84,7 +84,7 @@ my_style: {
    ```
 2. 执行导出命令生成 `build/performances/<songId>-performance.pbe3`。可在曲目 ID 后传入另一份编排 JSON 路径，输出文件名会使用该 JSON 的文件名。公共曲库原 PBE3 不会被替换。
    ```sh
-   npm run export:performance -- <songId>
+   npm run midi -- export-performance <songId>
    ```
 3. 在 `/vfx-lab` 导入演出 PBE3 预览。普通歌曲可直接分发 PBE3。需要随曲分发专属资源时，可用现有 `.pbesong` 或 ZIP 放入一个或多个 PBE3 和所需的 `.pbeplugin`。生成器会单独询问是否信任随包插件。
 
