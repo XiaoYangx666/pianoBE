@@ -69,7 +69,7 @@ export interface StudioPlugin {
     author: string;
     description: string;
     license?: string;
-    source: "builtin" | "local" | "upload" | "song";
+    source: "builtin" | "local" | "upload" | "remote" | "song";
     visibility: "public" | "internal";
     installed: boolean;
     enabled: boolean;

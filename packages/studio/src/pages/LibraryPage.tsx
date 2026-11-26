@@ -125,7 +125,7 @@ export function LibraryPage() {
     const addonSet = useMemo(() => new Set(selectedSongIds), [selectedSongIds]);
 
     const officialPacks = useMemo(
-        () => plugins.filter((p) => p.source === "builtin" && p.contents.songs > 0),
+        () => plugins.filter((p) => (p.source === "builtin" || p.source === "remote") && p.contents.songs > 0),
         [plugins],
     );
     const pickerPlugin = useMemo(

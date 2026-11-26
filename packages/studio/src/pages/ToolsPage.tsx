@@ -8,6 +8,7 @@ import {
     Link2,
     Play,
     QrCode,
+    RefreshCw,
     Save,
     Search,
     Trash2,
@@ -43,9 +44,16 @@ import {
     type TranscribeOutput,
     type TranscribeProgress,
 } from "../amt/transcribe";
-import { serverApi } from "../adapters/serverAdapter";
+import { serverApi, type ServerAmtInstallState } from "../adapters/serverAdapter";
 import { studioPlayer } from "../audio/player";
 import { useStudio } from "../store/studio";
+
+const AMT_SOURCE_LABELS: Record<"env" | "managed" | "npm" | "path", string> = {
+    env: "环境变量",
+    managed: "托管下载",
+    npm: "npm 依赖",
+    path: "系统 PATH",
+};
 
 function formatDur(sec: number): string {
     const s = Math.max(0, Math.floor(sec));
@@ -76,12 +84,20 @@ export function ToolsPage() {
     // Server AMT state
     const [serverAmtStatus, setServerAmtStatus] = useState<{
         available: boolean;
+        source?: "env" | "managed" | "npm" | "path";
+        platform?: string;
+        canInstall?: boolean;
+        message?: string;
         bilibili?: boolean;
         queued?: number;
         active?: number;
         queueLimit?: number;
         queueFull?: boolean;
+        install?: ServerAmtInstallState;
     } | null>(null);
+    const [amtRegistry, setAmtRegistry] = useState<"npmmirror" | "npm">("npmmirror");
+    const [amtInstallState, setAmtInstallState] = useState<ServerAmtInstallState | null>(null);
+    const [amtInstallTriggering, setAmtInstallTriggering] = useState(false);
     const [serverAmtTab, setServerAmtTab] = useState<"upload" | "bilibili">("upload");
     const [biliQuery, setBiliQuery] = useState("");
     const [biliResults, setBiliResults] = useState<
@@ -125,10 +141,60 @@ export function ToolsPage() {
         } else {
             serverApi
                 .getTranscribeStatus()
-                .then(setServerAmtStatus)
+                .then((res) => {
+                    setServerAmtStatus(res);
+                    if (res.install) setAmtInstallState(res.install);
+                })
                 .catch(() => setServerAmtStatus({ available: false }));
         }
     }, [mode]);
+
+    useEffect(() => {
+        if (mode !== "server" || amtInstallState?.status !== "running") return;
+        let cancelled = false;
+        const timer = window.setInterval(async () => {
+            try {
+                const res = await serverApi.getServerAmtInstallStatus();
+                if (cancelled) return;
+                setAmtInstallState(res.install);
+                if (res.install.status === "done") {
+                    window.clearInterval(timer);
+                    const fresh = await serverApi.getTranscribeStatus();
+                    if (!cancelled) setServerAmtStatus(fresh);
+                    notify({ title: "AMT 组件已就绪，可直接开始转录", color: "teal" });
+                } else if (res.install.status === "error") {
+                    window.clearInterval(timer);
+                    notify({
+                        title: "AMT 组件下载失败",
+                        message: res.install.error ?? res.install.message ?? "请检查网络或切换下载源",
+                        color: "red",
+                    });
+                }
+            } catch {
+                // ignore transient poll failure
+            }
+        }, 800);
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    }, [mode, amtInstallState?.status]);
+
+    const handleInstallServerAmt = async () => {
+        setAmtInstallTriggering(true);
+        try {
+            const res = await serverApi.installServerAmt(amtRegistry);
+            setAmtInstallState(res.install);
+        } catch (err) {
+            notify({
+                title: "无法启动 AMT 下载",
+                message: err instanceof Error ? err.message : String(err),
+                color: "red",
+            });
+        } finally {
+            setAmtInstallTriggering(false);
+        }
+    };
 
     useEffect(() => {
         if (!serverJobId) return;
@@ -519,20 +585,85 @@ export function ToolsPage() {
                                     上传音频或检索 B 站视频交给后端异步转录，完成后预览并一键入库。
                                 </p>
                             </div>
-                            <SongBadge
-                                tone={serverAmtStatus?.available && !serverAmtStatus.queueFull ? "brand" : "default"}
-                            >
-                                {!serverAmtStatus?.available
-                                    ? "服务端未启用转录组件"
-                                    : serverAmtStatus.queueFull
-                                      ? "转录队列已满"
-                                      : `服务端转录就绪${
-                                            serverAmtStatus.queued
-                                                ? ` · 排队 ${serverAmtStatus.queued}/${serverAmtStatus.queueLimit ?? 10}`
-                                                : ""
-                                        }`}
-                            </SongBadge>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {serverAmtStatus?.available && serverAmtStatus.source === "managed" && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        color="ghost"
+                                        loading={amtInstallTriggering || amtInstallState?.status === "running"}
+                                        onClick={() => void handleInstallServerAmt()}
+                                    >
+                                        <RefreshCw size={13} /> 更新组件
+                                    </Button>
+                                )}
+                                <SongBadge
+                                    tone={serverAmtStatus?.available && !serverAmtStatus.queueFull ? "brand" : "default"}
+                                >
+                                    {!serverAmtStatus?.available
+                                        ? "服务端未启用转录组件"
+                                        : serverAmtStatus.queueFull
+                                          ? "转录队列已满"
+                                          : `服务端转录就绪${
+                                                serverAmtStatus.source
+                                                    ? `（${AMT_SOURCE_LABELS[serverAmtStatus.source]}）`
+                                                    : ""
+                                            }${
+                                                serverAmtStatus.queued
+                                                    ? ` · 排队 ${serverAmtStatus.queued}/${serverAmtStatus.queueLimit ?? 10}`
+                                                    : ""
+                                            }`}
+                                </SongBadge>
+                            </div>
                         </div>
+
+                        {(!serverAmtStatus?.available || amtInstallState?.status === "running") && (
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ore-divider bg-ore-sunken px-3.5 py-2.5 text-[12px]">
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-ore-text">
+                                        {amtInstallState?.status === "running"
+                                            ? `${amtInstallState.message ?? "正在下载 AMT 组件…"}${
+                                                  typeof amtInstallState.percent === "number" &&
+                                                  amtInstallState.percent >= 0
+                                                      ? ` (${amtInstallState.percent}%)`
+                                                      : ""
+                                              }${
+                                                  amtInstallState.downloadedBytes
+                                                      ? ` · ${(amtInstallState.downloadedBytes / 1048576).toFixed(1)} MB`
+                                                      : ""
+                                              }`
+                                            : serverAmtStatus?.canInstall === false
+                                              ? `当前服务端平台 (${serverAmtStatus.platform ?? "unknown"}) 暂不支持在线下载，请手动配置 AMT_CLI`
+                                              : serverAmtStatus?.message || "服务端尚未安装 amt-cli 转录组件"}
+                                    </div>
+                                    {amtInstallState?.status === "error" && amtInstallState.error && (
+                                        <div className="mt-1 text-red-400">上次下载失败：{amtInstallState.error}</div>
+                                    )}
+                                </div>
+                                {serverAmtStatus?.canInstall !== false && (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <select
+                                            value={amtRegistry}
+                                            disabled={amtInstallState?.status === "running"}
+                                            onChange={(e) => setAmtRegistry(e.target.value as "npmmirror" | "npm")}
+                                            aria-label="AMT 下载源"
+                                            className="h-8 rounded border border-[var(--pb-control-border)] bg-ore-raised px-2 text-[12px]"
+                                        >
+                                            <option value="npmmirror">国内镜像 (npmmirror)</option>
+                                            <option value="npm">npm 官方源</option>
+                                        </select>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            loading={amtInstallTriggering || amtInstallState?.status === "running"}
+                                            onClick={() => void handleInstallServerAmt()}
+                                        >
+                                            <CloudDownload size={14} /> 一键下载 AMT 组件
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <Segmented
                             value={serverAmtTab}
@@ -572,7 +703,11 @@ export function ToolsPage() {
                                         <Button
                                             type="button"
                                             loading={serverBusy}
-                                            disabled={serverJobActive || Boolean(serverAmtStatus?.queueFull)}
+                                            disabled={
+                                                !serverAmtStatus?.available ||
+                                                serverJobActive ||
+                                                Boolean(serverAmtStatus?.queueFull)
+                                            }
                                             onClick={() => void handleServerUploadTranscribe()}
                                         >
                                             <AudioWaveform size={14} /> 提交转录任务
@@ -599,7 +734,11 @@ export function ToolsPage() {
                                         <Button
                                             type="button"
                                             loading={serverBusy}
-                                            disabled={serverJobActive || Boolean(serverAmtStatus?.queueFull)}
+                                            disabled={
+                                                !serverAmtStatus?.available ||
+                                                serverJobActive ||
+                                                Boolean(serverAmtStatus?.queueFull)
+                                            }
                                             onClick={() => void handleBiliTranscribe(biliQuery)}
                                         >
                                             <Link2 size={14} /> 直接转录
@@ -637,7 +776,12 @@ export function ToolsPage() {
                                                 type="button"
                                                 size="sm"
                                                 color="secondary"
-                                                disabled={serverBusy || serverJobActive || Boolean(serverAmtStatus?.queueFull)}
+                                                disabled={
+                                                    !serverAmtStatus?.available ||
+                                                    serverBusy ||
+                                                    serverJobActive ||
+                                                    Boolean(serverAmtStatus?.queueFull)
+                                                }
                                                 onClick={() => {
                                                     const clean = item.title.replace(/<[^>]+>/g, "");
                                                     void handleBiliTranscribe(item.bvid, clean);

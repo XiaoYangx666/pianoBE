@@ -22,20 +22,14 @@ const pubDir = path.join(pkgDir, serverOnly ? "public-server" : "public");
 
 fs.mkdirSync(pubDir, { recursive: true });
 
-// 1. template.mcaddon（仅本地/完整版）
+// 1. template.mcaddon（仅本地/完整版，零插件纯净基础模板）
 if (!serverOnly) {
-    const bareSrc = path.join(repoRoot, "packages/addon/dist/template-bare.mcaddon");
-    const fullSrc = path.join(repoRoot, "packages/addon/dist/template.mcaddon");
-    const bare = fs.statSync(bareSrc, { throwIfNoEntry: false });
-    const full = fs.statSync(fullSrc, { throwIfNoEntry: false });
-    // 模板只带标准钢琴与宿主 VFX 底座；内置插件（含可选音色/曲库）走 .pbeplugin，
-    // 因此优先使用 bare 模板，避免把插件代码重复打进导出的包。
-    const src = bare ? bareSrc : fullSrc;
+    const src = path.join(repoRoot, "packages/addon/dist/template.mcaddon");
     if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(pubDir, "template.mcaddon"));
-        console.log(`✓ template.mcaddon (${path.basename(src)})`);
+        console.log("✓ template.mcaddon");
     } else {
-        console.warn("⚠ 未找到 template-bare.mcaddon 或 template.mcaddon");
+        console.warn("⚠ 未找到 packages/addon/dist/template.mcaddon");
     }
 }
 

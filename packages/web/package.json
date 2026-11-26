@@ -1,7 +1,7 @@
 {
     "name": "@piano/web",
     "version": "0.1.0",
-    "description": "PianoBE 曲库管理页面（React + Vite，由 server 托管）",
+    "description": "PianoBE VFX Lab 开发预览工具（Three.js + Wintersky）",
     "type": "module",
     "license": "CC-BY-NC-4.0",
     "private": true,

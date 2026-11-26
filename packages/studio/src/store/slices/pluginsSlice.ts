@@ -143,7 +143,7 @@ export function createPluginsSlice(
                     if (get().mode === "server") {
                         await serverApi.installBuiltinPlugin(id);
                         await get().refresh();
-                        notify({ title: `已安装内置扩展 ${id}`, color: "teal" });
+                        notify({ title: `已下载扩展 ${id}`, message: "请在扩展中心手动启用", color: "teal" });
                         return;
                     }
                     const plugin = get().plugins.find((p) => p.id === id);
@@ -181,6 +181,25 @@ export function createPluginsSlice(
                                 ? `已加入音乐库（${plugin.contents.songs} 首），已默认纳入导出清单`
                                 : "已启用，可在扩展中心或附加包页随时调整",
                         color: "teal",
+                    });
+                } finally {
+                    set({ busy: false });
+                }
+            });
+        },
+
+        scanServerPlugins() {
+            return runtime.queue.enqueue(async () => {
+                set({ busy: true });
+                try {
+                    const res = await serverApi.scanPlugins();
+                    await get().refresh();
+                    notify({
+                        title: "已刷新外置插件目录",
+                        message: res.registryError
+                            ? `扫描到本地 ${res.items.filter((p) => p.installed).length} 个（远程源拉取失败：${res.registryError}）`
+                            : `当前共 ${res.items.filter((p) => p.installed).length} 个已发现扩展`,
+                        color: res.registryError ? "yellow" : "teal",
                     });
                 } finally {
                     set({ busy: false });

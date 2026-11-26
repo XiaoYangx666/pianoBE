@@ -208,15 +208,7 @@ export function createAddonSlice(
                 }
                 return;
             }
-
-            await runtime.queue.enqueue(async () => {
-                const current = get().deploymentStatus?.enabledTimbres ?? ["piano"];
-                const next = current.includes(id)
-                    ? current.filter((x) => x !== id)
-                    : [...current, id];
-                const res = await serverApi.updateAddonConfig({ enabledTimbres: next });
-                set({ deploymentStatus: normalizeServerDeployment(res.status) });
-            });
+            notify({ title: "请先安装对应音色插件", color: "yellow" });
         },
 
         addScores(entries) {

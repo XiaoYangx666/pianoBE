@@ -8,6 +8,7 @@ import {
     EyeOff,
     Info,
     ListMusic,
+    RefreshCw,
     Search,
     ShieldCheck,
     Trash2,
@@ -39,6 +40,7 @@ const SOURCE_LABELS: Record<StudioPlugin["source"], string> = {
     builtin: "官方",
     local: "本地",
     upload: "已上传",
+    remote: "官方源",
     song: "随曲",
 };
 
@@ -84,6 +86,7 @@ export function ExtensionsPage() {
 
     const importFiles = useStudio((s) => s.importFiles);
     const installBuiltinPlugin = useStudio((s) => s.installBuiltinPlugin);
+    const scanServerPlugins = useStudio((s) => s.scanServerPlugins);
     const trustPlugin = useStudio((s) => s.trustPlugin);
     const togglePlugin = useStudio((s) => s.togglePlugin);
     const uninstallPlugin = useStudio((s) => s.uninstallPlugin);
@@ -252,14 +255,27 @@ export function ExtensionsPage() {
                 title="扩展中心"
                 description="按曲库、特效与钢琴音色分类分发 .pbeplugin 扩展包；支持按需整包安装、浏览曲包挑单曲与在线试听音色。"
                 actions={
-                    <Button
-                        type="button"
-                        size="sm"
-                        loading={busy}
-                        onClick={() => fileRef.current?.click()}
-                    >
-                        <Upload size={14} /> 导入 .pbeplugin
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {mode === "server" && (
+                            <Button
+                                type="button"
+                                color="secondary"
+                                size="sm"
+                                loading={busy}
+                                onClick={() => void scanServerPlugins()}
+                            >
+                                <RefreshCw size={14} /> 刷新目录
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            size="sm"
+                            loading={busy}
+                            onClick={() => fileRef.current?.click()}
+                        >
+                            <Upload size={14} /> 导入 .pbeplugin
+                        </Button>
+                    </div>
                 }
             />
 
@@ -456,13 +472,13 @@ export function ExtensionsPage() {
                                             {summarizePluginCapabilities(plugin)}
                                         </div>
                                     </div>
-                                    {timbreId && (
+                                    {timbreId && plugin.installed && (
                                         <RowPlayButton
                                             playState={isPlayingDemo ? "playing" : "idle"}
                                             label={
                                                 canUseTimbre
                                                     ? `试听 ${plugin.name}`
-                                                    : `试听样音 ${plugin.name}（安装后可在播放器中切换）`
+                                                    : `试听样音 ${plugin.name}（已安装待启用）`
                                             }
                                             onPlay={() => {
                                                 if (isPlayingDemo) {
@@ -512,7 +528,7 @@ export function ExtensionsPage() {
                                             </label>
                                         )}
 
-                                        {hasSongs && (
+                                        {hasSongs && (mode === "local" || plugin.installed) && (
                                             <Button
                                                 type="button"
                                                 color="secondary"

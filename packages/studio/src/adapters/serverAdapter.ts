@@ -227,7 +227,21 @@ export const serverApi = {
     },
 
     listPlugins() {
-        return req<{ items: ServerPluginRaw[]; deployment: ServerAddonStatusRaw }>("/api/plugins");
+        return req<{
+            items: ServerPluginRaw[];
+            deployment: ServerAddonStatusRaw;
+            registryUrl?: string;
+            registryError?: string;
+        }>("/api/plugins");
+    },
+
+    scanPlugins() {
+        return req<{
+            items: ServerPluginRaw[];
+            deployment: ServerAddonStatusRaw;
+            registryUrl?: string;
+            registryError?: string;
+        }>("/api/plugins/scan", { method: "POST" });
     },
 
     async fetchPluginArchive(id: string): Promise<Uint8Array> {
@@ -239,11 +253,11 @@ export const serverApi = {
         return new Uint8Array(await res.arrayBuffer());
     },
 
-    installBuiltinPlugin(builtinId: string) {
+    installBuiltinPlugin(remoteId: string) {
         return req<ServerPluginRaw>("/api/plugins", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ builtinId }),
+            body: JSON.stringify({ remoteId }),
         });
     },
 
@@ -283,7 +297,6 @@ export const serverApi = {
         bdsPackMode?: "development" | "release";
         packName?: string;
         packDescription?: string;
-        enabledTimbres?: string[];
     }) {
         return req<{ bdsConfig: StudioDeploymentStatus["bdsConfig"]; status: ServerAddonStatusRaw }>(
             "/api/addon/config",
@@ -360,13 +373,38 @@ export const serverApi = {
     getTranscribeStatus() {
         return req<{
             available: boolean;
-            bilibili?: boolean;
+            source?: "env" | "managed" | "npm" | "path";
+            platform?: string;
+            canInstall?: boolean;
             message?: string;
+            bilibili?: boolean;
             queued?: number;
             active?: number;
             queueLimit?: number;
             queueFull?: boolean;
+            install?: ServerAmtInstallState;
         }>("/api/transcribe/status");
+    },
+
+    installServerAmt(registry?: string) {
+        return req<{ install: ServerAmtInstallState }>("/api/transcribe/amt/install", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(registry ? { registry } : {}),
+        });
+    },
+
+    getServerAmtInstallStatus() {
+        return req<{
+            install: ServerAmtInstallState;
+            status: {
+                available: boolean;
+                source?: "env" | "managed" | "npm" | "path";
+                platform?: string;
+                canInstall?: boolean;
+                message?: string;
+            };
+        }>("/api/transcribe/amt/install");
     },
 
     searchBilibili(q: string, page = 1) {
@@ -463,6 +501,19 @@ export const serverApi = {
     },
 };
 
+export interface ServerAmtInstallState {
+    status: "idle" | "running" | "done" | "error";
+    stage?: "resolving" | "downloading_model" | "downloading_binary" | "extracting" | "done" | "error";
+    message?: string;
+    percent?: number;
+    downloadedBytes?: number;
+    totalBytes?: number;
+    version?: string;
+    registry?: string;
+    error?: string;
+    updatedAt?: number;
+}
+
 export interface ServerPluginRaw {
     id: string;
     name: string;
@@ -480,7 +531,7 @@ export interface ServerPluginRaw {
         preview?: { thumbnail?: string; description?: string };
     };
     size: number;
-    source: "builtin" | "upload";
+    source: "builtin" | "local" | "upload" | "remote";
     installed: boolean;
     enabled: boolean;
     trusted: boolean;

@@ -11,13 +11,13 @@ import {
     exportLocalLibraryPlugin,
     getLocalImportCode,
     installLocalPluginBytes,
-    parsePerformanceJsonText,
     removeSongFromLocalLibrary,
     renameLocalSong,
     saveLocalLibrary,
     saveLocalPerformance,
     saveLocalSongBytes,
 } from "../../adapters/localAdapter";
+import { parsePerformanceJsonText } from "../../adapters/performanceParser";
 import { serverApi } from "../../adapters/serverAdapter";
 import type { StudioPlugin } from "../../adapters/types";
 import { persistAddonPlan, snapshotPlan } from "../derived";

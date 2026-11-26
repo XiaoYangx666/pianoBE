@@ -37,16 +37,13 @@ import {
     songTableGrid,
     usePlayerState,
 } from "@piano/ui";
-import {
-    computeLocalSongPluginMatch,
-    importScoresFromArchiveFile,
-} from "../adapters/localAdapter";
+import { computeLocalSongPluginMatch } from "../adapters/localAdapter";
 import { getServerToken, serverApi } from "../adapters/serverAdapter";
 import type { StudioTokenInfo } from "../adapters/types";
 import { studioPlayer } from "../audio/player";
 import { ScorePreviewModal } from "../components/ScorePreviewModal";
 import { importScorePages } from "../scores/importPages";
-import type { ScoreEntry } from "../scores/scores";
+import { importScorePack, type ScoreEntry } from "../scores/scores";
 import { useStudio } from "../store/studio";
 
 function formatBytesMB(bytes: number): string {
@@ -231,7 +228,7 @@ export function AddonPage() {
 
     const handleImportScorePack = async (file: File) => {
         try {
-            const imported = await importScoresFromArchiveFile(file, activeScores);
+            const imported = await importScorePack(file, activeScores);
             if (imported.length > 0) {
                 await addScores(imported);
                 notify({ title: `从包内导入 ${imported.length} 张曲谱`, color: "teal" });

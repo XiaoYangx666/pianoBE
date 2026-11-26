@@ -14,8 +14,9 @@ import { PluginIcon } from "./PluginIcon";
 
 const SOURCE_LABELS: Record<StudioPlugin["source"], string> = {
     builtin: "官方内置",
-    local: "本地导入",
+    local: "本地目录",
     upload: "已上传",
+    remote: "官方源",
     song: "随曲附带",
 };
 
