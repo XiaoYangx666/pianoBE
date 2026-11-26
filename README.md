@@ -141,8 +141,13 @@ npm run build:core       # @piano/core
 npm run build:vfx        # @piano/vfx（addon/web 的前置）
 npm run build:template   # addon 模板包（生成器底包，build:generator 的前置）
 npm run build:server     # addon 服务器专用包
+npm run build:server:exe # 单文件服务端（服务器版，AOT + trim；需 Bun canary）
 npm run build:generator  # 生成器
 npm run build:web        # 管理页
+
+# Studio 两种构建（本地版 / 服务器版）
+npm run build:studio        # 本地/完整版 → packages/studio/dist（模板、插件、浏览器转录）
+npm run build:studio:server # 服务器版 → packages/studio/dist-server（仅服务器管理模式）
 
 # 测试
 npm test                 # core vitest + vfx bun test

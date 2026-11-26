@@ -40,8 +40,11 @@ process.on("unhandledRejection", (reason) => {
 
 if (!config.webRoot) {
     const studioDist = resolve(import.meta.dir, "../../studio/dist");
+    // 单文件发行版：studio 资源被嵌在可执行文件根目录的 web/
+    const embeddedWeb = resolve(import.meta.dir, "../../../web");
     const webDist = resolve(import.meta.dir, "../../web/dist");
     if (existsSync(studioDist)) config.webRoot = studioDist;
+    else if (existsSync(embeddedWeb)) config.webRoot = embeddedWeb;
     else if (existsSync(webDist)) config.webRoot = webDist;
 }
 

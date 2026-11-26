@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,30 +13,36 @@ import { fileURLToPath } from "node:url";
  * Run with --check to fail when the generated tree drifted.
  */
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const source = join(root, "packages/addon/rp/sounds");
+// 标准钢琴在 rp/sounds，可选音色在 timbre-samples（不在资源包基础模板内）
+const sources = [
+    join(root, "packages/addon/rp/sounds"),
+    join(root, "packages/addon/timbre-samples"),
+];
 const target = join(root, "packages/web/public/piano");
 const check = process.argv.includes("--check");
 
 const webName = (file) => file.replace(/#/g, "sharp");
 
-const packs = readdirSync(source, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((pack) => readdirSync(join(source, pack)).some((file) => file.endsWith(".ogg")));
-
-if (!packs.length) throw new Error(`No sample packs found in ${source}`);
-
+const packs = [];
 /** @type {Map<string, string>} relative target path -> absolute source path */
 const expected = new Map();
 let bytes = 0;
-for (const pack of packs) {
-    for (const file of readdirSync(join(source, pack))) {
-        if (!file.endsWith(".ogg")) continue;
-        const from = join(source, pack, file);
-        expected.set(`${pack}/${webName(file)}`, from);
-        bytes += readFileSync(from).length;
+for (const source of sources) {
+    if (!existsSync(source)) continue;
+    for (const entry of readdirSync(source, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const files = readdirSync(join(source, entry.name)).filter((file) => file.endsWith(".ogg"));
+        if (!files.length) continue;
+        packs.push(entry.name);
+        for (const file of files) {
+            const from = join(source, entry.name, file);
+            expected.set(`${entry.name}/${webName(file)}`, from);
+            bytes += readFileSync(from).length;
+        }
     }
 }
+
+if (!packs.length) throw new Error(`No sample packs found in ${sources.join(", ")}`);
 
 function listOgg(dir, prefix = "") {
     const out = [];

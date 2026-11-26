@@ -49,25 +49,37 @@ const ortExternal = new URL(
     import.meta.url,
 ).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
-export default defineConfig({
-    base: "./",
-    plugins: [tailwindcss(), react()],
-    resolve: {
-        alias: {
-            "onnxruntime-web-external": ortExternal,
+/**
+ * 两种构建：
+ * - 默认（本地/完整版）：`vite build` → dist/，含本地工作区、模板、插件、浏览器转录
+ * - 服务器版：`vite build --mode server` → dist-server/，只有服务器管理模式与试听采样
+ */
+export default defineConfig(({ mode }) => {
+    const serverOnly = mode === "server";
+    return {
+        base: "./",
+        define: {
+            __PIANOBE_SERVER_ONLY__: JSON.stringify(serverOnly),
         },
-    },
-    server: {
-        headers: isolationHeaders,
-        proxy: {
-            "/api": apiProxy,
+        publicDir: serverOnly ? "public-server" : "public",
+        plugins: [tailwindcss(), react()],
+        resolve: {
+            alias: {
+                "onnxruntime-web-external": ortExternal,
+            },
         },
-    },
-    preview: {
-        headers: isolationHeaders,
-    },
-    build: {
-        outDir: "dist",
-        emptyOutDir: true,
-    },
+        server: {
+            headers: isolationHeaders,
+            proxy: {
+                "/api": apiProxy,
+            },
+        },
+        preview: {
+            headers: isolationHeaders,
+        },
+        build: {
+            outDir: serverOnly ? "dist-server" : "dist",
+            emptyOutDir: true,
+        },
+    };
 });

@@ -2,9 +2,10 @@ import { Suspense, lazy, useEffect, useMemo } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AudioWaveform, Boxes, HardDrive, LogOut, Music2, PackageCheck, Server } from "lucide-react";
 import { PIANO_TIMBRES } from "@piano/core";
-import { AppLayout, PianoMark, Spinner, ThemeToggle, type AppNavItem } from "@piano/ui";
+import { AppLayout, PianoMark, Spinner, ThemeToggle, notify, type AppNavItem } from "@piano/ui";
 import { studioPlayer } from "./audio/player";
 import { LoginView } from "./components/LoginView";
+import { SERVER_ONLY } from "./flags";
 import { useStudio } from "./store/studio";
 
 // 路由级懒加载：四个工作台页面各自成 chunk，首屏不再一次性加载
@@ -90,7 +91,16 @@ export default function App() {
         return (
             <LoginView
                 onLogin={loginServer}
-                onUseLocal={() => void switchMode("local")}
+                onUseLocal={
+                    SERVER_ONLY
+                        ? () =>
+                              notify({
+                                  title: "服务器版不提供本地模式",
+                                  message: "请填写后端签发的访问令牌。",
+                                  color: "yellow",
+                              })
+                        : () => void switchMode("local")
+                }
             />
         );
     }
@@ -118,7 +128,7 @@ export default function App() {
             }}
             headerActions={
                 <div className="flex items-center gap-1.5">
-                    {serverAvailable && (
+                    {!SERVER_ONLY && serverAvailable && (
                         <button
                             type="button"
                             onClick={() => void switchMode(mode === "server" ? "local" : "server")}
@@ -150,7 +160,7 @@ export default function App() {
                             {mode === "server" ? <Server size={13} /> : <HardDrive size={13} />}
                             {mode === "server" ? "服务器模式" : "本地模式"}
                         </span>
-                        {serverAvailable && (
+                        {!SERVER_ONLY && serverAvailable && (
                             <button
                                 type="button"
                                 onClick={() => void switchMode(mode === "server" ? "local" : "server")}

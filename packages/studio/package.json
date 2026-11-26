@@ -13,7 +13,9 @@
         "build": "vite build",
         "preview": "vite preview",
         "test": "bun test",
-        "typecheck": "tsc --noEmit -p tsconfig.json"
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "build:server": "vite build --mode server",
+        "prebuild:server": "bun scripts/sync.mjs --server"
     },
     "dependencies": {
         "@bepack/addon": "^0.1.0-beta.9",

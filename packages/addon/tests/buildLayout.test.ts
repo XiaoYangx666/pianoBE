@@ -65,8 +65,13 @@ describe("embedded MIDI build layout", () => {
         expect(assemblyAssembler).toContain("TIMBRES_SCRIPT_PATH");
         expect(assemblyAssembler).not.toContain("scripts/piano/timbres.js");
 
-        expect(fs.readFileSync(path.join(addonRoot, "../../tools/build/strip-template-timbres.mjs"), "utf8"))
-            .toContain(timbresModule);
+        // 可选音色采样不在资源包里，避免基础模板被打包进无关音色
+        const soundDirs = fs
+            .readdirSync(path.join(addonRoot, "rp/sounds"), { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name);
+        expect(soundDirs.every((name) => /^piano_v\d$/.test(name))).toBe(true);
+        expect(fs.existsSync(path.join(addonRoot, "timbre-samples"))).toBe(true);
         expect(fs.readFileSync(path.join(addonRoot, "../../tools/verify/verify-timbres.mjs"), "utf8"))
             .toContain(`bp/${timbresModule}`);
     });

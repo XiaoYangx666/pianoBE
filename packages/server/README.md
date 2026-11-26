@@ -83,6 +83,43 @@ docker compose -f docker-compose.dev.yml up
 | `LOG_MAX_BYTES` | `10485760` | 单个日志文件上限（字节） |
 | `LOG_MAX_FILES` | `7` | 保留的历史日志文件数 |
 
+## 开发与生产
+
+| | 开发 | 生产（单文件发行版） |
+|---|---|---|
+| 启动 | `npm run dev:server`（bun --watch） | 直接运行 `pianobe-server-<平台>` |
+| 管理页 | `packages/studio` 的 `npm run dev`（本地/完整版） | 构建时嵌入 `packages/studio/dist-server` |
+| Studio 模式 | 本地工作区 + 服务器模式 | **仅服务器模式**（无本地入口） |
+| 资源目录 | `packages/studio/dist`、`WEB_ROOT` 可覆盖 | 嵌入可执行文件，`web/` 虚拟目录 |
+| 配置 | `packages/server/.env` | 环境变量或运行目录 `.env` |
+
+Studio 两套构建互不覆盖：
+
+```bash
+npm run build:studio        # dist/：本地版（模板、内置插件、浏览器转录 AMT）
+npm run build:studio:server # dist-server/：服务器版（只有服务器模式与试听采样）
+```
+
+## 单文件发行版（Linux x64）
+
+```bash
+npm run build:server:exe
+# 产物：build/server-exe/pianobe-server-linux-x64（约 79 MiB）
+```
+
+- 服务器版只保留后端服务与管理页：**不含浏览器本地转录、本地工作区模式**，
+  因此也不内嵌 ONNX WASM、客户端模板 `template.mcaddon` 和重复的插件目录
+- 内嵌：管理页前端（`dist-server`）、内置插件（`build/plugins`）、服务器附加包模板
+  `server.mcaddon`
+- 模板只带标准钢琴（`piano_v1~3`）：可选音色采样存放在 `packages/addon/timbre-samples/`，
+  不在 `rp/sounds` 内，打包时不会进入模板；多余音色统一以 `.pbeplugin` 插件形式按需启用
+- 构建用 `Bun.build` 的 AOT + `trim`，需要 **Bun canary（1.4.5-canary 及以上）**；
+  稳定版 1.4.5 的 `--aot/--trim` 不生效
+- AOT **不能交叉编译**：Windows 版要在 Windows 上执行同一脚本
+- 运行：`./pianobe-server-linux-x64`，配置用环境变量或同目录 `.env`（`PORT`、`DB_PATH`、
+  `BOOTSTRAP_TOKEN`、`BDS_DIR`…）；数据库默认写到当前目录 `./data/`
+- AMT 不在包内：设置 `AMT_CLI`（附 `AMT_MODEL`）或把 `amt-cli` 依赖放在可执行文件附近
+
 ## BDS 附加包部署
 
 管理页「BDS 部署与校验」会把模板与已启用的插件/音色/曲谱重新装配，并写入 BDS：

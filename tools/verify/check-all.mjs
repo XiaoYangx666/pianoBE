@@ -110,7 +110,6 @@ async function main() {
                     ["build", "--skip-copy", "--pack", "--mode", "template"],
                     addonDir,
                 );
-                await runStep("Strip template timbres", "node", ["tools/build/strip-template-timbres.mjs"]);
                 await runStep("Strip template VFX (bare)", "bun", ["tools/build/strip-template-vfx.mjs"]);
                 await runStep(
                     "Build server addon",

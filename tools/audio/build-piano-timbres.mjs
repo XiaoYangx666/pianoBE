@@ -39,6 +39,9 @@ import { PIANO_TIMBRES, PIANO_SAMPLE_KEYS, pianoSoundId, pianoSoundLayers } from
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CACHE = join(ROOT, "tools", "piano_timbres_source");
 const SOUNDS = join(ROOT, "packages", "addon", "rp", "sounds");
+// 可选音色采样放在 rp 之外，避免基础模板把它们打包进去
+const TIMBRE_SOUNDS = join(ROOT, "packages", "addon", "timbre-samples");
+const soundRoot = (timbreId) => (timbreId === "piano" ? SOUNDS : TIMBRE_SOUNDS);
 const WEB_PUBLIC = join(ROOT, "packages", "web", "public", "piano");
 const FFMPEG = process.env.FFMPEG ?? "ffmpeg";
 const FLUIDSYNTH = process.env.FLUIDSYNTH ?? "fluidsynth";
@@ -491,7 +494,7 @@ async function convertTimbre(timbreId, analysis) {
     const timbre = PIANO_TIMBRES.find((t) => t.id === timbreId);
     if (!timbre) throw new Error(`@piano/core 中缺少音色定义: ${timbreId}`);
     for (const layer of analysis.layers) {
-        const dir = join(SOUNDS, pianoSoundId(timbre.value, layer));
+        const dir = join(soundRoot(timbre.id), pianoSoundId(timbre.value, layer));
         await rm(dir, { recursive: true, force: true });
         for (const row of analysis.rows.filter((row) => row.layer === layer)) {
             await convertSample(row.file, join(dir, `${row.note}.ogg`), row.gain, row.transpose);
@@ -592,22 +595,27 @@ async function convertSample(source, target, gainDb, transpose = 0) {
 
 /** web 试听页内嵌全部可选音色，保持副本与资源包一致（文件名 # → sharp）。 */
 async function syncWebPreview() {
-    const expected = new Set(
+    /** 目录 → 采样来源（标准钢琴在 rp/sounds，其余在 timbre-samples） */
+    const roots = new Map(
         PIANO_TIMBRES.flatMap((timbre) =>
-            pianoSoundLayers(timbre.value).map((layer) => pianoSoundId(timbre.value, layer))
+            pianoSoundLayers(timbre.value).map((layer) => [
+                pianoSoundId(timbre.value, layer),
+                soundRoot(timbre.id),
+            ])
         )
     );
+    const expected = new Set(roots.keys());
     for (const entry of await readdir(WEB_PUBLIC, { withFileTypes: true })) {
         if (entry.isDirectory() && !expected.has(entry.name)) {
             await rm(join(WEB_PUBLIC, entry.name), { recursive: true, force: true });
             console.log(`移除旧 Web 试听目录 ${entry.name}`);
         }
     }
-    for (const dir of expected) {
+    for (const [dir, root] of roots) {
         const targetDir = join(WEB_PUBLIC, dir);
         await mkdir(targetDir, { recursive: true });
         for (const note of BASE_NOTES) {
-            await copyFile(join(SOUNDS, dir, `${note}.ogg`), join(targetDir, `${note.replace("#", "sharp")}.ogg`));
+            await copyFile(join(root, dir, `${note}.ogg`), join(targetDir, `${note.replace("#", "sharp")}.ogg`));
         }
     }
     console.log(`\nWeb 试听采样已同步 ${WEB_PUBLIC}`);
@@ -615,7 +623,8 @@ async function syncWebPreview() {
 
 async function writeSoundDefinitions() {
     const definitions = {};
-    for (const timbre of PIANO_TIMBRES) {
+    // 基础模板只带标准钢琴；可选音色的 sound_definitions 由 .pbeplugin 自带
+    for (const timbre of PIANO_TIMBRES.filter((item) => item.id === "piano")) {
         for (const layer of pianoSoundLayers(timbre.value)) {
             const dir = pianoSoundId(timbre.value, layer);
             if (!existsSync(join(SOUNDS, dir))) {
@@ -766,21 +775,27 @@ for (const analysis of analyses) {
 if (timbreIds.includes("piano")) await syncWebPreview();
 
 // 清掉已下线的音色目录（旧版本的 meta_piano / upright_kw / ydp_grand 等）。
-const expectedDirs = new Set(PIANO_TIMBRES.flatMap((timbre) =>
-    pianoSoundLayers(timbre.value).map((layer) => pianoSoundId(timbre.value, layer))));
-for (const entry of await readdir(SOUNDS, { withFileTypes: true })) {
-    if (entry.isDirectory() && !expectedDirs.has(entry.name)) {
-        await rm(join(SOUNDS, entry.name), { recursive: true, force: true });
-        console.log(`移除旧音色目录 ${entry.name}`);
+const dirsFor = (ids) => new Set(
+    PIANO_TIMBRES.filter((t) => ids.includes(t.id)).flatMap((timbre) =>
+        pianoSoundLayers(timbre.value).map((layer) => pianoSoundId(timbre.value, layer))));
+const cleanRoot = async (root, expected) => {
+    if (!existsSync(root)) return;
+    for (const entry of await readdir(root, { withFileTypes: true })) {
+        if (entry.isDirectory() && !expected.has(entry.name)) {
+            await rm(join(root, entry.name), { recursive: true, force: true });
+            console.log(`移除旧音色目录 ${entry.name}`);
+        }
     }
-}
+};
+await cleanRoot(SOUNDS, dirsFor(["piano"]));
+await cleanRoot(TIMBRE_SOUNDS, dirsFor(PIANO_TIMBRES.map((t) => t.id).filter((id) => id !== "piano")));
 
 await writeSoundDefinitions();
 
 const totalFiles = (await Promise.all(timbreIds.map(async (id) => {
     const value = PIANO_TIMBRES.find((t) => t.id === id).value;
     const counts = await Promise.all(pianoSoundLayers(value).map(async (layer) =>
-        (await readdir(join(SOUNDS, pianoSoundId(value, layer)))).length));
+        (await readdir(join(soundRoot(id), pianoSoundId(value, layer)))).length));
     return counts.reduce((a, b) => a + b, 0);
 }))).reduce((a, b) => a + b, 0);
 console.log(`\n完成：${timbreIds.length} 个音色，${totalFiles} 个采样文件。`);

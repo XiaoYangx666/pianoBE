@@ -58,7 +58,7 @@
 
 | 脚本 | 用途 |
 |---|---|
-| `strip-template-timbres.mjs` | 从模板包裁剪可选音色（`build:template` 调用） |
+| `build-server-exe.ts` | 构建服务器版单文件可执行程序（AOT + trim） |
 
 ## 数据目录与报告
 

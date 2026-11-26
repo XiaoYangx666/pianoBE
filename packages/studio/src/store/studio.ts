@@ -10,6 +10,7 @@ import {
 } from "../adapters/serverAdapter";
 import type { StudioMode } from "../adapters/types";
 import { studioPlayer } from "../audio/player";
+import { SERVER_ONLY } from "../flags";
 import type { ScoreEntry } from "../scores/scores";
 import { createLatestTracker, createMutationQueue } from "./concurrency";
 import {
@@ -58,8 +59,11 @@ export const useStudio = create<StudioState>((set, get) => ({
             try {
                 const probe = await serverApi.checkAvailable();
                 const preferred = localStorage.getItem(MODE_PREF_KEY) as StudioMode | null;
-                const mode: StudioMode =
-                    probe.ok && preferred !== "local" ? "server" : "local";
+                const mode: StudioMode = SERVER_ONLY
+                    ? "server"
+                    : probe.ok && preferred !== "local"
+                      ? "server"
+                      : "local";
 
                 set({
                     serverAvailable: probe.ok,
@@ -70,7 +74,8 @@ export const useStudio = create<StudioState>((set, get) => ({
                 });
 
                 await get().refresh();
-                void get().loadTemplate();
+                // 服务器发行版不打包客户端模板，本地模板加载只在本地模式使用
+                if (!SERVER_ONLY) void get().loadTemplate();
                 const timbres = get().timbreIndex;
                 void studioPlayer
                     .setTimbre(get().previewTimbreId, timbres, async (tid) => {

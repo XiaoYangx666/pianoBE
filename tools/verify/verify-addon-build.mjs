@@ -67,8 +67,14 @@ check(assemblyTemplate.includes(`TIMBRES_SCRIPT_PATH = "${timbresSource}"`),
     "assembly timbres path matches preserve-modules output");
 const assemblyAssembler = read(path.join(root, "packages/assembly/src/assembler.ts"));
 check(assemblyAssembler.includes("TIMBRES_SCRIPT_PATH"), "assembly assembler uses TIMBRES_SCRIPT_PATH");
-check(read(path.join(root, "tools/build/strip-template-timbres.mjs")).includes(timbresSource),
-    "template strip uses the domain timbres path");
+const rpSounds = path.join(addon, "rp/sounds");
+const rpSoundDirs = fs.existsSync(rpSounds)
+    ? fs.readdirSync(rpSounds, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+    : [];
+check(rpSoundDirs.every((name) => /^piano_v\d$/.test(name)),
+    "rp/sounds only contains the bundled standard piano");
+check(fs.existsSync(path.join(addon, "timbre-samples")) && fs.readdirSync(path.join(addon, "timbre-samples")).length > 0,
+    "optional timbre samples live outside the resource pack");
 check(read(path.join(root, "tools/verify/verify-timbres.mjs")).includes(timbresModule),
     "timbres verifier uses the domain timbres path");
 

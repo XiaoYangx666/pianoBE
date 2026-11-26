@@ -13,6 +13,8 @@ import { writePbePluginArchive } from "@piano/vfx/package";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SOUNDS_DIR = join(ROOT, "packages/addon/rp/sounds");
+// 可选音色采样不在 rp/sounds 里（避免被打进基础模板），单独存放
+const TIMBRE_SOUNDS_DIR = join(ROOT, "packages/addon/timbre-samples");
 const OUT_DIR = join(ROOT, "build/plugins");
 
 const TIMBRE_PLUGIN_META = {
@@ -64,7 +66,7 @@ export function packOfficialTimbres() {
             const dir = dirs[`v${layer + 1}`];
             const stereoDir = pianoSoundId(timbre.value, layer, true);
             for (const note of PIANO_SAMPLE_KEYS) {
-                const file = join(SOUNDS_DIR, dir, `${note}.ogg`);
+                const file = join(TIMBRE_SOUNDS_DIR, dir, `${note}.ogg`);
                 if (!existsSync(file)) {
                     throw new Error(`缺少音色 ${timbre.id} 采样文件：${file}`);
                 }

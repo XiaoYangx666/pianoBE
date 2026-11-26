@@ -5,6 +5,9 @@
  * - public/timbres/（可选钢琴音色包）
  * - public/amt/（浏览器端音频转 MIDI 模型与 ORT 运行时）
  * - public/piano/（服务器模式在线试听用钢琴采样）
+ *
+ * 服务器版构建加 --server：只同步 public-server/piano/（试听采样），
+ * 不包含本地模式使用的模板、内置插件与浏览器端 AMT 运行时。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -14,17 +17,20 @@ import { readPbePluginArchive } from "@piano/vfx/package";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkgDir = path.resolve(here, "..");
 const repoRoot = path.resolve(here, "../../..");
-const pubDir = path.join(pkgDir, "public");
+const serverOnly = process.argv.includes("--server");
+const pubDir = path.join(pkgDir, serverOnly ? "public-server" : "public");
 
 fs.mkdirSync(pubDir, { recursive: true });
 
-// 1. template.mcaddon
-{
+// 1. template.mcaddon（仅本地/完整版）
+if (!serverOnly) {
     const bareSrc = path.join(repoRoot, "packages/addon/dist/template-bare.mcaddon");
     const fullSrc = path.join(repoRoot, "packages/addon/dist/template.mcaddon");
     const bare = fs.statSync(bareSrc, { throwIfNoEntry: false });
     const full = fs.statSync(fullSrc, { throwIfNoEntry: false });
-    const src = bare && (!full || bare.mtimeMs >= full.mtimeMs) ? bareSrc : fullSrc;
+    // 模板只带标准钢琴与宿主 VFX 底座；内置插件（含可选音色/曲库）走 .pbeplugin，
+    // 因此优先使用 bare 模板，避免把插件代码重复打进导出的包。
+    const src = bare ? bareSrc : fullSrc;
     if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(pubDir, "template.mcaddon"));
         console.log(`✓ template.mcaddon (${path.basename(src)})`);
@@ -48,8 +54,8 @@ function previewBytesToDataUrl(filePath, bytes) {
     return `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
 }
 
-// 2. built-in .pbeplugin packages (from build/plugins)
-{
+// 2. built-in .pbeplugin packages (from build/plugins)（仅本地/完整版）
+if (!serverOnly) {
     const srcDir = path.join(repoRoot, "build/plugins");
     const dstDir = path.join(pubDir, "plugins");
     fs.rmSync(dstDir, { recursive: true, force: true });
@@ -108,8 +114,8 @@ fs.rmSync(path.join(pubDir, "performances"), { recursive: true, force: true });
 fs.rmSync(path.join(pubDir, "timbres"), { recursive: true, force: true });
 console.log("✓ timbres (distributed as official .pbeplugin packages)");
 
-// 6. AMT browser runtime + model
-{
+// 6. AMT browser runtime + model（仅本地/完整版）
+if (!serverOnly) {
     const outDir = path.join(pubDir, "amt");
     fs.mkdirSync(outDir, { recursive: true });
     const candidates = [
