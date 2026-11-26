@@ -42,8 +42,11 @@ COPY --from=builder /app/packages/core/dist packages/core/dist
 COPY --from=builder /app/packages/core/package.json packages/core/
 COPY --from=builder /app/packages/vfx/dist packages/vfx/dist
 COPY --from=builder /app/packages/vfx/package.json packages/vfx/
+# 这两个包的 exports.bun 指向 src，运行阶段没有 src 会 Cannot find module
+COPY --from=builder /app/packages/vfx/src packages/vfx/src
 COPY --from=builder /app/packages/assembly/dist packages/assembly/dist
 COPY --from=builder /app/packages/assembly/package.json packages/assembly/
+COPY --from=builder /app/packages/assembly/src packages/assembly/src
 COPY --from=builder /app/packages/studio/dist packages/studio/dist
 COPY --from=builder /app/build/plugins build/plugins
 
@@ -52,7 +55,8 @@ RUN mkdir -p plugins \
     && printf '{"name":"@piano/plugins","version":"0.0.0","private":true}\n' > plugins/package.json
 
 # 只装 server 运行时依赖（hono + amt-cli + @piano/core）。不带 lockfile，production 全新解析
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production --no-save --filter @piano/server
+# 用 hoisted 布局：隔离布局下服务端看不到 fflate 与 amt-cli 的分平台可选依赖
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production --no-save --filter @piano/server --linker=hoisted
 
 WORKDIR /app/packages/server
 ENV PORT=3000 DB_PATH=/app/data/piano.db LOG_FILE=/app/data/logs/server.log WEB_ROOT=/app/packages/studio/dist BUILTIN_PLUGINS_DIR=/app/build/plugins

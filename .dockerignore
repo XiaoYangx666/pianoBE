@@ -8,6 +8,8 @@ packages/addon/*
 !packages/addon/rp
 packages/addon/rp/*
 !packages/addon/rp/sounds
+# 可选音色采样：pack:plugins 打 pianobe.timbre.* 时需要
+!packages/addon/timbre-samples
 packages/addon/dist
 packages/server/dist
 packages/server/data

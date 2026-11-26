@@ -17,6 +17,7 @@
         "@piano/core": "file:../core",
         "@piano/vfx": "file:../vfx",
         "amt-cli": "^0.1.1",
+        "fflate": "^0.8.2",
         "hono": "^4.6.0"
     },
     "devDependencies": {
