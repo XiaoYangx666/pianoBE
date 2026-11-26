@@ -1,7 +1,14 @@
-# 单文件服务端镜像：glibc 基础层 + 编译好的二进制（约 88 MB）
+# 单文件服务端镜像：glibc 基础层 + 编译好的二进制 + 内置 AMT（约 128 MB）
 # 构建：docker build -f Dockerfile.server -t pianobe-server:single .
 # 运行见 docker-compose.single.yml（注意 bridge 网络 MTU）
 FROM oven/bun:1-slim AS libs
+
+# 构建期装好 amt-cli（模型 + Linux x64 二进制 + libonnxruntime），运行期无需联网下载。
+# 版本固定，升级 AMT 时改这里并重建镜像。
+FROM oven/bun:1-slim AS amt
+RUN mkdir -p /amt \
+    && printf '{"name":"amt-bundle","private":true}\n' > /amt/package.json \
+    && cd /amt && bun add amt-cli@0.1.1
 
 FROM frolvlad/alpine-glibc:latest
 # TLS 根证书（下载 AMT / 远程插件源需要）
@@ -14,6 +21,14 @@ RUN ln -sf libstdc++.so.6.0.33 /opt/lib/libstdc++.so.6
 ENV LD_LIBRARY_PATH=/opt/lib
 
 COPY build/server-exe/pianobe-server-linux-x64 /app/pianobe-server
+
+# 内置 AMT：目录布局与管理页下载到 data/amt 的一致（二进制 + 模型 + onnxruntime）
+COPY --from=amt /amt/node_modules/amt-cli/models /opt/amt/models
+COPY --from=amt /amt/node_modules/amt-cli/LICENSE /opt/amt/LICENSE
+COPY --from=amt /amt/node_modules/@xiaoyangx666/amt-cli-linux-x64/amt-cli /opt/amt/amt-cli
+COPY --from=amt /amt/node_modules/@xiaoyangx666/amt-cli-linux-x64/libonnxruntime.so /opt/amt/libonnxruntime.so
+RUN chmod 755 /opt/amt/amt-cli
+ENV AMT_CLI=/opt/amt/amt-cli
 
 ENV PIANOBE_HOME=/data \
     DATA_DIR=/data

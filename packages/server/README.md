@@ -141,7 +141,7 @@ npm run build:server:exe
 
 ## Docker（单文件版）
 
-镜像只包含 glibc 基础层 + 编译好的二进制（约 90 MB），不装 Node/Bun：
+镜像只包含 glibc 基础层 + 编译好的二进制 + 内置 AMT（约 130 MB），不装 Node/Bun：
 
 ```bash
 npm run build:server:exe
@@ -152,7 +152,9 @@ docker compose -f docker-compose.single.yml up -d
 - 运行目录固定为 `/data`（plugins / data / logs 都在卷 `pianobe-data` 里）
 - 网络显式设为 MTU 1400：宿主机链路 MTU 小于 1500 时，Bun 的 TLS 握手会被
   bridge 静默丢弃（表现为 AMT/远程插件下载超时）
-- 镜像已带 `libgcc_s` / `libstdc++`，可在管理页直接下载 AMT 并转录
+- 镜像已带 `libgcc_s` / `libstdc++`，并内置 `amt-cli@0.1.1`（`/opt/amt`，`AMT_CLI` 指过去），
+  启动即可转录，首次运行不需要联网下载 AMT；升级 AMT 版本时改 `Dockerfile.server` 重建镜像
+- 没有内置 AMT 的旧镜像仍可在管理页一键下载（约 17 MB），但要求容器能正常访问 npm registry
 
 ## BDS 附加包部署
 
