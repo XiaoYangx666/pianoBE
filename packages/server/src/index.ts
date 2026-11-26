@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { setDiagnosticSink } from "@piano/core";
 import { openDb } from "./db.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, loadHomeEnv, resolveHomeDir } from "./config.js";
 import { ensureBootstrapToken, migrateLegacyRoles } from "./auth.js";
 import { createLogger } from "./logger.js";
 import { SqliteSongPort } from "./drivers/sqlitePorts.js";
@@ -12,7 +12,9 @@ import { TranscribeJobStore } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
 
-const config = loadConfig();
+const argv = process.argv.slice(2);
+loadHomeEnv(resolveHomeDir(process.env, argv), process.env);
+const config = loadConfig(process.env, argv);
 const log = createLogger({
     file: config.logFile,
     level: config.logLevel,
@@ -39,13 +41,17 @@ process.on("unhandledRejection", (reason) => {
 });
 
 if (!config.webRoot) {
-    const studioDist = resolve(import.meta.dir, "../../studio/dist");
-    // 单文件发行版：studio 资源被嵌在可执行文件根目录的 web/
-    const embeddedWeb = resolve(import.meta.dir, "../../../web");
-    const webDist = resolve(import.meta.dir, "../../web/dist");
-    if (existsSync(studioDist)) config.webRoot = studioDist;
-    else if (existsSync(embeddedWeb)) config.webRoot = embeddedWeb;
-    else if (existsSync(webDist)) config.webRoot = webDist;
+    // 单文件发行版（不同 Bun 版本 $bunfs 深度可能为 root / root/server/src）与源码运行路径
+    const candidates = [
+        resolve(import.meta.dir, "web"),
+        resolve(import.meta.dir, "../web"),
+        resolve(import.meta.dir, "../../web"),
+        resolve(import.meta.dir, "../../../web"),
+        resolve(import.meta.dir, "../../studio/dist-server"),
+        resolve(import.meta.dir, "../../../packages/studio/dist-server"),
+        resolve(import.meta.dir, "../../studio/dist"),
+    ];
+    config.webRoot = candidates.find((dir) => existsSync(resolve(dir, "index.html")));
 }
 
 const db = openDb(config.dbPath);
@@ -67,7 +73,8 @@ if (generated) {
 }
 
 const songPort = new SqliteSongPort(db, log.scope("db"));
-const pluginService = new PluginService(songPort, config);
+const pluginService = new PluginService(songPort, config, log.scope("plugins"));
+pluginService.syncDirectory();
 const deploymentService = new DeploymentService(songPort, pluginService, config);
 const amt = new AmtService(config);
 const amtStatus = amt.status();
@@ -101,9 +108,13 @@ const server = Bun.serve({
 });
 
 log.info(`PianoBE server: http://0.0.0.0:${config.port}`, {
+    home: config.homeDir,
+    data: config.dataDir,
+    plugins: config.pluginsDir,
     db: config.dbPath,
     logLevel: config.logLevel,
     format: config.logFormat,
+    ...(config.pluginRegistryUrl ? { pluginRegistry: config.pluginRegistryUrl } : {}),
 });
 if (log.file) {
     log.info(`日志文件: ${log.file}`, {

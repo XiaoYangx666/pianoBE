@@ -72,7 +72,11 @@ if (options.flags.has("skip-build")) {
     console.log("\x1b[36m▶ 构建服务器专用包（npm run build:server）\x1b[0m");
     const npm = process.platform === "win32" ? "npm.cmd" : "npm";
     try {
-        execFileSync(npm, ["run", "build:server"], { cwd: root, stdio: "inherit" });
+        execFileSync(npm, ["run", "build:server"], {
+            cwd: root,
+            stdio: "inherit",
+            shell: process.platform === "win32",
+        });
     } catch {
         fail("构建失败，未部署");
     }
@@ -87,8 +91,10 @@ const sizeText = `${(meta.size / 1024 / 1024).toFixed(1)} MB, ${meta.mtime.toLoc
 if (!remoteUrl) {
     // 本地模式：后端和 BDS 都在本机，直接调服务代码写文件
     console.log(`\x1b[36m▶ 本地部署\x1b[0m ${templateFile.replace(`${root}/`, "")} (${sizeText})`);
+    const deployArgs = ["src/cli/deploy.ts", "--file", templateFile];
+    if (options.dir) deployArgs.push("--dir", resolve(options.dir));
     try {
-        execFileSync("bun", ["src/cli/deploy.ts", "--file", templateFile], {
+        execFileSync("bun", deployArgs, {
             cwd: serverDir,
             stdio: "inherit",
         });

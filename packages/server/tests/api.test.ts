@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openDb } from "../src/db";
 import { createApp, type AppDeps } from "../src/app";
 import { createToken, ensureBootstrapToken, getTokenInfo } from "../src/auth";
@@ -22,6 +25,7 @@ let app: ReturnType<typeof createApp>;
 let writerToken = "";
 let readerToken = "";
 let songId = "";
+let tempHome = "";
 
 /** 类型化 json 解析 */
 async function j<T>(res: Response): Promise<T> {
@@ -36,13 +40,14 @@ function req(path: string, init: RequestInit & { token?: string } = {}) {
 }
 
 beforeAll(() => {
+    tempHome = mkdtempSync(join(tmpdir(), "piano-api-home-"));
     const db = openDb(":memory:");
     ensureBootstrapToken(db, ADMIN);
     const songPort = new SqliteSongPort(db);
     deps = {
         db,
         songPort,
-        config: loadConfig({}),
+        config: loadConfig({ PIANOBE_HOME: tempHome }),
     };
     app = createApp(deps);
     writerToken = createToken(db, "writer", "admin").token;
@@ -51,6 +56,7 @@ beforeAll(() => {
 
 afterAll(() => {
     deps.db.close();
+    rmSync(tempHome, { recursive: true, force: true });
 });
 
 describe("健康检查与鉴权", () => {

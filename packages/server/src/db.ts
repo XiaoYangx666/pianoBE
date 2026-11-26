@@ -1,4 +1,6 @@
 import { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS songs (
@@ -89,6 +91,9 @@ CREATE TABLE IF NOT EXISTS tokens (
 
 /** 打开数据库并确保表结构存在（幂等迁移） */
 export function openDb(path: string): Database {
+    if (path !== ":memory:") {
+        mkdirSync(dirname(path), { recursive: true });
+    }
     const db = new Database(path);
     // WAL + 忙等：部署批量写库与 BDS 拉曲并发时，避免直接 SQLITE_BUSY
     db.exec("PRAGMA journal_mode = WAL");

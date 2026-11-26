@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadConfig } from "../config.js";
+import { loadConfig, loadHomeEnv, resolveHomeDir } from "../config.js";
 import { openDb } from "../db.js";
 import { SqliteSongPort } from "../drivers/sqlitePorts.js";
 import { PluginService } from "../services/plugins.js";
@@ -20,7 +20,9 @@ function argValue(name: string): string | undefined {
     return inline?.slice(name.length + 1);
 }
 
-const config = loadConfig();
+const argv = process.argv.slice(2);
+loadHomeEnv(resolveHomeDir(process.env, argv), process.env);
+const config = loadConfig(process.env, argv);
 const file = resolve(argValue("--file") ?? "../../packages/addon/dist/server.mcaddon");
 if (!existsSync(file)) {
     console.error(`找不到模板：${file}（先 npm run build:server，或去掉 --skip-build）`);
@@ -30,6 +32,7 @@ if (!existsSync(file)) {
 const db = openDb(config.dbPath);
 const songPort = new SqliteSongPort(db);
 const pluginService = new PluginService(songPort, config);
+pluginService.syncDirectory();
 const deployment = new DeploymentService(songPort, pluginService, config);
 
 const bytes = new Uint8Array(readFileSync(file));

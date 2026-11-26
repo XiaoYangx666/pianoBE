@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { writeFileAtomic } from "../atomic.js";
-import { readAddonArchive } from "@bepack/addon";
 import {
     MAX_SCORES,
     SCORE_ID_PATTERN,
@@ -11,8 +10,6 @@ import {
     loadAddonTemplate,
     scoreStandPath,
     type AssemblyScoreEntry,
-    type LoadedTimbrePack,
-    type TimbreExportSelection,
     type TimbreIndexEntry,
 } from "@piano/assembly";
 import {
@@ -151,7 +148,7 @@ export class DeploymentService {
     }
 
     private customTemplatePath(): string {
-        return join(dirname(this.config.pluginsDir), "server-template.mcaddon");
+        return join(this.config.dataDir, "server-template.mcaddon");
     }
 
     saveServerTemplate(bytes: Uint8Array): void {
@@ -161,25 +158,19 @@ export class DeploymentService {
     }
 
     resolveTemplatePath(): string | undefined {
-        const custom = this.customTemplatePath();
-        if (existsSync(custom)) return custom;
-        if (this.config.serverTemplatePath && existsSync(this.config.serverTemplatePath)) {
-            return this.config.serverTemplatePath;
-        }
-        const serverDist = resolve(import.meta.dir, "../../../addon/dist/server.mcaddon");
-        if (existsSync(serverDist)) return serverDist;
-        const bareDist = resolve(import.meta.dir, "../../../addon/dist/template-bare.mcaddon");
-        if (existsSync(bareDist)) return bareDist;
-        return undefined;
-    }
-
-    private resolveTimbresDir(): string | undefined {
         const candidates = [
-            this.config.timbresDir,
-            this.config.webRoot ? join(this.config.webRoot, "timbres") : undefined,
-            resolve(import.meta.dir, "../../../studio/public/timbres"),
-        ].filter((item): item is string => Boolean(item));
-        return candidates.find((dir) => existsSync(join(dir, "index.json")));
+            this.customTemplatePath(),
+            this.config.serverTemplatePath,
+            resolve(import.meta.dir, "server.mcaddon"),
+            resolve(import.meta.dir, "../server.mcaddon"),
+            resolve(import.meta.dir, "../../server.mcaddon"),
+            resolve(import.meta.dir, "../../../server.mcaddon"),
+            resolve(import.meta.dir, "../../addon/dist/server.mcaddon"),
+            resolve(import.meta.dir, "../../../addon/dist/server.mcaddon"),
+            resolve(import.meta.dir, "../../addon/dist/template.mcaddon"),
+            resolve(import.meta.dir, "../../../addon/dist/template.mcaddon"),
+        ];
+        return candidates.find((p): p is string => Boolean(p && existsSync(p)));
     }
 
     getAvailableTimbres(): TimbreIndexEntry[] {
@@ -200,7 +191,7 @@ export class DeploymentService {
             file: null,
         });
 
-        for (const { archive } of this.pluginService.listBuiltinArchives()) {
+        for (const archive of this.pluginService.listInstalledArchives()) {
             for (const timbre of archive.timbres) {
                 byId.set(timbre.id, {
                     id: timbre.id,
@@ -216,33 +207,6 @@ export class DeploymentService {
                     file: null,
                 });
             }
-        }
-        for (const archive of this.pluginService.getActivePackArchives()) {
-            for (const timbre of archive.timbres) {
-                byId.set(timbre.id, {
-                    id: timbre.id,
-                    value: timbre.value ?? PIANO_TIMBRES.find((t) => t.id === timbre.id)?.value ?? 0,
-                    label: timbre.label,
-                    description: timbre.description ?? "",
-                    required: false,
-                    bundled: false,
-                    dirs: timbre.dirs,
-                    notes: [...timbre.notes],
-                    layers: [...timbre.layers],
-                    size: archive.size,
-                    file: null,
-                });
-            }
-        }
-
-        const dir = this.resolveTimbresDir();
-        if (dir) {
-            try {
-                const legacy = JSON.parse(readFileSync(join(dir, "index.json"), "utf8")) as TimbreIndexEntry[];
-                for (const item of legacy) {
-                    if (!byId.has(item.id)) byId.set(item.id, item);
-                }
-            } catch { /* ignore */ }
         }
 
         const coreOrder = new Map<string, number>(PIANO_TIMBRES.map((t, i) => [t.id, i]));
@@ -252,35 +216,14 @@ export class DeploymentService {
     }
 
     getEnabledTimbres(): string[] {
-        const raw = this.songPort.getState("enabled_timbres_json");
-        let list: string[] = [];
-        if (raw) {
-            try {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                    list = parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
-                }
-            } catch { /* fallback */ }
-        }
         const pluginTimbres = this.pluginService
             .getActivePackArchives()
             .flatMap((archive) => archive.timbres.map((t) => t.id));
-        return ["piano", ...new Set([...pluginTimbres, ...list].filter((id) => id !== "piano"))];
-    }
-
-    updateEnabledTimbres(ids: readonly string[]): string[] {
-        const available = this.getAvailableTimbres();
-        const allowed = available.length > 0 ? new Set(available.map((t) => t.id)) : null;
-        const normalized = [
-            "piano",
-            ...[...new Set(ids)].filter((id) => id && id !== "piano" && (!allowed || allowed.has(id))),
-        ];
-        this.songPort.setState("enabled_timbres_json", JSON.stringify(normalized));
-        return normalized;
+        return ["piano", ...new Set(pluginTimbres.filter((id) => id !== "piano"))];
     }
 
     private scoresDir(): string {
-        return join(dirname(this.config.pluginsDir), "scores");
+        return join(this.config.dataDir, "scores");
     }
 
     private scoresMetaPath(): string {
@@ -375,48 +318,9 @@ export class DeploymentService {
 
     private async buildAssemblyExtras(
         templateScores: readonly AssemblyScoreEntry[],
-        activeArchives: readonly PbePluginArchive[],
     ): Promise<{
-        timbres?: TimbreExportSelection;
         scores?: AssemblyScoreEntry[];
     }> {
-        const enabledTimbres = this.getEnabledTimbres();
-        const pluginTimbreIds = new Set(activeArchives.flatMap((a) => a.timbres.map((t) => t.id)));
-        const extraTimbreIds = enabledTimbres.filter((id) => id !== "piano" && !pluginTimbreIds.has(id));
-        let timbres: TimbreExportSelection | undefined;
-        if (extraTimbreIds.length > 0) {
-            const dir = this.resolveTimbresDir();
-            const all = this.getAvailableTimbres();
-            const selected: LoadedTimbrePack[] = [];
-            const builtins = this.pluginService.listBuiltinArchives();
-            for (const id of extraTimbreIds) {
-                const meta = all.find((t) => t.id === id);
-                if (!meta) continue;
-                const builtinMatch = builtins.find((b) => b.archive.timbres.some((t) => t.id === id));
-                if (builtinMatch) {
-                    const timbre = builtinMatch.archive.timbres.find((t) => t.id === id)!;
-                    const files = new Map<string, Uint8Array>();
-                    for (const [path, bytes] of builtinMatch.archive.sounds) files.set(path, bytes);
-                    selected.push({ meta, files, soundDefinitions: timbre.soundDefinitions });
-                    continue;
-                }
-                if (dir && meta.file) {
-                    const zipPath = join(dir, meta.file);
-                    if (!existsSync(zipPath)) continue;
-                    const entries = await readAddonArchive(new Uint8Array(readFileSync(zipPath)));
-                    const files = new Map(entries.map((f) => [f.path, f.bytes]));
-                    const defEntry = entries.find((f) => f.path === "sound_definitions.json");
-                    const soundDefinitions = defEntry
-                        ? (JSON.parse(new TextDecoder().decode(defEntry.bytes)).sound_definitions ?? {})
-                        : {};
-                    selected.push({ meta, files, soundDefinitions });
-                }
-            }
-            if (all.length > 0) {
-                timbres = { all, selected, enabledIds: enabledTimbres };
-            }
-        }
-
         const customMeta = this.listScores();
         let scores: AssemblyScoreEntry[] | undefined;
         if (customMeta.length > 0) {
@@ -442,20 +346,16 @@ export class DeploymentService {
             ].slice(0, MAX_SCORES);
         }
 
-        return { timbres, scores };
+        return { scores };
     }
 
     private computeTargetConfigHash(): { hash: string; plugins: string[]; issues: string[] } {
         const issues: string[] = [];
+        this.pluginService.syncDirectory();
         const archives = this.pluginService.getActivePackArchives();
         const pluginSpecs = archives
             .map((archive) => `${archive.manifest.id}@${archive.manifest.version}:${crc32Hex(archive.bytes)}`)
             .sort();
-        const enabledTimbres = this.getEnabledTimbres();
-        const pluginTimbreIds = new Set(archives.flatMap((a) => a.timbres.map((t) => t.id)));
-        const hasExtraTimbres = enabledTimbres.some((id) => id !== "piano" && !pluginTimbreIds.has(id));
-        const availableTimbres = this.getAvailableTimbres();
-        const timbreSpecs = hasExtraTimbres && availableTimbres.length > 0 ? [...enabledTimbres].sort() : [];
         const customScores = this.listScores();
         const scoreSpecs = customScores.length
             ? customScores.map((s) => `${s.id}:${s.pages.join(",")}`).sort()
@@ -463,7 +363,7 @@ export class DeploymentService {
         const identity = this.packIdentityOptions();
         const payload = JSON.stringify({
             plugins: pluginSpecs,
-            timbres: timbreSpecs,
+            timbres: [],
             embedSongs: false,
             pack: {
                 name: identity.name ?? "",
@@ -568,25 +468,25 @@ export class DeploymentService {
     private async prepareAssembledTemplate() {
         const templatePath = this.resolveTemplatePath();
         if (!templatePath) {
-            throw new Error("未找到服务器基础模板（server.mcaddon / template-bare.mcaddon），请先上传或构建模板");
+            throw new Error("未找到服务器基础模板（server.mcaddon / template.mcaddon），请先上传或构建模板");
         }
+        this.pluginService.syncDirectory();
         const raw = new Uint8Array(readFileSync(templatePath));
         const stored = zipSync(unzipSync(raw), { level: 0 });
         const info = await loadAddonTemplate(stored);
         const archives = this.pluginService.getActivePackArchives();
-        const extras = await this.buildAssemblyExtras(info.scores, archives);
+        const extras = await this.buildAssemblyExtras(info.scores);
         return { info, archives, ...extras };
     }
 
     async buildDownloadBytes(): Promise<Uint8Array> {
-        const { info, archives, timbres, scores } = await this.prepareAssembledTemplate();
+        const { info, archives, scores } = await this.prepareAssembledTemplate();
         const identity = this.packIdentityOptions();
         return assembleAddonBytes(info, [], {
             name: identity.name,
             desc: identity.desc,
             randomUuid: false,
             plugins: archives,
-            ...(timbres ? { timbres } : {}),
             ...(scores ? { scores } : {}),
             embedSongs: false,
         });
@@ -601,14 +501,13 @@ export class DeploymentService {
             throw new Error(`BDS 目录不存在：${bdsConfig.bdsDir}`);
         }
 
-        const { info, archives, timbres, scores } = await this.prepareAssembledTemplate();
+        const { info, archives, scores } = await this.prepareAssembledTemplate();
         const identity = this.packIdentityOptions();
         const assembled = assembleAddonTemplate(info, [], {
             name: identity.name,
             desc: identity.desc,
             randomUuid: false,
             plugins: archives,
-            ...(timbres ? { timbres } : {}),
             ...(scores ? { scores } : {}),
             embedSongs: false,
         });

@@ -16,11 +16,33 @@ export function pluginsRoutes(
     const readRole = () => requireRole("user", deps.config.allowPublicRead);
     const adminRole = () => requireRole("admin");
 
-    app.get("/", readRole(), (c) => {
+    app.get("/", readRole(), async (c) => {
         const status = deploymentService.getStatus();
+        const catalog = await pluginService.listCatalogWithRemote(
+            status.deployedPlugins,
+            status.loadedPlugins,
+        );
         return c.json({
-            items: pluginService.listCatalog(status.deployedPlugins, status.loadedPlugins),
+            items: catalog.items,
             deployment: status,
+            ...(catalog.registryUrl ? { registryUrl: catalog.registryUrl } : {}),
+            ...(catalog.registryError ? { registryError: catalog.registryError } : {}),
+        });
+    });
+
+    app.post("/scan", adminRole(), async (c) => {
+        pluginService.syncDirectory();
+        const status = deploymentService.getStatus();
+        const catalog = await pluginService.listCatalogWithRemote(
+            status.deployedPlugins,
+            status.loadedPlugins,
+            true,
+        );
+        return c.json({
+            items: catalog.items,
+            deployment: status,
+            ...(catalog.registryUrl ? { registryUrl: catalog.registryUrl } : {}),
+            ...(catalog.registryError ? { registryError: catalog.registryError } : {}),
         });
     });
 
@@ -28,14 +50,22 @@ export function pluginsRoutes(
         const contentType = c.req.header("Content-Type") ?? "";
         if (contentType.includes("application/json")) {
             const body = await c.req.json().catch(() => null);
-            const builtinId = typeof body?.builtinId === "string" ? body.builtinId.trim() : "";
-            if (!builtinId) return c.json({ error: "请提供 builtinId 或上传 .pbeplugin 文件" }, 400);
+            const remoteId =
+                typeof body?.remoteId === "string"
+                    ? body.remoteId.trim()
+                    : typeof body?.builtinId === "string"
+                      ? body.builtinId.trim()
+                      : "";
+            if (!remoteId) return c.json({ error: "请提供 remoteId 或上传 .pbeplugin 文件" }, 400);
             try {
-                const record = pluginService.installBuiltin(builtinId);
+                const record = await pluginService.installFromRegistry(remoteId);
                 return c.json(record, 201);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                return c.json({ error: message }, error instanceof SongConflictError ? 409 : 400);
+                return c.json(
+                    { error: message },
+                    error instanceof SongConflictError || error instanceof PluginConflictError ? 409 : 400,
+                );
             }
         }
 
@@ -83,7 +113,8 @@ export function pluginsRoutes(
             const record = pluginService.trustPlugin(c.req.param("id") ?? "");
             return c.json(record);
         } catch (error) {
-            return c.json({ error: error instanceof Error ? error.message : String(error) }, 404);
+            const status = error instanceof PluginConflictError ? 409 : 404;
+            return c.json({ error: error instanceof Error ? error.message : String(error) }, status);
         }
     });
 

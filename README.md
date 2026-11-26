@@ -18,11 +18,11 @@ PianoBE 是一套面向基岩版的钢琴附加包解决方案，由以下部分
 
 | 部分 | 说明 |
 |---|---|
-| **附加包（addon）** | 游戏内钢琴方块：实时弹奏、MIDI 播放器、播放队列与多钢琴支持 |
-| **在线生成器（generator）** | 网页端将 `.mid` 文件与内置曲库打包为 `.mcaddon`，Cloudflare Workers Static Assets 部署；D1 记录试听播放量 |
-| **自托管后端（server + web）** | Hono + SQLite 文件曲库服务，配套 React 管理页；BDS 服务器经 server-net 远程拉取曲目 |
-| **音频转 MIDI（AMT）** | 生成器内置浏览器端转录（多线程 WASM）；server 调用 Rust `amt-cli`，支持上传音频与 B 站视频链接 |
-| **共享核心库（core）** | MIDI 转换/打包、曲库编解码、音符映射、存储端口等无游戏依赖的领域逻辑 |
+| **附加包（addon）** | 游戏内钢琴方块：实时弹奏、MIDI 播放器、播放队列与多钢琴支持（源码与底包保持零插件） |
+| **网页版工作台（studio）** | 面向普通玩家的静态应用：本地工作区将 `.mid`、曲库与 `.pbeplugin` 装配为 `.mcaddon`，内置浏览器端 ONNX 转录 |
+| **自托管后端（server + studio:server）** | Hono + SQLite 单文件服务与精简管理页；外置 `plugins/` / `data/` / `logs/`，BDS 经 server-net 远程拉取曲目 |
+| **音频转 MIDI（AMT）** | 玩家网页版内置浏览器端转录（多线程 WASM）；server 调用 Rust `amt-cli`（支持环境变量 / 管理页一键从 npm 下载 / `node_modules` / PATH） |
+| **共享核心库（core / vfx / assembly）** | MIDI 转换/打包、曲库编解码、视觉特效与插件装配器等无游戏依赖领域逻辑 |
 
 主要特性：
 
@@ -67,7 +67,7 @@ npm run deploy:bds
 #   secrets.json   → { "pianoBackendToken": "Bearer <令牌>" }
 ```
 
-后端日志默认写入 `packages/server/data/logs/server.log`（单文件 10 MB，轮转保留 7 个 `.1`～`.7`），同时输出到控制台；`LOG_FILE=off` 可关闭文件日志，级别/格式/大小用 `LOG_LEVEL`、`LOG_FORMAT`、`LOG_MAX_BYTES`、`LOG_MAX_FILES` 调整。
+后端默认按 MC Server 风格在运行目录（当前目录或 `--dir` / `PIANOBE_HOME`）下组织 `plugins/`、`data/`、`logs/`：把 `.pbeplugin` 直接放进 `plugins/`，在扩展中心点「刷新目录」即可识别并按需启用/信任；日志默认写入 `logs/server.log`（单文件 10 MB，轮转保留 7 个）。
 
 管理页的「BDS 部署」默认把行为包/资源包写入 `development_behavior_packs` / `development_resource_packs`，切换目录时旧的同名包会归档到隐藏目录；manifest 的包名/描述也可以在页面自定义。本机开发时也可以一条命令跑完：`npm run deploy:bds`——直接调用后端代码写文件，不上传产物、不需要令牌（`--skip-build` 复用现有产物；`--url`/`--token` 用于部署到远端后端）。部署只写文件，重启 BDS 或重进世界后才加载新包。
 
@@ -84,19 +84,21 @@ pianoBE/
 ├── packages/          # npm workspaces：共享库与各交付物
 │   ├── core/          # 共享核心库 @piano/core（零 MC 依赖）
 │   ├── vfx/           # 跨平台视觉库 @piano/vfx（琴型/琴键/舞台/特效/粒子资源，Addon 与 Web 共用）
+│   ├── assembly/      # 统一装配器 @piano/assembly（插件依赖校验、BP/RP 装配）
 │   ├── ui/            # 共享设计系统 @piano/ui：Tailwind 主题、基础组件、布局、播放器
-│   ├── addon/         # 附加包 @piano/addon（双目标构建：模板包 / 服务器专用包）
-│   ├── server/        # 后端 @piano/server：Hono + bun:sqlite + 文件曲库
-│   ├── web/           # 管理页 @piano/web：React + Tailwind + Vite
-│   └── generator/     # 独立生成器 @piano/generator（React + Tailwind + Vite，Cloudflare 可部署）
-├── midis/             # 曲库数据资产（见"曲库与贡献"）
-├── tools/             # 转换与验证脚本
+│   ├── addon/         # 附加包 @piano/addon（零插件底包：template.mcaddon / server.mcaddon）
+│   ├── studio/        # 统一工作台 @piano/studio（网页完整版 dist / 服务器精简版 dist-server）
+│   ├── server/        # 后端 @piano/server：Hono + bun:sqlite + 外置目录服务
+│   └── web/           # 开发期 VFX Lab 预览工具（Three.js + Wintersky）
+├── plugins/           # 官方 VFX 扩展源码
+├── midis/             # 曲库与官方精选演出资产
+└── tools/             # 构建、插件打包、开发装配与验证脚本
 ```
 （sapi-pro 使用 npm 发布版，不再 vendor 内置）
 
-**依赖方向**：`addon`、`server`、`generator` → `core`；`addon`、`web` → `vfx` → `core`；`web`、`generator` → `ui`；`web` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
+**依赖方向**：`addon`、`server`、`studio` → `core`；`addon`、`studio`、`web` → `vfx` → `core`；`studio`、`web` → `ui`；`studio:server` → `server` API；addon（BDS）→ `server`（server-net 拉取）。
 
-**前端约定**：两个 React 应用共用 `@piano/ui` 的 Tailwind 设计系统、基础控件（按钮/输入框/下拉/标签）、`AppLayout`（桌面侧栏 / 移动底部导航）、`PlayerBar`、`AppPlayer`（MIDI 采样与原音频试听的统一外壳）与歌曲行组件；深浅色通过 `data-theme` + `--pb-*` 变量切换。`generator` 的播放器绑定模板音色，`web` 的播放器读取 `/piano` 采样；两者都基于 `@piano/core/player`，共享音色切换、逐曲响度归一化与音符卷帘，跨路由保持播放。
+**双构建说明**：`studio`（面向普通玩家，纯静态可部署 Cloudflare）与 `studio:server`（面向 BDS 服主，内嵌进单文件服务端，自动剔除浏览器 ONNX 与本地装配依赖）共用 UI 与状态层但产物彻底隔离；`addon` 的生产构建（`build:template` / `build:server`）始终输出零插件纯净底包，本地日常开发运行 `npm run build` 或 `npm run build:dev` 时会自动把全部本地插件与曲库装配进开发包。
 
 ### 两个 Addon 包（同一份源码，注入式条件编译）
 
@@ -137,30 +139,33 @@ pianoBE/
 npm install
 
 # 构建共享库与各交付物
-npm run build:core       # @piano/core
-npm run build:vfx        # @piano/vfx（addon/web 的前置）
-npm run build:template   # addon 模板包（生成器底包，build:generator 的前置）
-npm run build:server     # addon 服务器专用包
-npm run build:server:exe # 单文件服务端（服务器版，AOT + trim；需 Bun canary）
-npm run build:generator  # 生成器
-npm run build:web        # 管理页
+npm run build:core          # @piano/core
+npm run build:vfx           # @piano/vfx（addon/studio/web 的前置）
+npm run build:assembly      # @piano/assembly（装配器）
+npm run build:template      # addon 零插件客户端底包（packages/addon/dist/template.mcaddon）
+npm run build:server        # addon 零插件服务器底包（packages/addon/dist/server.mcaddon）
+npm run build:dev           # 开发包（基于 template.mcaddon 自动装入全部本地插件与曲库 -> dist/dev.mcaddon）
+npm run build               # 一键装配满血开发包并复制到本地 Minecraft 开发目录
+npm run build:server:exe    # 单文件服务端（仅含后端 + 精简管理页 + 零插件 server.mcaddon）
+npm run build:web           # VFX Lab 开发预览工具
 
-# Studio 两种构建（本地版 / 服务器版）
-npm run build:studio        # 本地/完整版 → packages/studio/dist（模板、插件、浏览器转录）
-npm run build:studio:server # 服务器版 → packages/studio/dist-server（仅服务器管理模式）
+# Studio 两种构建（玩家网页版 / 服务器管理版）
+npm run build:studio        # dist/：面向普通玩家（零插件底包、官方插件、浏览器转录 AMT）
+npm run build:studio:server # dist-server/：精简服务器管理版（剔除本地工作区、ONNX 与前端装配依赖）
 
 # 测试
-npm test                 # core vitest + vfx bun test
-npm run test:server      # server bun test
-npm run test -w @piano/addon  # addon netSource 缓存/降级
+npm test                    # core + vfx + assembly
+npm run test:server         # server bun test
+npm run test -w @piano/addon  # addon 单元测试
 
 # 运行
-npm run dev:generator    # 生成器开发模式（predev 自动同步底包与曲库到 public/）
+npm run dev                 # addon 热重载开发
+bun --filter @piano/studio dev  # Studio 开发模式
 
 # 本机直接跑后端（非 Docker）
-cp .env.example packages/server/.env   # 按需改端口 / 令牌
-npm run build:core                     # @piano/server 依赖 core 的构建产物
-npm run start:server                   # http://127.0.0.1:3000，日志在 packages/server/data/logs/
+cp .env.example packages/server/.env   # 按需改端口 / 令牌 / PLUGIN_REGISTRY_URL
+npm run build:core && npm run build:vfx && npm run build:assembly && npm run build:studio:server
+npm run start:server                   # http://127.0.0.1:3000，目录为 plugins/ data/ logs/
 ```
 
 ### 音频转 MIDI（AMT）资源

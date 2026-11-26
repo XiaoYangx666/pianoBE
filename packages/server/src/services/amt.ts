@@ -22,10 +22,15 @@ import type { ServerConfig } from "../config.js";
  * 服务端只负责排队、超时控制和临时文件清理。
  */
 
+export type AmtSource = "env" | "managed" | "npm" | "path";
+
 export interface AmtStatus {
     available: boolean;
+    source?: AmtSource;
     cli?: string;
     model?: string;
+    platform: string;
+    canInstall: boolean;
     decoder: "native" | "ffmpeg";
     threads: number;
     eco: boolean;
@@ -106,7 +111,34 @@ function pathCandidates(exeNames: string[]): string[] {
 
 interface AmtResolution {
     runtime?: AmtRuntime;
+    source?: AmtSource;
     message?: string;
+}
+
+const SUPPORTED_INSTALL_TARGETS = new Set(["win32-x64", "linux-x64"]);
+
+/** 解析托管下载目录（<dataDir>/amt/）中的 CLI 与模型 */
+function resolveManagedPackage(config: ServerConfig): AmtResolution {
+    const exe = process.platform === "win32" ? "amt-cli.exe" : "amt-cli";
+    const root = join(config.dataDir, "amt");
+    const cli = join(root, exe);
+    if (!existsSync(cli)) return {};
+    if (!platformMatches(cli)) {
+        return { message: `托管目录中的 amt-cli 与本机平台不匹配（当前 ${process.platform}）：${cli}` };
+    }
+    ensureExecutable(cli);
+    if (!isExecutable(cli)) {
+        return { message: `amt-cli 缺少执行权限：chmod +x ${cli}` };
+    }
+    const model = firstExisting([
+        config.amtModel ? resolve(config.amtModel) : undefined,
+        ...AMT_MODEL_NAMES.map((name) => join(root, "models", name)),
+        ...AMT_MODEL_NAMES.map((name) => join(root, name)),
+    ]);
+    if (!model) {
+        return { message: `托管目录缺少 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：${join(root, "models")}` };
+    }
+    return { runtime: { cli, model }, source: "managed" };
 }
 
 /** 手动按 node_modules 向上查找，编译成单文件后 require.resolve 不可用 */
@@ -202,8 +234,8 @@ function findModel(config: ServerConfig, cli: string): string | undefined {
     ]);
 }
 
-/** 解析 CLI 与模型路径：AMT_CLI > npm 依赖 amt-cli > PATH */
-function resolveRuntime(config: ServerConfig): AmtResolution {
+/** 解析 CLI 与模型路径：AMT_CLI(env) > 托管下载(managed) > npm 依赖(npm) > PATH(path) */
+function resolveRuntime(config: ServerConfig, options: { skipNpmLookup?: boolean } = {}): AmtResolution {
     const exeNames = process.platform === "win32" ? ["amt-cli.exe", "amt-cli"] : ["amt-cli"];
 
     if (config.amtCli) {
@@ -223,15 +255,20 @@ function resolveRuntime(config: ServerConfig): AmtResolution {
                 message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：请设置 AMT_MODEL`,
             };
         }
-        return { runtime: { cli, model } };
+        return { runtime: { cli, model }, source: "env" };
     }
 
-    const fromNpm = resolveNpmPackage(config);
+    const fromManaged = resolveManagedPackage(config);
+    if (fromManaged.runtime) {
+        return fromManaged;
+    }
+
+    const fromNpm = options.skipNpmLookup ? {} : resolveNpmPackage(config);
     if (fromNpm.runtime) {
         if (!isExecutable(fromNpm.runtime.cli)) {
             return { message: `amt-cli 缺少执行权限：chmod +x ${fromNpm.runtime.cli}` };
         }
-        return fromNpm;
+        return { runtime: fromNpm.runtime, source: "npm" };
     }
 
     const autoCandidates = pathCandidates(exeNames);
@@ -241,7 +278,9 @@ function resolveRuntime(config: ServerConfig): AmtResolution {
         return {
             message: wrong
                 ? `找到的 amt-cli 与本机平台不匹配（当前 ${process.platform}）：${wrong}`
-                : (fromNpm.message ?? "未找到 amt-cli：请安装 amt-cli 依赖（npm install），或设置 AMT_CLI"),
+                : (fromManaged.message ??
+                  fromNpm.message ??
+                  "未找到 amt-cli：可在管理页一键下载 AMT 组件、执行 npm install 或设置 AMT_CLI"),
         };
     }
 
@@ -252,34 +291,53 @@ function resolveRuntime(config: ServerConfig): AmtResolution {
     const model = findModel(config, cli);
     if (!model) {
         return {
-            message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：请安装 amt-cli 依赖，或设置 AMT_MODEL`,
+            message: `未找到 AMT 模型（${AMT_MODEL_NAMES.join(" / ")}）：可在管理页一键下载 AMT 组件，或设置 AMT_MODEL`,
         };
     }
 
-    return { runtime: { cli, model } };
+    return { runtime: { cli, model }, source: "path" };
 }
 
 export class AmtService {
-    private readonly runtime: AmtRuntime | undefined;
-    private readonly resolutionMessage: string | undefined;
+    private runtime: AmtRuntime | undefined;
+    private resolutionSource: AmtSource | undefined;
+    private resolutionMessage: string | undefined;
 
-    constructor(private readonly config: ServerConfig) {
-        const { runtime, message } = resolveRuntime(config);
-        this.runtime = runtime;
-        this.resolutionMessage = message;
+    constructor(
+        private readonly config: ServerConfig,
+        private readonly options: { skipNpmLookup?: boolean } = {},
+    ) {
+        this.applyResolution(resolveRuntime(config, options));
+    }
+
+    private applyResolution(res: AmtResolution): void {
+        this.runtime = res.runtime;
+        this.resolutionSource = res.source;
+        this.resolutionMessage = res.message;
+    }
+
+    /** 下载/安装完成后重新扫描解析路径，立即热生效而无需重启服务。 */
+    reload(): AmtStatus {
+        this.applyResolution(resolveRuntime(this.config, this.options));
+        return this.status();
     }
 
     status(): AmtStatus {
+        const platform = `${process.platform}-${process.arch}`;
         return {
             available: Boolean(this.runtime),
+            ...(this.resolutionSource ? { source: this.resolutionSource } : {}),
             cli: this.runtime?.cli,
             model: this.runtime?.model,
+            platform,
+            canInstall: SUPPORTED_INSTALL_TARGETS.has(platform),
             decoder: this.config.amtDecoder,
             threads: this.config.amtThreads,
             eco: this.config.amtEco,
             message: this.runtime
                 ? undefined
-                : (this.resolutionMessage ?? "未找到 amt-cli 或 ONNX 模型：请安装 amt-cli 依赖（npm install），或设置 AMT_CLI / AMT_MODEL"),
+                : (this.resolutionMessage ??
+                  "未找到 amt-cli 或 ONNX 模型：可在管理页一键下载 AMT 组件、执行 npm install 或设置 AMT_CLI / AMT_MODEL"),
         };
     }
 

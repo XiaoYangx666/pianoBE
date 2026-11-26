@@ -86,7 +86,8 @@ export interface PluginRow {
 export interface SaveSongOptions {
     name?: string;
     origin?: ContentOrigin;
-    libraryId?: string;
+    /** 传入 null 表示仅入总表，不自动加入 default 曲库（例如由插件曲库单独归属时） */
+    libraryId?: string | null;
     performanceMeta?: {
         id?: string;
         name?: string;
@@ -181,7 +182,7 @@ export class SqliteSongPort implements SongPort {
 
         const existingByFp = this.findSongByFingerprint(fp, pbe3);
         if (existingByFp && existingByFp.id !== song.id) {
-            this.mergeAliasAndLibrary(existingByFp.id, displayName, options.libraryId);
+            this.mergeAliasAndLibrary(existingByFp.id, displayName, options.libraryId ?? undefined);
             this.bumpCatalogVersion();
             return this.getDetailedMeta(existingByFp.id)!;
         }
@@ -202,7 +203,9 @@ export class SqliteSongPort implements SongPort {
                 format: "mid",
                 origin,
             });
-            this.ensureLibraryMembership(options.libraryId ?? "default", song.id);
+            if (options.libraryId !== null) {
+                this.ensureLibraryMembership(options.libraryId ?? "default", song.id);
+            }
             this.bumpCatalogVersion();
         })();
         this.cachePbe3(song.id, pbe3);
@@ -217,7 +220,7 @@ export class SqliteSongPort implements SongPort {
 
         const existingByFp = this.findSongByFingerprint(fp, buffer);
         if (existingByFp) {
-            this.mergeAliasAndLibrary(existingByFp.id, displayName, options.libraryId);
+            this.mergeAliasAndLibrary(existingByFp.id, displayName, options.libraryId ?? undefined);
             if (header.performance?.length) {
                 this.upsertPerformanceForSong(
                     existingByFp.id,
@@ -249,7 +252,9 @@ export class SqliteSongPort implements SongPort {
                 format: "pbe3",
                 origin,
             });
-            this.ensureLibraryMembership(options.libraryId ?? "default", header.id);
+            if (options.libraryId !== null) {
+                this.ensureLibraryMembership(options.libraryId ?? "default", header.id);
+            }
             if (header.performance?.length) {
                 this.upsertPerformanceForSong(
                     header.id,
@@ -943,7 +948,7 @@ export class SqliteSongPort implements SongPort {
         return true;
     }
 
-    deletePluginData(pluginId: string): void {
+    deletePluginDynamicData(pluginId: string): void {
         // 1. 删除插件贡献的演出
         this.db
             .query(`DELETE FROM performances WHERE origin_kind='plugin' AND origin_id=?`)
@@ -971,8 +976,12 @@ export class SqliteSongPort implements SongPort {
             }
         }
 
-        this.db.query(`DELETE FROM plugins WHERE id=?`).run(pluginId);
         this.bumpCatalogVersion();
+    }
+
+    deletePluginData(pluginId: string): void {
+        this.deletePluginDynamicData(pluginId);
+        this.db.query(`DELETE FROM plugins WHERE id=?`).run(pluginId);
     }
 }
 

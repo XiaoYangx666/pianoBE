@@ -32,10 +32,6 @@ export function addonRoutes(
                 packName: typeof body.packName === "string" ? body.packName : undefined,
                 packDescription: typeof body.packDescription === "string" ? body.packDescription : undefined,
             });
-            if (Array.isArray(body.enabledTimbres)) {
-                const ids = body.enabledTimbres.filter((item: unknown): item is string => typeof item === "string");
-                deploymentService.updateEnabledTimbres(ids);
-            }
             deps.logger?.scope("deploy").info("BDS 部署配置已更新", {
                 req: c.get("requestId"),
                 dir: config.bdsDir,

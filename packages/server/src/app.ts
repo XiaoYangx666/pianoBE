@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { serveStatic } from "hono/bun";
 import type { Database } from "bun:sqlite";
 import type { SqliteSongPort } from "./drivers/sqlitePorts.js";
@@ -23,6 +24,7 @@ import { librariesRoutes } from "./routes/libraries.js";
 import { pluginsRoutes } from "./routes/plugins.js";
 import { addonRoutes } from "./routes/addon.js";
 import type { AmtService } from "./services/amt.js";
+import { AmtInstaller } from "./services/amtInstaller.js";
 import { TranscribeJobStore } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
@@ -38,6 +40,8 @@ export interface AppDeps {
     config: ServerConfig;
     /** AMT 转录服务；未配置时相关接口返回 503 */
     amt?: AmtService;
+    /** AMT 组件在线安装器；不传且存在 amt 时自动创建 */
+    amtInstaller?: AmtInstaller;
     /** 转录任务管理器；不传时由 createApp 创建（调用方需要生命周期控制时应显式传入） */
     transcribeJobs?: TranscribeJobStore;
     pluginService?: PluginService;
@@ -96,7 +100,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         });
     });
 
-    const pluginService = deps.pluginService ?? new PluginService(deps.songPort, deps.config);
+    const pluginService = deps.pluginService ?? new PluginService(deps.songPort, deps.config, deps.logger?.scope("plugins"));
     const deploymentService = deps.deploymentService ?? new DeploymentService(deps.songPort, pluginService, deps.config);
     const transcribeJobs =
         deps.transcribeJobs ??
@@ -106,6 +110,15 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
             amt: deps.amt,
             logger: deps.logger?.scope("transcribe"),
         });
+    const amtInstaller =
+        deps.amtInstaller ??
+        (deps.amt
+            ? new AmtInstaller({
+                  config: deps.config,
+                  amt: deps.amt,
+                  logger: deps.logger?.scope("amt"),
+              })
+            : undefined);
     const readRole = () => requireRole("user", deps.config.allowPublicRead);
 
     // 解析令牌（仅挂上下文，不拦截；角色门槛由具体路由决定）
@@ -143,7 +156,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     api.route("/plugins", pluginsRoutes(deps, pluginService, deploymentService));
     api.route("/addon", addonRoutes(deps, deploymentService));
     api.route("/tokens", tokensRoutes(deps));
-    api.route("/transcribe", transcribeRoutes(deps, transcribeJobs));
+    api.route("/transcribe", transcribeRoutes({ ...deps, amtInstaller }, transcribeJobs));
 
     api.get("/performances/:perfId", readRole(), (c) => {
         const perf = deps.songPort.getPerformance(c.req.param("perfId") ?? "");
@@ -192,7 +205,8 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     });
 
     // 静态托管 Studio / Web 构建产物（SPA fallback 到 index.html）
-    if (deps.config.webRoot && existsSync(deps.config.webRoot)) {
+    const webRoot = deps.config.webRoot;
+    if (webRoot && existsSync(webRoot)) {
         // 所有静态文件（Studio 前端 bundle、模板、插件、采样）都要求令牌：
         // 未登录只返回内联登录页，公网无凭证拿不到任何前端文件。
         app.use("*", async (c, next) => {
@@ -220,7 +234,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         app.use(
             "*",
             serveStatic({
-                root: deps.config.webRoot,
+                root: webRoot,
                 mimes: { ogg: "audio/ogg", wasm: "application/wasm", onnx: "application/octet-stream" },
             }),
         );
@@ -228,7 +242,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
             if (c.req.path === "/api" || c.req.path.startsWith("/api/")) {
                 return c.json({ error: "接口不存在" }, 404);
             }
-            const file = Bun.file(`${deps.config.webRoot}/index.html`);
+            const file = Bun.file(join(webRoot, "index.html"));
             if (await file.exists()) {
                 return new Response(await file.text(), {
                     headers: {

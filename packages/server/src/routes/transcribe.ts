@@ -102,7 +102,40 @@ export function transcribeRoutes(
             active: jobs.activeCount,
             queueLimit: deps.config.amtMaxQueue,
             queueFull: jobs.isQueueFull,
+            ...(deps.amtInstaller ? { install: deps.amtInstaller.getState() } : {}),
         });
+    });
+
+    // GET /api/transcribe/amt/install —— 查询在线下载安装进度
+    app.get("/amt/install", jobRole(), (c) => {
+        if (!deps.amt || !deps.amtInstaller) {
+            return c.json({ error: "服务端未启用 AMT 安装器" }, 503);
+        }
+        return c.json({
+            install: deps.amtInstaller.getState(),
+            status: deps.amt.status(),
+        });
+    });
+
+    // POST /api/transcribe/amt/install —— 管理员触发从 npm registry 下载/更新 amt-cli
+    app.post("/amt/install", requireRole("admin"), async (c) => {
+        if (!deps.amt || !deps.amtInstaller) {
+            return c.json({ error: "服务端未启用 AMT 安装器" }, 503);
+        }
+        if (jobs.activeCount > 0) {
+            return c.json({ error: "当前有转录任务正在运行，请等待任务结束后再安装或更新 AMT" }, 409);
+        }
+        const body = (await c.req.json().catch(() => null)) as { registry?: unknown } | null;
+        const registry = typeof body?.registry === "string" ? body.registry.trim() : undefined;
+        try {
+            const install = deps.amtInstaller.start(registry || undefined);
+            return c.json({ install }, 202);
+        } catch (error) {
+            return c.json(
+                { error: error instanceof Error ? error.message : String(error) },
+                400,
+            );
+        }
     });
 
     // GET /api/transcribe/bilibili/search?q= —— 关键词搜索（需要 buvid 指纹）

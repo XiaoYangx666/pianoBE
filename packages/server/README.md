@@ -2,22 +2,40 @@
 
 Hono + bun:sqlite 的单进程服务：托管 API、前端管理页（同源，免 CORS）与 Docker 部署。
 
-## 快速开始（本地）
+## 快速开始（本地源码运行）
 
 ```bash
-# 构建共享库与前端
+# 构建共享库与服务器版前端
 npm run build:core
-npm run build:web
+npm run build:vfx
+npm run build:assembly
+npm run build:studio:server
 
-# 本地运行（.env 在仓库根目录：cp .env.example .env）
+# 本地运行（--dir 可指定运行根目录；不传则以当前目录作为运行根目录）
 cd packages/server
-bun src/index.ts
+bun src/index.ts --dir ./run
 # 或：npm run start:server
 ```
 
-> 配置全部走根目录 `.env`（见 `.env.example`），bun 启动时自动加载，无需手动 export。
+> 配置读取运行目录 `.env`（或环境变量，见仓库根 `.env.example`），bun 启动时自动加载。
 > 首次启动未设置 `BOOTSTRAP_TOKEN` 时，会自动生成一个管理员令牌并打印到控制台。
 > 用该令牌登录管理页（或直接作为 `Authorization: Bearer <token>` 调用 API）。
+
+## 运行目录模型（MC Server 风格）
+
+无论是单文件发行版还是从仓库源码启动，运行根目录（当前目录或 `--dir` / `PIANOBE_HOME` 指定目录）统一组织为：
+
+```text
+<运行目录>/
+├── pianobe-server(.exe)   # 单文件可执行程序（内嵌精简管理页 + 零插件 server.mcaddon）
+├── .env                   # 端口、令牌、BDS_DIR、PLUGIN_REGISTRY_URL 等配置
+├── plugins/               # 直接放入或删除 .pbeplugin（启动或点「刷新目录」自动同步，待手动启用）
+├── data/                  # piano.db、scores/、自定义 server-template.mcaddon、网页下载的 amt/
+└── logs/                  # server.log 及轮转日志文件
+```
+
+- **外置插件**：把 `.pbeplugin` 放进 `plugins/` 后，在管理页扩展中心点「刷新目录」（或重启服务）即可看到新发现的插件，由管理员手动点击启用/信任；从 `plugins/` 删除文件后自动清理对应记录。若配置了 `PLUGIN_REGISTRY_URL`（如面向玩家网页版的 `/plugins/index.json`），还可在扩展中心直接从远程源一键下载。
+- **可选音色**：已全部统一为 `.pbeplugin` 音色插件，不再保留旧版散装 `timbres/` 开关；启用对应音色插件即可装配进 BDS。
 
 ## Docker 部署
 
@@ -55,12 +73,17 @@ docker compose -f docker-compose.dev.yml up
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `PORT` | `3000` | 监听端口 |
-| `DB_PATH` | `./data/piano.db` | SQLite 文件路径（曲目 meta/内容/令牌） |
+| `PIANOBE_HOME` | `.` | 运行根目录（也可通过 `--dir <path>` 传入） |
+| `DATA_DIR` | `<home>/data` | 数据目录（`piano.db`、`scores/`、覆盖模板、托管 `amt/`） |
+| `DB_PATH` | `<data>/piano.db` | SQLite 文件路径（曲目 meta/内容/令牌） |
+| `PLUGINS_DIR` | `<home>/plugins` | 外置插件目录（`.pbeplugin`） |
+| `PLUGIN_REGISTRY_URL` | 无 | 可选远程插件清单 URL（如 `https://.../plugins/index.json`） |
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
-| `WEB_ROOT` | 无 | 前端构建产物目录（不存在则不托管） |
-| `AMT_CLI` | npm 包 `amt-cli` | AMT Rust CLI 路径（默认用依赖内置的当前平台二进制，也可在 PATH 中查找） |
-| `AMT_MODEL` | 包内 `models/run4_int8.onnx` | ONNX 模型路径 |
+| `WEB_ROOT` | 自动探测 | 前端构建产物目录（单文件优先内嵌 `web/`，源码优先 `studio/dist-server`） |
+| `AMT_CLI` | 自动探测 | 显式指定 `amt-cli` 路径（优先级最高） |
+| `AMT_MODEL` | 自动探测 | ONNX 模型路径 |
+| `NPM_REGISTRY` | `https://registry.npmmirror.com` | 网页一键下载 `amt-cli` 时使用的 npm 源 |
 | `AMT_DECODER` | `native` | `native` 内置解码（mp3/m4a/flac/wav/ogg）；`ffmpeg` 外部解码 |
 | `AMT_THREADS` | `4` | 转录线程数 |
 | `AMT_CONCURRENCY` | `1` | 同时运行的转录任务数 |
@@ -77,7 +100,7 @@ docker compose -f docker-compose.dev.yml up
 | `BDS_PACK_MODE` | `development` | `development` 部署到 `development_behavior_packs` / `development_resource_packs`；`release` 部署到 `behavior_packs` / `resource_packs` |
 | `BDS_PACK_NAME` | 模板名 | 自定义 manifest 包名（管理页可改） |
 | `BDS_PACK_DESCRIPTION` | 模板描述 | 自定义 manifest 描述（管理页可改） |
-| `LOG_FILE` | `./data/logs/server.log` | 日志文件；设为 `off` 只输出到控制台 |
+| `LOG_FILE` | `<home>/logs/server.log` | 日志文件；设为 `off` 只输出到控制台 |
 | `LOG_LEVEL` | `info` | 最低日志级别：`debug` / `info` / `warn` / `error` |
 | `LOG_FORMAT` | `text` | 文件格式：`text` 或 `json`（一行一条） |
 | `LOG_MAX_BYTES` | `10485760` | 单个日志文件上限（字节） |
@@ -88,37 +111,33 @@ docker compose -f docker-compose.dev.yml up
 | | 开发 | 生产（单文件发行版） |
 |---|---|---|
 | 启动 | `npm run dev:server`（bun --watch） | 直接运行 `pianobe-server-<平台>` |
-| 管理页 | `packages/studio` 的 `npm run dev`（本地/完整版） | 构建时嵌入 `packages/studio/dist-server` |
-| Studio 模式 | 本地工作区 + 服务器模式 | **仅服务器模式**（无本地入口） |
-| 资源目录 | `packages/studio/dist`、`WEB_ROOT` 可覆盖 | 嵌入可执行文件，`web/` 虚拟目录 |
-| 配置 | `packages/server/.env` | 环境变量或运行目录 `.env` |
+| 管理页 | `packages/studio` 的 `npm run dev`（完整版） | 构建时嵌入 `packages/studio/dist-server`（精简服务器版） |
+| Studio 模式 | 本地工作区 + 服务器模式 | **仅服务器模式**（无本地工作区、无 ONNX/前端装配依赖） |
+| 资源目录 | 优先 `studio/dist-server`、`WEB_ROOT` 可覆盖 | 嵌入可执行文件 `web/` 虚拟目录 |
+| 插件与数据 | 运行目录 `plugins/`、`data/`、`logs/` | 同左（全部外置，不打入二进制） |
+| 配置 | `.env` 或环境变量 | 环境变量或运行目录 `.env` |
 
 Studio 两套构建互不覆盖：
 
 ```bash
-npm run build:studio        # dist/：本地版（模板、内置插件、浏览器转录 AMT）
-npm run build:studio:server # dist-server/：服务器版（只有服务器模式与试听采样）
+npm run build:studio        # dist/：面向玩家的完整网页版（含模板、官方插件、浏览器转录 AMT）
+npm run build:studio:server # dist-server/：精简服务器管理版（剔除本地工作区、ONNX 与前端装配依赖）
 ```
 
-## 单文件发行版（Linux x64）
+## 单文件发行版
 
 ```bash
 npm run build:server:exe
-# 产物：build/server-exe/pianobe-server-linux-x64（约 79 MiB）
+# 产物：build/server-exe/pianobe-server-<platform>-<arch>(.exe)
 ```
 
-- 服务器版只保留后端服务与管理页：**不含浏览器本地转录、本地工作区模式**，
-  因此也不内嵌 ONNX WASM、客户端模板 `template.mcaddon` 和重复的插件目录
-- 内嵌：管理页前端（`dist-server`）、内置插件（`build/plugins`）、服务器附加包模板
-  `server.mcaddon`
-- 模板只带标准钢琴（`piano_v1~3`）：可选音色采样存放在 `packages/addon/timbre-samples/`，
-  不在 `rp/sounds` 内，打包时不会进入模板；多余音色统一以 `.pbeplugin` 插件形式按需启用
-- 构建用 `Bun.build` 的 AOT + `trim`，需要 **Bun canary（1.4.5-canary 及以上）**；
-  稳定版 1.4.5 的 `--aot/--trim` 不生效
-- AOT **不能交叉编译**：Windows 版要在 Windows 上执行同一脚本
-- 运行：`./pianobe-server-linux-x64`，配置用环境变量或同目录 `.env`（`PORT`、`DB_PATH`、
-  `BOOTSTRAP_TOKEN`、`BDS_DIR`…）；数据库默认写到当前目录 `./data/`
-- AMT 不在包内：设置 `AMT_CLI`（附 `AMT_MODEL`）或把 `amt-cli` 依赖放在可执行文件附近
+- 单文件二进制**仅包含**：后端 API + 精简服务器管理页（`dist-server`）+ 零插件服务器底包 `server.mcaddon`
+- **不内嵌** `build/plugins`、ONNX WASM、浏览器装配器与 `amt-cli`；插件、数据库、自定义曲谱、日志全部保存在运行目录外部
+- 模板只带标准钢琴（`piano_v1~3`）：可选音色采样统一打包为 `.pbeplugin` 插件按需启用
+- 构建用 `Bun.build` 的 AOT + `trim`，需要 **Bun canary（1.4.5-canary 及以上）**；稳定版 1.4.5 的 `--aot/--trim` 不生效
+- AOT **不能交叉编译**：Windows 版需在 Windows 上执行同一脚本
+- 运行：`./pianobe-server-linux-x64 --dir ./my-server`（Windows 为 `pianobe-server-win32-x64.exe`）
+- AMT 四级解析顺序：`AMT_CLI`（环境变量） → `<dataDir>/amt/`（管理页「音乐工具」一键从 npm 下载） → `node_modules`（npm 依赖） → `PATH`
 
 ## BDS 附加包部署
 
@@ -200,17 +219,14 @@ MIDI 暂存在临时目录，管理页可试听、改名、生成导入码，确
 任务 30 分钟无更新自动清理。进度来自 `amt-cli --events` 的实时音符事件，
 按「已解码音频时间 / 总时长」估算百分比（总时长未知时显示不确定进度）。
 
-CLI、ONNX Runtime 与 int8 模型都来自 npm 包
-[`amt-cli`](https://www.npmjs.com/package/amt-cli)（`@piano/server` 的依赖），
-`npm install` / `bun install` 后即自动就绪，不再需要 `AMT_DIR` 或同步脚本：
+CLI、ONNX Runtime 与 int8 模型来自 npm 包 [`amt-cli`](https://www.npmjs.com/package/amt-cli)。单文件二进制用户在「音乐工具」页点击「一键下载 AMT 组件」（支持国内镜像 `npmmirror` 与 npm 官方源）即可自动拉取并热重载生效；克隆仓库开发也可直接 `npm install` 后开箱使用：
 
 ```bash
 npm install     # 安装依赖（含 amt-cli 与当前平台二进制，约 40 MB）
 npm run start:server
 ```
 
-解析顺序为 `AMT_CLI` → 依赖包内 `${platform}-${arch}/` 二进制 → `PATH`；模型优先
-`models/run4_int8.onnx`。npm tarball 不带执行位，服务启动解析时会自动 `chmod +x`。
+解析顺序为：`AMT_CLI`（环境变量） → `<dataDir>/amt/`（网页一键下载） → `node_modules`（npm 依赖） → `PATH`；模型优先 `models/run4_int8.onnx`。npm tarball 不带执行位，服务启动解析时会自动 `chmod +x`。
 
 B 站解析流程：`finger/spi` 取匿名 buvid → `view` 取 cid/title → `playurl`（DASH）
 选最高码率音轨 → 带 Referer 下载 fMP4（`.m4s`）→ 直接交给 `amt-cli`。
@@ -223,7 +239,7 @@ B 站解析流程：`finger/spi` 取匿名 buvid → `view` 取 cid/title → `p
 
 ## 日志与排查
 
-控制台和文件使用同一套格式，默认写入 `./data/logs/server.log`：
+控制台和文件使用同一套格式，默认写入 `<home>/logs/server.log`：
 
 ```
 2026-11-26 12:00:00.123 INFO  [http] GET /api/songs 200 12ms | req=8f3c2a1b4c5d auth=admin#3

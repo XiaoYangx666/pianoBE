@@ -29,6 +29,7 @@ beforeAll(() => {
     adminTokenId = created.id;
     adminToken = created.token;
     const config = loadConfig({
+        PIANOBE_HOME: tempRoot,
         WEB_ROOT: webRoot,
         PLUGINS_DIR: join(tempRoot, "plugins"),
     });

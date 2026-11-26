@@ -43,7 +43,8 @@ packages/addon/rp/textures/entity/pbe_stage_props/
 
 __pycache__/
 
-# 单文件服务端从当前目录运行时生成的默认数据目录
+# 单文件服务端从当前目录运行时生成的默认目录
 /data/
+/logs/
 packages/studio/public-server
 packages/studio/dist-server
