@@ -1,4 +1,4 @@
-import { TIME_SCALE } from "@piano/core";
+import { TIME_SCALE, reportDiagnostic } from "@piano/core";
 import { resolveEffectCustomParams } from "../domain/effects";
 import { quietFeatures, type MusicFeatures, type VfxKeyNote } from "./music";
 import { addTimelineTicks, timelineTickAt, type TimelineTick } from "./time";
@@ -72,10 +72,17 @@ export class VfxEngine {
                 error,
             });
             if (disabled) {
-                console.warn(`[piano-vfx] 插件 ${owner} 连续出错，已自动禁用`, error);
+                reportDiagnostic("error", "vfx", "插件连续出错，已自动禁用", error, {
+                    plugin: owner,
+                    effect: def.id,
+                    phase,
+                });
             }
         } else {
-            console.warn(`[piano-vfx] 特效 ${def.id} (${phase}) 执行异常`, error);
+            reportDiagnostic("warn", "vfx", "特效执行异常", error, {
+                effect: def.id,
+                phase,
+            });
         }
     }
 

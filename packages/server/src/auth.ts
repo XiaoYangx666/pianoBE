@@ -112,6 +112,8 @@ export function ensureBootstrapToken(
 export interface AppVariables {
     db: Database;
     token?: TokenInfo;
+    /** 每个请求的短 ID，用于把访问日志与异常日志关联起来 */
+    requestId?: string;
 }
 
 export function getToken(c: Context<{ Variables: AppVariables }>): TokenInfo | undefined {

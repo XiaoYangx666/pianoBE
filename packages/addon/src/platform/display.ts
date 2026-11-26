@@ -1,3 +1,4 @@
+import { reportDiagnostic } from "@piano/core";
 import { reconcileEntityTransform, releaseVisual } from "@begame/tabletop/minecraft";
 import { Entity, EntityComponentTypes, Vector3, system } from "@minecraft/server";
 import type { InstrumentLocation } from "@platform/instrumentLocation";
@@ -212,7 +213,9 @@ export class PianoDisplay {
             this.entity.setDynamicProperty(SETTINGS, raw);
             this.savedSettings = raw;
         } catch (error) {
-            console.warn("[piano] 保存钢琴设置失败", error);
+            reportDiagnostic("warn", "display", "保存钢琴设置失败", error, {
+                entity: this.entity.id,
+            });
         }
     }
 

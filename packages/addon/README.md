@@ -66,38 +66,42 @@ MIDI 播放器提供「在线转录」入口：输入 BV 号或完整视频链�
 
 ### 故障排查（BDS 控制台日志）
 
-server 构建会在控制台输出逐步诊断（不打印令牌）：
+运行时日志统一为 `[PBE][模块][级别] 消息 | 字段`。默认只输出 `info/warn/error`，
+逐页/逐曲目的细节在 `debug`；同一个 `warn/error` 在 10 秒内重复出现只保留一条，
+并带 `repeated=N`。现场排查时可临时打开细节日志：
 
 ```
-[piano] 主脚本已加载，构建目标: server          ← 确认装的是服务器专用包
-[piano] server 构建：20 tick 后尝试初始化远程曲库
-[serverAdmin] step1 读取配置 pianoBackendUrl = "http://...:35050"
-[serverAdmin] step2 获取 @minecraft/server-net 适配器
-[serverAdmin] @minecraft/server-net 适配器就绪
-[serverAdmin] step3 已读取 secrets 令牌（SecretString，透传不输出值）  ← 或「未读取到 secrets 令牌」
-[serverAdmin] step4 切换到远程曲库: http://...:35050
-[serverAdmin] 远程曲库已启用: http://...:35050
-[piano] 远程曲库初始化结果: 成功
-[server] 在线转录已启用
-[netSource] 拉取曲目第 1 页: GET http://.../api/songs?pageSize=5&page=1
-[netSource] 第 1 页响应状态: 200
-[netSource] 第 1 页 5 首（共 N 首）
-[netSource] 拉取单曲: GET http://.../api/songs/<id>
-[netSource] 单曲 <id> 响应状态: 200
+/scriptevent pbe:log debug
+/scriptevent pbe:log info     # 恢复默认
+```
+
+server 构建的启动日志（不打印令牌）：
+
+```
+[PBE][app][INFO] 主脚本已加载 | target=server          ← 确认装的是服务器专用包
+[PBE][server][INFO] 已切换到远程曲库 | url=http://...:35050
+[PBE][transcribe][INFO] 在线转录已启用
+```
+
+远程拉取细节（`debug` 级别）：
+```
+[PBE][net][DEBUG] 拉取曲目页 | page=1 url=http://.../api/songs?pageSize=100&page=1
+[PBE][net][WARN] 拉取曲目页失败 | page=1 url=http://.../api/songs?... status=401
+[PBE][net][DEBUG] 拉取单曲 | song=<id> url=http://.../api/songs/<id>
 ```
 
 对照判断：
 
 | 日志表现 | 含义 |
 |---|---|
-| 完全没有 `[piano] 主脚本已加载` | 装的是模板包（client）或脚本未运行 |
+| 完全没有 `[PBE][app][INFO] 主脚本已加载` | 装的是模板包（client）或脚本未运行 |
 | `Module [@minecraft/server-net] is unrecognized` | 装的包里 manifest 没声明该原生模块（常见于客户端/服务器构建混装），或客户端/单机环境装了服务器专用包——客户端不提供 server-net |
-| `初始化失败，使用内嵌曲库` + 上面那条 | 同上；单机请改装客户端包，BDS 请用 `dist/server.mcaddon` |
-| `曲目内容不存在: 名称 (id)` | 当前没有可用曲库来源：服务器包内嵌曲库为空且远程未启用，或该曲目只残留在队列里 |
-| `step1 ... (未配置)` | `variables.json` 路径/格式不对（应为 `config/default/variables.json`） |
-| `step3 未读取到 secrets 令牌` | `secrets.json` 缺失或键名不对（`pianoBackendToken` 需含完整 `Bearer ` 前缀） |
-| `[netSource] ... 拉取失败: ... 网络/超时/连接被拒` | 后端不可达：确认 URL 端口、BDS 与后端网络互通（容器内 BDS 需用宿主 IP） |
-| `响应状态: 401/403` | 令牌错误或后端 `ALLOW_PUBLIC_READ=false` 下未带有效令牌 |
+| `[PBE][server][WARN] 未配置后端地址` | `variables.json` 路径/格式不对（应为 `config/default/variables.json`），或键名不是 `pianoBackendUrl` |
+| `[PBE][app][WARN] 远程曲库初始化失败` | 后端连接初始化异常；堆栈里会带具体错误。单机请改装客户端包，BDS 请用 `dist/server.mcaddon` |
+| `[PBE][playback][WARN] 曲目已失效，已从队列移除` | 当前没有可用曲库来源：服务器包内嵌曲库为空且远程未启用，或该曲目只残留在队列里 |
+| `[PBE][net][WARN] 拉取曲目页/单曲失败` + `status=401/403` | 令牌错误，或后端 `ALLOW_PUBLIC_READ=false` 下未带有效令牌 |
+| `[PBE][net][WARN] 请求失败（网络/超时/连接被拒）` | 后端不可达：确认 URL 端口、BDS 与后端网络互通（容器内 BDS 需用宿主 IP） |
+| `[PBE][server][WARN] 上报加载状态失败` | 后端 `/api/addon/loaded` 不可达或令牌无效；部署哈希不会更新 |
 
 ## 音乐存储：公共曲库、存储卡与播放队列
 

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { setDiagnosticSink } from "@piano/core";
 import { openDb } from "./db.js";
 import { loadConfig } from "./config.js";
 import { ensureBootstrapToken, migrateLegacyRoles } from "./auth.js";
@@ -12,7 +13,21 @@ import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
 
 const config = loadConfig();
-const log = createLogger({ file: config.logFile });
+const log = createLogger({
+    file: config.logFile,
+    level: config.logLevel,
+    format: config.logFormat,
+    maxBytes: config.logMaxBytes,
+    maxFiles: config.logMaxFiles,
+});
+// core 内部的诊断也进入同一套文件/级别/脱敏规则
+setDiagnosticSink((level, scope, message, error, fields) => {
+    const target = log.scope(scope);
+    if (level === "error") target.error(message, error, fields);
+    else if (level === "warn") target.warn(message, error, fields);
+    else if (level === "info") target.info(message, fields);
+    else target.debug(message, fields);
+});
 
 // 崩溃也要留痕：Windows 下双击启动时控制台会直接关闭，只有日志文件能事后排查
 process.on("uncaughtException", (error) => {
@@ -48,7 +63,7 @@ if (generated) {
     log.info(`bootstrap 管理员令牌已就绪 (${token.slice(0, 8)}…)`);
 }
 
-const songPort = new SqliteSongPort(db);
+const songPort = new SqliteSongPort(db, log.scope("db"));
 const pluginService = new PluginService(songPort, config);
 const deploymentService = new DeploymentService(songPort, pluginService, config);
 const amt = new AmtService(config);
@@ -59,7 +74,12 @@ if (amtStatus.available) {
     log.warn(`AMT 转录未启用: ${amtStatus.message}`);
 }
 
-const transcribeJobs = new TranscribeJobStore({ songPort, config, amt });
+const transcribeJobs = new TranscribeJobStore({
+    songPort,
+    config,
+    amt,
+    logger: log.scope("transcribe"),
+});
 
 const app = createApp({ db, songPort, config, amt, pluginService, deploymentService, logger: log, transcribeJobs });
 
@@ -77,9 +97,16 @@ const server = Bun.serve({
     },
 });
 
-log.info(`PianoBE server: http://0.0.0.0:${config.port} (db=${config.dbPath})`);
+log.info(`PianoBE server: http://0.0.0.0:${config.port}`, {
+    db: config.dbPath,
+    logLevel: config.logLevel,
+    format: config.logFormat,
+});
 if (log.file) {
-    log.info(`日志文件: ${log.file}（单文件 5 MB，自动轮转保留 3 个）`);
+    log.info(`日志文件: ${log.file}`, {
+        maxBytes: config.logMaxBytes,
+        maxFiles: config.logMaxFiles,
+    });
 } else {
     log.info("日志文件已关闭（LOG_FILE=off），仅输出到控制台");
 }

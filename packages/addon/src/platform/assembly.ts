@@ -1,4 +1,5 @@
 import { Block, BlockPermutation, Dimension, ItemStack, Vector3 } from "@minecraft/server";
+import { reportDiagnostic } from "@piano/core";
 import { Cardinal_Direction } from "@domain/types";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { Signal } from "@domain/util/signal";
@@ -70,7 +71,9 @@ export function placeInstrument(location: InstrumentLocation, definition = locat
         blocks.forEach((block, i) => block!.setPermutation(permutations[i]));
     } catch (error) {
         blocks.forEach((block, i) => { try { block!.setPermutation(previous[i]); } catch {} });
-        console.warn("[piano] placement failed", error);
+        reportDiagnostic("warn", "assembly", "放置乐器失败", error, {
+            piano: instrumentKey(location.dimension, location.pos),
+        });
         return false;
     }
     instrumentPlaced.publish({ ...location, definition });
@@ -100,7 +103,9 @@ export function destroyInstrument(location: InstrumentLocation, drop: boolean, d
         try {
             location.dimension.spawnItem(card, spawn);
         } catch (error) {
-            console.warn("[piano] 退还存储卡失败", error);
+            reportDiagnostic("warn", "assembly", "退还存储卡失败", error, {
+                piano: instrumentKey(location.dimension, location.pos),
+            });
         }
     }
     return true;

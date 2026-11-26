@@ -1,7 +1,10 @@
 import { http, HttpRequest, HttpHeader } from "@minecraft/server-net";
 import { HttpRequestMethod } from "./httpMethod";
 import type { SecretString } from "@minecraft/server-admin";
+import { createLogger } from "@runtime/log";
 import type { NetFetch } from "../admin/netSource";
+
+const log = createLogger("net");
 
 /**
  * 构建并缓存 server-net 适配器。
@@ -30,16 +33,20 @@ export async function getNetFetch(): Promise<NetFetch | null> {
         if (init.body) {
             req.body = init.body;
         }
-        console.log(`[serverNet] 请求发出: ${req.method} ${url}`);
+        log.debug("请求发出", { method: req.method, url });
         let res;
         try {
             res = await http.request(req);
-        } catch (e) {
-            console.warn(`[serverNet] 请求失败（网络/超时/连接被拒）: ${(e as Error)?.message ?? e}`);
-            throw e;
+        } catch (error) {
+            log.warn("请求失败（网络/超时/连接被拒）", error, { method: req.method, url });
+            throw error;
         }
         if (res.status >= 400) {
-            console.warn(`[serverNet] ${url} 返回非成功状态码: ${res.status}`);
+            log.warn("请求返回非成功状态码", undefined, {
+                method: req.method,
+                url,
+                status: res.status,
+            });
         }
         return {
             status: res.status,

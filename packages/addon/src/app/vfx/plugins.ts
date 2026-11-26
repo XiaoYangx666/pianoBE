@@ -1,5 +1,8 @@
 import { BUILTIN_PLUGINS } from "@piano/plugins";
+import { createLogger } from "@runtime/log";
 import { orderVfxPlugins, registerVfxPlugin, vfxRegistry } from "./host";
+
+const log = createLogger("vfx");
 
 export const INSTALLED_VFX_PLUGINS: readonly string[] = BUILTIN_PLUGINS.map(plugin => plugin.manifest.id);
 
@@ -14,7 +17,7 @@ export function registerVfxPlugins() {
         try {
             registerVfxPlugin(plugin, vfxRegistry);
         } catch (error) {
-            console.warn(`[piano-vfx] 注册插件 ${plugin.manifest?.id ?? "unknown"} 失败`, error);
+            log.warn("注册 VFX 插件失败", error, { plugin: plugin.manifest?.id ?? "unknown" });
         }
     }
 }

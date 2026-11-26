@@ -13,6 +13,7 @@ import { midiBufferToSong } from "@piano/core/convert";
 import type { SqliteSongPort } from "../drivers/sqlitePorts.js";
 import type { TokenInfo } from "../auth.js";
 import type { ServerConfig } from "../config.js";
+import { NOOP_LOGGER, type Logger } from "../logger.js";
 import {
     AmtAbortedError,
     AmtTimeoutError,
@@ -103,6 +104,7 @@ export interface TranscribeJobDeps {
     songPort: SqliteSongPort;
     config: ServerConfig;
     amt?: AmtService;
+    logger?: Logger;
 }
 
 const JOB_TTL_MS = 30 * 60 * 1000;
@@ -198,7 +200,8 @@ export class TaskQueue {
 
     constructor(
         private readonly concurrency: number,
-        private readonly maxPending = Number.POSITIVE_INFINITY
+        private readonly maxPending = Number.POSITIVE_INFINITY,
+        private readonly log: Logger = NOOP_LOGGER
     ) {}
 
     /** 入队；队列已满时返回 false，调用方负责清理刚创建的任务。 */
@@ -266,7 +269,7 @@ export class TaskQueue {
                     await task.run(controller.signal);
                 } catch (error) {
                     // 单个任务异常不能卡死队列
-                    console.error("转录队列任务异常", error);
+                    this.log.error("转录队列任务异常", error, { job: task.id });
                 } finally {
                     this.running.delete(task.id);
                     this.pump();
@@ -282,11 +285,14 @@ export class TranscribeJobStore {
     private readonly jobs = new Map<string, TranscribeJob>();
     private readonly timer: ReturnType<typeof setInterval>;
     private readonly queue: TaskQueue;
+    private readonly log: Logger;
 
     constructor(private readonly deps: TranscribeJobDeps) {
+        this.log = deps.logger ?? NOOP_LOGGER;
         this.queue = new TaskQueue(
             Math.max(1, deps.config.amtConcurrency || 1),
-            Math.max(1, deps.config.amtMaxQueue || 1)
+            Math.max(1, deps.config.amtMaxQueue || 1),
+            this.log
         );
         // 崩溃/强杀会留下 pianobe-* 临时目录；启动时只清掉足够久、肯定已结束的残留，
         // 避免误删另一个实例正在排队/执行的任务目录（排队上限 × 单任务超时 + 任务 TTL）。
@@ -564,6 +570,12 @@ export class TranscribeJobStore {
             listeners: new Set(),
         };
         this.jobs.set(job.id, job);
+        this.log.debug("转录任务已创建", {
+            job: job.id,
+            source: source.kind,
+            name: job.name,
+            owner: ownerId,
+        });
         return job;
     }
 
@@ -572,9 +584,34 @@ export class TranscribeJobStore {
      * 并发请求都通过预检时仍会在这里被挡住。
      */
     private enqueue(job: TranscribeJob, run: (signal: AbortSignal) => Promise<void>): void {
-        if (!this.queue.add(job.id, run)) {
+        // queue.add() 会立即 pump，可能在返回前就打出「开始转录」。先检查容量并记录入队，
+        // 保证日志顺序是「已入队」→「开始转录」。
+        if (this.queue.isFull) {
             this.jobs.delete(job.id);
             rmSync(job.dir, { recursive: true, force: true });
+            this.log.warn("转录队列已满，任务被拒绝", undefined, {
+                job: job.id,
+                pending: this.queue.pendingCount,
+                active: this.queue.activeCount,
+            });
+            throw new TranscribeQueueFullError();
+        }
+        this.log.info("转录任务已入队", {
+            job: job.id,
+            source: job.source.kind,
+            name: job.name,
+            pending: this.queue.pendingCount + 1,
+            active: this.queue.activeCount,
+        });
+        if (!this.queue.add(job.id, run)) {
+            // 预检查与 add 之间没有 await，正常不会走到这里；保留兜底清理。
+            this.jobs.delete(job.id);
+            rmSync(job.dir, { recursive: true, force: true });
+            this.log.warn("转录队列已满，任务被拒绝", undefined, {
+                job: job.id,
+                pending: this.queue.pendingCount,
+                active: this.queue.activeCount,
+            });
             throw new TranscribeQueueFullError();
         }
     }
@@ -608,9 +645,17 @@ export class TranscribeJobStore {
             }
             if (signal?.aborted || !this.jobs.has(job.id)) return;
             const audioPath = join(job.dir, "audio.m4s");
-            await downloadBiliAudio(video, audioPath, this.deps.config.biliSessdata, {
+            const audioBytes = await downloadBiliAudio(video, audioPath, this.deps.config.biliSessdata, {
                 signal,
                 maxBytes: this.deps.config.amtMaxDownloadBytes,
+                logger: this.log,
+            });
+            this.log.info("B站音频已下载", {
+                job: job.id,
+                bvid: video.bvid,
+                bytes: audioBytes,
+                quality: video.quality,
+                duration: video.durationSec,
             });
             if (signal?.aborted || !this.jobs.has(job.id)) return;
             job.audioPath = audioPath;
@@ -650,6 +695,12 @@ export class TranscribeJobStore {
                 stage: "analyzing",
                 message: "分析音频…",
                 percent: basePercent + 2,
+            });
+            this.log.info("开始转录", {
+                job: job.id,
+                name: job.name,
+                source: job.source.kind,
+                duration: job.durationSec,
             });
             const result = await this.deps.amt.transcribe(job.audioPath, {
                 signal,
@@ -692,6 +743,13 @@ export class TranscribeJobStore {
                 dataSize: result.midi.byteLength,
                 midiReady: true,
             });
+            this.log.info("转录完成", {
+                job: job.id,
+                name: job.name,
+                notes: noteCount,
+                bytes: result.midi.byteLength,
+                ms: result.elapsedMs,
+            });
         } catch (error) {
             if (!this.jobs.has(job.id) || error instanceof AmtAbortedError) return;
             this.fail(job, error);
@@ -705,7 +763,12 @@ export class TranscribeJobStore {
             error instanceof BiliError
                 ? error.message
                 : `转录失败：${error instanceof Error ? error.message : String(error)}`;
-        console.error("[transcribe]", job.id, error);
+        this.log.error("转录任务失败", error, {
+            job: job.id,
+            name: job.name,
+            stage: job.stage,
+            source: job.source.kind,
+        });
         this.update(job, {
             stage: "error",
             message,

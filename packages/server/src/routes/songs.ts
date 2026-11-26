@@ -106,6 +106,12 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
                 cues,
                 origin: { kind: "user" },
             });
+            deps.logger?.scope("songs").info("演出已保存", {
+                req: c.get("requestId"),
+                song: songId,
+                performance: saved.id,
+                cues: cues.length,
+            });
             return c.json(saved, 201);
         } catch (error) {
             const status = error instanceof SongConflictError ? 409 : 400;
@@ -164,6 +170,13 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
                     libraryId,
                     origin: { kind: "user" },
                 });
+                deps.logger?.scope("songs").info("曲目已写入", {
+                    req: c.get("requestId"),
+                    song: meta.id,
+                    name: meta.name,
+                    bytes: bytes.byteLength,
+                    format: "pbe3",
+                });
                 return c.json(meta, 201);
             }
 
@@ -171,6 +184,13 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
             const meta = deps.songPort.saveMidiFile(bytes, name ?? "", {
                 libraryId,
                 origin: { kind: "user" },
+            });
+            deps.logger?.scope("songs").info("曲目已写入", {
+                req: c.get("requestId"),
+                song: meta.id,
+                name: meta.name,
+                bytes: bytes.byteLength,
+                format: "midi",
             });
             return c.json(meta, 201);
         } catch (error) {
@@ -189,12 +209,24 @@ export function songsRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         if (!name) return c.json({ error: "曲名不能为空" }, 400);
         const meta = deps.songPort.rename(id, name);
         if (!meta) return c.json({ error: "曲目不存在" }, 404);
+        deps.logger?.scope("songs").info("曲目已改名", {
+            req: c.get("requestId"),
+            song: id,
+            name,
+        });
         return c.json(meta);
     });
 
     // DELETE /api/songs/:id
     app.delete("/:id", requireRole("admin"), (c) => {
-        deps.songPort.remove(c.req.param("id") ?? "");
+        const id = c.req.param("id") ?? "";
+        const existed = deps.songPort.has(id);
+        deps.songPort.remove(id);
+        deps.logger?.scope("songs").info("曲目已删除", {
+            req: c.get("requestId"),
+            song: id,
+            existed,
+        });
         return c.body(null, 204);
     });
 

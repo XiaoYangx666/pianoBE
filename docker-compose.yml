@@ -10,6 +10,10 @@ services:
             BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
             DB_PATH: /app/data/piano.db
             LOG_FILE: /app/data/logs/server.log
+            LOG_LEVEL: ${LOG_LEVEL:-info}
+            LOG_FORMAT: ${LOG_FORMAT:-text}
+            LOG_MAX_BYTES: ${LOG_MAX_BYTES:-10485760}
+            LOG_MAX_FILES: ${LOG_MAX_FILES:-7}
             WEB_ROOT: /app/packages/studio/dist
             BUILTIN_PLUGINS_DIR: /app/build/plugins
             # 需要公开读时设为 true

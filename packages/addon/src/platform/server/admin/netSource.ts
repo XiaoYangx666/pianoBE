@@ -1,5 +1,8 @@
 import { decodeBase64Url, type MidiSongMeta, type PerformanceCue, type PerformanceDescriptor } from "@piano/core";
 import { HttpRequestMethod, type HttpRequestMethod as HttpRequestMethodType } from "@platform/server/net/httpMethod";
+import { createLogger } from "@runtime/log";
+
+const log = createLogger("net");
 
 /** 网络响应（适配 server-net HttpResponse / 测试 mock） */
 export interface NetResponse {
@@ -70,13 +73,18 @@ export class RemoteMidiSource {
     }
 
     async libraries(): Promise<RemoteLibraryMeta[]> {
+        const url = this.base("/api/libraries");
         try {
-            const res = await this.opts.fetch(this.base("/api/libraries"), { headers: this.headers() });
-            if (res.status !== 200) return [];
+            const res = await this.opts.fetch(url, { headers: this.headers() });
+            if (res.status !== 200) {
+                log.warn("拉取曲库列表失败", undefined, { url, status: res.status });
+                return [];
+            }
             const data = (await res.json()) as { items?: RemoteLibraryMeta[]; catalogVersion?: number };
             this.trackCatalogVersion(data.catalogVersion);
             return Array.isArray(data.items) ? data.items : [];
-        } catch {
+        } catch (error) {
+            log.warn("拉取曲库列表失败", error, { url });
             return [];
         }
     }
@@ -92,10 +100,18 @@ export class RemoteMidiSource {
         if (q) query.push(`q=${encodeURIComponent(q)}`);
         if (libraryId) query.push(`libraryId=${encodeURIComponent(libraryId)}`);
         const url = this.base(`/api/songs?${query.join("&")}`);
-        console.log(`[netSource] 拉取曲目第 ${page} 页: GET ${url}`);
-        const res = await this.opts.fetch(url, { headers: this.headers() });
-        console.log(`[netSource] 第 ${page} 页响应状态: ${res.status}`);
-        if (res.status !== 200) throw new Error(`songs 接口返回 ${res.status}`);
+        log.debug("拉取曲目页", { page, url });
+        let res: NetResponse;
+        try {
+            res = await this.opts.fetch(url, { headers: this.headers() });
+        } catch (error) {
+            log.warn("拉取曲目页失败", error, { page, url });
+            throw error;
+        }
+        if (res.status !== 200) {
+            log.warn("拉取曲目页失败", undefined, { page, url, status: res.status });
+            throw new Error(`songs 接口返回 ${res.status}`);
+        }
         const data = (await res.json()) as {
             items?: Array<MidiSongMeta & { dataSize?: number }>;
             total?: number;
@@ -118,7 +134,7 @@ export class RemoteMidiSource {
             return meta;
         });
         const total = typeof data.total === "number" ? data.total : items.length;
-        console.log(`[netSource] 第 ${page} 页 ${items.length} 首（共 ${total} 首）`);
+        log.debug("曲目页完成", { page, items: items.length, total });
         return { items, total };
     }
 
@@ -134,49 +150,66 @@ export class RemoteMidiSource {
             if (page >= 20) break;
             page++;
         }
-        console.log(`[netSource] metaAll${q ? `(q=${q})` : ""} 共 ${all.length} 首`);
+        log.debug("曲目元信息拉取完成", { query: q, library: libraryId, count: all.length });
         return all;
     }
 
     async getPerformance(perfId: string): Promise<readonly PerformanceCue[] | undefined> {
+        const url = this.base(`/api/performances/${encodeURIComponent(perfId)}`);
         try {
-            const url = this.base(`/api/performances/${encodeURIComponent(perfId)}`);
             const res = await this.opts.fetch(url, { headers: this.headers() });
-            if (res.status !== 200) return undefined;
+            if (res.status !== 200) {
+                // 404 表示该曲目没有这份演出，播放器会降级为普通演奏，不算故障
+                if (res.status === 404) log.debug("演出编排不存在", { perf: perfId });
+                else log.warn("拉取演出编排失败", undefined, { perf: perfId, status: res.status });
+                return undefined;
+            }
             const payload = (await res.json()) as { cues?: PerformanceCue[] };
             return Array.isArray(payload.cues) ? payload.cues : undefined;
-        } catch {
+        } catch (error) {
+            log.warn("拉取演出编排失败", error, { perf: perfId });
             return undefined;
         }
     }
 
     async get(id: string): Promise<Uint8Array | undefined> {
+        const url = this.base(`/api/songs/${encodeURIComponent(id)}`);
         try {
-            const url = this.base(`/api/songs/${encodeURIComponent(id)}`);
-            console.log(`[netSource] 拉取单曲: GET ${url}`);
+            log.debug("拉取单曲", { song: id, url });
             const res = await this.opts.fetch(url, { headers: this.headers() });
-            console.log(`[netSource] 单曲 ${id} 响应状态: ${res.status}`);
-            if (res.status !== 200) return undefined;
+            if (res.status !== 200) {
+                log.warn("拉取单曲失败", undefined, { song: id, status: res.status });
+                return undefined;
+            }
             const payload = (await res.json()) as RemoteSongPayload;
-            if (!payload.data) return undefined;
+            if (!payload.data) {
+                log.warn("单曲响应缺少数据", undefined, { song: id });
+                return undefined;
+            }
             const bytes = decodeBase64Url(payload.data);
-            console.log(`[netSource] 单曲 ${id} 拉取成功（${payload.name ?? ""}，${bytes.length}B）`);
+            log.debug("单曲拉取完成", { song: id, name: payload.name, bytes: bytes.length });
             return bytes;
-        } catch (e) {
-            console.warn(`[netSource] 单曲 ${id} 拉取失败: ${(e as Error)?.message ?? e}`);
+        } catch (error) {
+            log.warn("拉取单曲失败", error, { song: id });
             return undefined;
         }
     }
 
     async reportLoaded(payload: { configHash: string; installedPlugins: readonly string[] }): Promise<boolean> {
+        const url = this.base("/api/addon/loaded");
         try {
-            const res = await this.opts.fetch(this.base("/api/addon/loaded"), {
+            const res = await this.opts.fetch(url, {
                 method: HttpRequestMethod.Post,
                 headers: this.headers({ "Content-Type": "application/json" }),
                 body: JSON.stringify(payload),
             });
-            return res.status >= 200 && res.status < 300;
-        } catch {
+            if (res.status < 200 || res.status >= 300) {
+                log.warn("上报加载状态失败", undefined, { url, status: res.status });
+                return false;
+            }
+            return true;
+        } catch (error) {
+            log.warn("上报加载状态失败", error, { url });
             return false;
         }
     }

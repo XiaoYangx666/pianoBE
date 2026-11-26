@@ -611,7 +611,7 @@ function serializeVfxPluginsLoaderModule(
         "        try {",
         "            registerVfxPlugin({ manifest, register: api => plugin.register(api) }, vfxRegistry);",
         "        } catch (error) {",
-        "            console.warn(`[piano-vfx] 注册插件 ${pluginId} 失败`, error);",
+        "            console.warn(`[PBE][vfx][WARN] 注册 VFX 插件失败 | plugin=${pluginId}`, error);",
         "        }",
         "    }",
         "}",

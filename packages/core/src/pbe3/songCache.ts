@@ -1,3 +1,4 @@
+import { reportDiagnostic } from "../diagnostics.js";
 import { readPbe3Events } from "./codec.js";
 import type { Pbe3Header, Pbe3SeekIndexEntry } from "./format.js";
 import { buildPbe3SeekIndex } from "./seekIndex.js";
@@ -192,7 +193,10 @@ export class SongCache {
         try {
             const { header, events } = readPbe3Events(bytes);
             if (!this.verify(key, header)) {
-                console.warn(`[songCache] 曲目校验失败：请求 ${key}，实际 id ${header.id}`);
+                reportDiagnostic("warn", "songCache", "曲目校验失败", undefined, {
+                    requested: key,
+                    actual: header.id,
+                });
                 return undefined;
             }
             const index = buildPbe3SeekIndex(events, header.velocityBits, this.indexStepTicks);
@@ -220,7 +224,7 @@ export class SongCache {
             this.totalBytes += song.byteSize;
             return song;
         } catch (error) {
-            console.warn(`[songCache] 曲目 ${key} 解码失败`, error);
+            reportDiagnostic("warn", "songCache", "曲目解码失败", error, { key });
             return undefined;
         }
     }

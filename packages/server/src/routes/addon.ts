@@ -36,6 +36,12 @@ export function addonRoutes(
                 const ids = body.enabledTimbres.filter((item: unknown): item is string => typeof item === "string");
                 deploymentService.updateEnabledTimbres(ids);
             }
+            deps.logger?.scope("deploy").info("BDS 部署配置已更新", {
+                req: c.get("requestId"),
+                dir: config.bdsDir,
+                world: config.bdsWorld,
+                mode: config.bdsPackMode,
+            });
             return c.json({ bdsConfig: config, status: deploymentService.getStatus() });
         } catch (error) {
             return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
@@ -90,14 +96,27 @@ export function addonRoutes(
             return c.json({ error: "模板文件为空" }, 400);
         }
         deploymentService.saveServerTemplate(new Uint8Array(buf));
+        deps.logger?.scope("deploy").info("服务器模板已更新", {
+            req: c.get("requestId"),
+            bytes: buf.byteLength,
+        });
         return c.json(deploymentService.getStatus());
     });
 
     app.post("/deploy", adminRole(), async (c) => {
+        const log = deps.logger?.scope("deploy");
         try {
             const status = await deploymentService.deployToBds();
+            log?.info("BDS 部署完成", {
+                req: c.get("requestId"),
+                status: status.status,
+                configHash: status.deployedConfigHash,
+                issues: status.issues.length,
+                warnings: status.warnings.length,
+            });
             return c.json(status);
         } catch (error) {
+            log?.error("BDS 部署失败", error, { req: c.get("requestId") });
             return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
         }
     });
@@ -125,7 +144,14 @@ export function addonRoutes(
         const installedPlugins = Array.isArray(body?.installedPlugins)
             ? body.installedPlugins.filter((item: unknown): item is string => typeof item === "string")
             : undefined;
-        return c.json(deploymentService.reportLoaded({ configHash, installedPlugins }));
+        const result = deploymentService.reportLoaded({ configHash, installedPlugins });
+        deps.logger?.scope("deploy").info("BDS 已上报加载状态", {
+            req: c.get("requestId"),
+            configHash,
+            plugins: installedPlugins?.length,
+            status: result.status,
+        });
+        return c.json(result);
     });
 
     return app;

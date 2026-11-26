@@ -18,7 +18,10 @@ import { isUnloadedChunkError } from "@platform/errors";
 import { vfxInstrumentFor } from "@domain/instrument/definition";
 import { spawnVfxEmitter } from "@platform/vfxParticle";
 import { VfxPropRenderer } from "@platform/vfxProp";
+import { createLogger } from "@runtime/log";
 import { STAGE_PROP_REGISTRATIONS } from "./stagePropCatalog";
+
+const log = createLogger("vfx");
 
 export type AutoRequest = { auto: true; piano: PianoRuntime } & (
     | { kind: "performance"; midi: MidiPlayer; performance: NonNullable<MidiPlayer["performance"]> }
@@ -264,7 +267,12 @@ function syncSongVfx(piano: PianoRuntime, transport: PianoTransportEvent) {
     const performance = midi.performance;
     if (settings.stageChoreography && performance && transport.type === "start") {
         const missing = missingPerformanceResources(performance.cues);
-        if (missing.length) console.warn(`[piano-vfx] 曲目 ${midi.getInfo().midiName} 缺少演出资源：${missing.join(", ")}`);
+        if (missing.length) {
+            log.warn("曲目缺少演出资源", undefined, {
+                song: midi.getInfo().midiName,
+                missing: missing.join(","),
+            });
+        }
     }
     let request: AutoRequest | undefined;
     if (settings.stageChoreography && performance && hasAvailablePerformanceEffects(performance.cues)) {
@@ -360,7 +368,7 @@ function updateTick() {
                 }
             } catch (error) {
                 failures++;
-                if (!isUnloadedChunkError(error)) console.warn("[piano-vfx] 运行失败", error);
+                if (!isUnloadedChunkError(error)) log.warn("VFX 运行失败", error);
                 stopSession(session);
             }
         }
@@ -376,7 +384,7 @@ function updateTick() {
             // cleanup, pending reservations and the engine lifecycle all close.
             failures++;
             // 区块卸载导致的发射失败是预期情况：静默结束会话即可。
-            if (!isUnloadedChunkError(error)) console.warn("[piano-vfx] 发射失败", error);
+            if (!isUnloadedChunkError(error)) log.warn("VFX 发射失败", error);
             stopSession(session);
         }
 

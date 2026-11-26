@@ -1,3 +1,5 @@
+import { parseLogFormat, parseLogLevel, type LogFormat, type LogLevel } from "./logger.js";
+
 export interface ServerConfig {
     port: number;
     /** sqlite 文件路径（":memory:" 用于测试） */
@@ -54,6 +56,14 @@ export interface ServerConfig {
     biliSessdata?: string;
     /** 日志文件路径；设为 off 时只输出到控制台（默认 ./data/logs/server.log） */
     logFile?: string;
+    /** 最低日志级别（默认 info） */
+    logLevel: LogLevel;
+    /** 文件日志格式（默认 text；json 为一行一条） */
+    logFormat: LogFormat;
+    /** 单个日志文件上限（默认 10 MB） */
+    logMaxBytes: number;
+    /** 保留的历史日志文件数（默认 7） */
+    logMaxFiles: number;
 }
 
 /**
@@ -98,5 +108,9 @@ export function loadConfig(
             env.LOG_FILE === "off"
                 ? undefined
                 : env.LOG_FILE || "./data/logs/server.log",
+        logLevel: parseLogLevel(env.LOG_LEVEL),
+        logFormat: parseLogFormat(env.LOG_FORMAT),
+        logMaxBytes: Math.max(64 * 1024, Number(env.LOG_MAX_BYTES ?? 10 * 1024 * 1024) || 10 * 1024 * 1024),
+        logMaxFiles: Math.min(50, Math.max(1, Number(env.LOG_MAX_FILES ?? 7) || 7)),
     };
 }

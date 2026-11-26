@@ -6,6 +6,9 @@ import { RemoteMidiSource } from "@platform/server/admin/netSource";
 import type { NetFetch } from "@platform/server/admin/netSource";
 import { world } from "@minecraft/server";
 import { secrets, variables } from "@minecraft/server-admin";
+import { createLogger } from "@runtime/log";
+
+const log = createLogger("server");
 
 /** variables.json 键名：后端地址（可读） */
 export const KEY_BACKEND_URL = "pianoBackendUrl";
@@ -32,7 +35,7 @@ function clearLegacyRemoteCache(): number {
         world.setDynamicProperty(id);
     }
     if (ids.length > 0) {
-        console.log(`[serverAdmin] 已清除旧版动态属性曲目缓存 ${ids.length} 条（${LEGACY_CACHE_PREFIX}*）`);
+        log.info("已清除旧版远程曲目缓存", { count: ids.length, prefix: LEGACY_CACHE_PREFIX });
     }
     return ids.length;
 }
@@ -43,32 +46,24 @@ export async function initServerAdmin(): Promise<ServerBackend | undefined> {
     clearLegacyRemoteCache();
 
     const url = variables.get(KEY_BACKEND_URL);
-    console.log(`[serverAdmin] step1 读取配置 ${KEY_BACKEND_URL} = ${typeof url === "string" && url ? `"${url}"` : "(未配置)"}`);
     if (typeof url !== "string" || !url) {
-        console.warn(
-            `[serverAdmin] 未配置 ${KEY_BACKEND_URL}（BDS config/default/variables.json），使用内嵌曲库`
-        );
+        log.warn("未配置后端地址，使用内嵌曲库", { key: KEY_BACKEND_URL });
         return undefined;
     }
+    log.debug("读取后端配置", { url });
 
-    console.log("[serverAdmin] step2 获取 @minecraft/server-net 适配器");
     const fetch = await getNetFetch();
     if (!fetch) {
-        console.warn("[serverAdmin] @minecraft/server-net 不可用（getNetFetch 返回 null），使用内嵌曲库");
+        log.warn("@minecraft/server-net 不可用，使用内嵌曲库");
         return undefined;
     }
-    console.log("[serverAdmin] @minecraft/server-net 适配器就绪");
 
     const token = secrets.get(KEY_BACKEND_TOKEN);
-    console.log(
-        token
-            ? "[serverAdmin] step3 已读取 secrets 令牌（SecretString，透传不输出值）"
-            : "[serverAdmin] step3 未读取到 secrets 令牌（请求将不带 Authorization 头）"
-    );
+    log.debug(token ? "已读取后端令牌" : "未配置后端令牌，请求将不带 Authorization");
     const extraHeaders = token ? () => ({ Authorization: token }) : undefined;
     backend = { baseUrl: url, fetch, extraHeaders };
 
-    console.log(`[serverAdmin] step4 切换到远程曲库: ${url}`);
+    log.info("已切换到远程曲库", { url });
     const remote = new RemoteMidiSource({
         baseUrl: url,
         fetch,
@@ -81,8 +76,7 @@ export async function initServerAdmin(): Promise<ServerBackend | undefined> {
     void remote.reportLoaded({
         configHash: DEPLOYMENT_INFO.configHash,
         installedPlugins: INSTALLED_VFX_PLUGINS,
-    }).catch(() => {});
-    console.log(`[serverAdmin] 远程曲库已启用: ${url}`);
+    }).catch(error => log.warn("上报加载状态失败", error, { url }));
     initialized = true;
     return backend;
 }

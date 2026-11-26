@@ -77,6 +77,11 @@ docker compose -f docker-compose.dev.yml up
 | `BDS_PACK_MODE` | `development` | `development` 部署到 `development_behavior_packs` / `development_resource_packs`；`release` 部署到 `behavior_packs` / `resource_packs` |
 | `BDS_PACK_NAME` | 模板名 | 自定义 manifest 包名（管理页可改） |
 | `BDS_PACK_DESCRIPTION` | 模板描述 | 自定义 manifest 描述（管理页可改） |
+| `LOG_FILE` | `./data/logs/server.log` | 日志文件；设为 `off` 只输出到控制台 |
+| `LOG_LEVEL` | `info` | 最低日志级别：`debug` / `info` / `warn` / `error` |
+| `LOG_FORMAT` | `text` | 文件格式：`text` 或 `json`（一行一条） |
+| `LOG_MAX_BYTES` | `10485760` | 单个日志文件上限（字节） |
+| `LOG_MAX_FILES` | `7` | 保留的历史日志文件数 |
 
 ## BDS 附加包部署
 
@@ -167,6 +172,35 @@ B 站解析流程：`finger/spi` 取匿名 buvid → `view` 取 cid/title → `p
 > Docker 镜像的运行阶段是 Debian（glibc），`bun install --production` 会从 npm
 > 安装当前平台（linux-x64）的 `amt-cli`、`libonnxruntime.so` 与 int8 模型；
 > Windows 版文件不会进入运行环境。
+
+## 日志与排查
+
+控制台和文件使用同一套格式，默认写入 `./data/logs/server.log`：
+
+```
+2026-11-26 12:00:00.123 INFO  [http] GET /api/songs 200 12ms | req=8f3c2a1b4c5d auth=admin#3
+2026-11-26 12:00:01.004 ERROR [transcribe] 转录任务失败 | job=abc stage=transcribing
+    AmtTimeoutError: amt-cli 超时（600s）
+    at ...
+```
+
+- **模块**：`http`、`songs`、`tokens`、`deploy`、`bilibili`、`transcribe`、`db`；可用 `[模块]` 直接过滤。
+- **请求 ID**：每个请求响应头带 `x-request-id`；访问日志和异常日志都用 `req=` 关联。500 响应体里也带 `requestId`，用户报错时给这个 ID 即可定位。
+- **健康检查**：成功请求只在 `LOG_LEVEL=debug` 时记录，避免每 30 秒一条把问题冲掉。
+- **级别**：`LOG_LEVEL=debug/info/warn/error`；`warn` 以上通常需要人处理。
+- **格式**：`LOG_FORMAT=json` 时一行一条 JSON（包含 `err.name/message/stack`），适合 `jq` 或日志采集；默认 `text` 便于直接看。
+- **轮转**：`LOG_MAX_BYTES`（默认 10 MB）和 `LOG_MAX_FILES`（默认 7 个）控制文件历史。
+- **脱敏**：`Bearer`、`SESSDATA`、`token=` 以及字段名含 `token/secret/password/authorization/cookie` 的内容会替换为 `***`。
+
+常用排查：
+
+```bash
+grep 'req=8f3c2a1b4c5d' data/logs/server.log    # 按请求 ID 查完整链路
+grep '\[transcribe\]' data/logs/server.log      # 转录任务阶段
+grep '\[deploy\]' data/logs/server.log          # BDS 部署与加载上报
+grep '\[ERROR\]' data/logs/server.log | tail    # 最近错误
+docker logs --tail 200 <container>              # 控制台镜像（与文件内容一致）
+```
 
 ## 一致性设计
 

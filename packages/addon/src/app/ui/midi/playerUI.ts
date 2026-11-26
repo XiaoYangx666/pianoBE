@@ -13,6 +13,9 @@ import { MusicCardPage } from "./cardUI";
 import { MidiImportPage } from "./importUI";
 import { midiMenuActions } from "./menuActions";
 import { PlayQueuePage } from "./queueUI";
+import { createLogger } from "@runtime/log";
+
+const log = createLogger("ui.player");
 
 const playModes: PlayMode[] = ["sequence", "single", "loop", "shuffle"];
 
@@ -84,7 +87,7 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 if (state === "playing") midi.pause();
                 else if (state === "paused") midi.resume();
                 else if (state === "idle") {
-                    void midi.play().catch((error) => console.error("[midi] 播放失败", error));
+                    void midi.play().catch((error) => log.error("播放失败", error));
                 } else return ui.close();
                 refresh();
                 syncSource();
@@ -93,14 +96,14 @@ export const MidiPlayerPage = DDUI.page<{ piano: PianoRuntime; block: Block }>(
                 if (!alive()) return ui.close();
                 midi.queue.prev();
                 syncSource();
-                void midi.play().catch((error) => console.error("[midi] 播放失败", error));
+                void midi.play().catch((error) => log.error("播放失败", error));
                 refresh();
             })
             .button("⏭ 下一首", () => {
                 if (!alive()) return ui.close();
                 midi.queue.next();
                 syncSource();
-                void midi.play().catch((error) => console.error("[midi] 播放失败", error));
+                void midi.play().catch((error) => log.error("播放失败", error));
                 refresh();
             })
             .button(viewModel.playMode, () => {

@@ -65,6 +65,7 @@ describe("静态资源鉴权：没有令牌连前端文件都不给", () => {
     test("未登录用浏览器打开时只给内联登录页", async () => {
         const res = await get("/", { Accept: "text/html" });
         expect(res.status).toBe(200);
+        expect(res.headers.get("x-request-id")).toMatch(/^[A-Za-z0-9._:-]{1,64}$/);
         const html = await res.text();
         expect(html).toContain("需要访问令牌");
         expect(html).not.toContain("studio-app");
@@ -82,6 +83,7 @@ describe("静态资源鉴权：没有令牌连前端文件都不给", () => {
         const cookie = await login();
         const asset = await get("/assets/app.js", { Cookie: cookie });
         expect(asset.status).toBe(200);
+        expect(asset.headers.get("x-request-id")).toMatch(/^[A-Za-z0-9._:-]{1,64}$/);
         expect(await asset.text()).toContain("studio");
         expect((await get("/template.mcaddon", { Cookie: cookie })).status).toBe(200);
         const shell = await get("/", { Cookie: cookie, Accept: "text/html" });

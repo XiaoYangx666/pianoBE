@@ -21,6 +21,7 @@ import {
     validateSong,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
+import { NOOP_LOGGER, type Logger } from "../logger.js";
 
 export class SongConflictError extends Error {
     constructor(message: string) {
@@ -107,7 +108,10 @@ export class SqliteSongPort implements SongPort {
     private readonly pbe3Cache = new Map<string, Uint8Array>();
     private static readonly MAX_PBE3_CACHE = 32;
 
-    constructor(private readonly db: Database) {}
+    constructor(
+        private readonly db: Database,
+        private readonly log: Logger = NOOP_LOGGER,
+    ) {}
 
     /* ================== 曲目内容（song_files） ================== */
 
@@ -459,10 +463,11 @@ export class SqliteSongPort implements SongPort {
                 // 只有 PBE3、没有 MIDI/JSON 时删掉 BLOB 会永久丢失曲目；
                 // 此时宁可保留旧文件头，也不能丢内容。有回退来源时才删除以便重新生成。
                 const hasFallback = Boolean(this.getRaw(id) || this.getFileBlob(id, "json"));
-                console.warn(
-                    `[songs] PBE3 改名失败，曲目 ${id} 的元数据已更新但文件头仍为旧曲名` +
+                this.log.warn(
+                    "PBE3 改名失败，元数据已更新但文件头仍为旧曲名" +
                         (hasFallback ? "（将从 MIDI/JSON 重新生成）" : "（保留唯一原始数据，未删除 BLOB）"),
-                    error
+                    error,
+                    { song: id }
                 );
                 if (hasFallback) this.deleteFileBlob(id, "pbe3");
             }

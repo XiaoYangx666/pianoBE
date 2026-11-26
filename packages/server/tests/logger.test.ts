@@ -65,6 +65,17 @@ describe("logger", () => {
         expect(text).toContain("/missing.js 404 1ms");
     });
 
+    test("任务状态轮询成功时降到 debug", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false, level: "debug" });
+        log.http("GET", "/api/transcribe/jobs/abc", 200, 1);
+        log.http("GET", "/api/transcribe/jobs/abc/code", 200, 1);
+
+        const text = readFileSync(file, "utf8");
+        expect(text).toContain("[DEBUG] GET /api/transcribe/jobs/abc 200 1ms");
+        expect(text).toContain("[INFO] GET /api/transcribe/jobs/abc/code 200 1ms");
+    });
+
     test("不传文件时只输出控制台，不创建文件", () => {
         const log = createLogger({ console: false });
         log.info("console only");
@@ -77,5 +88,87 @@ describe("logger", () => {
         );
         expect(formatError("plain")).toBe("plain");
         expect(formatError(new Error("x"))).toContain("Error: x");
+    });
+
+    test("scope 与结构化字段进入同一行", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false });
+        log.scope("transcribe", { job: "abc" }).warn("下载失败", new Error("boom"), {
+            attempt: 2,
+            bvid: "BV1xx",
+        });
+
+        const text = readFileSync(file, "utf8");
+        expect(text).toContain("[WARN] [transcribe] 下载失败 | job=abc attempt=2 bvid=BV1xx");
+        expect(text).toContain("Error: boom");
+    });
+
+    test("按级别过滤，debug 默认不输出", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false, level: "warn" });
+        log.debug("debug-line");
+        log.info("info-line");
+        log.warn("warn-line");
+        log.error("error-line");
+
+        const text = readFileSync(file, "utf8");
+        expect(text).not.toContain("debug-line");
+        expect(text).not.toContain("info-line");
+        expect(text).toContain("warn-line");
+        expect(text).toContain("error-line");
+    });
+
+    test("json 格式一行一条并保留错误结构", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false, format: "json" });
+        log.error("失败", new Error("bad"), { req: "8f3c2a", song: "abc" });
+
+        const lines = readFileSync(file, "utf8").trim().split("\n");
+        expect(lines.length).toBe(1);
+        const record = JSON.parse(lines[0]);
+        expect(record.level).toBe("error");
+        expect(record.msg).toBe("失败");
+        expect(record.req).toBe("8f3c2a");
+        expect(record.song).toBe("abc");
+        expect(record.err.name).toBe("Error");
+        expect(record.err.message).toBe("bad");
+    });
+
+    test("json 字段不能覆盖 time/level/msg 等保留字段", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false, format: "json" });
+        log.info("启动完成", { level: "debug", msg: "假的", time: "假的", logLevel: "info" });
+
+        const record = JSON.parse(readFileSync(file, "utf8").trim());
+        expect(record.level).toBe("info");
+        expect(record.msg).toBe("启动完成");
+        expect(record.time).toMatch(/^\d{4}-\d{2}-\d{2} /);
+        expect(record.logLevel).toBe("info");
+    });
+
+    test("凭据类字段与文本会被打码", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false });
+        log.info("Authorization: Bearer abcdefghijklmnop123456 SESSDATA=secret", {
+            token: "should-not-leak",
+            bvid: "BV1xx",
+        });
+
+        const text = readFileSync(file, "utf8");
+        expect(text).toContain("Bearer ***");
+        expect(text).toContain("SESSDATA=***");
+        expect(text).toContain("token=***");
+        expect(text).not.toContain("abcdefghijklmnop123456");
+        expect(text).not.toContain("should-not-leak");
+    });
+
+    test("错误堆栈里的凭据也会被打码", () => {
+        const file = tempLogFile();
+        const log = createLogger({ file, console: false });
+        log.error("请求失败", new Error("Bearer abcdefgh12345678"));
+
+        const text = readFileSync(file, "utf8");
+        expect(text).toContain("Bearer ***");
+        expect(text).not.toContain("abcdefgh12345678");
     });
 });

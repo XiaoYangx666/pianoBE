@@ -8,6 +8,7 @@
  */
 
 import { writeFileSync } from "node:fs";
+import { NOOP_LOGGER, type Logger } from "../logger.js";
 import { fetchWithTimeout } from "./http.js";
 
 const API = "https://api.bilibili.com";
@@ -366,9 +367,9 @@ export async function downloadBiliAudio(
     video: BiliVideo,
     dest: string,
     sessdata?: string,
-    options: { signal?: AbortSignal; maxBytes?: number } = {}
+    options: { signal?: AbortSignal; maxBytes?: number; logger?: Logger } = {}
 ): Promise<number> {
-    const { signal, maxBytes = Number.POSITIVE_INFINITY } = options;
+    const { signal, maxBytes = Number.POSITIVE_INFINITY, logger = NOOP_LOGGER } = options;
     throwIfAborted(signal);
     const buvid = await getBuvidCookie();
     throwIfAborted(signal);
@@ -415,7 +416,11 @@ export async function downloadBiliAudio(
                 throw error;
             }
             lastError = error;
-            console.warn(`[bilibili] 音频下载失败（第 ${attempt + 1} 次）`, error);
+            logger.warn("B站音频下载失败", error, {
+                bvid: video.bvid,
+                attempt: attempt + 1,
+                maxAttempts: 3,
+            });
             if (attempt < 2) await Bun.sleep(1000 * (attempt + 1));
         }
     }

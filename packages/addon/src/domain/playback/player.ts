@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, type MusicRef, type SongHandle, type PerformanceCue, type PerformanceDescriptor } from "@piano/core";
+import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, reportDiagnostic, type MusicRef, type SongHandle, type PerformanceCue, type PerformanceDescriptor } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -417,7 +417,11 @@ export class MidiPlayer {
                     try {
                         this.performanceCues = await this.resolvePerformanceById(info, song, info.performanceId);
                     } catch (error) {
-                        console.warn(`读取演出 ${info.performanceId} 失败，降级为普通演奏：${info.name}`, error);
+                        reportDiagnostic("warn", "playback", "读取演出失败，降级为普通演奏", error, {
+                            song: info.id,
+                            name: info.name,
+                            performance: info.performanceId,
+                        });
                         this.performanceCues = undefined;
                     }
                 }
@@ -428,7 +432,10 @@ export class MidiPlayer {
                     try {
                         this.performanceCues = this.loader.performances?.(info)[mode - 1];
                     } catch (error) {
-                        console.warn(`读取附加编排失败，继续播放音乐：${info.name}`, error);
+                        reportDiagnostic("warn", "playback", "读取附加编排失败，继续播放音乐", error, {
+                            song: info.id,
+                            name: info.name,
+                        });
                     }
                 }
             }
@@ -439,8 +446,17 @@ export class MidiPlayer {
         } catch (e) {
             if (generation !== this.generation) return;
             // 曲目被删除属于数据过期，不是播放器故障：降级为 WARN，并附上被摘除的信息。
-            if (this.loadMissing) console.warn(`曲目已失效，已从队列移除: ${info.name} (${info.id})`);
-            else console.error(`加载 MIDI 失败: ${info.name}`, e);
+            if (this.loadMissing) {
+                reportDiagnostic("warn", "playback", "曲目已失效，已从队列移除", undefined, {
+                    song: info.id,
+                    name: info.name,
+                });
+            } else {
+                reportDiagnostic("error", "playback", "加载 MIDI 失败", e, {
+                    song: info.id,
+                    name: info.name,
+                });
+            }
             this.releaseSong();
             this.totalNotes = 0;
         }

@@ -12,6 +12,9 @@ import { canImportMidi, isPbeAdmin } from "@app/permissions";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { midiManager } from "@app/midi";
 import { worldLibrary } from "@platform/storage/worldLibrary";
+import { createLogger } from "@runtime/log";
+
+const log = createLogger("ui.import");
 
 /** 同一玩家两次成功入库之间的最小间隔（毫秒） */
 const SUBMIT_COOLDOWN_MS = 5_000;
@@ -169,7 +172,7 @@ export const MidiImportPage = DDUI.page<MidiImportArgs>("导入 MIDI", (ui, args
             player.sendMessage(`§a[MIDI] 导入成功：${message.replace(/§./g, "").split("\n")[0]}`);
         } catch (error) {
             status.setData(`§c保存失败：${(error as Error).message ?? error}`);
-            console.warn("[midiImport] 保存失败", error);
+            log.warn("保存导入曲目失败", error, { player: player.id });
         }
     };
 

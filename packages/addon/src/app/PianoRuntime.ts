@@ -1,5 +1,6 @@
 import { NativeTextSurface, textRotationForHeading } from "@begame/tabletop/minecraft";
 import { hostScope, textPort } from "@platform/host";
+import { createLogger } from "@runtime/log";
 import { PianoScope } from "@runtime/scope";
 import { PIANO_SCREEN } from "@data/hitboxes.generated";
 import { type Entity, type Player, type SoundInstance, Vector3, system } from "@minecraft/server";
@@ -23,6 +24,8 @@ import type { MusicStorage } from "@domain/music/storage";
 import { SoundReleaseQueue } from "@domain/playback/soundRelease";
 import type { PianoTransportEvent, PianoVisualNote } from "@domain/playback/visualEvent";
 import type { PianoParticleOverride } from "@piano/vfx";
+
+const log = createLogger("piano");
 
 function lcdTime(seconds: number) {
     const whole = Math.max(0, Math.floor(seconds));
@@ -197,6 +200,10 @@ export class PianoRuntime {
         return true;
     }
 
+    private get logPiano(): string {
+        return instrumentKey(this.location.dimension, this.location.pos);
+    }
+
     flushSettings(displayId: string) {
         if (!this.disposed && this.display?.entity.id === displayId) this.display.flushSettings();
     }
@@ -218,18 +225,18 @@ export class PianoRuntime {
                 this.visualScope = this.scope.child("visual");
                 this.text = new NativeTextSurface(this.display.entity, this.visualScope.raw,
                     { distance: 12, background: { red: 0, green: 0, blue: 0, alpha: 0 } },
-                    error => console.warn("[piano] 屏幕文字失败", error), textPort);
+                    error => log.warn("屏幕文字更新失败", error, { piano: this.logPiano }), textPort);
                 this.refreshText();
                 // 只重试一次同步（不重建 primitive），实体刚加载时首写失败也能补上。
                 this.visualScope.schedule(10, () => this.refreshText());
             }
             const record = this.display.playback;
             if (!this.midi && record?.songs.length) {
-                void this.getMidiPlayer().restore(record).catch(error => console.warn("[piano] 恢复播放失败", error));
+                void this.getMidiPlayer().restore(record).catch(error => log.warn("恢复播放失败", error, { piano: this.logPiano }));
             }
         } catch (error) {
             this.visualRetryAt = tick + SWEEP_INTERVAL;
-            console.warn("[piano] 显示实体初始化失败", error);
+            log.warn("显示实体初始化失败", error, { piano: this.logPiano });
         }
     }
 
@@ -249,7 +256,7 @@ export class PianoRuntime {
                 }
             } catch (error) {
                 this.scoreRetryAt = tick + SWEEP_INTERVAL;
-                console.warn("[piano] 同步空白谱架失败", error);
+                log.warn("同步空白谱架失败", error, { piano: this.logPiano });
             }
             return;
         }
@@ -272,7 +279,7 @@ export class PianoRuntime {
             }
         } catch (error) {
             this.scoreRetryAt = tick + SWEEP_INTERVAL;
-            console.warn("[piano] 同步谱架失败", error);
+            log.warn("同步谱架失败", error, { piano: this.logPiano });
         }
     }
 
@@ -443,7 +450,7 @@ export class PianoRuntime {
         const record = this.midi?.checkpoint();
         if (!record) return;
         try { this.display.checkpoint(record); }
-        catch (error) { console.warn("[piano] 保存播放失败", error); }
+        catch (error) { log.warn("保存播放状态失败", error, { piano: this.logPiano }); }
     }
 
     dispose(removeVisual: boolean) {
@@ -451,7 +458,7 @@ export class PianoRuntime {
         this.disposed = true;
         this.soundReleases.stopAll();
         for (const cleanup of [...this.disposeCleanups]) {
-            try { cleanup(); } catch (error) { console.warn("[piano] 运行时清理回调失败", error); }
+            try { cleanup(); } catch (error) { log.warn("运行时清理回调失败", error, { piano: this.logPiano }); }
         }
         this.disposeCleanups.clear();
         this.removeVisualOnDispose = removeVisual;
@@ -465,7 +472,7 @@ export class PianoRuntime {
             try {
                 this.checkpoint();
             } catch (error) {
-                console.warn("[piano] 保存播放失败", error);
+                log.warn("保存播放状态失败", error, { piano: this.logPiano });
             }
         }
         // Scope owns visual/text, midi and display; one failed cleanup cannot
@@ -474,7 +481,7 @@ export class PianoRuntime {
         try {
             this.music.dispose();
         } catch (error) {
-            console.warn("[piano] 释放音乐缓存失败", error);
+            log.warn("释放音乐缓存失败", error, { piano: this.logPiano });
         }
         this.cardSlotBinding = undefined;
         // 断开世界组装时注入的回调；它们捕获了本运行时。

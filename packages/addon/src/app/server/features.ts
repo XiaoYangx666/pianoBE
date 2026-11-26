@@ -1,5 +1,6 @@
 import { world } from "@minecraft/server";
 import { hostScope } from "@platform/host";
+import { createLogger } from "@runtime/log";
 import { PianoScope } from "@runtime/scope";
 import { OnlineTranscribeClient } from "@platform/server/admin/transcribeClient";
 import type { ServerBackend } from "@app/serverAdmin";
@@ -16,6 +17,7 @@ import { TranscribePage } from "./transcription/ui";
 
 /** 管理器轮询节拍：按 20 tick/秒换算，与任务管理器内部的 2 秒节流一致。 */
 const POLL_TICKS = Math.max(1, Math.round(POLL_INTERVAL_MS / 50));
+const log = createLogger("transcribe");
 
 let scope: PianoScope | undefined;
 let manager: TranscriptionManager | undefined;
@@ -38,14 +40,14 @@ export function initServerFeatures(backend: ServerBackend): void {
             try {
                 player.sendMessage(message);
             } catch (error) {
-                console.warn("[transcribe] 通知玩家失败", error);
+                log.warn("通知玩家失败", error, { player: playerId });
             }
         },
         schedule: (callback) => {
             const handle = featureScope.interval(POLL_TICKS, callback);
             return () => handle.cancel();
         },
-        report: (error) => console.warn("[transcribe]", error),
+        report: (error) => log.warn("在线转录异常", error),
     });
 
     featureScope.own("transcription", () => transcription.dispose());
@@ -67,7 +69,7 @@ export function initServerFeatures(backend: ServerBackend): void {
     // 管理器内部同样按 POLL_INTERVAL_MS 节流；这里只保留一个共同来源。
     scope = featureScope;
     manager = transcription;
-    console.log("[server] 在线转录已启用");
+    log.info("在线转录已启用");
 }
 
 /** 显式销毁（测试或将来热重载）；正常游戏生命周期由 hostScope 管理。 */

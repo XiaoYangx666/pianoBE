@@ -1,3 +1,5 @@
+import { reportDiagnostic } from "@piano/core";
+
 export type EventCallback<T = any> = (data: T) => void;
 
 export class Signal<T = any> {
@@ -37,7 +39,7 @@ export class Signal<T = any> {
             try {
                 callback(data as T);
             } catch (error) {
-                console.error(`Error in event handler:`, error);
+                reportDiagnostic("error", "signal", "事件处理器异常", error);
             }
         });
     }

@@ -1,10 +1,13 @@
 import { RuntimeScope, type Disposable, type RuntimeResourceStats } from "@begame/tabletop";
+import { createLogger } from "@runtime/log";
 
 export type PianoErrorReporter = (boundary: string, error: unknown) => void;
 
+const log = createLogger("runtime");
+
 /** One diagnostic boundary for every runtime resource owned by PianoBE. */
 export function reportPianoError(boundary: string, error: unknown): void {
-    console.warn(`[piano] ${boundary}`, error);
+    log.warn("运行时资源清理失败", error, { boundary });
 }
 
 /**

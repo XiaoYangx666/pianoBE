@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { existsSync } from "node:fs";
@@ -48,6 +49,7 @@ export interface AppDeps {
 export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
     const log = deps.logger ?? NOOP_LOGGER;
+    const httpLog = log.scope("http");
 
     const sessionStmt = deps.db.prepare(`SELECT id FROM tokens WHERE token_hash=? AND revoked=0`);
     const bearerOf = (c: Context<{ Variables: AppVariables }>): string => {
@@ -62,24 +64,48 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         return Boolean(token && getTokenInfo(deps.db, token));
     };
 
-    // 访问日志：一条一行，带耗时；静态资源成功请求不落盘
+    // 请求 ID + 访问日志：一条一行，带耗时；静态资源成功请求不落盘
     app.use("*", async (c, next) => {
+        const incoming = c.req.header("x-request-id")?.trim();
+        const requestId =
+            incoming && /^[A-Za-z0-9._:-]{1,64}$/.test(incoming)
+                ? incoming
+                : randomUUID().slice(0, 12);
+        c.set("requestId", requestId);
+
         const start = Date.now();
         await next();
+        // 响应已产生后再写头：静态文件/登录页返回的是原始 Response，
+        // 在 next() 之前设置的 header 不会合并进去。
+        c.header("x-request-id", requestId);
         // 上传的曲目/插件归档都走同源下载，禁止浏览器按内容嗅探成 HTML
         c.header("X-Content-Type-Options", "nosniff");
         // 入口 HTML 每次回源，避免部署后仍拿旧页面
         if ((c.res.headers.get("content-type") ?? "").startsWith("text/html")) {
             c.header("Cache-Control", "no-cache");
         }
-        log.http(c.req.method, c.req.path, c.res.status, Date.now() - start);
+        // 健康检查每 30 秒一次，成功请求降到 debug，避免把真正的问题冲掉
+        if (c.req.path === "/api/health" && c.res.status < 400) {
+            httpLog.debug(`${c.req.method} ${c.req.path} ${c.res.status}`, { req: requestId });
+            return;
+        }
+        const token = c.get("token");
+        httpLog.http(c.req.method, c.req.path, c.res.status, Date.now() - start, {
+            req: requestId,
+            auth: token ? `${token.role}#${token.id}` : undefined,
+        });
     });
 
     const pluginService = deps.pluginService ?? new PluginService(deps.songPort, deps.config);
     const deploymentService = deps.deploymentService ?? new DeploymentService(deps.songPort, pluginService, deps.config);
     const transcribeJobs =
         deps.transcribeJobs ??
-        new TranscribeJobStore({ songPort: deps.songPort, config: deps.config, amt: deps.amt });
+        new TranscribeJobStore({
+            songPort: deps.songPort,
+            config: deps.config,
+            amt: deps.amt,
+            logger: deps.logger?.scope("transcribe"),
+        });
     const readRole = () => requireRole("user", deps.config.allowPublicRead);
 
     // 解析令牌（仅挂上下文，不拦截；角色门槛由具体路由决定）
@@ -152,8 +178,9 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AppVariables }> {
 
     // 未捕获的请求异常：记录堆栈后返回 JSON，而不是裸 500 文本
     app.onError((err, c) => {
-        log.error(`${c.req.method} ${c.req.path} 处理异常`, err);
-        return c.json({ error: "服务器内部错误" }, 500);
+        const requestId = c.get("requestId");
+        httpLog.error(`${c.req.method} ${c.req.path} 处理异常`, err, { req: requestId });
+        return c.json({ error: "服务器内部错误", requestId }, 500);
     });
 
     // 未匹配的 /api 路由必须返回 JSON 404，不能被 SPA 回退成 index.html

@@ -1,5 +1,5 @@
 import type { MidiSongMeta, PerformanceCue, PerformanceDescriptor } from "@piano/core";
-import { SongCache, worldRawId, type SongHandle } from "@piano/core";
+import { SongCache, reportDiagnostic, worldRawId, type SongHandle } from "@piano/core";
 
 /**
  * 曲库管理器：
@@ -82,7 +82,7 @@ export class MidiManager {
             const list = await this.source.list();
             if (list) this.reset(list);
         } catch (e) {
-            console.error("刷新曲库元信息失败", e);
+            reportDiagnostic("error", "playback", "刷新曲库元信息失败", e);
         }
     }
 

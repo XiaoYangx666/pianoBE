@@ -1,4 +1,5 @@
 import { hostScope } from "@platform/host";
+import { createLogger } from "@runtime/log";
 import { PianoScope } from "@runtime/scope";
 import { ButtonState, InputButton, Player, Vector3, system, world } from "@minecraft/server";
 import type { EntityLoadAfterEvent, PlayerButtonInputAfterEvent } from "@minecraft/server";
@@ -16,6 +17,8 @@ import { isUnloadedChunkError } from "@platform/errors";
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
 import { SWEEP_INTERVAL, UNLOAD_GRACE, VIEW_RANGE_SQUARED } from "@app/pianoConfig";
+
+const log = createLogger("piano");
 
 class PianoWorld {
     readonly created = new Signal<PianoRuntime>();
@@ -170,7 +173,9 @@ class PianoWorld {
                 try {
                     removeDormantDisplay(location, pianoCenter(location));
                 } catch (error) {
-                    console.warn("[piano] 清理显示实体失败", error);
+                    log.warn("清理显示实体失败", error, {
+                        piano: instrumentKey(location.dimension, location.pos),
+                    });
                 }
             }
             return;
@@ -180,7 +185,7 @@ class PianoWorld {
         try {
             piano.dispose(removeVisual);
         } catch (error) {
-            console.warn("[piano] 运行时卸载失败", error);
+            log.warn("运行时卸载失败", error, { piano: key });
         }
     }
 
@@ -214,11 +219,12 @@ class PianoWorld {
                     piano.refreshScreen();
                 }
             } catch (error) {
-                if (!isUnloadedChunkError(error)) console.warn("[piano] 钢琴运行时扫描失败", error);
+                const pianoId = instrumentKey(piano.location.dimension, piano.location.pos);
+                if (!isUnloadedChunkError(error)) log.warn("钢琴运行时扫描失败", error, { piano: pianoId });
                 try {
                     this.unload(piano.location, false);
                 } catch (cleanupError) {
-                    console.warn("[piano] 运行时清理失败", cleanupError);
+                    log.warn("运行时清理失败", cleanupError, { piano: pianoId });
                 }
             }
         }
@@ -245,13 +251,14 @@ class PianoWorld {
             } catch (error) {
                 // 区块卸载后访问位置失败是正常现象：直接结束该运行时，等区块
                 // 重新加载时再从组装体恢复，不需要专门轮询区块是否加载。
-                if (!isUnloadedChunkError(error)) console.warn("[piano] 钢琴运行时更新失败", error);
+                const pianoId = instrumentKey(piano.location.dimension, piano.location.pos);
+                if (!isUnloadedChunkError(error)) log.warn("钢琴运行时更新失败", error, { piano: pianoId });
                 // Rebuild from the assembly on the next interaction/sweep instead
                 // of leaving a runtime that is loaded but no longer ticked.
                 try {
                     this.unload(piano.location, false);
                 } catch (cleanupError) {
-                    console.warn("[piano] 运行时清理失败", cleanupError);
+                    log.warn("运行时清理失败", cleanupError, { piano: pianoId });
                 }
             }
         }

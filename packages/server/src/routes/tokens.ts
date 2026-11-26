@@ -26,6 +26,12 @@ export function tokensRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         }
         try {
             const { id, token } = createToken(deps.db, label, role);
+            deps.logger?.scope("tokens").info("令牌已创建", {
+                req: c.get("requestId"),
+                id,
+                label,
+                role,
+            });
             return c.json({ id, label, role, token }, 201);
         } catch {
             return c.json({ error: "label 已存在" }, 409);
@@ -38,6 +44,7 @@ export function tokensRoutes(deps: AppDeps): Hono<{ Variables: AppVariables }> {
         if (!revokeToken(deps.db, id)) {
             return c.json({ error: "令牌不存在或已吊销" }, 404);
         }
+        deps.logger?.scope("tokens").info("令牌已吊销", { req: c.get("requestId"), id });
         return c.body(null, 204);
     });
 

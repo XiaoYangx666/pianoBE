@@ -57,6 +57,7 @@ describe("健康检查与鉴权", () => {
     test("health 公开可用", async () => {
         const res = await req("/api/health");
         expect(res.status).toBe(200);
+        expect(res.headers.get("x-request-id")).toMatch(/^[A-Za-z0-9._:-]{1,64}$/);
     });
 
     test("无令牌访问受保护接口 → 401", async () => {

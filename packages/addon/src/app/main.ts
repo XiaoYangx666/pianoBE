@@ -13,8 +13,14 @@ import { clearPlayerPerformance } from "@app/playerPerformance";
 import { midiManager } from "@app/midi";
 import { loadPbeSettings } from "@platform/storage/pbeSettingsStore";
 import { worldLibrary } from "@platform/storage/worldLibrary";
+import { setDiagnosticSink } from "@piano/core";
+import { createLogger, routeDiagnostic, setLogLevel } from "@runtime/log";
 import { system, world } from "@minecraft/server";
 import { Command, initSAPIPro, pcommand } from "sapi-pro";
+
+// core / vfx 的诊断统一走 addon logger，保证控制台前缀和级别一致。
+setDiagnosticSink(routeDiagnostic);
+const log = createLogger("app");
 
 //注册模组组件
 system.beforeEvents.startup.subscribe((e) => {
@@ -55,14 +61,14 @@ system.run(() => {
     try {
         loadPbeSettings();
     } catch (error) {
-        console.warn("[piano] 读取管理员设置失败", error);
+        log.warn("读取管理员设置失败", error);
     }
     // 世界级全局曲库：启动时扫描一次元数据，之后搜索/分页只查内存索引。
     try {
         worldLibrary.reload();
         midiManager.addPublicSource(worldLibrary.publicSource);
     } catch (error) {
-        console.warn("[piano] 加载世界全局曲库失败", error);
+        log.warn("加载世界全局曲库失败", error);
     }
 });
 
@@ -73,7 +79,18 @@ world.afterEvents.playerLeave.subscribe((e) => {
 });
 
 // 启动标记：确认行为包脚本已加载及其构建目标（模板包=client / 服务器专用包=server）
-console.log(`[piano] 主脚本已加载，构建目标: ${__PIANO_TARGET__}`);
+log.info("主脚本已加载", { target: __PIANO_TARGET__ });
+
+// 现场排查时临时打开细节日志：/scriptevent pbe:log debug
+system.afterEvents.scriptEventReceive.subscribe((event) => {
+    if (event.id !== "pbe:log") return;
+    const level = event.message.trim().toLowerCase();
+    if (level !== "debug" && level !== "info" && level !== "warn" && level !== "error") return;
+    setLogLevel(level);
+    log.info("日志级别已切换", { level });
+    const player = event.sourceEntity as { sendMessage?: (message: string) => void } | undefined;
+    player?.sendMessage?.(`§a[PianoBE] 日志级别：${level}`);
+});
 
 initSAPIPro({
     name: "**NAME**",
@@ -93,6 +110,7 @@ pcommand.registerNative(
                 `(预算 ${(stats.maxBytes / 1024).toFixed(0)} KB, 活跃 ${stats.activeSongs}, ` +
                 `加载中 ${stats.loading}, 淘汰 ${stats.evictions}, 命中 ${stats.hits}/${stats.hits + stats.misses})`
         );
+        player.sendMessage(`[日志] level=${log.level}`);
         player.sendMessage(pianoWorld.debugDump());
     })
 );
@@ -115,19 +133,16 @@ pcommand.registerNative(
 // URL/token，经 server-net 拉取）。client 构建时此分支被 compile.define 注入常量
 // 折叠 + 死代码消除整体裁剪（产物不含 serverAdmin/serverNet/在线转录代码）。
 if (__PIANO_TARGET__ === "server") {
-    console.log("[piano] server 构建：20 tick 后尝试初始化远程曲库");
+    log.debug("server 构建：20 tick 后尝试初始化远程曲库");
     system.runTimeout(async () => {
         try {
             const { initServerAdmin } = await import("./serverAdmin.js");
             const backend = await initServerAdmin();
-            console.log(
-                `[piano] 远程曲库初始化结果: ${backend ? "成功" : "未启用（使用内嵌曲库）"}`
-            );
             if (!backend) return;
             const { initServerFeatures } = await import("./server/features.js");
             initServerFeatures(backend);
         } catch (e) {
-            console.warn("[serverAdmin] 初始化失败，使用内嵌曲库", e);
+            log.warn("远程曲库初始化失败，使用内嵌曲库", e);
         }
     }, 20);
 }

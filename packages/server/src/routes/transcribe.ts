@@ -77,6 +77,7 @@ export function transcribeRoutes(
         songPort: deps.songPort,
         config: deps.config,
         amt: deps.amt,
+        logger: deps.logger?.scope("transcribe"),
     })
 ): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
@@ -201,6 +202,11 @@ export function transcribeRoutes(
             video = await resolveBiliVideo(input, page, deps.config.biliSessdata);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
+            const fields = { req: c.get("requestId"), input, page };
+            const log = deps.logger?.scope("bilibili");
+            // 链接格式错误属于用户输入问题，只在 debug 留痕；上游/网络失败才需要人看。
+            if (error instanceof BiliError) log?.warn("视频解析失败", error, fields);
+            else log?.debug("视频解析失败", { ...fields, error: message });
             return c.json({ error: message }, error instanceof BiliError ? 502 : 400);
         }
         if (video.durationSec && video.durationSec > deps.config.amtMaxAudioSeconds) {
