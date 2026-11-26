@@ -15,6 +15,40 @@ import { DeploymentService } from "./services/deployment.js";
 const argv = process.argv.slice(2);
 loadHomeEnv(resolveHomeDir(process.env, argv), process.env);
 const config = loadConfig(process.env, argv);
+// 前端目录不做运行时候选探测，三种运行形态各有确定来源：
+//   1. WEB_ROOT（环境变量 / .env）：显式指定，Docker 与本地源码部署都用这个
+//   2. 单文件产物：构建脚本 __PIANOBE_WEB__ 注入内嵌目录（$bunfs/root/web）
+//   3. 仓库内直接运行：固定为 packages/studio/dist
+// 这段放在建日志器之前，好让 --check-web 只输出一行路径供构建脚本自检。
+declare const __PIANOBE_WEB__: string | undefined;
+const checkWebOnly = argv.includes("--check-web");
+const explicitWebRoot = config.webRoot;
+if (explicitWebRoot) {
+    config.webRoot = resolve(explicitWebRoot);
+} else {
+    config.webRoot =
+        typeof __PIANOBE_WEB__ !== "undefined"
+            ? resolve(import.meta.dir, __PIANOBE_WEB__)
+            : resolve(import.meta.dir, "../../studio/dist");
+}
+const resolvedWebRoot = config.webRoot;
+let webNote = `前端目录: ${resolvedWebRoot}${explicitWebRoot ? "（WEB_ROOT）" : ""}`;
+if (!existsSync(resolve(resolvedWebRoot, "index.html"))) {
+    const message = explicitWebRoot
+        ? `WEB_ROOT 无效：${resolvedWebRoot} 下没有 index.html`
+        : `前端未构建：${resolvedWebRoot} 下没有 index.html（先 npm run build:studio，或用 WEB_ROOT 指定）`;
+    if (explicitWebRoot || checkWebOnly) {
+        console.error(message);
+        process.exit(1);
+    }
+    webNote = message;
+    config.webRoot = undefined;
+}
+if (checkWebOnly) {
+    console.log(config.webRoot);
+    process.exit(0);
+}
+
 const log = createLogger({
     file: config.logFile,
     level: config.logLevel,
@@ -22,6 +56,10 @@ const log = createLogger({
     maxBytes: config.logMaxBytes,
     maxFiles: config.logMaxFiles,
 });
+if (webNote) {
+    if (config.webRoot) log.info(webNote);
+    else log.warn(webNote);
+}
 // core 内部的诊断也进入同一套文件/级别/脱敏规则
 setDiagnosticSink((level, scope, message, error, fields) => {
     const target = log.scope(scope);
@@ -39,22 +77,6 @@ process.on("uncaughtException", (error) => {
 process.on("unhandledRejection", (reason) => {
     log.error("未处理的 Promise 拒绝", reason);
 });
-
-if (!config.webRoot) {
-    // 单文件发行版（不同 Bun 版本 $bunfs 深度可能为 root / root/server/src）与源码运行路径
-    // 单文件发行版内嵌 web/ 的路径深度随 Bun 版本变化，仍排在最前；
-    // 源码运行时 packages/web 是玩家网页版入口（引用 /src/main.tsx），必须让位于构建产物。
-    const candidates = [
-        resolve(import.meta.dir, "web"),
-        resolve(import.meta.dir, "../web"),
-        resolve(import.meta.dir, "../../../web"),
-        resolve(import.meta.dir, "../../studio/dist-server"),
-        resolve(import.meta.dir, "../../../packages/studio/dist-server"),
-        resolve(import.meta.dir, "../../studio/dist"),
-        resolve(import.meta.dir, "../../web"),
-    ];
-    config.webRoot = candidates.find((dir) => existsSync(resolve(dir, "index.html")));
-}
 
 const db = openDb(config.dbPath);
 const { token, generated } = ensureBootstrapToken(db, config.bootstrapToken);

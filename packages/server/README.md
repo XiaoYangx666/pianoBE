@@ -80,7 +80,7 @@ docker compose -f docker-compose.dev.yml up
 | `PLUGIN_REGISTRY_URL` | 无 | 可选远程插件清单 URL（如 `https://.../plugins/index.json`） |
 | `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
-| `WEB_ROOT` | 自动探测 | 前端构建产物目录（单文件优先内嵌 `web/`，源码优先 `studio/dist-server`） |
+| `WEB_ROOT` | 见下 | 前端构建产物目录；相对路径按当前工作目录解析，设了但无 `index.html` 会直接退出 |
 | `AMT_CLI` | 自动探测 | 显式指定 `amt-cli` 路径（优先级最高） |
 | `AMT_MODEL` | 自动探测 | ONNX 模型路径 |
 | `NPM_REGISTRY` | `https://registry.npmmirror.com` | 网页一键下载 `amt-cli` 时使用的 npm 源 |
@@ -106,6 +106,12 @@ docker compose -f docker-compose.dev.yml up
 | `LOG_MAX_BYTES` | `10485760` | 单个日志文件上限（字节） |
 | `LOG_MAX_FILES` | `7` | 保留的历史日志文件数 |
 
+前端目录只有三个来源，运行期不做候选探测：
+
+- 设了 `WEB_ROOT`：就用它；目录里没有 `index.html` 直接退出（配置错了不静默降级）
+- 单文件产物：构建时注入内嵌的 `web/`（产物内 `$bunfs/root/web`）
+- 仓库内直接运行：固定 `packages/studio/dist`，没构建就只有 API、页面 404
+
 ## 开发与生产
 
 | | 开发 | 生产（单文件发行版） |
@@ -113,7 +119,7 @@ docker compose -f docker-compose.dev.yml up
 | 启动 | `npm run dev:server`（bun --watch） | 直接运行 `pianobe-server-<平台>` |
 | 管理页 | `packages/studio` 的 `npm run dev`（完整版） | 构建时嵌入 `packages/studio/dist-server`（精简服务器版） |
 | Studio 模式 | 本地工作区 + 服务器模式 | **仅服务器模式**（无本地工作区、无 ONNX/前端装配依赖） |
-| 资源目录 | 优先 `studio/dist-server`、`WEB_ROOT` 可覆盖 | 嵌入可执行文件 `web/` 虚拟目录 |
+| 资源目录 | `WEB_ROOT`；未设时固定为 `packages/studio/dist` | 构建时嵌入 `web/`（`WEB_ROOT` 仍可覆盖） |
 | 插件与数据 | 运行目录 `plugins/`、`data/`、`logs/` | 同左（全部外置，不打入二进制） |
 | 配置 | `.env` 或环境变量 | 环境变量或运行目录 `.env` |
 

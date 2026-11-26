@@ -13,8 +13,8 @@
  * 需要带 --aot/--trim 的 Bun（1.4.5-canary 及以上；稳定版 1.4.5 不生效）。
  * AOT 只能构建当前平台；Windows 版需在 Windows 上执行同一脚本。
  */
-import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, rmSync, statSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,6 +77,9 @@ try {
     console.log("▶ 编译单文件（AOT + trim）");
     const result = await Bun.build({
         entrypoints: [join(root, "packages/server/src/index.ts")],
+        // 内嵌前端目录在产物里的位置：$bunfs/root/web，而入口是 $bunfs/root/server/src，
+        // 所以相对入口是 ../../web。构建结束后脚本会用 --check-web 自检，改了布局会直接构建失败。
+        define: { __PIANOBE_WEB__: JSON.stringify("../../web") },
         compile: {
             outfile,
             aot: true,
@@ -94,3 +97,20 @@ try {
 const size = statSync(outfile).size;
 console.log(`✔ ${outfile}`);
 console.log(`  ${(size / 1024 / 1024).toFixed(1)} MiB（${size} 字节）`);
+
+// 立即自检内嵌前端：布局写错（Bun 改了 $bunfs 结构、assets 目录改名）就在构建阶段失败，
+// 而不是部署后才白屏。在空目录里跑，确保不读到仓库里的前端。
+const checkDir = mkdtempSync(join(tmpdir(), "pianobe-web-check-"));
+try {
+    const check = spawnSync(outfile, ["--check-web"], {
+        cwd: checkDir,
+        env: { ...process.env, WEB_ROOT: "" },
+        encoding: "utf8",
+    });
+    if (check.status !== 0) {
+        throw new Error(`内嵌前端自检失败：${(check.stderr || check.stdout).trim()}`);
+    }
+    console.log(`  内嵌前端自检通过：${check.stdout.trim()}`);
+} finally {
+    rmSync(checkDir, { recursive: true, force: true });
+}
