@@ -94,6 +94,17 @@ docker compose -f docker-compose.dev.yml up
 - `world_behavior_packs.json` / `world_resource_packs.json` 会同步更新到新版本。
 - 包名与描述可在页面自定义；留空则沿用模板 manifest 的值。
 
+也可以不打开页面，一条命令完成「构建 → 装配 → 写入 BDS」。默认是本机直连：脚本直接调用后端代码写文件，不经过 HTTP、不上传产物，也不需要令牌：
+
+```bash
+npm run deploy:bds                      # 构建 + 本地直接部署
+npm run deploy:bds -- --skip-build      # 复用 packages/addon/dist/server.mcaddon
+npm run deploy:bds -- --file <mcaddon>  # 指定其他产物
+npm run deploy:bds -- --url http://host:35050 --token <admin 令牌>   # 远端后端（走 HTTP）
+```
+
+脚本会打印部署结果、configHash、问题与提示。部署只写文件，重启 BDS 实例或重进世界后才加载新包；命令失败时不会留下半套文件。
+
 ## 令牌与角色
 
 - 令牌即身份：`Authorization: Bearer <token>`，服务端存 SHA-256 哈希，明文只在创建时返回一次

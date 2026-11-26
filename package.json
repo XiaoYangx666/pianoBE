@@ -20,6 +20,7 @@
         "copy": "npm run copy -w @piano/addon",
         "build:template": "npm run build:template -w @piano/addon",
         "build:server": "npm run build:server -w @piano/addon",
+        "deploy:bds": "node tools/deploy/deploy-bds.mjs",
         "verify:addon-build": "npm run verify:build -w @piano/addon",
         "convert": "node tools/midi/convert.js",
         "add-song": "node tools/midi/add-song.mjs",
