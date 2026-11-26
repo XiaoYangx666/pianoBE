@@ -23,6 +23,7 @@
         "build:dev": "npm run pack -w @piano/addon",
         "deploy:bds": "node tools/deploy/deploy-bds.mjs",
         "build:server:exe": "bun tools/build/build-server-exe.ts",
+        "docker:single": "npm run build:server:exe && docker build -f Dockerfile.server -t pianobe-server:single .",
         "verify:addon-build": "npm run verify:build -w @piano/addon",
         "convert": "node tools/midi/convert.js",
         "add-song": "node tools/midi/add-song.mjs",

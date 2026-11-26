@@ -139,6 +139,21 @@ npm run build:server:exe
 - 运行：`./pianobe-server-linux-x64 --dir ./my-server`（Windows 为 `pianobe-server-win32-x64.exe`）
 - AMT 四级解析顺序：`AMT_CLI`（环境变量） → `<dataDir>/amt/`（管理页「音乐工具」一键从 npm 下载） → `node_modules`（npm 依赖） → `PATH`
 
+## Docker（单文件版）
+
+镜像只包含 glibc 基础层 + 编译好的二进制（约 90 MB），不装 Node/Bun：
+
+```bash
+npm run build:server:exe
+docker build -f Dockerfile.server -t pianobe-server:single .
+docker compose -f docker-compose.single.yml up -d
+```
+
+- 运行目录固定为 `/data`（plugins / data / logs 都在卷 `pianobe-data` 里）
+- 网络显式设为 MTU 1400：宿主机链路 MTU 小于 1500 时，Bun 的 TLS 握手会被
+  bridge 静默丢弃（表现为 AMT/远程插件下载超时）
+- 镜像已带 `libgcc_s` / `libstdc++`，可在管理页直接下载 AMT 并转录
+
 ## BDS 附加包部署
 
 管理页「BDS 部署与校验」会把模板与已启用的插件/音色/曲谱重新装配，并写入 BDS：

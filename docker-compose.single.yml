@@ -1,0 +1,28 @@
+# 单文件服务端：镜像内只有 glibc + binary（约 90 MB），数据/插件/日志挂载到卷。
+#
+#   npm run build:server:exe              # 先产出 build/server-exe/pianobe-server-linux-x64
+#   docker build -f Dockerfile.server -t pianobe-server:single .
+#   docker compose -f docker-compose.single.yml up -d
+#
+services:
+    pianobe:
+        image: pianobe-server:single
+        container_name: pianobe-server
+        restart: unless-stopped
+        ports:
+            - "${PIANOBE_PORT:-3000}:3000"
+        environment:
+            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
+        volumes:
+            - pianobe-data:/data
+
+networks:
+    default:
+        driver: bridge
+        driver_opts:
+            # 宿主机链路 MTU 低于 1500 时，Bun 的大 TLS 握手会被 bridge 静默丢弃；
+            # 1400 对常见 VPS / PPPoE 都安全。
+            com.docker.network.driver.mtu: "1400"
+
+volumes:
+    pianobe-data:

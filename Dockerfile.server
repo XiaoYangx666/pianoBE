@@ -1,0 +1,22 @@
+# 单文件服务端镜像：glibc 基础层 + 编译好的二进制（约 88 MB）
+# 构建：docker build -f Dockerfile.server -t pianobe-server:single .
+# 运行见 docker-compose.single.yml（注意 bridge 网络 MTU）
+FROM oven/bun:1-slim AS libs
+
+FROM frolvlad/alpine-glibc:latest
+# TLS 根证书（下载 AMT / 远程插件源需要）
+COPY --from=libs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+# amt-cli / libonnxruntime.so 依赖 libgcc_s 与 libstdc++（alpine-glibc 不带）
+COPY --from=libs /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /opt/lib/libgcc_s.so.1
+COPY --from=libs /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33 /opt/lib/libstdc++.so.6.0.33
+RUN ln -sf libstdc++.so.6.0.33 /opt/lib/libstdc++.so.6
+ENV LD_LIBRARY_PATH=/opt/lib
+
+COPY build/server-exe/pianobe-server-linux-x64 /app/pianobe-server
+
+ENV PIANOBE_HOME=/data \
+    DATA_DIR=/data
+VOLUME /data
+EXPOSE 3000
+ENTRYPOINT ["/app/pianobe-server", "--dir", "/data"]
