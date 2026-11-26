@@ -42,14 +42,16 @@ process.on("unhandledRejection", (reason) => {
 
 if (!config.webRoot) {
     // 单文件发行版（不同 Bun 版本 $bunfs 深度可能为 root / root/server/src）与源码运行路径
+    // 单文件发行版内嵌 web/ 的路径深度随 Bun 版本变化，仍排在最前；
+    // 源码运行时 packages/web 是玩家网页版入口（引用 /src/main.tsx），必须让位于构建产物。
     const candidates = [
         resolve(import.meta.dir, "web"),
         resolve(import.meta.dir, "../web"),
-        resolve(import.meta.dir, "../../web"),
         resolve(import.meta.dir, "../../../web"),
         resolve(import.meta.dir, "../../studio/dist-server"),
         resolve(import.meta.dir, "../../../packages/studio/dist-server"),
         resolve(import.meta.dir, "../../studio/dist"),
+        resolve(import.meta.dir, "../../web"),
     ];
     config.webRoot = candidates.find((dir) => existsSync(resolve(dir, "index.html")));
 }
