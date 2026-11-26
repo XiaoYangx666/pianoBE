@@ -14,7 +14,6 @@ import {
     sameSongMusic,
 } from "@piano/core";
 import { midiBufferToSong } from "@piano/core/convert";
-import { readPerformance } from "./performance.mjs";
 
 const libDir = path.resolve("./midis/library");
 
@@ -60,7 +59,7 @@ for (const file of [...files].sort((a, b) => a.localeCompare(b))) {
         new Uint8Array(fs.readFileSync(file)),
         path.basename(file).replace(/\.midi?$/i, "")
     );
-    const data = encodeSong({ ...song, performance: readPerformance(song.id) });
+    const data = encodeSong(song);
     const noteCount = collectSongNoteCount(song);
     const existing = index.find(meta => meta.duration === song.duration && meta.noteCount === noteCount
         && sameSongMusic(fs.readFileSync(path.join(libDir, `${meta.id}.pbe3`)), data));

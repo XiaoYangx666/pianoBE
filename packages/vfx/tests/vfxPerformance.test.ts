@@ -259,9 +259,11 @@ test("VfxEngine interpolates key_style colors, switches explicit variant, and re
 });
 
 function simulateSongPerformance(fileName: string, starts: readonly number[], registry?: VfxRegistry, nativeProps = false) {
+    const songId = fileName.replace(/\.pbe3$/i, "");
     const data = readFileSync(new URL(`../../../midis/library/${fileName}`, import.meta.url));
-    const { duration, performance } = readSongHeader(data);
-    expect(performance).toBeDefined();
+    const perfSource = JSON.parse(readFileSync(new URL(`../../../midis/performances/${songId}.json`, import.meta.url), "utf8"));
+    const { duration } = readSongHeader(data);
+    const performance = compilePerformanceSource(perfSource, songId);
 
     const notes = new Map<number, ReturnType<typeof songToNoteEvents>>();
     for (const note of songToNoteEvents(data)) {

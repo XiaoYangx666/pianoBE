@@ -1,7 +1,9 @@
 import { expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+    attachSongPerformance,
     buildPbe3SeekIndex,
+    compilePerformanceSource,
     encodePbe3,
     readPbe3Events,
     SongCache,
@@ -84,7 +86,9 @@ const record = readPlaybackRecord(JSON.stringify({
 }))!;
 
 test("Secret and a legacy PBE3 use the same player clock across pause, seek, resume and switch", async () => {
-    const data = readFileSync(new URL("../../../midis/library/e1563b03.pbe3", import.meta.url));
+    const raw = new Uint8Array(readFileSync(new URL("../../../midis/library/e1563b03.pbe3", import.meta.url)));
+    const perfJson = JSON.parse(readFileSync(new URL("../../../midis/performances/e1563b03.json", import.meta.url), "utf8"));
+    const data = attachSongPerformance(raw, compilePerformanceSource(perfJson, { expectedSongId: "e1563b03" }));
     const secret = { id: "e1563b03", name: "Secret", duration: 3444 };
     const cache = new SongCache(async id => id === secret.id ? data : undefined);
     const transport: PianoTransportEvent[] = [];

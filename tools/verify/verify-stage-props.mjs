@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { posix } from "node:path";
 import {
     attachSongPerformance,
+    compilePerformanceSource,
     computeMusicFingerprint,
     decodePbe3,
     encodeSong,
@@ -31,7 +33,7 @@ function pbe3ToEntry(data) {
     };
 }
 
-const bare = new Uint8Array(await readFile("packages/addon/dist/template-bare.mcaddon"));
+const bare = new Uint8Array(await readFile("packages/addon/dist/template.mcaddon"));
 const readPlugin = async id => readPbePluginArchive(new Uint8Array(await readFile(`build/plugins/${id}.pbeplugin`)));
 const [sinner, chinese, legacy] = await Promise.all(["pianobe.sinner", "pianobe.chinese", "pianobe.stage"].map(readPlugin));
 const registration = (archive) => archive.stageProps[0].registration;
@@ -39,7 +41,15 @@ const exportOptions = { name: "PianoBE Stage Props", desc: "Stage prop verificat
 const isPropFile = (path, bp, rp) =>
     path.startsWith(bp + STAGE_PROP_BP_TREE) || STAGE_PROP_RP_TREES.some(tree => path.startsWith(rp + tree));
 const doc = (addon, path) => JSON.parse(addon.readTextSync(path));
-const readSong = async id => pbe3ToEntry(new Uint8Array(await readFile(`midis/library/${id}.pbe3`)));
+const readSong = async id => {
+    let bytes = new Uint8Array(await readFile(`midis/library/${id}.pbe3`));
+    const perfPath = `midis/performances/${id}.json`;
+    if (existsSync(perfPath)) {
+        const doc = JSON.parse(await readFile(perfPath, "utf8"));
+        bytes = attachSongPerformance(bytes, compilePerformanceSource(doc, { expectedSongId: id }));
+    }
+    return pbe3ToEntry(bytes);
+};
 
 async function readTemplate(input) {
     // Bun on Windows can exhaust worker threads while inflating a full pack.
