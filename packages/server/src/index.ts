@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { setDiagnosticSink } from "@piano/core";
 import { openDb } from "./db.js";
 import { loadConfig, loadHomeEnv, resolveHomeDir } from "./config.js";
@@ -12,7 +12,26 @@ import { TranscribeJobStore } from "./services/transcribeJobs.js";
 import { PluginService } from "./services/plugins.js";
 import { DeploymentService } from "./services/deployment.js";
 
+// 版本号：单文件产物由构建脚本注入；源码运行读 packages/server/package.json
+declare const __PIANOBE_VERSION__: string | undefined;
+
+function readVersion(): string {
+    if (typeof __PIANOBE_VERSION__ !== "undefined") return __PIANOBE_VERSION__;
+    try {
+        const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+            version?: unknown;
+        };
+        return typeof pkg.version === "string" ? pkg.version : "0.0.0";
+    } catch {
+        return "0.0.0";
+    }
+}
+
 const argv = process.argv.slice(2);
+if (argv.includes("--version")) {
+    console.log(`pianobe-server ${readVersion()} (${process.platform}-${process.arch})`);
+    process.exit(0);
+}
 loadHomeEnv(resolveHomeDir(process.env, argv), process.env);
 const config = loadConfig(process.env, argv);
 // 前端目录不做运行时候选探测，三种运行形态各有确定来源：
@@ -85,13 +104,17 @@ if (migratedRoles > 0) {
     log.warn(`已把 ${migratedRoles} 个旧 read/write 令牌迁移为 user（曲库写权限请使用 admin 令牌）`);
 }
 if (generated) {
-    // 令牌只打到控制台，不写日志文件
+    // 令牌明文只落盘一份（600）；日志只记路径，避免进入日志文件或 supervisor 输出。
+    // 没有 TTY 时（nohup/服务托管）控制台也拿不到，只能靠这个文件。
+    const tokenFile = join(config.dataDir, "bootstrap-token.txt");
+    writeFileSync(tokenFile, `${generated}\n`, { mode: 0o600 });
+    chmodSync(tokenFile, 0o600);
     console.log("===============================================");
-    console.log(" 未设置 BOOTSTRAP_TOKEN，已自动生成管理员令牌：");
-    console.log(` ${generated}`);
-    console.log(" 请立即保存（下次可通过环境变量重置）");
+    console.log(" 未设置 BOOTSTRAP_TOKEN，已自动生成管理员令牌");
+    if (process.stdout.isTTY) console.log(` ${generated}`);
+    console.log(` 已写入：${tokenFile}（权限 600，登录后请删除）`);
     console.log("===============================================");
-    log.warn("未设置 BOOTSTRAP_TOKEN，已自动生成管理员令牌（仅控制台显示，请立即保存）");
+    log.warn(`已自动生成管理员令牌并写入 ${tokenFile}（权限 600，登录后请删除）`);
 } else if (token) {
     log.info(`bootstrap 管理员令牌已就绪 (${token.slice(0, 8)}…)`);
 }

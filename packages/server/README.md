@@ -18,7 +18,9 @@ bun src/index.ts --dir ./run
 ```
 
 > 配置读取运行目录 `.env`（或环境变量，见仓库根 `.env.example`），bun 启动时自动加载。
-> 首次启动未设置 `BOOTSTRAP_TOKEN` 时，会自动生成一个管理员令牌并打印到控制台。
+> 首次启动未设置 `BOOTSTRAP_TOKEN` 时，会自动生成一个管理员令牌并写入 `data/bootstrap-token.txt`（权限 600）；
+> 有 TTY 时同时打印到控制台。登录后在管理页重置令牌并删除该文件。
+> 查看版本：`./pianobe-server --version`；确认前端目录：`./pianobe-server --check-web`。
 > 用该令牌登录管理页（或直接作为 `Authorization: Bearer <token>` 调用 API）。
 
 ## 运行目录模型（MC Server 风格）
@@ -30,7 +32,7 @@ bun src/index.ts --dir ./run
 ├── pianobe-server(.exe)   # 单文件可执行程序（内嵌精简管理页 + 零插件 server.mcaddon）
 ├── .env                   # 端口、令牌、BDS_DIR、PLUGIN_REGISTRY_URL 等配置
 ├── plugins/               # 直接放入或删除 .pbeplugin（启动或点「刷新目录」自动同步，待手动启用）
-├── data/                  # piano.db、scores/、自定义 server-template.mcaddon、网页下载的 amt/
+├── data/                  # piano.db、scores/、自定义 server-template.mcaddon、网页下载的 amt/、bootstrap-token.txt
 └── logs/                  # server.log 及轮转日志文件
 ```
 
@@ -78,7 +80,7 @@ docker compose -f docker-compose.dev.yml up
 | `DB_PATH` | `<data>/piano.db` | SQLite 文件路径（曲目 meta/内容/令牌） |
 | `PLUGINS_DIR` | `<home>/plugins` | 外置插件目录（`.pbeplugin`） |
 | `PLUGIN_REGISTRY_URL` | 无 | 可选远程插件清单 URL（如 `https://.../plugins/index.json`） |
-| `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌（重启可重置） |
+| `BOOTSTRAP_TOKEN` | 自动生成 | 管理员引导令牌；未设置时首次启动生成并写入 `data/bootstrap-token.txt`（600） |
 | `ALLOW_PUBLIC_READ` | `false` | `true` 时曲目读接口免令牌 |
 | `WEB_ROOT` | 见下 | 前端构建产物目录；相对路径按当前工作目录解析，设了但无 `index.html` 会直接退出 |
 | `AMT_CLI` | 自动探测 | 显式指定 `amt-cli` 路径（优先级最高） |

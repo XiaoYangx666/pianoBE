@@ -14,12 +14,15 @@
  * AOT 只能构建当前平台；Windows 版需在 Windows 上执行同一脚本。
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const version = (
+    JSON.parse(readFileSync(join(root, "packages/server/package.json"), "utf8")) as { version?: string }
+).version ?? "0.0.0";
 const args = process.argv.slice(2);
 const skipBuild = args.includes("--skip-build");
 const outfileArg = args[args.indexOf("--outfile") + 1];
@@ -79,7 +82,10 @@ try {
         entrypoints: [join(root, "packages/server/src/index.ts")],
         // 内嵌前端目录在产物里的位置：$bunfs/root/web，而入口是 $bunfs/root/server/src，
         // 所以相对入口是 ../../web。构建结束后脚本会用 --check-web 自检，改了布局会直接构建失败。
-        define: { __PIANOBE_WEB__: JSON.stringify("../../web") },
+        define: {
+            __PIANOBE_WEB__: JSON.stringify("../../web"),
+            __PIANOBE_VERSION__: JSON.stringify(version),
+        },
         compile: {
             outfile,
             aot: true,
@@ -96,7 +102,7 @@ try {
 
 const size = statSync(outfile).size;
 console.log(`✔ ${outfile}`);
-console.log(`  ${(size / 1024 / 1024).toFixed(1)} MiB（${size} 字节）`);
+console.log(`  v${version} · ${(size / 1024 / 1024).toFixed(1)} MiB（${size} 字节）`);
 
 // 立即自检内嵌前端：布局写错（Bun 改了 $bunfs 结构、assets 目录改名）就在构建阶段失败，
 // 而不是部署后才白屏。在空目录里跑，确保不读到仓库里的前端。
