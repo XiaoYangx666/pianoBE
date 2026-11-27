@@ -5,11 +5,10 @@ import {
     computeMusicFingerprint,
     encodeSong,
     mergeSongCatalog,
-    normalizeMusicRef,
     rebuildContentIndex,
     reidentifySong,
     renameSong,
-    sameMusicRef,
+    sameMusicSelection,
     type CatalogSongCandidate,
     type MidiSong,
     type MusicStorageKv,
@@ -237,15 +236,10 @@ describe("核心领域模型：指纹、合并规则与稳定演出", () => {
         expect(afterUninstall.songs[0].performanceEntries?.map((p) => p.id)).toEqual(["third.starry:starry"]);
     });
 
-    test("MusicRef 兼容稳定 performanceId 与旧版数值索引", () => {
-        const plainById = normalizeMusicRef({ source: "library", id: "abc", name: "test", duration: 100, performanceId: "plain" });
-        const plainByNum = normalizeMusicRef({ source: "library", id: "abc", name: "test", duration: 100, performance: -1 });
-        expect(plainById?.performanceId).toBe("plain");
-        expect(sameMusicRef(plainById!, plainByNum!)).toBe(true);
-
-        const p1 = normalizeMusicRef({ source: "library", id: "abc", name: "test", duration: 100, performanceId: "perf_a" });
-        const p2 = normalizeMusicRef({ source: "library", id: "abc", name: "test", duration: 100, performanceId: "perf_b" });
-        expect(sameMusicRef(p1!, p2!)).toBe(false);
+    test("MusicSelection 使用稳定 performanceId 区分同一曲目的演出", () => {
+        const track = { source: "library" as const, id: "abc", name: "test", duration: 100 };
+        expect(sameMusicSelection({ ...track, performanceId: "plain" }, { ...track, performanceId: "default" })).toBe(false);
+        expect(sameMusicSelection({ ...track, performanceId: "perf_a" }, { ...track, performanceId: "perf_b" })).toBe(false);
     });
 
     test("MusicCollection 支持命名演出写入与读取", () => {

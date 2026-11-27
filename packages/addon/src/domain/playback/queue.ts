@@ -1,4 +1,4 @@
-import { normalizeMusicRef, sameMusicRef, type MusicRef } from "@piano/core";
+import { sameMusicSelection, toMusicSelection, type MusicSelection } from "@piano/core";
 
 export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
 
@@ -16,11 +16,11 @@ export function getPlayModeName(mode: PlayMode) {
 /**
  * 播放队列：只负责“接下来放哪一首”。
  *
- * 每条记录都是带来源的 MusicRef（钢琴 / 存储卡 / 曲库），不复制曲目正文。
+ * 每条记录都是带来源的选择（存储卡 / 曲库）。
  * 身份判断同时比较来源与内容指纹，避免把不同存储里的同 id 曲目当成同一首。
  */
 export class PlayQueue {
-    private list: MusicRef[] = [];
+    private list: MusicSelection[] = [];
     private index = -1;
     private mode: PlayMode = "sequence";
 
@@ -31,7 +31,7 @@ export class PlayQueue {
         this.index = -1;
     }
 
-    current(): MusicRef | undefined {
+    current(): MusicSelection | undefined {
         if (this.index < 0 || this.index >= this.list.length) return;
         return this.list[this.index];
     }
@@ -51,24 +51,25 @@ export class PlayQueue {
     /**
      * 插入当前后面并立即跳转
      */
-    insertBack(midi: MusicRef): MusicRef {
+    insertBack(midi: MusicSelection): MusicSelection {
+        const selection = toMusicSelection(midi, midi.performanceId);
         if (this.index === -1) {
-            this.list.push(midi);
+            this.list.push(selection);
             this.index = 0;
-            return midi;
+            return selection;
         }
 
         const insertIndex = Math.min(this.list.length, this.index + 1);
-        this.list.splice(insertIndex, 0, midi);
+        this.list.splice(insertIndex, 0, selection);
         this.index = insertIndex;
-        return midi;
+        return selection;
     }
 
     /**
      * 普通加入队列（尾部）
      */
-    enqueue(midi: MusicRef): MusicRef | undefined {
-        this.list.push(midi);
+    enqueue(midi: MusicSelection): MusicSelection | undefined {
+        this.list.push(toMusicSelection(midi, midi.performanceId));
 
         if (this.index === -1) {
             this.index = 0;
@@ -77,25 +78,28 @@ export class PlayQueue {
     }
 
     /** 去重加入尾部；已存在时不产生第二条。 */
-    enqueueUnique(midi: MusicRef): "added" | "exists" {
+    enqueueUnique(midi: MusicSelection): "added" | "exists" {
         if (this.indexOf(midi) >= 0) return "exists";
         this.enqueue(midi);
         return "added";
     }
 
     /** 在当前曲目之后插入整组歌曲并跳到第一首；其余歌曲保留在后面。 */
-    insertCollectionAfterCurrent(refs: readonly MusicRef[]): { added: number; exists: number } {
-        const unique: MusicRef[] = [];
-        for (const ref of refs) if (!unique.some(item => sameMusicRef(item, ref))) unique.push(ref);
+    insertCollectionAfterCurrent(refs: readonly MusicSelection[]): { added: number; exists: number } {
+        const unique: MusicSelection[] = [];
+        for (const ref of refs) {
+            if (!unique.some(item => sameMusicSelection(item, ref))) unique.push(toMusicSelection(ref, ref.performanceId));
+        }
         if (!unique.length) return { added: 0, exists: 0 };
-        const selected = (ref: MusicRef) => unique.some(item => sameMusicRef(item, ref));
+        const selected = (ref: MusicSelection) => unique.some(item => sameMusicSelection(item, ref));
         const previous = this.list;
-        const exists = unique.filter(ref => previous.some(item => sameMusicRef(item, ref))).length;
-        const currentIsSelected = this.current() !== undefined && selected(this.current()!);
+        const exists = unique.filter(ref => previous.some(item => sameMusicSelection(item, ref))).length;
+        const current = this.current();
+        const currentIsSelected = current !== undefined && selected(current);
         const originalInsertAt = this.index < 0 ? 0
             : Math.min(previous.length, this.index + (currentIsSelected ? 0 : 1));
         let removedBefore = 0;
-        const kept: MusicRef[] = [];
+        const kept: MusicSelection[] = [];
         for (let i = 0; i < previous.length; i++) {
             if (selected(previous[i])) {
                 if (i < originalInsertAt) removedBefore++;
@@ -106,18 +110,6 @@ export class PlayQueue {
         this.list = kept;
         this.index = insertAt;
         return { added: unique.length - exists, exists };
-    }
-
-    /** 移除指定引用（按来源/id/指纹匹配）；用于整卡播放前整理重复项。 */
-    removeRefs(refs: readonly MusicRef[]): number {
-        let removed = 0;
-        for (const ref of refs) {
-            const index = this.indexOf(ref);
-            if (index < 0) continue;
-            this.remove(index);
-            removed++;
-        }
-        return removed;
     }
 
     /** 调整顺序；当前播放位置跟随被移动的曲目。 */
@@ -135,7 +127,7 @@ export class PlayQueue {
         return true;
     }
 
-    remove(index: number): MusicRef | undefined {
+    remove(index: number): MusicSelection | undefined {
         if (index < 0 || index >= this.list.length) return;
 
         const removed = this.list[index];
@@ -157,7 +149,7 @@ export class PlayQueue {
         return removed;
     }
 
-    jump(index: number): MusicRef | undefined {
+    jump(index: number): MusicSelection | undefined {
         if (index < 0 || index >= this.list.length) return;
         this.index = index;
         return this.list[index];
@@ -172,7 +164,7 @@ export class PlayQueue {
      * @param expected 期望被摘除的引用。`loadMidi` 是异步的，期间玩家可能改动队列，
      *                 按引用定位可避免误删当前选中的其它曲目。
      */
-    dropCurrent(expected?: MusicRef): MusicRef | undefined {
+    dropCurrent(expected?: MusicSelection): MusicSelection | undefined {
         const index = expected ? this.indexOf(expected) : this.index;
         if (index < 0 || index >= this.list.length) return expected ? this.current() : undefined;
         this.list.splice(index, 1);
@@ -188,7 +180,7 @@ export class PlayQueue {
 
     /* ================== 跳转 ================== */
 
-    next(): MusicRef | undefined {
+    next(): MusicSelection | undefined {
         if (this.list.length === 0) return;
 
         if (this.mode === "single") {
@@ -217,7 +209,7 @@ export class PlayQueue {
         return;
     }
 
-    prev(): MusicRef | undefined {
+    prev(): MusicSelection | undefined {
         if (this.list.length === 0) return;
 
         if (this.mode === "single") {
@@ -253,12 +245,8 @@ export class PlayQueue {
         return this.index >= this.list.length;
     }
 
-    getQueue() {
-        return this.list.map((m) => m.name ?? "unknown");
-    }
-
     /** 队列原始引用（UI/来源标记用）。 */
-    getRefs(): readonly MusicRef[] {
+    getRefs(): readonly MusicSelection[] {
         return this.list;
     }
 
@@ -270,34 +258,17 @@ export class PlayQueue {
         return this.list.length;
     }
 
-    /** 查找曲目在队列中的位置；字符串按 id 匹配（兼容旧调用），对象按来源+id+指纹匹配。 */
-    indexOf(ref: MusicRef | string) {
-        if (typeof ref === "string") return this.list.findIndex((song) => song.id === ref);
-        return this.list.findIndex((song) => sameMusicRef(song, ref));
+    indexOf(ref: MusicSelection) {
+        return this.list.findIndex((song) => sameMusicSelection(song, ref));
     }
 
     snapshot() {
-        // Save playback selectors and track identity. Cue arrays belong to the library.
-        const songs = this.list.map((ref) => normalizeMusicRef(ref)!);
-        return { songs, index: this.index, mode: this.mode };
+        return { songs: this.list.slice(), index: this.index, mode: this.mode };
     }
 
-    restore({ songs, index, mode }: { songs: MusicRef[]; index: number; mode: PlayMode }) {
-        this.list = songs.slice();
+    restore({ songs, index, mode }: { songs: MusicSelection[]; index: number; mode: PlayMode }) {
+        this.list = songs.map(song => toMusicSelection(song, song.performanceId));
         this.index = index;
         this.mode = mode;
-    }
-
-    /* ================== 导入与导出 ================== */
-
-    /**导入播放列表，覆盖当前 */
-    import(list: MusicRef[]): void {
-        this.list = list;
-        this.index = list.length == 0 ? -1 : 0;
-    }
-
-    /**导出midi的id列表 */
-    export(): string[] {
-        return this.list.map((t) => t.id);
     }
 }

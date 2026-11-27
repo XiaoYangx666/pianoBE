@@ -1,6 +1,6 @@
 import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
-import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, reportDiagnostic, type MusicRef, type SongHandle, type PerformanceCue, type PerformanceDescriptor } from "@piano/core";
+import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, isDefaultPerformanceSelection, reportDiagnostic, type MusicSelection, type SongHandle, type PerformanceCue } from "@piano/core";
 import { NoteInfo } from "@domain/types";
 import { PlayQueue } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
@@ -26,10 +26,8 @@ interface MidiOutput {
 
 /** 播放器只需要“按引用获取共享曲目”，缓存策略由存储层/SongCache 统一负责。 */
 export interface MidiLoader {
-    acquire(ref: MusicRef): Promise<SongHandle | undefined>;
-    performances?(ref: MusicRef): readonly (readonly PerformanceCue[])[];
-    performanceEntries?(ref: MusicRef): readonly PerformanceDescriptor[];
-    resolvePerformanceCues?(ref: MusicRef, performanceId: string): Promise<readonly PerformanceCue[] | undefined>;
+    acquire(ref: MusicSelection): Promise<SongHandle | undefined>;
+    resolvePerformanceCues?(ref: MusicSelection, performanceId: string): Promise<readonly PerformanceCue[] | undefined>;
 }
 
 export class MidiPlayer {
@@ -76,7 +74,7 @@ export class MidiPlayer {
 
     checkpoint(): PlaybackRecord | undefined {
         if (this.state === "stopped" || this.isLoading) return;
-        return { version: 2, ...this.queue.snapshot(), state: this.state, seconds: this.currentTime };
+        return { ...this.queue.snapshot(), state: this.state, seconds: this.currentTime };
     }
 
     async restore(record: PlaybackRecord) {
@@ -165,12 +163,12 @@ export class MidiPlayer {
     }
 
     /** 加入队列（去重）；返回是否真的新增。 */
-    addToQueue(ref: MusicRef): "added" | "exists" {
+    addToQueue(ref: MusicSelection): "added" | "exists" {
         return this.queue.enqueueUnique(ref);
     }
 
     /** 按给定顺序把一组曲目加入队列；重复项自动跳过。 */
-    addCollectionToQueue(refs: readonly MusicRef[]): { added: number; exists: number } {
+    addCollectionToQueue(refs: readonly MusicSelection[]): { added: number; exists: number } {
         let added = 0;
         let exists = 0;
         for (const ref of refs) {
@@ -186,7 +184,7 @@ export class MidiPlayer {
      * - 不在队列中 → 插入当前曲目之后；
      * 不清理原队列，也不产生重复条目。
      */
-    async playNow(ref: MusicRef) {
+    async playNow(ref: MusicSelection) {
         const existing = this.queue.indexOf(ref);
         if (existing >= 0) this.queue.jump(existing);
         else this.queue.insertBack(ref);
@@ -194,7 +192,7 @@ export class MidiPlayer {
     }
 
     /** 整卡播放：卡片歌曲在当前曲目后组成连续块，后续队列不会被跳过。 */
-    async playCollection(refs: readonly MusicRef[]): Promise<{ added: number; exists: number } | undefined> {
+    async playCollection(refs: readonly MusicSelection[]): Promise<{ added: number; exists: number } | undefined> {
         if (!refs.length) return undefined;
         const result = this.queue.insertCollectionAfterCurrent(refs);
         await this.play();
@@ -227,19 +225,42 @@ export class MidiPlayer {
     }
 
     end() {
-        this.generation++;
-        this.state = "stopped";
-        this.output.stopNotes();
-        this.output.playing(false);
-        this.output.transport?.({ type: "stop", position: this.currentTime });
-        this.releaseSong();
-        this.currentTime = 0;
-        this.isLoading = false;
         this.queue.clear();
-        this.signal.publish();
+        this.stopPlayback("stopped");
         this.signal.dispose();
         this.disposedSignal.publish();
         this.disposedSignal.dispose();
+    }
+
+    clearQueue() {
+        if (!this.isAlive()) return;
+        this.queue.clear();
+        this.stopPlayback("idle");
+    }
+
+    removeFromQueue(ref: MusicSelection): boolean {
+        if (!this.isAlive()) return false;
+        const index = this.queue.indexOf(ref);
+        if (index < 0) return false;
+        const removingCurrent = index === this.queue.getIndex();
+        this.queue.remove(index);
+        if (removingCurrent) this.stopPlayback("idle");
+        return true;
+    }
+
+    private stopPlayback(state: "idle" | "stopped") {
+        this.generation++;
+        const position = this.currentTime;
+        const wasActive = this.state !== "idle" || this.isLoading;
+        this.state = state;
+        this.releaseSong();
+        this.totalNotes = 0;
+        this.currentTime = 0;
+        this.isLoading = false;
+        if (wasActive || state === "stopped") this.output.stopNotes();
+        this.output.playing(false);
+        this.output.transport?.({ type: "stop", position });
+        this.signal.publish();
     }
 
     /** 开关逐曲响度归一化；播放中切换从后续音符开始生效。 */
@@ -329,7 +350,7 @@ export class MidiPlayer {
      *              避免指针二次前进跳过后继曲目。
      * @param useFirst 为 true 表示完全采用 `first`（即使为 undefined 也不再自行取歌）。
      */
-    private async prepareNext(first?: MusicRef, useFirst = false) {
+    private async prepareNext(first?: MusicSelection, useFirst = false) {
         if (this.isLoading) return;
 
         this.isLoading = true;
@@ -393,7 +414,7 @@ export class MidiPlayer {
         }
     }
 
-    private async loadMidi(info: MusicRef, generation: number) {
+    private async loadMidi(info: MusicSelection, generation: number) {
         this.loadMissing = false;
         try {
             const song = await this.loader.acquire(info);
@@ -408,38 +429,9 @@ export class MidiPlayer {
 
             this.releaseSong();
             this.song = song;
-            if (info.performanceId !== undefined) {
-                if (info.performanceId === "plain") {
-                    this.performanceCues = undefined;
-                } else if (info.performanceId === "default") {
-                    this.performanceCues = song.song.header.performance;
-                } else {
-                    try {
-                        this.performanceCues = await this.resolvePerformanceById(info, song, info.performanceId);
-                    } catch (error) {
-                        reportDiagnostic("warn", "playback", "读取演出失败，降级为普通演奏", error, {
-                            song: info.id,
-                            name: info.name,
-                            performance: info.performanceId,
-                        });
-                        this.performanceCues = undefined;
-                    }
-                }
-            } else {
-                const mode = info.performance ?? 0;
-                this.performanceCues = mode === 0 ? song.song.header.performance : undefined;
-                if (mode > 0) {
-                    try {
-                        this.performanceCues = this.loader.performances?.(info)[mode - 1];
-                    } catch (error) {
-                        reportDiagnostic("warn", "playback", "读取附加编排失败，继续播放音乐", error, {
-                            song: info.id,
-                            name: info.name,
-                        });
-                    }
-                }
-            }
+            const cues = await this.resolvePerformance(info, song);
             if (generation !== this.generation) return;
+            this.performanceCues = cues;
             this.cursor = createSongCursor(song.song);
             this.totalNotes = song.song.noteCount;
             this.updateNormalizationGain();
@@ -464,24 +456,24 @@ export class MidiPlayer {
         this.currentTime = 0;
     }
 
-    private async resolvePerformanceById(
-        info: MusicRef,
+    private async resolvePerformance(
+        info: MusicSelection,
         song: SongHandle,
-        performanceId: string,
     ): Promise<readonly PerformanceCue[] | undefined> {
-        if (performanceId === `embedded:${song.song.id}`) {
+        const { performanceId } = info;
+        if (performanceId === "plain") return;
+        if (isDefaultPerformanceSelection(info.id, performanceId)) {
             return song.song.header.performance;
         }
-        const local = this.loader.performanceEntries?.(info).find((item) => item.id === performanceId);
-        if (local?.cues) return local.cues;
-        if (this.loader.resolvePerformanceCues) {
-            const fetched = await this.loader.resolvePerformanceCues(info, performanceId);
-            if (fetched) return fetched;
+
+        const fields = { song: info.id, name: info.name, performance: performanceId };
+        try {
+            const cues = await this.loader.resolvePerformanceCues?.(info, performanceId);
+            if (cues) return cues;
+            reportDiagnostic("warn", "playback", "演出不可用，继续普通演奏", undefined, fields);
+        } catch (error) {
+            reportDiagnostic("warn", "playback", "读取演出失败，继续普通演奏", error, fields);
         }
-        if (song.song.header.performance?.length && performanceId === `embedded:${info.id}`) {
-            return song.song.header.performance;
-        }
-        return undefined;
     }
 
     private releaseSong() {

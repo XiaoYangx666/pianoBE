@@ -1,4 +1,4 @@
-import type { MidiSongMeta } from "../types.js";
+import { DEFAULT_PERFORMANCE_ID, defaultPerformanceId } from "./domain.js";
 
 /**
  * 音乐内容来源。
@@ -8,12 +8,15 @@ import type { MidiSongMeta } from "../types.js";
  */
 export type MusicSource = "card" | "library";
 
-export interface MusicRef extends MidiSongMeta {
+export interface MusicSelection {
+    id: string;
+    name: string;
+    duration: number;
+    noteCount?: number;
+    bytes?: number;
     source: MusicSource;
     /** 稳定演出标识："plain" 普通演奏，"default" 默认演出，或独立演出 ID。 */
-    performanceId?: string;
-    /** -1 普通演奏，0 或缺省为文件内编排，1 起为附加编排（兼容旧引用）。 */
-    performance?: number;
+    performanceId: string;
     /** 整份 PBE3 的 CRC32（16 进制，来源提供时用于内容校验） */
     checksum?: string;
     /**
@@ -25,16 +28,6 @@ export interface MusicRef extends MidiSongMeta {
     cardUid?: string;
 }
 
-function performanceSelectorKey(ref: Pick<MusicRef, "performance" | "performanceId">): string {
-    if (typeof ref.performanceId === "string" && ref.performanceId.length > 0) {
-        if (ref.performanceId === "plain" || ref.performanceId === "default") return ref.performanceId;
-        return `id:${ref.performanceId}`;
-    }
-    if (ref.performance === -1) return "plain";
-    if (typeof ref.performance === "number" && ref.performance > 0) return `idx:${ref.performance}`;
-    return "default";
-}
-
 /** 世界公共曲库在索引和队列中使用独立 ID，PBE3 文件头仍使用原始 ID。 */
 export const WORLD_LIBRARY_PUBLIC_PREFIX = "world:";
 export function worldPublicId(id: string): string { return `${WORLD_LIBRARY_PUBLIC_PREFIX}${id}`; }
@@ -42,30 +35,37 @@ export function worldRawId(id: string): string | undefined {
     return id.startsWith(WORLD_LIBRARY_PUBLIC_PREFIX) ? id.slice(WORLD_LIBRARY_PUBLIC_PREFIX.length) : undefined;
 }
 
+export function isDefaultPerformanceSelection(songId: string, performanceId: string): boolean {
+    const rawId = worldRawId(songId);
+    return performanceId === DEFAULT_PERFORMANCE_ID || performanceId === defaultPerformanceId(songId) ||
+        (rawId !== undefined && performanceId === defaultPerformanceId(rawId));
+}
+
 /** 缓存键同时包含实体卡身份，避免不同卡片的缓存串用。 */
-export function musicRefKey(ref: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid">): string {
+export function musicRefKey(ref: Pick<MusicSelection, "source" | "id" | "checksum" | "cardUid">): string {
     return `${ref.source}:${ref.id}:${ref.checksum ?? ""}:${ref.source === "card" ? ref.cardUid ?? "" : ""}`;
 }
 
 /** 卡片歌曲还必须属于同一张实体卡。 */
-export function sameMusicRef(
-    a: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance" | "performanceId">,
-    b: Pick<MusicRef, "source" | "id" | "checksum" | "cardUid" | "performance" | "performanceId">
+export function sameMusicSelection(
+    a: MusicSelection,
+    b: MusicSelection
 ): boolean {
     return a.id === b.id && a.source === b.source && (a.checksum ?? "") === (b.checksum ?? "")
-        && performanceSelectorKey(a) === performanceSelectorKey(b)
+        && a.performanceId === b.performanceId
         && (a.source !== "card" || (a.cardUid ?? "") === (b.cardUid ?? ""));
 }
 
-/** 把存储条目/曲库元信息统一转换为队列引用。 */
-export function toMusicRef(
-    source: MusicSource,
-    meta: MidiSongMeta & { noteCount?: number; bytes?: number; checksum?: string }
-): MusicRef {
-    const ref: MusicRef = { id: meta.id, name: meta.name, duration: meta.duration, source };
-    if (meta.noteCount !== undefined) ref.noteCount = meta.noteCount;
-    if (meta.bytes !== undefined) ref.bytes = meta.bytes;
-    if (meta.checksum !== undefined) ref.checksum = meta.checksum;
+/** 只复制队列需要的字段，允许调用方显式更新演出选择。 */
+export function toMusicSelection(
+    track: Omit<MusicSelection, "performanceId">,
+    performanceId: string,
+): MusicSelection {
+    const ref: MusicSelection = { id: track.id, name: track.name, duration: track.duration, source: track.source, performanceId };
+    if (track.noteCount !== undefined) ref.noteCount = track.noteCount;
+    if (track.bytes !== undefined) ref.bytes = track.bytes;
+    if (track.checksum !== undefined) ref.checksum = track.checksum;
+    if (track.source === "card" && track.cardUid !== undefined) ref.cardUid = track.cardUid;
     return ref;
 }
 
@@ -76,26 +76,4 @@ const SOURCE_LABELS: Record<MusicSource, string> = {
 
 export function musicSourceLabel(source: MusicSource): string {
     return SOURCE_LABELS[source] ?? "曲库";
-}
-
-/** 旧版播放快照只有 id/name/duration（无 source），统一视为曲库来源。 */
-export function normalizeMusicRef(value: unknown): MusicRef | undefined {
-    if (!value || typeof value !== "object") return;
-    const raw = value as Record<string, unknown>;
-    if (typeof raw.id !== "string" || typeof raw.name !== "string" ||
-        typeof raw.duration !== "number" || !Number.isFinite(raw.duration)) return;
-    // 已移除的 piano 来源按曲库处理；旧存储方案不做兼容迁移。
-    const source: MusicSource = raw.source === "card" ? "card" : "library";
-    const ref: MusicRef = { id: raw.id, name: raw.name, duration: raw.duration, source };
-    if (typeof raw.noteCount === "number" && Number.isFinite(raw.noteCount)) ref.noteCount = raw.noteCount;
-    if (typeof raw.bytes === "number" && Number.isFinite(raw.bytes) && raw.bytes > 0) ref.bytes = raw.bytes;
-    if (typeof raw.checksum === "string" && /^[0-9a-f]{1,8}$/i.test(raw.checksum)) ref.checksum = raw.checksum;
-    if (typeof raw.performanceId === "string" && raw.performanceId.trim() && raw.performanceId.length <= 128) {
-        ref.performanceId = raw.performanceId.trim();
-    }
-    if (typeof raw.performance === "number" && Number.isSafeInteger(raw.performance) && raw.performance >= -1) {
-        ref.performance = raw.performance;
-    }
-    if (source === "card" && typeof raw.cardUid === "string" && raw.cardUid) ref.cardUid = raw.cardUid;
-    return ref;
 }

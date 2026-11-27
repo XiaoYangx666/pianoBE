@@ -419,7 +419,7 @@ describe("播放队列页面", () => {
         const { piano, midi } = makePiano({
             music: { availability: (ref: { source: string }) => ref.source === "card" ? "missing" : "ok" },
         });
-        midi.queue.enqueue({ id: "s1", name: "卡上的歌", duration: 1200, source: "card", cardUid: "card-a", checksum: "abcd1234" });
+        midi.queue.enqueue({ id: "s1", name: "卡上的歌", duration: 1200, source: "card", performanceId: "default", cardUid: "card-a", checksum: "abcd1234" });
         const form = open(PlayQueuePage, { piano });
 
         expect(form.buttonLabels().some(label => label.includes("⚠") && label.includes("卡上的歌"))).toBe(true);
@@ -438,7 +438,7 @@ describe("播放队列页面", () => {
 
     test("歌曲操作页可以跳转到队列中的歌曲并播放", async () => {
         const { piano, midi } = makePiano();
-        const ref = { id: "q1", name: "队列歌", duration: 800, source: "library" as const };
+        const ref = { id: "q1", name: "队列歌", duration: 800, source: "library" as const, performanceId: "default" };
         midi.queue.enqueue(ref);
         let played: any;
         piano.getMidiPlayer = () => ({
@@ -459,13 +459,45 @@ describe("播放队列页面", () => {
 });
 
 describe("歌曲详情页面", () => {
+    test("同曲已在卡内时拒绝复制内嵌默认演出，命名演出仍可复制", async () => {
+        const entry = makeEntry("l1", "晴天");
+        const card = cardAccess([entry]);
+        const save = mock((_bytes: Uint8Array, _name?: string, _meta?: { id?: string }) => entry);
+        card.storage().save = save;
+        const bytes = encodePbe3({
+            id: "l1", name: "晴天", duration: 1200,
+            tracks: [{ instrument: { family: "", number: 0, name: "" }, notes: [60, 0, 20, 90] }],
+        });
+        const { piano } = makePiano({
+            cardAccess: card,
+            readBytes: () => bytes,
+            performanceEntries: () => [
+                { id: "embedded:l1", name: "曲目默认演出" },
+                { id: "stage:variant", name: "命名演出" },
+            ],
+        });
+        const form = open(TrackActionsPage, {
+            piano, ref: { id: "world:l1", name: "晴天", duration: 1200, source: "library", performanceId: "default" },
+        });
+        form.click("复制到存储卡");
+        await settle();
+        expect(save).not.toHaveBeenCalled();
+        expect(form.labelTexts()).toContain("§e卡里已有这首歌");
+
+        dropdown(form).setData(2);
+        form.click("复制到存储卡");
+        await settle();
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(save.mock.calls[0][2]?.id).toBe("stage:variant");
+    });
+
     test("演奏方式选择以稳定 performanceId 随曲目进入播放队列", () => {
         const { piano, midi } = makePiano({
             performanceEntries: () => [
                 { id: "pianobe.chinese:rain_green", name: "雨过见青", cues: [{ tick: 0, op: "set", effect: "starfield", color: "#8EB8FF", level: 80, scale: 100, fade: 10 }] },
             ],
         });
-        const ref = { id: "l1", name: "晴天", duration: 1200, source: "library" };
+        const ref = { id: "l1", name: "晴天", duration: 1200, source: "library", performanceId: "default" };
         const form = open(TrackActionsPage, { piano, ref });
         // index 1 = 雨过见青, index 0 = 普通演奏
         dropdown(form).setData(1);
@@ -478,7 +510,7 @@ describe("歌曲详情页面", () => {
         const { piano } = makePiano();
         const form = open(TrackActionsPage, {
             piano,
-            ref: { id: "l1", name: "晴天", duration: 1200, source: "library", noteCount: 10, bytes: 200 },
+            ref: { id: "l1", name: "晴天", duration: 1200, source: "library", performanceId: "default", noteCount: 10, bytes: 200 },
         });
 
         const buttons = form.buttonLabels();
@@ -495,14 +527,14 @@ describe("歌曲详情页面", () => {
         const { piano } = makePiano({ cardAccess: cardAccess([]) });
         const libraryForm = open(TrackActionsPage, {
             piano,
-            ref: { id: "l1", name: "晴天", duration: 1200, source: "library" },
+            ref: { id: "l1", name: "晴天", duration: 1200, source: "library", performanceId: "default" },
         });
         expect(libraryForm.buttonLabels()).toContain("复制到存储卡");
         expect(libraryForm.buttonLabels()).not.toContain("删除歌曲");
 
         const cardForm = open(TrackActionsPage, {
             piano,
-            ref: { id: "c1", name: "卡上歌", duration: 1200, source: "card", cardUid: "card-a" },
+            ref: { id: "c1", name: "卡上歌", duration: 1200, source: "card", performanceId: "default", cardUid: "card-a" },
         });
         expect(cardForm.buttonLabels()).toContain("删除歌曲");
         expect(cardForm.buttonLabels()).not.toContain("复制到存储卡");
@@ -511,7 +543,7 @@ describe("歌曲详情页面", () => {
     test("立即播放使用播放业务层接口，不直接清空队列", () => {
         const { piano, midi } = makePiano();
         const calls: string[] = [];
-        midi.queue.enqueue({ id: "keep", name: "保留", duration: 100, source: "library" });
+        midi.queue.enqueue({ id: "keep", name: "保留", duration: 100, source: "library", performanceId: "default" });
         piano.getMidiPlayer = () => ({
             queue: midi.queue,
             playNow: (ref: any) => { calls.push(`play:${ref.id}`); return Promise.resolve(); },
@@ -520,7 +552,7 @@ describe("歌曲详情页面", () => {
         });
         const form = open(TrackActionsPage, {
             piano,
-            ref: { id: "l1", name: "晴天", duration: 1200, source: "library" },
+            ref: { id: "l1", name: "晴天", duration: 1200, source: "library", performanceId: "default" },
         });
         form.click("▶ 立即播放");
         expect(calls).toEqual(["play:l1"]);

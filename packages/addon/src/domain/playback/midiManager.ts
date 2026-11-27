@@ -106,15 +106,6 @@ export class MidiManager {
         return this.metaMap.get(id);
     }
 
-    performances(id: string) {
-        if (worldRawId(id) === undefined) return this.getInfo(id)?.performances ?? [];
-        for (const source of this.publicSources) {
-            const performances = source.performances?.(id);
-            if (performances) return performances;
-        }
-        return [];
-    }
-
     performanceEntries(id: string): readonly PerformanceDescriptor[] {
         if (worldRawId(id) === undefined) {
             const info = this.getInfo(id);
@@ -129,15 +120,6 @@ export class MidiManager {
         for (const source of this.publicSources) {
             const entries = source.performanceEntries?.(id);
             if (entries?.length) return entries;
-            const perfs = source.performances?.(id);
-            if (perfs?.length) {
-                return perfs.map((cues, index) => ({
-                    id: `${id}:perf:${index + 1}`,
-                    name: `附加演出 ${index + 1}`,
-                    songId: id,
-                    cues,
-                }));
-            }
         }
         return [];
     }
@@ -386,7 +368,6 @@ export interface MidiSourceLike {
         libraryId?: string,
     ): Promise<{ items: MidiSongMeta[]; total: number }>;
     metaAll?(q?: string, libraryId?: string): Promise<MidiSongMeta[]>;
-    performances?(id: string): MidiSongMeta["performances"];
     performanceEntries?(id: string): readonly PerformanceDescriptor[] | undefined;
     getPerformance?(perfId: string): Promise<readonly PerformanceCue[] | undefined>;
 }

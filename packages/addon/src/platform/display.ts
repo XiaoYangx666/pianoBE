@@ -3,7 +3,8 @@ import { reconcileEntityTransform, releaseVisual } from "@begame/minecraft";
 import { Entity, EntityComponentTypes, Vector3, system } from "@minecraft/server";
 import type { InstrumentLocation } from "@platform/instrumentLocation";
 import type { Cardinal_Direction } from "@domain/types";
-import { readPlaybackRecord, type PlaybackRecord } from "@domain/playback/playbackRecord";
+import type { PlaybackRecord } from "@domain/playback/playbackRecord";
+import { PlaybackStore } from "@platform/storage/playbackStore";
 import { readPianoSettings, type PianoSettings } from "@domain/piano/settings";
 import { grandDefinition } from "@domain/instrument/definition";
 import { RightOffsets } from "@domain/geometry/offsets";
@@ -22,9 +23,6 @@ export function pianoDisplayType(location: InstrumentLocation) {
     return location.definition?.displayId ?? PIANO_DISPLAY;
 }
 const ANCHOR = "pbe:anchor";
-const PLAYBACK = "pbe:playback_v1";
-// 10,000 UTF-16 code units fit in one dynamic property even with CJK names.
-const PLAYBACK_PART_SIZE = 10_000;
 const SETTINGS = "pbe:settings_v1";
 const LOWEST_KEY = 21;
 const KEY_COUNT = 88;
@@ -138,53 +136,16 @@ export function removePianoDisplay(entity: Entity) {
     releaseVisual(entity);
 }
 
-function readSavedPlayback(entity: Entity): string | undefined {
-    const value = entity.getDynamicProperty(PLAYBACK);
-    if (typeof value !== "string") return;
-    const parts = /^parts:([01]):([1-9]\d*)$/.exec(value);
-    if (!parts) return value;
-    const chunks: string[] = [];
-    for (let i = 0; i < Number(parts[2]); i++) {
-        const chunk = entity.getDynamicProperty(`${PLAYBACK}:${parts[1]}:${i}`);
-        if (typeof chunk !== "string") return;
-        chunks.push(chunk);
-    }
-    return chunks.join("");
-}
-
-function writeSavedPlayback(entity: Entity, raw: string) {
-    if (raw.length <= PLAYBACK_PART_SIZE) {
-        entity.setDynamicProperty(PLAYBACK, raw);
-        return;
-    }
-    const previous = entity.getDynamicProperty(PLAYBACK);
-    const slot = typeof previous === "string" && previous.startsWith("parts:0:") ? 1 : 0;
-    let count = 0;
-    for (let start = 0; start < raw.length;) {
-        let end = Math.min(start + PLAYBACK_PART_SIZE, raw.length);
-        const last = raw.charCodeAt(end - 1);
-        if (end < raw.length && last >= 0xd800 && last <= 0xdbff) end--;
-        const key = `${PLAYBACK}:${slot}:${count++}`;
-        const chunk = raw.slice(start, end);
-        if (entity.getDynamicProperty(key) !== chunk) entity.setDynamicProperty(key, chunk);
-        start = end;
-    }
-    // Publish only after writing the entire inactive slot so a failed save leaves the last snapshot intact.
-    entity.setDynamicProperty(PLAYBACK, `parts:${slot}:${count}`);
-}
-
 export class PianoDisplay {
     private readonly release = new Map<number, number>();
     private readonly sent = new Array<number>(MASK_COUNT).fill(1);
     private readonly pendingStrikes = new Array<number>(MASK_COUNT).fill(0);
     private light = 1;
-    private saved: unknown;
     private config: PianoSettings;
     /** 最近一次成功写入动态属性的 JSON，避免重复写。 */
     private savedSettings: string;
 
-    private constructor(readonly entity: Entity) {
-        this.saved = readSavedPlayback(entity);
+    private constructor(readonly entity: Entity, private readonly playbackStore: PlaybackStore) {
         this.config = readPianoSettings(entity.getDynamicProperty(SETTINGS));
         this.savedSettings = JSON.stringify(this.config);
         // Clear pressed keys and strike bits left in a persisted display.
@@ -207,10 +168,7 @@ export class PianoDisplay {
         const entity = match ?? dimension.spawnEntity(identifier, point, { initialRotation: yaw });
         try {
             if (!match) entity.setDynamicProperty(ANCHOR, pos);
-            if (readSavedPlayback(entity) === undefined) {
-                const migrated = candidates.map(readSavedPlayback).find(saved => saved !== undefined);
-                if (migrated !== undefined) writeSavedPlayback(entity, migrated);
-            }
+            const playbackStore = new PlaybackStore(entity, candidates);
             if (entity.getDynamicProperty(SETTINGS) === undefined) {
                 const migrated = candidates.map(candidate => candidate.getDynamicProperty(SETTINGS))
                     .find(saved => typeof saved === "string");
@@ -226,7 +184,7 @@ export class PianoDisplay {
                     cardSlotOf(candidate)?.write(undefined);
                 }
             }
-            const display = new PianoDisplay(entity);
+            const display = new PianoDisplay(entity, playbackStore);
             for (const candidate of candidates) {
                 if (candidate.id !== entity.id) removePianoDisplay(candidate);
             }
@@ -237,7 +195,7 @@ export class PianoDisplay {
         }
     }
 
-    get playback() { return readPlaybackRecord(this.saved); }
+    get playback() { return this.playbackStore.record; }
     get settings() { return this.config; }
 
     updateSettings(settings: PianoSettings) {
@@ -260,11 +218,7 @@ export class PianoDisplay {
     }
 
     checkpoint(record: PlaybackRecord) {
-        if (!this.entity.isValid) return;
-        const raw = JSON.stringify(record);
-        if (raw === this.saved) return;
-        writeSavedPlayback(this.entity, raw);
-        this.saved = raw;
+        this.playbackStore.checkpoint(record, system.currentTick);
     }
 
     strike(midi: number, seconds: number) {

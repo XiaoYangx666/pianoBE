@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
-import { encodePbe3, crc32Hex, type MusicRef, type StoredMusicEntry } from "@piano/core";
+import { encodePbe3, crc32Hex, type MusicSelection, type StoredMusicEntry } from "@piano/core";
 import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
 import { PlayQueue } from "../src/domain/playback/queue";
 
@@ -59,8 +59,8 @@ function fakeStorage(entries: StoredMusicEntry[], data: Map<string, Uint8Array>)
 describe("播放队列（带来源）", () => {
     test("同 id 不同来源不是同一首", () => {
         const queue = new PlayQueue();
-        const fromLibrary: MusicRef = { id: "x", name: "X", duration: 40, source: "library", checksum: "1111" };
-        const fromCard: MusicRef = { id: "x", name: "X", duration: 40, source: "card", checksum: "1111" };
+        const fromLibrary: MusicSelection = { id: "x", name: "X", duration: 40, source: "library", performanceId: "default", checksum: "1111" };
+        const fromCard: MusicSelection = { id: "x", name: "X", duration: 40, source: "card", performanceId: "default", checksum: "1111" };
         queue.enqueue(fromLibrary);
         queue.enqueue(fromCard);
         expect(queue.getLength()).toBe(2);
@@ -70,44 +70,47 @@ describe("播放队列（带来源）", () => {
 
     test("同一曲目存放在不同实体卡中，队列不会错误去重", () => {
         const queue = new PlayQueue();
-        const ref: MusicRef = { id: "x", name: "X", duration: 40, source: "card", checksum: "abc12345", cardUid: "card-a" };
+        const ref: MusicSelection = { id: "x", name: "X", duration: 40, source: "card", performanceId: "default", checksum: "abc12345", cardUid: "card-a" };
         queue.enqueue(ref);
         expect(queue.enqueueUnique({ ...ref, cardUid: "card-b" })).toBe("added");
         expect(queue.indexOf({ ...ref, cardUid: "card-b" })).toBe(1);
         expect(queue.getLength()).toBe(2);
     });
 
-    test("快照/恢复保留来源，旧调用仍可按 id 查找", () => {
+    test("快照/恢复保留来源和选择身份", () => {
         const queue = new PlayQueue();
-        queue.enqueue({ id: "a", name: "A", duration: 40, source: "card", checksum: "abcd" });
+        const selection: MusicSelection = { id: "a", name: "A", duration: 40, source: "card", performanceId: "default", checksum: "abcd" };
+        queue.enqueue(selection);
         const snapshot = queue.snapshot();
         const restored = new PlayQueue();
         restored.restore(snapshot);
         expect(restored.current()?.source).toBe("card");
-        expect(restored.indexOf("a")).toBe(0);
+        expect(restored.indexOf(selection)).toBe(0);
     });
 });
 
-describe("播放快照兼容", () => {
-    test("旧 v1 快照按曲库来源读取，不丢队列", () => {
+describe("PianoBE 2.0 播放快照", () => {
+    test.each([1, 2])("拒绝旧版 v%i 快照", (version) => {
         const raw = JSON.stringify({
-            version: 1,
-            songs: [{ id: "old", name: "老歌", duration: 400 }],
+            version,
+            songs: [{ id: "old", name: "老歌", duration: 400, source: "library", performanceId: "default" }],
             index: 0,
             mode: "loop",
             state: "paused",
             seconds: 12,
         });
-        const record = readPlaybackRecord(raw)!;
-        expect(record.version).toBe(2);
-        expect(record.songs[0].source).toBe("library");
-        expect(record.mode).toBe("loop");
+        expect(readPlaybackRecord(raw)).toBeUndefined();
     });
 
-    test("坏快照整份拒绝，而不是恢复到半份队列", () => {
+    test.each([
+        { id: "broken", name: "缺演出 ID", duration: 40, source: "library" },
+        { id: "broken", name: "旧来源", duration: 40, source: "piano", performanceId: "default" },
+        { id: "broken", name: "旧索引", duration: 40, source: "library", performanceId: "default", performance: 1 },
+        { id: "broken", name: "带演出正文", duration: 40, source: "library", performanceId: "default", performanceEntries: [] },
+    ])("拒绝含无效条目的整份快照（$name）", (invalid) => {
         const raw = JSON.stringify({
-            version: 2,
-            songs: [{ id: "ok", name: "好", duration: 40, source: "card" }, { nope: true }],
+            v: 1,
+            songs: [{ id: "ok", name: "好", duration: 40, source: "library", performanceId: "plain" }, invalid],
             index: 0,
             mode: "sequence",
             state: "playing",
@@ -125,11 +128,11 @@ describe("钢琴音乐读取（PianoMusic）", () => {
             () => fakeStorage([entry], new Map([["abc", bytes]])),
             () => "card-a"
         );
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes })).toBe("ok");
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: "deadbeef" })).toBe("missing");
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-b", checksum: entry.checksum })).toBe("missing");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes })).toBe("ok");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-a", checksum: "deadbeef" })).toBe("missing");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-b", checksum: entry.checksum })).toBe("missing");
         // 公共曲库：元信息未登记时返回 unknown，交给实际加载判断。
-        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "library" })).toBe("unknown");
+        expect(musicSource.availability({ id: "abc", name: "测试", duration: 40, source: "library", performanceId: "default" })).toBe("unknown");
     });
 
     test("读取时校验长度与 CRC，内容不符不会交给播放器", async () => {
@@ -140,49 +143,12 @@ describe("钢琴音乐读取（PianoMusic）", () => {
             () => "card-a"
         );
 
-        const ok = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes });
+        const ok = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes });
         expect(ok?.song.id).toBe("abc");
         ok?.release();
 
-        const bad = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: "00000000" });
+        const bad = await source.acquire({ id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-a", checksum: "00000000" });
         expect(bad).toBeUndefined();
-    });
-
-    test("索引未登记时，公共曲库引用自带的演出摘要仍可读取", () => {
-        const source = new PianoMusic(() => undefined, () => undefined);
-        const entry = {
-            id: "pianobe.pack.featured:abc",
-            name: "精选演出",
-            songId: "abc",
-            requiredEffects: ["starfield"],
-        };
-        const ref: MusicRef = {
-            id: "abc",
-            name: "花海",
-            duration: 40,
-            source: "library",
-            performanceEntries: [entry],
-        };
-        expect(source.performanceEntries(ref)).toEqual([entry]);
-        expect(source.performances(ref)).toEqual([]);
-    });
-
-    test("引用自带演出 cues 时直接解析，不再依赖索引", async () => {
-        const source = new PianoMusic(() => undefined, () => undefined);
-        const cues = [{ tick: 0, op: "flash" as const, effect: "starfield", color: "#FFFFFF", level: 80, scale: 100 }];
-        const ref: MusicRef = {
-            id: "abc",
-            name: "花海",
-            duration: 40,
-            source: "library",
-            performanceEntries: [{
-                id: "pianobe.pack.featured:abc",
-                name: "精选演出",
-                songId: "abc",
-                cues,
-            }],
-        };
-        expect(await source.resolvePerformanceCues(ref, "pianobe.pack.featured:abc")).toEqual(cues);
     });
 
     test("存储卡被取走或被替换后，卡来源的队列条目不可用", () => {
@@ -195,7 +161,7 @@ describe("钢琴音乐读取（PianoMusic）", () => {
             () => cardPresent ? cardStorage : undefined,
             () => cardUid
         );
-        const ref: MusicRef = { id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum };
+        const ref: MusicSelection = { id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-a", checksum: entry.checksum };
         expect(source.availability(ref)).toBe("ok");
         // 换成另一张卡：即使 id/内容一致也不能当作同一张卡。
         cardUid = "card-b";
@@ -216,7 +182,7 @@ describe("钢琴音乐读取（PianoMusic）", () => {
             () => present ? fakeStorage(tracks, new Map([["abc", bytes]])) : undefined,
             () => uid
         );
-        const ref: MusicRef = { id: "abc", name: "测试", duration: 40, source: "card", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes };
+        const ref: MusicSelection = { id: "abc", name: "测试", duration: 40, source: "card", performanceId: "default", cardUid: "card-a", checksum: entry.checksum, bytes: entry.bytes };
         const first = await source.acquire(ref);
         expect(first).toBeDefined();
         first?.release();

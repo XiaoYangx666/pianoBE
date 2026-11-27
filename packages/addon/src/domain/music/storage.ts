@@ -1,10 +1,10 @@
-import type {
-    MusicRef,
-    PerformanceCue,
-    SavePerformanceMeta,
-    StoredMusicEntry,
-    StoredPerformanceEntry,
-    StorageUsage,
+import {
+    toMusicSelection,
+    type MusicSelection,
+    type SavePerformanceMeta,
+    type StoredMusicEntry,
+    type StoredPerformanceEntry,
+    type StorageUsage,
 } from "@piano/core";
 
 /**
@@ -19,7 +19,6 @@ export interface MusicStorage {
     list(): StoredMusicEntry[];
     has(id: string): boolean;
     get(id: string): Uint8Array | undefined;
-    getPerformances?(id: string): readonly (readonly PerformanceCue[])[];
     getPerformanceEntries?(id: string): readonly StoredPerformanceEntry[];
     save(bytes: Uint8Array, name?: string, performanceMeta?: SavePerformanceMeta): StoredMusicEntry;
     remove(id: string): boolean;
@@ -33,16 +32,6 @@ export interface MusicStorage {
 }
 
 /** 把存储卡条目转换成队列引用；cardUid 用于区分不同实体卡。 */
-export function storageRef(entry: StoredMusicEntry, cardUid?: string): MusicRef {
-    const ref: MusicRef = {
-        id: entry.id,
-        name: entry.name,
-        duration: entry.duration,
-        noteCount: entry.noteCount,
-        bytes: entry.bytes,
-        checksum: entry.checksum,
-        source: "card",
-    };
-    if (cardUid) ref.cardUid = cardUid;
-    return ref;
+export function storageRef(entry: StoredMusicEntry, cardUid?: string): MusicSelection {
+    return toMusicSelection({ ...entry, source: "card", cardUid }, "default");
 }

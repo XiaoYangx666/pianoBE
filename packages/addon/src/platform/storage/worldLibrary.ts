@@ -207,10 +207,6 @@ export class WorldMusicLibrary {
             const id = worldRawId(publicId);
             return id === undefined ? Promise.resolve(undefined) : this.get(id);
         },
-        performances: (publicId: string) => {
-            const id = worldRawId(publicId);
-            return id === undefined ? undefined : this.collection.getPerformances(id);
-        },
         performanceEntries: (publicId: string) => {
             const id = worldRawId(publicId);
             return id === undefined ? undefined : this.collection.getPerformanceEntries(id);

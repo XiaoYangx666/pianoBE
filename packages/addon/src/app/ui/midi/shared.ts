@@ -1,5 +1,5 @@
-import type { MidiSongMeta, MusicRef, StoredMusicEntry } from "@piano/core";
-import { toMusicRef } from "@piano/core";
+import type { MidiSongMeta, MusicSelection, StoredMusicEntry } from "@piano/core";
+import { toMusicSelection } from "@piano/core";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { midiManager } from "@app/midi";
 import { storageRef } from "@domain/music/storage";
@@ -16,7 +16,7 @@ export const TAB_LABELS: Record<LibraryTab, string> = {
 export const TAB_ORDER: LibraryTab[] = ["library", "card"];
 
 export interface TabPage {
-    refs: MusicRef[];
+    refs: MusicSelection[];
     total: number;
     /** 数据源状态提示（如“未插卡”） */
     note?: string;
@@ -50,15 +50,12 @@ export function formatLibrarySearch(query: string, page: number): string {
 }
 
 /** 远程曲库条目可能带 dataSize，将它归一化为统一的 bytes 字段。 */
-function libraryRef(meta: MidiSongMeta & { dataSize?: number }): MusicRef {
-    const ref = toMusicRef("library", {
+function libraryRef(meta: MidiSongMeta & { dataSize?: number }): MusicSelection {
+    return toMusicSelection({
         ...meta,
+        source: "library",
         bytes: meta.bytes ?? meta.dataSize,
-    });
-    if (meta.libraries?.length) ref.libraries = meta.libraries;
-    if (meta.performanceEntries?.length) ref.performanceEntries = meta.performanceEntries;
-    if (meta.performances?.length) ref.performances = meta.performances;
-    return ref;
+    }, "default");
 }
 
 /** 按来源取一页曲目引用（存储卡为同步，公共曲库为异步分页）。 */
@@ -88,7 +85,7 @@ export async function listTab(
 }
 
 /** 队列条目的来源标记（按钮文本不支持颜色符号，只用纯文本前缀）。 */
-export function sourceMark(ref: MusicRef): string {
+export function sourceMark(ref: MusicSelection): string {
     return ref.source === "card" ? "[卡]" : "[库]";
 }
 

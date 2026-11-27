@@ -1,5 +1,5 @@
 import { DDUI } from "sapi-pro";
-import { formatBytes, type MusicRef } from "@piano/core";
+import { formatBytes, type MusicSelection } from "@piano/core";
 import { midiManager } from "@app/midi";
 import type { PianoRuntime } from "@app/PianoRuntime";
 import { TrackActionsPage, withDefaultQueuePerformance } from "./trackActions";
@@ -54,7 +54,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
         page: Math.max(1, args.page ?? 1),
         query: args.query ?? "",
         request: 0,
-        refs: [] as MusicRef[],
+        refs: [] as MusicSelection[],
         total: 0,
         maxPage: 1,
     };
@@ -85,8 +85,9 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
 
     const syncSearch = () => ui.set(search, formatLibrarySearch(state.query, state.page));
 
-    const perfSuffix = (ref: MusicRef): string => {
-        const count = ref.performanceEntries?.filter((entry) => entry.id !== "plain").length ?? ref.performances?.length ?? 0;
+    const perfSuffix = (ref: MusicSelection): string => {
+        if (ref.source !== "library") return "";
+        const count = piano.performanceEntries?.(ref).filter((entry) => entry.id !== "plain").length ?? 0;
         if (count <= 0) return "";
         return count === 1 ? " · 演出" : ` · ${count}演出`;
     };

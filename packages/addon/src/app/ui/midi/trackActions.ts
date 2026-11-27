@@ -1,11 +1,12 @@
 import { DDUI } from "sapi-pro";
 import {
     attachSongPerformance,
-    defaultPerformanceId,
     formatBytes,
+    isDefaultPerformanceSelection,
     musicSourceLabel,
     readSongHeader,
-    type MusicRef,
+    toMusicSelection,
+    type MusicSelection,
     type PerformanceDescriptor,
 } from "@piano/core";
 import { vfxRegistry } from "@piano/vfx";
@@ -13,7 +14,7 @@ import type { PianoRuntime } from "@app/PianoRuntime";
 
 export interface TrackActionArgs {
     piano: PianoRuntime;
-    ref: MusicRef;
+    ref: MusicSelection;
 }
 
 function formatDuration(duration: number): string {
@@ -27,7 +28,6 @@ interface PerformanceOption {
     author?: string;
     available: boolean;
     cues?: PerformanceDescriptor["cues"];
-    legacyNumber: number;
 }
 
 function isPerformanceAvailable(desc: PerformanceDescriptor): boolean {
@@ -36,12 +36,11 @@ function isPerformanceAvailable(desc: PerformanceDescriptor): boolean {
     return effects.every((id) => vfxRegistry.hasEffect(id));
 }
 
-export function withDefaultQueuePerformance(piano: PianoRuntime, ref: MusicRef): MusicRef {
-    if (ref.performanceId !== undefined || ref.performance !== undefined) return ref;
-    const localEntries = piano.performanceEntries?.(ref);
-    const entries = localEntries?.length ? localEntries : ref.performanceEntries ?? [];
+export function withDefaultQueuePerformance(piano: PianoRuntime, ref: MusicSelection): MusicSelection {
+    if (ref.performanceId !== "default") return ref;
+    const entries = piano.performanceEntries?.(ref) ?? [];
     const entry = entries.find((entry) => entry.id !== "plain" && isPerformanceAvailable(entry));
-    return entry ? { ...ref, performanceId: entry.id } : ref;
+    return entry && !isDefaultPerformanceSelection(ref.id, entry.id) ? toMusicSelection(ref, entry.id) : ref;
 }
 
 /** 歌曲详情：展示元信息，使用稳定演出标识选择演奏方式。 */
@@ -57,39 +56,22 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
     const canCopy = ui.boolean(ref.source === "library" && Boolean(piano.cardAccess), { clientWritable: false });
     const canDelete = ui.boolean(ref.source === "card", { clientWritable: false });
 
-    const descriptorSource: PerformanceDescriptor[] = (() => {
-        const entries = piano.performanceEntries?.(ref) ?? ref.performanceEntries ?? [];
-        if (entries.length > 0) return entries.filter((entry) => entry.id !== "plain");
-        const legacy = piano.performances?.(ref) ?? ref.performances ?? [];
-        return legacy.map((cues, index) => ({
-            id: `${ref.id}:perf:${index + 1}`,
-            name: `附加演出 ${index + 1}`,
-            songId: ref.id,
-            cues,
-        }));
-    })();
+    const descriptorSource = (piano.performanceEntries?.(ref) ?? []).filter((entry) => entry.id !== "plain");
 
     const options: PerformanceOption[] = [
-        { id: "plain", name: "普通演奏", available: true, legacyNumber: -1 },
-        ...descriptorSource.map((entry, index) => ({
-            id: entry.id,
+        { id: "plain", name: "普通演奏", available: true },
+        ...descriptorSource.map((entry) => ({
+            id: isDefaultPerformanceSelection(ref.id, entry.id) ? "default" : entry.id,
             name: entry.name,
             author: entry.author,
             available: isPerformanceAvailable(entry),
             cues: entry.cues,
-            legacyNumber: entry.id === defaultPerformanceId(ref.id) ? 0 : index + 1,
         })),
     ];
 
     const initialIndex = (() => {
-        if (ref.performanceId) {
-            const idx = options.findIndex((o) => o.id === ref.performanceId);
-            if (idx >= 0) return idx;
-        }
-        if (ref.performance === -1) return 0;
-        if (typeof ref.performance === "number" && ref.performance > 0 && options[ref.performance]) {
-            return ref.performance;
-        }
+        const idx = options.findIndex((o) => o.id === ref.performanceId);
+        if (idx >= 0) return idx;
         const firstAvailable = options.findIndex((option, index) => index > 0 && option.available);
         return Math.max(0, firstAvailable);
     })();
@@ -98,14 +80,7 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
     const showModes = ui.boolean(options.length > 1, { clientWritable: false });
     const selectedOption = (): PerformanceOption => options[mode.getData()] ?? options[0];
 
-    const chosen = (): MusicRef => {
-        const opt = selectedOption();
-        return {
-            ...ref,
-            performanceId: opt.id,
-            performance: opt.legacyNumber,
-        };
-    };
+    const chosen = (): MusicSelection => toMusicSelection(ref, selectedOption().id);
 
     if (descriptorSource.length === 0) {
         void Promise.resolve(piano.readBytes(ref))
@@ -114,11 +89,10 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
                 const embedded = readSongHeader(bytes).performance;
                 if (embedded?.length) {
                     options.push({
-                        id: defaultPerformanceId(ref.id),
+                        id: "default",
                         name: "曲目默认演出",
-                        available: isPerformanceAvailable({ id: defaultPerformanceId(ref.id), name: "曲目默认演出", cues: embedded }),
+                        available: isPerformanceAvailable({ id: "default", name: "曲目默认演出", cues: embedded }),
                         cues: embedded,
-                        legacyNumber: 0,
                     });
                     showModes.setData(true);
                 }
@@ -178,13 +152,17 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
                 .then(([bytes, cues]) => {
                     if (!bytes) throw new Error("源曲目已不可用");
                     const storage = card.storage();
+                if (opt.id === "default" && storage.has(readSongHeader(bytes).id)) {
+                    status.setData("§e卡里已有这首歌");
+                    return;
+                }
                     const selected = opt.id === "plain"
                         ? attachSongPerformance(bytes, [])
                         : cues
                           ? attachSongPerformance(bytes, cues)
                           : bytes;
                     const entry = storage.save(selected, ref.name, {
-                        id: opt.id,
+                    id: opt.id === "default" ? undefined : opt.id,
                         name: opt.name,
                         author: opt.author,
                     });

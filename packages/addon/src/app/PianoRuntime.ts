@@ -8,7 +8,7 @@ import { grandDefinition, vfxInstrumentFor } from "@domain/instrument/definition
 import { inspectInstrument, instrumentCenter, instrumentKey, type InstrumentLocation } from "@platform/assembly";
 import { MidiPlayer } from "@domain/playback/player";
 import { NoteInfo } from "@domain/types";
-import { pianoSoundId, velocityLayerIndex, velocityVolume, type MusicRef, type SongHandle } from "@piano/core";
+import { pianoSoundId, velocityLayerIndex, velocityVolume, type MusicSelection, type SongHandle } from "@piano/core";
 import { RightOffsets } from "@domain/geometry/offsets";
 import { summonParticle } from "@platform/particle";
 import { Signal } from "@domain/util/signal";
@@ -157,26 +157,22 @@ export class PianoRuntime {
     }
 
     /** 读取原始 PBE3（曲库复制到存储卡用；曲库来源会走远端/内嵌）。 */
-    readBytes(ref: MusicRef): Promise<Uint8Array | undefined> | Uint8Array | undefined {
+    readBytes(ref: MusicSelection): Promise<Uint8Array | undefined> | Uint8Array | undefined {
         if (ref.source === "library") return this.music.readLibrary(ref.id);
         if (ref.cardUid !== undefined && ref.cardUid !== this.cardUid) return undefined;
         return this.cardStorage?.get(ref.id);
     }
 
     /** 队列条目 → 可播放的共享曲目引用。 */
-    acquire(ref: MusicRef): Promise<SongHandle | undefined> {
+    acquire(ref: MusicSelection): Promise<SongHandle | undefined> {
         return this.music.acquire(ref);
     }
 
-    performances(ref: MusicRef) {
-        return this.music.performances(ref);
-    }
-
-    performanceEntries(ref: MusicRef) {
+    performanceEntries(ref: MusicSelection) {
         return this.music.performanceEntries(ref);
     }
 
-    resolvePerformanceCues(ref: MusicRef, performanceId: string) {
+    resolvePerformanceCues(ref: MusicSelection, performanceId: string) {
         return this.music.resolvePerformanceCues(ref, performanceId);
     }
 
@@ -288,9 +284,7 @@ export class PianoRuntime {
         if (!this.midi) {
             this.midi = new MidiPlayer(
                 {
-                    acquire: (ref: MusicRef) => this.music.acquire(ref),
-                    performances: ref => this.music.performances(ref),
-                    performanceEntries: ref => this.music.performanceEntries(ref),
+                    acquire: (ref: MusicSelection) => this.music.acquire(ref),
                     resolvePerformanceCues: (ref, perfId) => this.music.resolvePerformanceCues(ref, perfId),
                 },
                 {

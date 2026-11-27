@@ -11,10 +11,10 @@ import {
     type SongHandle,
     type PerformanceCue,
 } from "@piano/core";
-import { readPlaybackRecord } from "../src/domain/playback/playbackRecord";
+import { readPlaybackRecord, serializePlaybackRecord } from "../src/domain/playback/playbackRecord";
 import type { PianoTransportEvent } from "../src/domain/playback/visualEvent";
 
-const song = { id: "sample", name: "Sample", duration: 400 };
+const song = { id: "sample", name: "Sample", duration: 400, source: "library" as const, performanceId: "default" };
 
 function handleFor(
     info: MidiSongMeta,
@@ -56,12 +56,12 @@ test("the same musical data can be queued as ordinary and arranged playback with
     const trace: PianoTransportEvent[] = [];
     const notes: number[] = [];
     const alternate: PerformanceCue = { op: "flash", tick: 0, effect: "burst", color: "#ABCDEF", level: 90, scale: 100 };
-    const midi = new MidiPlayer({ ...loader, performances: () => [[alternate]] }, {
+    const midi = new MidiPlayer({ ...loader, resolvePerformanceCues: async (_ref, id) => id === "stage:spark" ? [alternate] : undefined }, {
         note: info => notes.push(info.midi), playing() {}, stopNotes() {}, transport: event => trace.push(event),
     });
-    const ordinary = { ...song, source: "library" as const, performance: -1 };
-    const special = { ...ordinary, performance: 1 };
-    const missing = { ...ordinary, performance: 2 };
+    const ordinary = { ...song, performanceId: "plain" };
+    const special = { ...ordinary, performanceId: "stage:spark" };
+    const missing = { ...ordinary, performanceId: "stage:missing" };
     expect(midi.addToQueue(ordinary)).toBe("added");
     expect(midi.addToQueue(special)).toBe("added");
     expect(midi.addToQueue(special)).toBe("exists");
@@ -82,14 +82,14 @@ test("the same musical data can be queued as ordinary and arranged playback with
 });
 
 const record = readPlaybackRecord(JSON.stringify({
-    version: 1, songs: [song, song], index: 1, mode: "loop", state: "playing", seconds: 2,
+    v: 1, songs: [song, song], index: 1, mode: "loop", state: "playing", seconds: 2,
 }))!;
 
 test("Secret and a legacy PBE3 use the same player clock across pause, seek, resume and switch", async () => {
     const raw = new Uint8Array(readFileSync(new URL("../../../midis/library/e1563b03.pbe3", import.meta.url)));
     const perfJson = JSON.parse(readFileSync(new URL("../../../midis/performances/e1563b03.json", import.meta.url), "utf8"));
     const data = attachSongPerformance(raw, compilePerformanceSource(perfJson, { expectedSongId: "e1563b03" }));
-    const secret = { id: "e1563b03", name: "Secret", duration: 3444 };
+    const secret = { id: "e1563b03", name: "Secret", duration: 3444, source: "library" as const, performanceId: "default" };
     const cache = new SongCache(async id => id === secret.id ? data : undefined);
     const transport: PianoTransportEvent[] = [];
     const notes: number[] = [];
@@ -128,18 +128,44 @@ function fixture() {
     return { midi, notes, playing, stopNotes };
 }
 
+test("clearing a playing queue publishes an empty checkpoint immediately and allows playing again", async () => {
+    const checkpoints: unknown[] = [];
+    const stopNotes = mock(() => {});
+    const midi = new MidiPlayer(loader, {
+        note() {}, stopNotes,
+        playing: () => {
+            const record = midi.checkpoint();
+            if (record) checkpoints.push(readPlaybackRecord(serializePlaybackRecord(record)));
+        },
+    });
+    await midi.playNow(song);
+    midi.clearQueue();
+    expect(stopNotes).toHaveBeenCalledTimes(2);
+    expect(checkpoints.at(-1)).toEqual({ songs: [], index: -1, mode: "sequence", state: "idle", seconds: 0 });
+    await midi.playNow(song);
+    expect(midi.getInfo().state).toBe("playing");
+});
+
+test("removing the current track stops playback and leaves the remaining queue ready to play", async () => {
+    const { midi } = fixture();
+    const next = { ...song, id: "next" };
+    await midi.playNow(song);
+    midi.addToQueue(next);
+    expect(midi.removeFromQueue(song)).toBe(true);
+    expect(midi.checkpoint()).toEqual({ songs: [next], index: 0, mode: "sequence", state: "idle", seconds: 0 });
+});
+
 test("playback checkpoints keep performance selection without copying cue data", () => {
     const { midi } = fixture();
     const ref = {
         ...song,
-        source: "library" as const,
         performanceId: "stage:spark",
         performanceEntries: [{ id: "stage:spark", name: "Spark", cues: [] }],
         libraries: ["official:featured"],
     };
     midi.queue.enqueue(ref);
     expect(midi.checkpoint()?.songs).toEqual([{ ...song, source: "library", performanceId: "stage:spark" }]);
-    expect(midi.queue.current()).toBe(ref);
+    expect(midi.queue.current()).toEqual({ ...song, performanceId: "stage:spark" });
 });
 
 test("visual output preserves source note time, default velocity and transport boundaries", async () => {
@@ -189,7 +215,7 @@ test("loaded piano resumes the saved song and skips earlier notes", async () => 
 });
 
 test("nearest-tick scheduling fires up to half a game tick early", async () => {
-    const meta = { id: "near", name: "Near", duration: 40 };
+    const meta = { ...song, id: "near", name: "Near", duration: 40 };
     const emitted: number[] = [];
     const midi = new MidiPlayer(
         { acquire: async () => handleFor(meta, [60, 40, 10, 90]) },
@@ -256,7 +282,7 @@ test("two pianos keep independent playback state", async () => {
 
 test("plays through the final note tail before switching songs", async () => {
     const tailNotes = [60, 40, 200, 90];
-    const tailMeta = { id: "tail", name: "Tail", duration: 120 };
+    const tailMeta = { ...song, id: "tail", name: "Tail", duration: 120 };
     const midi = new MidiPlayer(
         { acquire: async () => handleFor(tailMeta, tailNotes) },
         { note: () => {}, playing: () => {}, stopNotes: () => {} }
@@ -299,7 +325,7 @@ test("pause stops voices immediately", async () => {
 });
 
 test("natural end lets the release tail finish instead of hard-stopping", async () => {
-    const meta = { id: "single", name: "Single", duration: 40 };
+    const meta = { ...song, id: "single", name: "Single", duration: 40 };
     const stopNotes = mock(() => {});
     const midi = new MidiPlayer(
         { acquire: async () => handleFor(meta, [60, 0, 20, 90]) },
@@ -320,14 +346,14 @@ test("natural end lets the release tail finish instead of hard-stopping", async 
 
 test("立即播放插入当前曲目之后，已有歌曲只跳转不重复", async () => {
     const { midi } = fixture();
-    const first = { id: "a", name: "A", duration: 40 };
-    const second = { id: "b", name: "B", duration: 40 };
+    const first = { ...song, id: "a", name: "A", duration: 40 };
+    const second = { ...song, id: "b", name: "B", duration: 40 };
     midi.queue.enqueue(first);
     midi.queue.enqueue(second);
     await midi.play();
     expect(midi.queue.getIndex()).toBe(0);
 
-    const extra = { id: "c", name: "C", duration: 40 };
+    const extra = { ...song, id: "c", name: "C", duration: 40 };
     await midi.playNow(extra);
     expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["a", "c", "b"]);
     expect(midi.queue.getIndex()).toBe(1);
@@ -341,12 +367,12 @@ test("立即播放插入当前曲目之后，已有歌曲只跳转不重复", as
 
 test("整卡加入队列不中断播放，并按去重结果统计", () => {
     const { midi } = fixture();
-    const current = { id: "current", name: "Current", duration: 40 };
+    const current = { ...song, id: "current", name: "Current", duration: 40 };
     midi.queue.enqueue(current);
     const refs = [
-        { id: "a", name: "A", duration: 40, source: "card" as const, cardUid: "c1", checksum: "11" },
-        { id: "b", name: "B", duration: 40, source: "card" as const, cardUid: "c1", checksum: "22" },
-        { id: "a", name: "A", duration: 40, source: "card" as const, cardUid: "c1", checksum: "11" },
+        { id: "a", name: "A", duration: 40, source: "card" as const, performanceId: "default", cardUid: "c1", checksum: "11" },
+        { id: "b", name: "B", duration: 40, source: "card" as const, performanceId: "default", cardUid: "c1", checksum: "22" },
+        { id: "a", name: "A", duration: 40, source: "card" as const, performanceId: "default", cardUid: "c1", checksum: "11" },
     ];
     const result = midi.addCollectionToQueue(refs);
     expect(result).toEqual({ added: 2, exists: 1 });
@@ -356,9 +382,9 @@ test("整卡加入队列不中断播放，并按去重结果统计", () => {
 
 test("播放整张存储卡：按顺序补入队列并从第一首开始播放", async () => {
     const { midi } = fixture();
-    const original = { id: "original", name: "Original", duration: 40 };
-    const a = { id: "a", name: "A", duration: 40, source: "card" as const, cardUid: "c1", checksum: "11" };
-    const b = { id: "b", name: "B", duration: 40, source: "card" as const, cardUid: "c1", checksum: "22" };
+    const original = { ...song, id: "original", name: "Original", duration: 40 };
+    const a = { id: "a", name: "A", duration: 40, source: "card" as const, performanceId: "default", cardUid: "c1", checksum: "11" };
+    const b = { id: "b", name: "B", duration: 40, source: "card" as const, performanceId: "default", cardUid: "c1", checksum: "22" };
     midi.queue.enqueue(original);
     // 队列中已有卡片歌曲：整卡播放时去重并重新排成连续块。
     midi.queue.enqueue(b);
@@ -371,11 +397,11 @@ test("播放整张存储卡：按顺序补入队列并从第一首开始播放",
 
 test("整卡播放不会让队列里后续待播放歌曲被跳过", async () => {
     const { midi } = fixture();
-    const ref = (id: string) => ({ id, name: id, duration: 40, source: "card" as const, cardUid: "card-a", checksum: "aa" });
-    midi.queue.enqueue({ id: "current", name: "current", duration: 40, source: "library" });
-    midi.queue.enqueue({ id: "next", name: "next", duration: 40, source: "library" });
+    const ref = (id: string) => ({ id, name: id, duration: 40, source: "card" as const, performanceId: "default", cardUid: "card-a", checksum: "aa" });
+    midi.queue.enqueue({ id: "current", name: "current", duration: 40, source: "library", performanceId: "default" });
+    midi.queue.enqueue({ id: "next", name: "next", duration: 40, source: "library", performanceId: "default" });
     midi.queue.enqueue(ref("b"));
-    midi.queue.enqueue({ id: "last", name: "last", duration: 40, source: "library" });
+    midi.queue.enqueue({ id: "last", name: "last", duration: 40, source: "library", performanceId: "default" });
     await midi.playCollection([ref("a"), ref("b")]);
     expect(midi.queue.getRefs().map(item => item.id)).toEqual(["current", "a", "b", "next", "last"]);
     expect(midi.queue.current()?.id).toBe("a");
@@ -385,7 +411,7 @@ test("整卡播放不会让队列里后续待播放歌曲被跳过", async () =>
 
 test("队列自然结束后立即播放新歌曲不会产生越界索引", async () => {
     const { midi } = fixture();
-    const ref = { id: "a", name: "A", duration: 40, source: "library" as const };
+    const ref = { id: "a", name: "A", duration: 40, source: "library" as const, performanceId: "default" };
     midi.queue.enqueue(ref);
     expect(midi.queue.next()).toBeUndefined();
     await midi.playNow({ ...ref, id: "b", name: "B" });
@@ -395,7 +421,7 @@ test("队列自然结束后立即播放新歌曲不会产生越界索引", async
 
 test("加入队列按来源/ID/指纹去重", () => {
     const { midi } = fixture();
-    const ref = { id: "a", name: "A", duration: 40, source: "library" as const, checksum: "1111" };
+    const ref = { id: "a", name: "A", duration: 40, source: "library" as const, performanceId: "default", checksum: "1111" };
     expect(midi.addToQueue(ref)).toBe("added");
     expect(midi.addToQueue({ ...ref })).toBe("exists");
     expect(midi.addToQueue({ ...ref, source: "card" as const, cardUid: "c1" })).toBe("added");
@@ -406,12 +432,12 @@ test("播放已删除曲目时摘除队列条目并继续后继曲目", async ()
     const midi = new MidiPlayer({
         acquire: async ref => (ref.id === "gone" ? undefined : handleFor(song)),
     }, { note: () => {}, playing: () => {}, stopNotes: () => {} });
-    midi.queue.enqueue({ id: "gone", name: "Gone", duration: 1, source: "library" });
-    midi.queue.enqueue({ id: "song-2", name: "Next", duration: 1, source: "library" });
+    midi.queue.enqueue({ id: "gone", name: "Gone", duration: 1, source: "library", performanceId: "default" });
+    midi.queue.enqueue({ id: "song-2", name: "Next", duration: 1, source: "library", performanceId: "default" });
 
     await midi.play();
 
-    expect(midi.queue.getQueue()).toEqual(["Next"]);
+    expect(midi.queue.getRefs().map(ref => ref.name)).toEqual(["Next"]);
     expect(midi.queue.current()?.id).toBe("song-2");
     expect(midi.getInfo().state).toBe("playing");
     midi.end();

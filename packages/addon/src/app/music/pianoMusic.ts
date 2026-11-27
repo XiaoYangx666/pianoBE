@@ -1,9 +1,9 @@
 import {
     SongCache,
     crc32Hex,
-    defaultPerformanceId,
+    isDefaultPerformanceSelection,
     musicRefKey,
-    type MusicRef,
+    type MusicSelection,
     type PerformanceCue,
     type PerformanceDescriptor,
     type SongHandle,
@@ -40,12 +40,12 @@ export class PianoMusic {
     }
 
     /** 卡片身份必须与队列条目一致，避免换卡后误读另一张卡上的同 id 曲目。 */
-    private cardMatches(ref: MusicRef): boolean {
+    private cardMatches(ref: MusicSelection): boolean {
         if (ref.source !== "card" || ref.cardUid === undefined) return true;
         return this.cardUidProvider() === ref.cardUid;
     }
 
-    private readCard(ref: MusicRef): Uint8Array | undefined {
+    private readCard(ref: MusicSelection): Uint8Array | undefined {
         if (!this.cardMatches(ref)) return undefined;
         const storage = this.cardStorageProvider();
         if (!storage) return undefined;
@@ -57,7 +57,7 @@ export class PianoMusic {
         return bytes;
     }
 
-    async acquire(ref: MusicRef): Promise<SongHandle | undefined> {
+    async acquire(ref: MusicSelection): Promise<SongHandle | undefined> {
         if (ref.source === "library") return midiManager.acquire(ref.id);
         // 命中 SongCache 时不会执行 readCard，故每次新播放都必须先确认卡片仍可用。
         if (this.availability(ref) !== "ok") return undefined;
@@ -75,63 +75,18 @@ export class PianoMusic {
         return midiManager.read(id);
     }
 
-    performances(ref: MusicRef) {
-        if (ref.source === "library") {
-            const list = midiManager.performances(ref.id);
-            if (list.length) return list;
-            return ref.performances ?? this.libraryEntries(ref).flatMap((entry) => entry.cues ? [entry.cues] : []);
-        }
-        return this.cardMatches(ref) ? this.cardStorageProvider()?.getPerformances?.(ref.id) ?? [] : [];
-    }
-
-    performanceEntries(ref: MusicRef): readonly PerformanceDescriptor[] {
-        if (ref.source === "library") return this.libraryEntries(ref);
+    performanceEntries(ref: MusicSelection): readonly PerformanceDescriptor[] {
+        if (ref.source === "library") return midiManager.performanceEntries(ref.id);
         if (!this.cardMatches(ref)) return [];
-        const entries = this.cardStorageProvider()?.getPerformanceEntries?.(ref.id);
-        if (entries) {
-            return entries.map((entry) => ({
-                id: entry.id,
-                name: entry.name,
-                ...(entry.author ? { author: entry.author } : {}),
-                songId: ref.id,
-                cues: entry.cues,
-            }));
-        }
-        return (this.cardStorageProvider()?.getPerformances?.(ref.id) ?? []).map((cues, index) => ({
-            id: `extra:${index + 1}`,
-            name: `附加演出 ${index + 1}`,
+        return (this.cardStorageProvider()?.getPerformanceEntries?.(ref.id) ?? []).map(entry => ({
+            ...entry,
             songId: ref.id,
-            cues,
         }));
     }
 
-    /**
-     * 公共曲库演出摘要：优先用 MidiManager 的索引；远程分页结果尚未登记
-     * （例如世界曲库刷新后）时退回引用自身携带的摘要，避免只剩默认演出。
-     */
-    private libraryEntries(ref: MusicRef): readonly PerformanceDescriptor[] {
-        const indexed = midiManager.performanceEntries(ref.id);
-        if (indexed.length) return indexed;
-        if (ref.performanceEntries?.length) return ref.performanceEntries;
-        return (ref.performances ?? []).map((cues, index) => ({
-            id: `${ref.id}:perf:${index + 1}`,
-            name: `附加演出 ${index + 1}`,
-            songId: ref.id,
-            cues,
-        }));
-    }
-
-    async resolvePerformanceCues(ref: MusicRef, performanceId: string): Promise<readonly PerformanceCue[] | undefined> {
+    async resolvePerformanceCues(ref: MusicSelection, performanceId: string): Promise<readonly PerformanceCue[] | undefined> {
         if (performanceId === "plain") return undefined;
-        if (ref.source === "library") {
-            const local = this.libraryEntries(ref).find((entry) => entry.id === performanceId);
-            if (local?.cues) return local.cues;
-            return midiManager.resolvePerformanceCues(ref.id, performanceId);
-        }
-        const entries = this.performanceEntries(ref);
-        const match = entries.find((item) => item.id === performanceId);
-        if (match?.cues) return match.cues;
-        if (performanceId === "default" || performanceId === defaultPerformanceId(ref.id)) {
+        if (isDefaultPerformanceSelection(ref.id, performanceId)) {
             const handle = await this.acquire(ref);
             try {
                 return handle?.song.header.performance;
@@ -139,11 +94,15 @@ export class PianoMusic {
                 handle?.release();
             }
         }
-        return undefined;
+        if (ref.source === "library") {
+            return midiManager.resolvePerformanceCues(ref.id, performanceId);
+        }
+        const entries = this.performanceEntries(ref);
+        return entries.find((item) => item.id === performanceId)?.cues;
     }
 
     /** 队列 UI 用：这首歌现在还能不能读到。 */
-    availability(ref: MusicRef): TrackAvailability {
+    availability(ref: MusicSelection): TrackAvailability {
         if (ref.source === "library") return midiManager.getInfo(ref.id) ? "ok" : "unknown";
         if (!this.cardMatches(ref)) return "missing";
         const storage = this.cardStorageProvider();
