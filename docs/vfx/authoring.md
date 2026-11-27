@@ -127,7 +127,7 @@ my_style: {
 
 ## 7. 发布前回归检查项
 
-- [ ] `npm run check` 通过，包含客户端和服务器 Addon 构建、零插件模板、道具导出和 BP/RP 引用闭环验证
+- [ ] `npm run check` 通过（类型检查 + 全部单测）；发布前再跑 `npm run check:full`，它额外包含客户端/服务器 Addon 构建、零插件模板、道具导出和 BP/RP 引用闭环验证
 - [ ] `npm run check:vfx` 9 项 VFX 专项检查通过
 - [ ] `npm run build:web` 与 `npm run build:generator` 成功
 - [ ] 需要验证生成器的曲谱、音色和曲库组合装配时，执行 `npm run build:template` 和 `bun tools/verify/verify-generator.mjs`

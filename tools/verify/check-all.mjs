@@ -16,7 +16,9 @@ const binExt = isWin ? ".cmd" : "";
 const tscBin = join(root, "node_modules", ".bin", `tsc${binExt}`);
 const bepackBin = join(root, "node_modules", ".bin", `bepack${binExt}`);
 const viteBin = join(root, "node_modules", ".bin", `vite${binExt}`);
-const fastMode = process.argv.includes("--fast");
+// 默认只做验证（类型检查 + 单测）；--full 才跑打包与产物构建。
+// 这些产物构建是 build 的职责，放在 check 里会让日常验证多花 20 多秒。
+const fullMode = process.argv.includes("--full");
 
 function runStep(name, cmd, args, cwd = root) {
     return new Promise((resolveStep, rejectStep) => {
@@ -67,7 +69,7 @@ async function runPool(factories, concurrency = 4) {
 
 async function main() {
     const started = Date.now();
-    console.log(`[check] Mode: ${fastMode ? "fast (typecheck + unit tests)" : "full (parallel build, pack & verify)"}`);
+    console.log(`[check] Mode: ${fullMode ? "full (build, pack & verify)" : "verify (typecheck + unit tests)"}`);
 
     // 并发上限：留一半核心给系统，核心多的机器不要一次开太多 tsc/bun
     const parallel = Math.max(2, Math.min(8, Math.floor(cpus().length / 2)));
@@ -91,7 +93,7 @@ async function main() {
         () => runStep("Typecheck @piano/studio", "bun", ["check", "--no-script", "-p", "packages/studio"]),
     ];
 
-    if (fastMode) {
+    if (!fullMode) {
         phase2.push(
             () => runStep("Test @piano/core", "bun", ["test"], coreDir),
             () => runStep("Test @piano/studio", "bun", ["test"], studioDir),
@@ -158,7 +160,7 @@ async function main() {
         () => runStep("Test @piano/addon", "bun", ["test", "--isolate"], addonDir),
     ];
 
-    if (!fastMode) {
+    if (fullMode) {
         phase3.unshift(
             () => runStep("Test @piano/core", "bun", ["test"], coreDir),
             () => runStep("Test @piano/studio", "bun", ["test"], studioDir),

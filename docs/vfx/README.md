@@ -30,7 +30,8 @@ npm run validate:plugins
 
 # 一键验证 VFX / 插件全链路或完整仓库校验流水线
 npm run check:vfx
-npm run check
+npm run check        # 类型检查 + 单测（日常）
+npm run check:full   # 额外构建 addon / 打包插件 / 构建 studio（发布前、CI）
 ```
 
 进一步阅读：

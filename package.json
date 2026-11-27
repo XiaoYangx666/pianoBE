@@ -46,7 +46,7 @@
         "test": "npm run test -w @piano/core && npm run test -w @piano/vfx && bun test packages/assembly",
         "test:vfx": "npm run test -w @piano/vfx",
         "check": "node tools/verify/check-all.mjs",
-        "check:fast": "node tools/verify/check-all.mjs --fast",
+        "check:full": "node tools/verify/check-all.mjs --full",
         "check:vfx": "node tools/verify/check-vfx.mjs",
         "midi": "node tools/midi/cli.mjs",
         "audio-lab": "node tools/audio/cli.mjs",
