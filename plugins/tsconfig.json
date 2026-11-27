@@ -10,7 +10,9 @@
         "declaration": true,
         "resolveJsonModule": true,
         "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        "incremental": true,
+        "tsBuildInfoFile": "../build/.cache/tsbuildinfo/plugins.tsbuildinfo"
     },
     "include": ["index.ts", "*/vfx/**/*.ts", "*/plugin.json"]
 }

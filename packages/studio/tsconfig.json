@@ -9,7 +9,9 @@
         "noEmit": true,
         "skipLibCheck": true,
         "useDefineForClassFields": true,
-        "types": ["vite/client"]
+        "types": ["vite/client"],
+        "incremental": true,
+        "tsBuildInfoFile": "../../build/.cache/tsbuildinfo/studio.tsbuildinfo"
     },
     "include": ["src", "vite.config.ts"]
 }
