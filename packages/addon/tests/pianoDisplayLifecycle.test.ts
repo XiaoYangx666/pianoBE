@@ -34,7 +34,12 @@ class FakeEntity {
     constructor(id: string) { this.id = id; }
 
     getDynamicProperty(key: string) { return this.dynamicProperties.get(key); }
-    setDynamicProperty(key: string, value: unknown) { this.dynamicProperties.set(key, value); }
+    setDynamicProperty(key: string, value: unknown) {
+        if (typeof value === "string" && Buffer.byteLength(value) > 32_767) {
+            throw new RangeError("dynamic property exceeds 32767 bytes");
+        }
+        this.dynamicProperties.set(key, value);
+    }
     setProperty(key: string, value: number | boolean) { this.properties.set(key, value); }
     getProperty(key: string) { return this.properties.get(key); }
     getRotation() { return this.rotation; }
@@ -67,6 +72,30 @@ function fixture() {
 }
 
 describe("PianoDisplay lifecycle", () => {
+    test("large MIDI queues persist and a failed write preserves the prior snapshot", () => {
+        const { entities, location, point } = fixture();
+        const display = PianoDisplay.recover(location, point);
+        const songs = Array.from({ length: 605 }, (_, i) => ({
+            id: `song-${i}`, name: `曲目 🎹 ${i}`, duration: 90, source: "library" as const,
+        }));
+        const first = { version: 2, songs, index: 10, mode: "sequence", state: "playing", seconds: 0 } as const;
+        expect(Buffer.byteLength(JSON.stringify(first))).toBeGreaterThan(32_767);
+        display.checkpoint(first);
+        expect(PianoDisplay.recover(location, point).playback).toEqual(first);
+
+        const entity = entities[0];
+        const write = entity.setDynamicProperty.bind(entity);
+        entity.setDynamicProperty = (key, value) => {
+            if (key === PLAYBACK) throw new Error("write interrupted");
+            write(key, value);
+        };
+        expect(() => display.checkpoint({ ...first, seconds: 10 })).toThrow("write interrupted");
+        expect(PianoDisplay.recover(location, point).playback).toEqual(first);
+        entity.setDynamicProperty = write;
+        display.checkpoint({ ...first, seconds: 10 });
+        expect(PianoDisplay.recover(location, point).playback?.seconds).toBe(10);
+    });
+
     test("runtime release keeps the persistent display entity", () => {
         const { location, point } = fixture();
         const display = PianoDisplay.recover(location, point);

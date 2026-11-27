@@ -247,6 +247,26 @@ describe("公共曲库与管理/添加模式", () => {
         expect(form.labelTexts().some(text => text.includes("队列中已有"))).toBe(true);
     });
 
+    test("快捷加入选用第一个可用演出，并以同一个演出判定重复", async () => {
+        pageImpl = async () => ({ items: libraryMetas, total: libraryMetas.length });
+        const { piano, midi } = makePiano({
+            performanceEntries: () => [
+                { id: "plain", name: "普通演奏" },
+                { id: "missing", name: "缺少特效", requiredEffects: ["test:missing"] },
+                { id: "stage:spark", name: "火花", requiredEffects: [] },
+            ],
+        });
+        const form = open(MusicLibraryPage, { piano, mode: "add" });
+        await settle();
+        const name = libraryMetas[0].name;
+        form.click(form.buttonLabels().find(label => label.includes(name))!);
+        expect(midi.queue.getRefs().map(ref => ref.performanceId)).toEqual(["stage:spark"]);
+        const added = form.buttonLabels().find(label => label.startsWith("✓ ") && label.includes(name))!;
+        expect(added).toBeDefined();
+        form.click(added);
+        expect(midi.queue.getLength()).toBe(1);
+    });
+
     test("搜索框自动查询并解析末尾 p 页码；返回重建保持来源/搜索/页码", async () => {
         const calls: Array<{ page: number; q?: string }> = [];
         pageImpl = async (page, _size, q) => {

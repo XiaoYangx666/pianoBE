@@ -128,6 +128,20 @@ function fixture() {
     return { midi, notes, playing, stopNotes };
 }
 
+test("playback checkpoints keep performance selection without copying cue data", () => {
+    const { midi } = fixture();
+    const ref = {
+        ...song,
+        source: "library" as const,
+        performanceId: "stage:spark",
+        performanceEntries: [{ id: "stage:spark", name: "Spark", cues: [] }],
+        libraries: ["official:featured"],
+    };
+    midi.queue.enqueue(ref);
+    expect(midi.checkpoint()?.songs).toEqual([{ ...song, source: "library", performanceId: "stage:spark" }]);
+    expect(midi.queue.current()).toBe(ref);
+});
+
 test("visual output preserves source note time, default velocity and transport boundaries", async () => {
     const transport: PianoTransportEvent[] = [];
     const notes: [number, number, number, boolean][] = [];

@@ -36,6 +36,14 @@ function isPerformanceAvailable(desc: PerformanceDescriptor): boolean {
     return effects.every((id) => vfxRegistry.hasEffect(id));
 }
 
+export function withDefaultQueuePerformance(piano: PianoRuntime, ref: MusicRef): MusicRef {
+    if (ref.performanceId !== undefined || ref.performance !== undefined) return ref;
+    const localEntries = piano.performanceEntries?.(ref);
+    const entries = localEntries?.length ? localEntries : ref.performanceEntries ?? [];
+    const entry = entries.find((entry) => entry.id !== "plain" && isPerformanceAvailable(entry));
+    return entry ? { ...ref, performanceId: entry.id } : ref;
+}
+
 /** 歌曲详情：展示元信息，使用稳定演出标识选择演奏方式。 */
 export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, args) => {
     const { piano, ref } = args;
@@ -51,7 +59,7 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
 
     const descriptorSource: PerformanceDescriptor[] = (() => {
         const entries = piano.performanceEntries?.(ref) ?? ref.performanceEntries ?? [];
-        if (entries.length > 0) return [...entries];
+        if (entries.length > 0) return entries.filter((entry) => entry.id !== "plain");
         const legacy = piano.performances?.(ref) ?? ref.performances ?? [];
         return legacy.map((cues, index) => ({
             id: `${ref.id}:perf:${index + 1}`,
@@ -82,7 +90,8 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
         if (typeof ref.performance === "number" && ref.performance > 0 && options[ref.performance]) {
             return ref.performance;
         }
-        return options.length > 1 ? 1 : 0;
+        const firstAvailable = options.findIndex((option, index) => index > 0 && option.available);
+        return Math.max(0, firstAvailable);
     })();
 
     const mode = ui.number(initialIndex);

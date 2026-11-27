@@ -80,7 +80,11 @@ function formatFields(fields?: LogFields): string {
 
 function formatError(error: unknown): string {
     if (error instanceof Error) {
-        const text = error.stack || `${error.name}: ${error.message}`;
+        const summary = `${error.name}: ${error.message}`;
+        const stack = error.stack?.trimEnd();
+        const text = !stack || stack.startsWith(summary)
+            ? (stack || summary)
+            : `${summary}\n${stack}`;
         const lines = text.split(/\r?\n/).slice(0, MAX_STACK_LINES);
         if (text.split(/\r?\n/).length > MAX_STACK_LINES) lines.push("  ...");
         return redact(lines.join("\n"));

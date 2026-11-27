@@ -33,7 +33,7 @@ export interface PluginContentDialogProps {
     existingFingerprints: ReadonlySet<string>;
     onClose: () => void;
     onLoadArchive: (plugin: StudioPlugin) => Promise<PbePluginArchive>;
-    onInstallPack: (pluginId: string) => Promise<void>;
+    onInstallPack: (pluginId: string, onProgress?: (loaded: number) => void) => Promise<void>;
     onImportSingle: (
         archive: PbePluginArchive,
         songId: string,
@@ -65,6 +65,7 @@ export function PluginContentDialog({
     const [targetLibraryId, setTargetLibraryId] = useState<string>("");
     const [importingId, setImportingId] = useState<string | null>(null);
     const [installingPack, setInstallingPack] = useState(false);
+    const [packDownload, setPackDownload] = useState<{ id: string; loaded: number } | null>(null);
 
     const writableLibraries = useMemo(
         () => libraries.filter((l) => !l.readonly),
@@ -264,13 +265,23 @@ export function PluginContentDialog({
                                 loading={installingPack}
                                 onClick={() => {
                                     setInstallingPack(true);
-                                    void onInstallPack(plugin.id)
+                                    void onInstallPack(plugin.id, (loaded) => setPackDownload({ id: plugin.id, loaded }))
                                         .then(() => onClose())
-                                        .finally(() => setInstallingPack(false));
+                                        .finally(() => {
+                                            setInstallingPack(false);
+                                            setPackDownload(null);
+                                        });
                                 }}
                             >
                                 <Download size={14} /> 整包安装到{mode === "server" ? "服务器" : "本地"}
                             </Button>
+                        )}
+                        {installingPack && packDownload?.id === plugin.id && plugin.sizeBytes > 0 && (
+                            <span role="status" className="text-[12px] text-ore-dim">
+                                {packDownload.loaded >= plugin.sizeBytes
+                                    ? "正在安装…"
+                                    : `下载中 ${Math.floor((packDownload.loaded / plugin.sizeBytes) * 100)}%`}
+                            </span>
                         )}
                         <Button type="button" color="secondary" size="sm" onClick={onClose}>
                             关闭

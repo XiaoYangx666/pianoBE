@@ -30,6 +30,14 @@ afterEach(() => {
 });
 
 describe("addon logger", () => {
+    test("includes the engine error message when its stack contains only frames", () => {
+        const error = new RangeError("dynamic property exceeds its limit");
+        error.stack = "    at checkpoint (display.js:210)";
+        const lines = capture(() => createLogger("piano").warn("保存播放状态失败", error));
+        expect(lines[0]).toContain("RangeError: dynamic property exceeds its limit");
+        expect(lines[0]).toContain("at checkpoint");
+    });
+
     test("统一前缀、级别、scope 与字段", () => {
         const lines = capture(() => {
             createLogger("playback", { song: "abc" }).warn("加载失败", new Error("boom"), {

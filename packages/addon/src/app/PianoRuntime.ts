@@ -450,7 +450,9 @@ export class PianoRuntime {
         const record = this.midi?.checkpoint();
         if (!record) return;
         try { this.display.checkpoint(record); }
-        catch (error) { log.warn("保存播放状态失败", error, { piano: this.logPiano }); }
+        catch (error) {
+            log.warn("保存播放状态失败", error, { piano: this.logPiano, tracks: record.songs.length });
+        }
     }
 
     dispose(removeVisual: boolean) {

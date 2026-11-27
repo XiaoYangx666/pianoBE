@@ -464,7 +464,10 @@ export function ToolsPage() {
 
                         {dlProgress && (
                             <div className="text-[12px] text-ore-dim">
-                                {dlProgress.message} ({dlProgress.percent.toFixed(0)}%)
+                                {dlProgress.message} {Math.floor(dlProgress.percent)}%
+                                {" · "}
+                                {(dlProgress.loaded / 1_000_000).toFixed(1)} /{" "}
+                                {(dlProgress.total / 1_000_000).toFixed(1)} MB
                             </div>
                         )}
 

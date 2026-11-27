@@ -66,7 +66,7 @@ export interface PluginsSlice {
         songId: string,
         opts: { includePerformances: boolean; targetLibraryId?: string },
     ) => Promise<void>;
-    installBuiltinPlugin: (id: string) => Promise<void>;
+    installBuiltinPlugin: (id: string, onProgress?: (loaded: number) => void) => Promise<void>;
     scanServerPlugins: () => Promise<void>;
     trustPlugin: (id: string) => Promise<void>;
     confirmPendingTrust: (approvedIds: string[]) => Promise<void>;

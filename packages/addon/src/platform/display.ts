@@ -23,6 +23,8 @@ export function pianoDisplayType(location: InstrumentLocation) {
 }
 const ANCHOR = "pbe:anchor";
 const PLAYBACK = "pbe:playback_v1";
+// 10,000 UTF-16 code units fit in one dynamic property even with CJK names.
+const PLAYBACK_PART_SIZE = 10_000;
 const SETTINGS = "pbe:settings_v1";
 const LOWEST_KEY = 21;
 const KEY_COUNT = 88;
@@ -136,6 +138,41 @@ export function removePianoDisplay(entity: Entity) {
     releaseVisual(entity);
 }
 
+function readSavedPlayback(entity: Entity): string | undefined {
+    const value = entity.getDynamicProperty(PLAYBACK);
+    if (typeof value !== "string") return;
+    const parts = /^parts:([01]):([1-9]\d*)$/.exec(value);
+    if (!parts) return value;
+    const chunks: string[] = [];
+    for (let i = 0; i < Number(parts[2]); i++) {
+        const chunk = entity.getDynamicProperty(`${PLAYBACK}:${parts[1]}:${i}`);
+        if (typeof chunk !== "string") return;
+        chunks.push(chunk);
+    }
+    return chunks.join("");
+}
+
+function writeSavedPlayback(entity: Entity, raw: string) {
+    if (raw.length <= PLAYBACK_PART_SIZE) {
+        entity.setDynamicProperty(PLAYBACK, raw);
+        return;
+    }
+    const previous = entity.getDynamicProperty(PLAYBACK);
+    const slot = typeof previous === "string" && previous.startsWith("parts:0:") ? 1 : 0;
+    let count = 0;
+    for (let start = 0; start < raw.length;) {
+        let end = Math.min(start + PLAYBACK_PART_SIZE, raw.length);
+        const last = raw.charCodeAt(end - 1);
+        if (end < raw.length && last >= 0xd800 && last <= 0xdbff) end--;
+        const key = `${PLAYBACK}:${slot}:${count++}`;
+        const chunk = raw.slice(start, end);
+        if (entity.getDynamicProperty(key) !== chunk) entity.setDynamicProperty(key, chunk);
+        start = end;
+    }
+    // Publish only after writing the entire inactive slot so a failed save leaves the last snapshot intact.
+    entity.setDynamicProperty(PLAYBACK, `parts:${slot}:${count}`);
+}
+
 export class PianoDisplay {
     private readonly release = new Map<number, number>();
     private readonly sent = new Array<number>(MASK_COUNT).fill(1);
@@ -147,7 +184,7 @@ export class PianoDisplay {
     private savedSettings: string;
 
     private constructor(readonly entity: Entity) {
-        this.saved = entity.getDynamicProperty(PLAYBACK);
+        this.saved = readSavedPlayback(entity);
         this.config = readPianoSettings(entity.getDynamicProperty(SETTINGS));
         this.savedSettings = JSON.stringify(this.config);
         // Clear pressed keys and strike bits left in a persisted display.
@@ -170,11 +207,14 @@ export class PianoDisplay {
         const entity = match ?? dimension.spawnEntity(identifier, point, { initialRotation: yaw });
         try {
             if (!match) entity.setDynamicProperty(ANCHOR, pos);
-            for (const property of [PLAYBACK, SETTINGS]) {
-                if (entity.getDynamicProperty(property) !== undefined) continue;
-                const migrated = candidates.map(candidate => candidate.getDynamicProperty(property))
+            if (readSavedPlayback(entity) === undefined) {
+                const migrated = candidates.map(readSavedPlayback).find(saved => saved !== undefined);
+                if (migrated !== undefined) writeSavedPlayback(entity, migrated);
+            }
+            if (entity.getDynamicProperty(SETTINGS) === undefined) {
+                const migrated = candidates.map(candidate => candidate.getDynamicProperty(SETTINGS))
                     .find(saved => typeof saved === "string");
-                if (migrated !== undefined) entity.setDynamicProperty(property, migrated);
+                if (migrated !== undefined) entity.setDynamicProperty(SETTINGS, migrated);
             }
             // 卡槽里的实际物品也要跟着走，不能只迁移数据。
             if (!match) {
@@ -223,7 +263,7 @@ export class PianoDisplay {
         if (!this.entity.isValid) return;
         const raw = JSON.stringify(record);
         if (raw === this.saved) return;
-        this.entity.setDynamicProperty(PLAYBACK, raw);
+        writeSavedPlayback(this.entity, raw);
         this.saved = raw;
     }
 

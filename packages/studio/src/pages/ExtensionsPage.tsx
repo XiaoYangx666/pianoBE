@@ -116,6 +116,7 @@ export function ExtensionsPage() {
     const [browsePlugin, setBrowsePlugin] = useState<StudioPlugin | null>(null);
     const [detailPluginId, setDetailPluginId] = useState<string | null>(null);
     const [installingId, setInstallingId] = useState<string | null>(null);
+    const [downloadedBytes, setDownloadedBytes] = useState<number | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
     const playerState = usePlayerState(studioPlayer);
@@ -156,9 +157,11 @@ export function ExtensionsPage() {
     const bundledPiano = useMemo(() => bundledPianoEntry(), []);
 
     const handleInstall = async (plugin: StudioPlugin) => {
+        if (installingId) return;
         setInstallingId(plugin.id);
+        setDownloadedBytes(null);
         try {
-            await installBuiltinPlugin(plugin.id);
+            await installBuiltinPlugin(plugin.id, setDownloadedBytes);
         } catch (err) {
             notify({
                 title: "安装失败",
@@ -167,7 +170,15 @@ export function ExtensionsPage() {
             });
         } finally {
             setInstallingId(null);
+            setDownloadedBytes(null);
         }
+    };
+
+    const installStatus = (plugin: StudioPlugin) => {
+        if (installingId !== plugin.id || downloadedBytes === null) return undefined;
+        if (plugin.sizeBytes <= 0) return `已下载 ${(downloadedBytes / 1_000_000).toFixed(1)} MB`;
+        if (downloadedBytes >= plugin.sizeBytes) return "正在安装…";
+        return `下载中 ${Math.floor((downloadedBytes / plugin.sizeBytes) * 100)}%`;
     };
 
     const handleToggle = async (plugin: StudioPlugin) => {
@@ -528,6 +539,11 @@ export function ExtensionsPage() {
                                             </label>
                                         )}
 
+                                        {installStatus(plugin) && (
+                                            <span role="status" className="text-[12px] text-ore-dim">
+                                                {installStatus(plugin)}
+                                            </span>
+                                        )}
                                         {hasSongs && (mode === "local" || plugin.installed) && (
                                             <Button
                                                 type="button"
@@ -571,6 +587,7 @@ export function ExtensionsPage() {
                 plugin={detailPlugin}
                 mode={mode}
                 installing={Boolean(detailPlugin && installingId === detailPlugin.id)}
+                installStatus={detailPlugin ? installStatus(detailPlugin) : undefined}
                 onClose={() => setDetailPluginId(null)}
                 onInstall={(plugin) => void handleInstall(plugin)}
                 onToggle={(plugin) => void handleToggle(plugin)}

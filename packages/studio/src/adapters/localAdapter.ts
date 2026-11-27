@@ -419,7 +419,11 @@ function indexItemToUninstalledPlugin(item: BuiltinPluginIndexItem): StudioPlugi
 }
 
 let builtinIndexCache: Promise<BuiltinPluginIndexItem[]> | null = null;
-const builtinArchiveCache = new Map<string, Promise<Uint8Array>>();
+const builtinArchiveCache = new Map<string, {
+    bytes: Promise<Uint8Array>;
+    loaded: number;
+    listeners: Set<(loaded: number) => void>;
+}>();
 
 /**
  * 已解析插件包的缓存：本地模式下每次 refresh 都会从 IndexedDB 读出所有已安装插件的字节，
@@ -464,18 +468,48 @@ export function loadBuiltinPluginIndex(): Promise<BuiltinPluginIndexItem[]> {
     return builtinIndexCache;
 }
 
-export function fetchBuiltinPluginBytes(file: string): Promise<Uint8Array> {
+export async function fetchBuiltinPluginBytes(
+    file: string,
+    onProgress?: (loaded: number) => void,
+): Promise<Uint8Array> {
     let pending = builtinArchiveCache.get(file);
     if (!pending) {
-        pending = (async () => {
+        const listeners = new Set<(loaded: number) => void>();
+        const download = { loaded: 0, listeners, bytes: fetchArchive() };
+        async function fetchArchive(): Promise<Uint8Array> {
             const res = await fetch(`./plugins/${file}`);
             if (!res.ok) throw new Error(`获取扩展包失败 (${file}: ${res.status})`);
-            return new Uint8Array(await res.arrayBuffer());
-        })();
-        pending.catch(() => builtinArchiveCache.delete(file));
+            if (!res.body) return new Uint8Array(await res.arrayBuffer());
+            const reader = res.body.getReader();
+            const chunks: Uint8Array[] = [];
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                download.loaded += value.byteLength;
+                for (const listener of listeners) listener(download.loaded);
+            }
+            const bytes = new Uint8Array(download.loaded);
+            let offset = 0;
+            for (const chunk of chunks) {
+                bytes.set(chunk, offset);
+                offset += chunk.byteLength;
+            }
+            return bytes;
+        }
+        pending = download;
+        download.bytes.catch(() => builtinArchiveCache.delete(file));
         builtinArchiveCache.set(file, pending);
     }
-    return pending;
+    if (onProgress) pending.listeners.add(onProgress);
+    try {
+        onProgress?.(pending.loaded);
+        const bytes = await pending.bytes;
+        onProgress?.(bytes.byteLength);
+        return bytes;
+    } finally {
+        if (onProgress) pending.listeners.delete(onProgress);
+    }
 }
 
 export async function loadDefaultTemplate(): Promise<TemplateInfo> {

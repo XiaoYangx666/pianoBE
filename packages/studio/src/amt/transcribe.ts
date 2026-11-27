@@ -37,35 +37,36 @@ export interface TranscribeOutput {
 
 const TARGET_SAMPLE_RATE = 16_000;
 const AMT_BASE_URL = new URL("amt/", document.baseURI).href;
-const MODEL_URL = `${AMT_BASE_URL}run4_int8.onnx`;
-const META_URL = `${AMT_BASE_URL}cqt_meta.json`;
-const WASM_URL = `${AMT_BASE_URL}ort-wasm-simd-threaded.wasm`;
-const MJS_URL = `${AMT_BASE_URL}ort-wasm-simd-threaded.mjs`;
-// 模型从 fp16 换成 int8 后资源集合变了，旧缓存不再复用
+declare const __PIANOBE_AMT_ASSETS__: Record<string, { hash: string; size: number }>;
+
 const CACHE_NAME = "piano-amt-v2";
 
 export class AssetsNotReadyError extends Error {}
 
 export interface AssetDownloadProgress {
     message: string;
-    /** 0..100 */
+    loaded: number;
+    total: number;
     percent: number;
 }
 
-interface AssetFile {
-    url: string;
-    label: string;
-    from: number;
-    to: number;
-    contentType: string;
+function asset(name: string, label: string, contentType: string) {
+    const { hash, size } = __PIANOBE_AMT_ASSETS__[name];
+    return {
+        url: new URL(`v/${hash}/${name}`, AMT_BASE_URL).href,
+        legacyUrl: new URL(name, AMT_BASE_URL).href,
+        label,
+        contentType,
+        hash,
+        size,
+    };
 }
 
-const ASSET_FILES: AssetFile[] = [
-    { url: META_URL, label: "频谱参数", from: 0, to: 2, contentType: "application/json" },
-    { url: MODEL_URL, label: "转录模型", from: 2, to: 10, contentType: "application/octet-stream" },
-    { url: WASM_URL, label: "推理运行时", from: 10, to: 98, contentType: "application/wasm" },
-    { url: MJS_URL, label: "运行时加载器", from: 98, to: 100, contentType: "text/javascript" },
-];
+const META = asset("cqt_meta.json", "频谱参数", "application/json");
+const MODEL = asset("run4_int8.onnx", "转录模型", "application/octet-stream");
+const WASM = asset("ort-wasm-simd-threaded.wasm", "推理运行时", "application/wasm");
+const MJS = asset("ort-wasm-simd-threaded.mjs", "运行时加载器", "text/javascript");
+const ASSET_FILES = [META, MODEL, WASM, MJS];
 
 function report(
     options: TranscribeOptions,
@@ -119,62 +120,83 @@ export async function downloadModelAssets(
 ): Promise<void> {
     const cache = await openAssetCache();
 
-    for (const file of ASSET_FILES) {
-        if (await cache.match(file.url)) {
-            onProgress?.({ message: `${file.label}（已缓存）`, percent: file.to });
-            continue;
-        }
+    const total = ASSET_FILES.reduce((sum, file) => sum + file.size, 0);
+    const received = ASSET_FILES.map(() => 0);
+    const update = (message: string, finished = false) => {
+        const loaded = received.reduce((sum, size) => sum + size, 0);
+        onProgress?.({
+            message,
+            loaded,
+            total,
+            percent: finished ? 100 : Math.min(99, (loaded / total) * 100),
+        });
+    };
 
-        onProgress?.({ message: `下载${file.label}…`, percent: file.from });
-        const response = await fetch(file.url, { cache: "no-store" });
-        if (!response.ok) {
-            throw new Error(`下载${file.label}失败（HTTP ${response.status}）`);
-        }
+    update("正在准备转录资源…");
+    const results = await Promise.allSettled(ASSET_FILES.map(async (file, index) => {
+        if (!(await cache.match(file.url))) {
+            const legacy = await cache.match(file.legacyUrl);
+            let bytes = legacy && new Uint8Array(await legacy.arrayBuffer());
+            if (bytes?.byteLength === file.size) {
+                const digest = await crypto.subtle.digest("SHA-256", bytes);
+                const hash = Array.from(new Uint8Array(digest), (value) =>
+                    value.toString(16).padStart(2, "0"),
+                ).join("");
+                if (hash !== file.hash) bytes = undefined;
+            } else {
+                bytes = undefined;
+            }
 
-        let bytes: Uint8Array;
-        if (!response.body) {
-            bytes = new Uint8Array(await response.arrayBuffer());
-        } else {
-            const total = Number(response.headers.get("content-length") ?? 0);
-            const reader = response.body.getReader();
-            const parts: Uint8Array[] = [];
-            let received = 0;
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                parts.push(value);
-                received += value.byteLength;
-                if (total > 0) {
-                    const fraction = Math.min(1, received / total);
-                    onProgress?.({
-                        message: `下载${file.label}…`,
-                        percent: file.from + (file.to - file.from) * fraction,
-                    });
+            if (!bytes) {
+                const response = await fetch(file.url);
+                if (!response.ok) {
+                    throw new Error(`下载${file.label}失败（HTTP ${response.status}）`);
+                }
+                if (!response.body) {
+                    bytes = new Uint8Array(await response.arrayBuffer());
+                } else {
+                    const reader = response.body.getReader();
+                    bytes = new Uint8Array(file.size);
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        if (received[index] + value.byteLength > file.size) {
+                            await reader.cancel();
+                            throw new Error(`${file.label}大小与发布清单不符`);
+                        }
+                        bytes.set(value, received[index]);
+                        received[index] += value.byteLength;
+                        update("正在并行下载转录资源…");
+                    }
+                    if (received[index] !== file.size) {
+                        throw new Error(`${file.label}下载不完整`);
+                    }
                 }
             }
-            bytes = new Uint8Array(received);
-            let offset = 0;
-            for (const part of parts) {
-                bytes.set(part, offset);
-                offset += part.byteLength;
+            if (bytes.byteLength !== file.size) {
+                throw new Error(`${file.label}大小与发布清单不符`);
             }
+            await cache.put(
+                file.url,
+                new Response(bytes, { headers: { "content-type": file.contentType } }),
+            );
+            if (legacy) await cache.delete(file.legacyUrl);
         }
-
-        await cache.put(
-            file.url,
-            new Response(bytes as unknown as BodyInit, {
-                headers: { "content-type": file.contentType },
-            })
-        );
-        onProgress?.({ message: `${file.label}下载完成`, percent: file.to });
-    }
+        received[index] = file.size;
+        update("正在准备转录资源…");
+    }));
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+    update("转录资源下载完成", true);
 }
 
 /** 清除已下载的模型与运行时，并释放当前推理 session */
 export async function clearModelAssets(): Promise<void> {
     try {
         const cache = await openAssetCache();
-        for (const file of ASSET_FILES) await cache.delete(file.url);
+        for (const request of await cache.keys()) {
+            if (request.url.startsWith(AMT_BASE_URL)) await cache.delete(request);
+        }
     } catch {
         // 缓存不可用时无需处理
     }
@@ -263,7 +285,7 @@ async function decodeAudio(file: File): Promise<Float32Array> {
 }
 
 async function loadCqtMeta(): Promise<CqtMeta> {
-    const bytes = await requireCached(META_URL, "频谱参数");
+    const bytes = await requireCached(META.url, "频谱参数");
     return JSON.parse(new TextDecoder().decode(bytes)) as CqtMeta;
 }
 
@@ -271,7 +293,7 @@ let mjsBlobUrl: string | null = null;
 
 async function getRuntimeLoaderUrl(): Promise<string> {
     if (mjsBlobUrl) return mjsBlobUrl;
-    const bytes = await requireCached(MJS_URL, "推理运行时");
+    const bytes = await requireCached(MJS.url, "推理运行时");
     mjsBlobUrl = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: "text/javascript" }));
     return mjsBlobUrl;
 }
@@ -301,8 +323,8 @@ async function getSession(
     ort.env.wasm.proxy = false;
 
     report(options, "model", "加载本地模型…", 5);
-    const model = await requireCached(MODEL_URL, "转录模型");
-    const wasm = await requireCached(WASM_URL, "推理运行时");
+    const model = await requireCached(MODEL.url, "转录模型");
+    const wasm = await requireCached(WASM.url, "推理运行时");
     const mjs = await getRuntimeLoaderUrl();
     // wasm 直接来自 Cache Storage；mjs 用 blob URL，避免运行时再次联网
     ort.env.wasm.wasmBinary = wasm;

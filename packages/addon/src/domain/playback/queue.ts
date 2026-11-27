@@ -1,4 +1,4 @@
-import { sameMusicRef, type MusicRef } from "@piano/core";
+import { normalizeMusicRef, sameMusicRef, type MusicRef } from "@piano/core";
 
 export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
 
@@ -277,7 +277,9 @@ export class PlayQueue {
     }
 
     snapshot() {
-        return { songs: this.list.slice(), index: this.index, mode: this.mode };
+        // Save playback selectors and track identity. Cue arrays belong to the library.
+        const songs = this.list.map((ref) => normalizeMusicRef(ref)!);
+        return { songs, index: this.index, mode: this.mode };
     }
 
     restore({ songs, index, mode }: { songs: MusicRef[]; index: number; mode: PlayMode }) {

@@ -40,6 +40,7 @@ export interface PluginDetailDialogProps {
     plugin: StudioPlugin | null;
     mode: StudioMode;
     installing?: boolean;
+    installStatus?: string;
     onClose: () => void;
     onInstall: (plugin: StudioPlugin) => void;
     onToggle: (plugin: StudioPlugin) => void;
@@ -67,6 +68,7 @@ export function PluginDetailDialog({
     plugin,
     mode,
     installing = false,
+    installStatus,
     onClose,
     onInstall,
     onToggle,
@@ -222,6 +224,9 @@ export function PluginDetailDialog({
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ore-divider pt-3">
                     <div className="flex flex-wrap items-center gap-2">
+                        {installStatus && (
+                            <span role="status" className="text-[12px] text-ore-dim">{installStatus}</span>
+                        )}
                         {!plugin.installed ? (
                             <Button
                                 type="button"

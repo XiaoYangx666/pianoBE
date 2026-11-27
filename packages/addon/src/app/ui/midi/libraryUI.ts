@@ -2,7 +2,7 @@ import { DDUI } from "sapi-pro";
 import { formatBytes, type MusicRef } from "@piano/core";
 import { midiManager } from "@app/midi";
 import type { PianoRuntime } from "@app/PianoRuntime";
-import { TrackActionsPage } from "./trackActions";
+import { TrackActionsPage, withDefaultQueuePerformance } from "./trackActions";
 import {
     PAGE_SIZE,
     TAB_LABELS,
@@ -86,7 +86,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
     const syncSearch = () => ui.set(search, formatLibrarySearch(state.query, state.page));
 
     const perfSuffix = (ref: MusicRef): string => {
-        const count = ref.performanceEntries?.length ?? ref.performances?.length ?? 0;
+        const count = ref.performanceEntries?.filter((entry) => entry.id !== "plain").length ?? ref.performances?.length ?? 0;
         if (count <= 0) return "";
         return count === 1 ? " · 演出" : ` · ${count}演出`;
     };
@@ -101,7 +101,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
                 labels[index].setData("");
                 continue;
             }
-            const added = mode === "add" && queue.indexOf(ref) >= 0;
+            const added = mode === "add" && queue.indexOf(withDefaultQueuePerformance(piano, ref)) >= 0;
             // 按钮文本不支持格式化符号，只放纯文本。
             labels[index].setData(`${added ? "✓ " : ""}${sourceMark(ref)} ${ref.name}${perfSuffix(ref)}`);
         }
@@ -238,7 +238,7 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
                 const ref = state.refs[index];
                 if (!ref || !piano.isAlive()) return;
                 if (mode === "add") {
-                    const result = piano.getMidiPlayer().addToQueue(ref);
+                    const result = piano.getMidiPlayer().addToQueue(withDefaultQueuePerformance(piano, ref));
                     notice.setData(result === "added" ? `§a已加入队列：§f${ref.name}` : `§e队列中已有：§f${ref.name}`);
                     renderLabels();
                     return;

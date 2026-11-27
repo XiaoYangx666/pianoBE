@@ -10,6 +10,7 @@
  * 不包含本地模式使用的模板、内置插件与浏览器端 AMT 运行时。
  */
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPbePluginArchive } from "@piano/vfx/package";
@@ -138,10 +139,24 @@ if (!serverOnly) {
         }
         fs.copyFileSync(src, path.join(outDir, name));
     }
-    const size = fs
-        .readdirSync(outDir)
-        .reduce((sum, name) => sum + fs.statSync(path.join(outDir, name)).size, 0);
-    console.log(`✓ amt (${fs.readdirSync(outDir).length} files, ${(size / 1048576).toFixed(1)} MB)`);
+    let size = 0;
+    const manifest = {};
+    for (const name of fs.readdirSync(outDir)) {
+        const source = path.join(outDir, name);
+        const bytes = fs.readFileSync(source);
+        const hash = createHash("sha256").update(bytes).digest("hex");
+        const versionDir = path.join(outDir, "v", hash);
+        fs.mkdirSync(versionDir, { recursive: true });
+        fs.renameSync(source, path.join(versionDir, name));
+        manifest[name] = { hash, size: bytes.length };
+        size += bytes.length;
+    }
+    fs.writeFileSync(path.join(pkgDir, "public", "amt", "manifest.json"), JSON.stringify(manifest));
+    fs.writeFileSync(
+        path.join(pubDir, "_headers"),
+        "/amt/v/*\n  Cache-Control: public, max-age=31536000, immutable\n",
+    );
+    console.log(`✓ amt (${Object.keys(manifest).length} files, ${(size / 1048576).toFixed(1)} MB)`);
 }
 
 // 7. server preview piano samples

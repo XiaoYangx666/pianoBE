@@ -136,7 +136,7 @@ export function createPluginsSlice(
             });
         },
 
-        installBuiltinPlugin(id) {
+        installBuiltinPlugin(id, onProgress) {
             return runtime.queue.enqueue(async () => {
                 set({ busy: true });
                 try {
@@ -148,7 +148,7 @@ export function createPluginsSlice(
                     }
                     const plugin = get().plugins.find((p) => p.id === id);
                     if (!plugin?.file) throw new Error(`未找到内置扩展：${id}`);
-                    const bytes = await fetchBuiltinPluginBytes(plugin.file);
+                    const bytes = await fetchBuiltinPluginBytes(plugin.file, onProgress);
                     // 官方随应用分发的扩展默认可信，自动启用（含曲库包会在音乐库立即可用）
                     await installLocalPluginBytes(bytes, "builtin", true);
                     const archive = readPbePluginArchive(bytes);

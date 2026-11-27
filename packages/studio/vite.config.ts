@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -105,6 +106,9 @@ export default defineConfig(({ mode }) => {
         base: "./",
         define: {
             __PIANOBE_SERVER_ONLY__: JSON.stringify(serverOnly),
+            __PIANOBE_AMT_ASSETS__: serverOnly
+                ? "{}"
+                : readFileSync(new URL("./public/amt/manifest.json", import.meta.url), "utf8"),
         },
         publicDir: serverOnly ? "public-server" : "public",
         plugins: [
