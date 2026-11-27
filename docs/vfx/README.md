@@ -4,7 +4,7 @@ PianoBE 的舞台视觉系统围绕**一套共享的插件宿主与渲染原语 
 
 ## 1. 核心能力
 
-- **内置 VFX 插件包 (`plugins/*`)**：默认包含 9 个内置插件（`pianobe.atmosphere`、`pianobe.curves`、`pianobe.stage`、`pianobe.keys`、`pianobe.accents`、`pianobe.themes`、`pianobe.chinese`、`pianobe.floral`、`pianobe.sinner`），通过统一 `VfxRegistry` 注册 **62 种特效**（氛围 11、曲线 13、舞台 18、琴键 4、点缀 14、控制 2）、**8 套舞台主题**（`galaxy`、`neon`、`stage`、`sakura`、`starlight`、`cathedral`、`carnival`、`chinese_misty_rain`）、**8 套舞台锚点布局**（6 套灯光 + 2 套光幕）与 **8 种弹奏粒子样式**（6 种带稳定数字值、可在钢琴设置中选择；`snow`、`floral_touch` 仅由演出 cue 使用）。宿主同时支持零插件模式与第三方 `.pbeplugin` 扩展。
+- **内置 VFX 插件包 (`plugins/*`)**：默认包含 9 个内置插件（`pianobe.atmosphere`、`pianobe.curves`、`pianobe.stage`、`pianobe.keys`、`pianobe.accents`、`pianobe.themes`、`pianobe.chinese`、`pianobe.floral`、`pianobe.sinner`），通过统一 `VfxRegistry` 注册 **66 种特效**（按当前插件清单统计）、**8 套舞台主题**（`galaxy`、`neon`、`stage`、`sakura`、`starlight`、`cathedral`、`carnival`、`chinese_misty_rain`）、**7 套舞台锚点布局**（5 套灯光 + 2 套光幕）与 **8 种弹奏粒子样式**（6 种带稳定数字值、可在钢琴设置中选择；`snow`、`floral_touch` 仅由演出 cue 使用）。宿主同时支持零插件模式与第三方 `.pbeplugin` 扩展。
 - **曲目级演出编排 (`PBE3 v3`)**：通过紧凑的曲目内部符号表 + 颜色表随 `.pbe3` 曲目分发（如 `e1563b03` 《Secret》、`c8159589` 《Secret Base》、`b0cae095` 《Sparkle》、`ff9c1534` 《打上花火》、`2f434124` 《花海》），无需新增专用播放器代码或修改运行时代码。
 - **统一图集与画笔 (`vfxAtlas.json`)**：1024×1024 单张粒子图集 + Vibrant Visuals MER 贴图，统一管理 9 种点状画笔与 4 种线条笔刷。宿主提供 17 个公共绘制粒子文档；内置插件各自附带 13 个专属粒子文档（`pianobe.keys` 4 个：`pbe:vfx_key_stream`、`pbe:vfx_key_drift` 与使用 `piano_fx` 贴图的 `pbe:vfx_magic_trail` / `pbe:vfx_key_blue_tears`；`pianobe.chinese` 3 个；`pianobe.floral` 1 个、`pianobe.sinner` 5 个）。每种样式自带自由、限定或固定配色策略。
 - **Web VFX Lab (`/vfx-lab`)**：直接在浏览器中复用 `@piano/vfx` 引擎、插件注册表、音乐特征采样、预算限制与 `.particle.json` 资源，并支持实时勾选/屏蔽不同插件组合进行预览与零插件验证。

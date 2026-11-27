@@ -2,14 +2,21 @@
 
 PianoBE 后端提供远程曲库、扩展管理和 BDS 附加包部署。
 
-## 服主快速开始
+## 服主安装（交给 Agent）
 
-如果你已有 PianoBE 服务端可执行文件，把它放进一个单独的目录并从该目录启动。Windows 在 PowerShell 执行 `.\pianobe-server-win32-x64.exe`，Linux x64 执行 `./pianobe-server-linux-x64`。也可以按 [Docker 部署](#docker-部署) 构建并启动容器。
+如果你有能够访问 BDS 文件系统、执行命令并管理服务的 Agent，直接把下面提示词交给它。它应先识别当前环境，再按仓库实际配置完成部署，不需要服主手动照着 Docker 和配置文件逐项操作。
 
-1. 打开 `http://localhost:3000`（Docker 源码镜像使用端口 `35050`）。从另一台设备访问时，将 `localhost` 换成后端地址。
-2. 使用管理员令牌登录。首次启动没有预设 `BOOTSTRAP_TOKEN` 时，单文件版令牌写在运行目录下的 `data/bootstrap-token.txt`，Docker 源码镜像的宿主机路径为 `packages/server/data/bootstrap-token.txt`。
-3. 在「音乐库」导入曲目，再到「附加包」→「BDS 部署与校验」安装配套附加包。后端可读写 BDS 目录时，可在页面配置路径并直接部署。跨机器部署时，可下载配套 `.mcaddon` 后手动安装。
-4. 按 [BDS 配置示例](../addon/README.md#bds-配置配置文件示例) 设置后端地址、令牌和脚本权限，再重启 BDS。
+```text
+请在当前机器上为现有 Minecraft Bedrock Dedicated Server 部署 PianoBE 2.0。
+
+检查系统与架构、BDS 版本和安装目录、目标世界、Docker、端口与网络；先备份准备修改的配置。克隆 https://github.com/XiaoYangx666/pianoBE 的 main 分支，优先用仓库根目录的 Docker Compose 部署后端（默认对外端口 35050，数据保存在 packages/server/data）。然后装配并安装 BDS 专用 server.mcaddon，绑定目标世界，配置 BDS 脚本模块权限、pianoBackendUrl 和 pianoBackendToken。为游戏端创建独立 user 令牌，admin 令牌只用于管理页面。
+
+验证 /api/health、BDS 启动日志和游戏内远程曲库。不要覆盖世界存档、玩家数据或其他附加包，不要擅自更改世界实验设置；遇到冲突、权限不足或高风险操作时先停止并向我说明。
+```
+
+部署完成后，管理页面地址通常为 `http://<服务器地址>:35050`。首次启动的管理员引导令牌位于数据目录的 `bootstrap-token.txt`；不要把令牌写入公开仓库、世界配置或日志。
+
+以下内容保留给 Agent、维护者和需要手动排障的服主作为技术参考。
 
 ## 快速开始（本地源码运行）
 

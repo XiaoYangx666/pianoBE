@@ -5,14 +5,14 @@
 ## 游戏内演奏
 
 - 准星对准琴键并右键即可弹奏。右键面板右侧的青色按钮打开文字演奏与 MIDI 菜单。
-- 测试世界需要开启「Beta API」。行为包与资源包应同时启用。
+- 行为包与资源包需要同时启用；普通客户端世界不需要开启「Beta APIs」实验。
 - 每架琴的琴键显示和 MIDI 播放由同一个运行时管理。区块卸载，或附近 48 格内连续 10 秒没有玩家时，运行时释放播放实例。显示实体保存队列、播放模式和最近进度。回到附近后，正在播放的曲目从保存位置继续，暂停的曲目保持暂停。
 
 ## 采样与力度
 
 - 每个音色只保留一档 4 秒长采样；音符长度由 MIDI Note Off（手动按键为 150ms）决定，之后通过 `SoundInstance.fade()` 在 600ms 内淡出并释放。
 - Bedrock 客户端同时最多混 32 个音效（整个客户端共享）。钢琴按 28 的声部预算运行：先腾位再 `playSound`，超限时优先收掉更轻、更接近采样结束、或谱面而非手动敲出的音（同条件下保留高音），避免引擎随机截断。踏板长音在 4 秒采样放完后直接释放，不再白占名额。导入时会用同一套离线模型预计算峰值并提示超限曲目（见 `tools/voice-load-report.md`）。
-- 缩短淡出时长并不能降低峰值：全库最重的曲目峰值 42 个音来自真正同时按住的音，释放从 120ms 调到 800ms 峰值仍是 42~44，所以没有把淡出时长写进 PBE3。
+- 缩短淡出时长并不能降低真实同时发声的峰值：2026-11-18 的离线模拟在 606 首曲库中测得最大同时发声 56、P95 为 35。运行时按 28 的钢琴声部预算主动回收较不重要的音；完整数据见 `tools/voice-load-report.md`。
 - 力度不是音量档位，而是真实多力度采样：三层音色按 MIDI 力度 42 / 84 切换，立式钢琴两层按 64 切换；明亮三角目前只有单层母带。
 - 播放端按力度曲线调整音量（参考力度 90 = 1.0，最强约 +4.5dB），因此同一采样层内也有连续强弱。
 - 采样目录为 `rp/sounds/<音色>_v{1..3}/`。重新生成：`npm run build:timbres`；如体积紧张，可用 `VORBIS_Q=1 npm run build:timbres` 进一步压缩。
@@ -30,19 +30,28 @@
 
 注意：**服务器专用构建不打包内嵌曲库**（`midis = []`），远程初始化失败后它没有任何曲目可用。单机/客户端测试请使用客户端包。
 
-### BDS 配置（配置文件示例）
+### BDS 配置（Agent / 维护者参考）
 
-先给目标世界开启「测试版 API」。在部署后的行为包 `manifest.json` 中找到 `type` 为 `script` 的模块 UUID，复制 `config/default/permissions.json` 到 `config/<脚本模块 UUID>/permissions.json`，再在该文件的 `allowed_modules` 中补上 `@minecraft/server-net` 和 `@minecraft/server-admin`（已有条目保留）。[Microsoft Learn 的 BDS 脚本权限说明](https://learn.microsoft.com/en-us/minecraft/creator/documents/bedrockserver/scripting)。
+普通客户端包使用稳定版脚本 API，普通世界不需要开启「Beta APIs」实验。BDS 远程曲库由服务器专用构建提供，使用 `@minecraft/server-net` 与 `@minecraft/server-admin`；服主无需手工照下面步骤操作，优先把 [Server README 的 Agent 安装提示词](../server/README.md#服主安装交给-agent)交给能访问 BDS 文件系统的 Agent。
 
+Agent 或维护者需要核对以下配置：
+
+1. 从最终部署包的 `manifest.json` 读取 `type: "script"` 模块 UUID，在 BDS 的 `config/` 下创建对应目录，并为该模块配置 `permissions.json`。
+2. 在该模块的 `allowed_modules` 中允许 `@minecraft/server-net` 与 `@minecraft/server-admin`，保留已有模块权限。不要为了 PianoBE 覆盖其他脚本模块的权限配置。[Microsoft Learn：BDS 脚本权限](https://learn.microsoft.com/en-us/minecraft/creator/documents/bedrockserver/scripting)。
+3. 配置后端地址与专用游戏令牌：
+
+```json
+// config/default/variables.json
+{ "pianoBackendUrl": "http://192.168.1.10:35050" }
+
+// config/default/secrets.json
+{ "pianoBackendToken": "Bearer <user-token>" }
 ```
-config/default/variables.json    → { "pianoBackendUrl": "http://192.168.1.10:35050" }
-config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
-```
 
-- `pianoBackendUrl`：后端地址（`variables`，普通可读配置）
-- `pianoBackendToken`：令牌（`secrets`，**SecretString**：脚本环境读不到值，
-  请求时由 HttpHeader 解析；因无法拼接前缀，需保存完整的 `Bearer <token>`）
-- 未配置 URL 或模块不可用 → 跳过远程曲库与服务器版可选功能并输出警告；客户端构建仍使用内嵌曲库，服务器专用构建则没有任何曲目
+- `pianoBackendUrl`：BDS 能够访问的后端地址，不能想当然地使用另一容器或另一台机器上的 `localhost`。
+- `pianoBackendToken`：完整的 `Bearer <token>`。建议创建独立的 `user` 令牌供游戏端读取曲库和上报加载状态；不要把管理页面使用的 `admin` 令牌写入世界配置。
+- `secrets.json` 中的值是 `SecretString`，脚本不会读取明文；`HttpHeader` 会在发送请求时解析它，因此必须保存完整的 Bearer 字符串。
+- 未配置 URL 或模块不可用时，服务器专用构建没有内嵌曲库可回退，会记录警告；客户端构建仍使用内嵌曲库。
 
 ### 远程模式行为
 
@@ -174,7 +183,7 @@ npm run verify:addon-build   # 检查现有客户端脚本、template.mcaddon �
 
 ### 仍需 Minecraft 实机确认（脚本测试无法覆盖）
 
-1. 显示实体 `minecraft:inventory` 在 1.26.50 稳定版下是否随区块正常保存/恢复；`private` 是否完全阻止玩家直接打开该容器。
+1. 显示实体 `minecraft:inventory` 在最低支持版本 1.26.60 下是否随区块正常保存/恢复；`private` 是否完全阻止玩家直接打开该容器。
 2. ItemStack 与世界动态属性的单值长度与总量上限：存储卡默认 64 KiB、全局曲库默认 8 MiB，按 20k 字符分片；实机写入是否被引擎拒绝（超限时应报可见错误而不是丢数据）。
 3. 拆琴 → 存储卡退还 → 重新放置的完整链路（含区块边界、爆炸、活塞、创造模式）。
 4. 卡槽插入/取出/背包满/卡片被替换/多人同时操作时的真实交互与消息提示。
