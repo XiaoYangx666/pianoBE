@@ -61,6 +61,16 @@ const TRACKS = [
 
 const LAYER_IDS = ["vl2", "vl3", "vl4"];
 
+// midis/files/ 被 gitignore，干净克隆里没有这些曲子：先说清楚缺什么，
+// 而不是在 readFileSync 里抛一个裸 ENOENT。
+const missingTracks = TRACKS.filter((track) => !existsSync(track.file));
+if (missingTracks.length > 0) {
+    console.error("❌ audio-lab render 需要本地 MIDI 源文件（midis/files/ 不入库）：");
+    for (const track of missingTracks) console.error(`   缺少 ${track.file}`);
+    console.error("   把对应 .mid 放回 midis/files/ 后再运行。");
+    process.exit(1);
+}
+
 function noteNameToFile(name) {
     return name.replace("#", "sharp");
 }

@@ -137,6 +137,11 @@ async function transcode(source, target, transpose = 0) {
 
 async function main() {
     const refresh = process.argv.includes("--refresh");
+    if (!existsSync(CALIBRATION)) {
+        console.error(`❌ 缺少响度校准数据：${CALIBRATION}`);
+        console.error("   该文件由 npm run build:timbres 生成（会下载并渲染源采样）。");
+        process.exit(1);
+    }
     const calibration = JSON.parse(await readFile(CALIBRATION, "utf8"));
     const timbre = calibration.timbres.find((entry) => entry.timbreId === "classic_grand");
     if (!timbre) throw new Error("calibration.json 缺少 classic_grand");

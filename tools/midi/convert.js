@@ -21,6 +21,12 @@ const jsDir = path.resolve(process.argv[3] || "./midis/js");
 const libDir = path.resolve(process.argv[4] || "./midis/library");
 
 const inputPath = path.resolve(inputArg);
+if (!fs.existsSync(inputPath)) {
+    console.error(`❌ 找不到输入目录/文件：${inputPath}`);
+    console.error("   midis/files/ 被 gitignore——仓库不包含原始 MIDI 文件。");
+    console.error("   新增曲目请用: npm run midi -- add-song <文件或目录>");
+    process.exit(1);
+}
 const inputIsDir = fs.statSync(inputPath).isDirectory();
 if (!inputIsDir) {
     console.error(`❌ 单文件模式已移除：请用 npm run midi -- add-song ${inputArg}`);
