@@ -108,28 +108,40 @@ fs.rmSync(path.join(pubDir, "performances"), { recursive: true, force: true });
 fs.rmSync(path.join(pubDir, "timbres"), { recursive: true, force: true });
 console.log("✓ timbres (distributed as official .pbeplugin packages)");
 
-// 6. AMT browser runtime + model（仅本地/完整版）
+// 6. 浏览器端 AMT 模型、CQT 参数与 ORT 运行时（仅本地/完整版）
+// 模型与服务端同源：直接使用 amt-cli npm 包内的 int8 权重，不再从外部 AMT 仓库复制。
 if (!serverOnly) {
     const outDir = path.join(pubDir, "amt");
+    fs.rmSync(outDir, { recursive: true, force: true });
     fs.mkdirSync(outDir, { recursive: true });
-    const candidates = [
-        process.env.AMT_DIR ? path.join(process.env.AMT_DIR, "web_demo") : null,
-        path.join(repoRoot, "vendor", "Automated-Music-Transcription", "web_demo"),
-        path.join(repoRoot, "..", "Automated-Music-Transcription", "web_demo"),
-    ].filter(Boolean);
-    const modelDir = candidates.find((d) => fs.existsSync(path.join(d, "run4_best_fp16.onnx")));
-    if (modelDir) {
-        for (const name of ["cqt_meta.json", "run4_best_fp16.onnx"]) {
-            const src = path.join(modelDir, name);
-            if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outDir, name));
-        }
+
+    const modelSrc = path.join(repoRoot, "node_modules/amt-cli/models/run4_int8.onnx");
+    if (!fs.existsSync(modelSrc)) {
+        throw new Error(
+            `缺少浏览器端 AMT 模型：${modelSrc}\n` +
+                "请在仓库根目录执行 npm install（模型由 @piano/server 依赖的 amt-cli 提供）。",
+        );
     }
+    fs.copyFileSync(modelSrc, path.join(outDir, "run4_int8.onnx"));
+
+    const cqtMetaSrc = path.join(repoRoot, "assets/amt/cqt_meta.json");
+    if (!fs.existsSync(cqtMetaSrc)) {
+        throw new Error(`缺少浏览器端 CQT 参数：${cqtMetaSrc}`);
+    }
+    fs.copyFileSync(cqtMetaSrc, path.join(outDir, "cqt_meta.json"));
+
     const ortDist = path.join(repoRoot, "node_modules/onnxruntime-web/dist");
     for (const name of ["ort-wasm-simd-threaded.wasm", "ort-wasm-simd-threaded.mjs"]) {
         const src = path.join(ortDist, name);
-        if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outDir, name));
+        if (!fs.existsSync(src)) {
+            throw new Error(`缺少 ONNX Runtime Web 运行时：${src}（请先在仓库根目录 npm install）`);
+        }
+        fs.copyFileSync(src, path.join(outDir, name));
     }
-    console.log(`✓ amt (${fs.readdirSync(outDir).length} files)`);
+    const size = fs
+        .readdirSync(outDir)
+        .reduce((sum, name) => sum + fs.statSync(path.join(outDir, name)).size, 0);
+    console.log(`✓ amt (${fs.readdirSync(outDir).length} files, ${(size / 1048576).toFixed(1)} MB)`);
 }
 
 // 7. server preview piano samples

@@ -3,7 +3,7 @@ import { computeCqt, type CqtMeta } from "./cqt";
 import { decodeNotes, notesToMidi, type AmtNote } from "./notes";
 
 /**
- * 浏览器端音频转 MIDI：与 muscriptor 的 web_demo 完全相同的推理链路。
+ * 浏览器端音频转 MIDI：与 AMT 参考实现的推理链路一致（CQT → ONNX → 音符解码）。
  * 音频解码 / CQT / ONNX / 音符解码全部在本地完成，音频不会上传。
  */
 
@@ -36,12 +36,13 @@ export interface TranscribeOutput {
 }
 
 const TARGET_SAMPLE_RATE = 16_000;
-const SAMPLE_URL = new URL("amt/", document.baseURI).href;
-const MODEL_URL = `${SAMPLE_URL}run4_best_fp16.onnx`;
-const META_URL = `${SAMPLE_URL}cqt_meta.json`;
-const WASM_URL = `${SAMPLE_URL}ort-wasm-simd-threaded.wasm`;
-const MJS_URL = `${SAMPLE_URL}ort-wasm-simd-threaded.mjs`;
-const CACHE_NAME = "piano-amt-v1";
+const AMT_BASE_URL = new URL("amt/", document.baseURI).href;
+const MODEL_URL = `${AMT_BASE_URL}run4_int8.onnx`;
+const META_URL = `${AMT_BASE_URL}cqt_meta.json`;
+const WASM_URL = `${AMT_BASE_URL}ort-wasm-simd-threaded.wasm`;
+const MJS_URL = `${AMT_BASE_URL}ort-wasm-simd-threaded.mjs`;
+// 模型从 fp16 换成 int8 后资源集合变了，旧缓存不再复用
+const CACHE_NAME = "piano-amt-v2";
 
 export class AssetsNotReadyError extends Error {}
 
@@ -61,8 +62,8 @@ interface AssetFile {
 
 const ASSET_FILES: AssetFile[] = [
     { url: META_URL, label: "频谱参数", from: 0, to: 2, contentType: "application/json" },
-    { url: MODEL_URL, label: "转录模型", from: 2, to: 40, contentType: "application/octet-stream" },
-    { url: WASM_URL, label: "推理运行时", from: 40, to: 98, contentType: "application/wasm" },
+    { url: MODEL_URL, label: "转录模型", from: 2, to: 10, contentType: "application/octet-stream" },
+    { url: WASM_URL, label: "推理运行时", from: 10, to: 98, contentType: "application/wasm" },
     { url: MJS_URL, label: "运行时加载器", from: 98, to: 100, contentType: "text/javascript" },
 ];
 

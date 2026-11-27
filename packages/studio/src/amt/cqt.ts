@@ -1,5 +1,5 @@
 /**
- * 浏览器端多速率 log-CQT（移植自 muscriptor web_demo/cqt.js）。
+ * 浏览器端多速率 log-CQT（移植自 AMT 参考实现）。
  * 每个八度先按 2^i 抽取，再用固定 128 点 FFT + librosa 稀疏基分析。
  */
 
