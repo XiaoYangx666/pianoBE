@@ -1,115 +1,137 @@
 # PianoBE
 
-**让 Minecraft 基岩版拥有一架可以实时演奏、播放 MIDI，并能搭配舞台视觉演出的钢琴。**
+**在 Minecraft 基岩版中演奏钢琴、播放 MIDI，并为音乐打造自己的舞台。**
 
-PianoBE 是一个面向 Minecraft Bedrock Edition 的钢琴附加包与配套创作工作台。你可以在游戏中弹奏钢琴、播放 MIDI 音乐、管理曲库，也可以通过插件为歌曲组合不同音色、舞台主题、粒子和特效。
+PianoBE 是一套 Minecraft Bedrock Edition 钢琴附加包与创作工具。它把可实时演奏的 3D 钢琴、MIDI 播放器、音乐存储和插件化视觉演出带进游戏；配套的 PianoBE Studio 则负责管理曲库、扩展和附加包。
 
-**[打开 PianoBE Studio](https://piano.mcxfj.top/)** · [B 站演示视频](https://www.bilibili.com/video/BV1jLD9BzE5D) · [交流群](https://qm.qq.com/q/KUgqkHM5uS) · [问题反馈](https://github.com/XiaoYangx666/pianoBE/issues)
+**[打开 PianoBE Studio](https://piano.mcxfj.top/)** · [B 站演示视频](https://www.bilibili.com/video/BV1jLD9BzE5D) · [交流群](https://qm.qq.com/q/KUgqkHM5uS) · [GitHub Issues](https://github.com/XiaoYangx666/pianoBE/issues)
 
-## PianoBE 2.0 有什么？
+![PianoBE 2.0：可实际演奏的 P-88 电子琴](docs/images/pianobe-p88-keyboard.webp)
 
-### 游戏内钢琴
+## PianoBE 2.0
 
-- 可交互的立式电子琴与三角钢琴模型，琴键可以实际演奏。
-- 支持通过游戏内面板输入音符，也可以播放 MIDI 曲目。
-- 提供五套音色：标准钢琴、经典三角钢琴、明亮三角钢琴、原声立式钢琴和复古电钢。
-- 支持力度响应、音量调节和独立的钢琴运行时。
+### 不只是一个音乐播放器
+
+PianoBE 的钢琴拥有真实的 3D 琴键。你可以直接对准琴键演奏，也可以打开钢琴面板使用文字演奏和 MIDI 播放功能。
+
+- **可演奏的钢琴**：P-88 电子琴与三角钢琴模型，琴键可交互。
+- **五套钢琴音色**：标准钢琴、经典三角钢琴、明亮三角钢琴、原声立式钢琴和复古电钢。
+- **力度响应**：根据演奏力度切换采样层并调整音量。
+- **独立运行**：每架钢琴拥有自己的播放队列和播放状态。
 
 ### MIDI 播放与音乐管理
 
-- 支持 MIDI 曲目转换为 PianoBE 使用的 PBE3 格式。
-- 提供曲库浏览、搜索、播放队列、播放列表和播放进度控制。
-- 支持暂停、继续、跳转和从曲库选择歌曲。
-- 支持音乐存储卡与游戏内导入码，方便把自定义曲目带入已有世界。
-- 支持内嵌曲库；BDS 专用包还可以连接自托管后端使用远程曲库。
+把 MIDI 曲目带进 Minecraft，使用钢琴播放和管理自己的音乐。
 
-### 插件化舞台与视觉演出
+- 支持 MIDI 转换为 PianoBE 使用的 PBE3 播放格式。
+- 曲库浏览、搜索、播放队列、播放列表和播放进度控制。
+- 支持暂停、继续、跳转和选择歌曲演出方式。
+- **音乐存储卡**：保存多首自定义歌曲，可调整顺序、整卡播放或加入队列。
+- **世界全局曲库**：管理员可以导入和管理世界共享歌曲，玩家通过钢琴浏览和播放。
+- 支持内嵌曲库；BDS 服务器专用包可以连接自托管后端使用远程曲库。
 
-PianoBE 不只是 MIDI 播放器。歌曲可以携带自己的演出编排，也可以组合公共扩展能力：
+### 插件化演出
 
-- **音色扩展**：添加不同钢琴音色与采样。
-- **视觉特效**：粒子、画笔、光效和演出特效。
-- **舞台主题**：切换舞台氛围、灯光与视觉布局。
-- **歌曲与演出**：为曲目提供专属演出，也可以只播放普通 MIDI。
-- **按需组合**：歌曲不必强制依赖某一套特效；导出时选择需要的插件即可。
+歌曲不必只是音符。PianoBE 的插件系统可以把歌曲、音色和视觉能力组合起来：
 
-### PianoBE Studio
+- **歌曲与演出**：歌曲插件可以附带自己的演出编排，也可以作为普通 MIDI 播放。
+- **视觉特效**：粒子、画笔和其他演出效果。
+- **舞台元素**：琴型、舞台道具和视觉主题。
+- **音色扩展**：按需添加钢琴音色与采样。
+- **自由组合**：歌曲不需要强制绑定某个特效插件；导出时选择需要的扩展即可。
 
-[PianoBE Studio](https://piano.mcxfj.top/) 是配套的 Web 工作台，用来准备曲库和制作附加包：
+## 游戏画面
 
-- 从官方曲包添加歌曲，或导入自己的 MIDI / PBE3 文件。
-- 管理音乐库、曲目和扩展插件。
-- 选择要导出的歌曲、音色与演出插件。
-- 自定义附加包信息并导出 `.mcaddon`。
-- 在浏览器本地进行音频转 MIDI，生成可导入游戏的曲目。
-- 生成 MIDI / PBE3 分段导入码，给已经安装的世界添加歌曲。
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/images/pianobe-player.webp" alt="玩家在游戏中演奏钢琴" width="100%">
+      <p align="center"><strong>实时演奏</strong></p>
+    </td>
+    <td width="50%">
+      <img src="docs/images/pianobe-grand-piano.webp" alt="游戏中的三角钢琴" width="100%">
+      <p align="center"><strong>三角钢琴</strong></p>
+    </td>
+  </tr>
+</table>
+
+### 舞台视觉效果
+
+![PianoBE 钢琴演出中的舞台粒子与灯光效果](docs/images/pianobe-stage-vfx.webp)
+
+## PianoBE Studio
+
+[PianoBE Studio](https://piano.mcxfj.top/) 是配套的 Web 工作台。无需手动修改附加包源码，就可以准备音乐内容、选择插件并生成游戏附加包。
+
+![PianoBE Studio 音乐库：管理歌曲、演出和导出内容](docs/images/pianobe-studio-library.webp)
+
+Studio 提供：
+
+- **音乐库**：从官方曲包添加歌曲，或导入自己的 MIDI / PBE3 文件。
+- **扩展中心**：浏览和添加歌曲、音色及视觉扩展。
+- **附加包生成**：选择歌曲与插件，自定义包信息并导出 `.mcaddon`。
+- **音乐工具**：检查 MIDI / PBE3、生成游戏内分段导入码。
+- **音频转 MIDI**：在浏览器本地运行转录模型，将音频转换为 MIDI。
 
 ## 快速开始
 
 ### 环境要求
 
 - Minecraft Bedrock Edition **26.60 或更新版本**。
-- 创建世界时开启「测试版 API」。
-- 同时启用 PianoBE 行为包与资源包。
+- 世界开启「测试版 API（Beta APIs）」。
+- 同时启用 PianoBE 行为包和资源包。
 
-### 安装与游玩
+### 安装并开始演奏
 
 1. 打开 [PianoBE Studio](https://piano.mcxfj.top/)。
-2. 在「音乐库」中选择「从官方曲包添加」，或者导入自己的 `.mid` / `.pbe3` 文件。
-3. 在「扩展中心」安装需要的音色或演出插件，然后到「附加包」页面确认内容并导出 `.mcaddon`。
-4. 使用 Minecraft 打开导出的附加包。
-5. 创建新世界，启用导入的行为包和资源包，并开启「测试版 API」。
-6. 进入世界后从创造物品栏取出钢琴，放置并交互打开面板。手动演奏可以使用面板上的输入框；播放歌曲则进入「MIDI 播放器」。
+2. 进入「音乐库」，从官方曲包添加歌曲，或导入自己的 `.mid` / `.pbe3` 文件。
+3. 按需前往「扩展中心」添加音色或演出插件。
+4. 在「附加包」页面确认内容并导出 `.mcaddon`。
+5. 使用 Minecraft 打开导出的文件，将行为包和资源包导入游戏。
+6. 创建世界，启用这两个包并开启「测试版 API」。
+7. 从创造物品栏取出钢琴并放置。对准琴键右键即可演奏；右键钢琴面板右侧的青色按钮，可以打开文字演奏和 MIDI 菜单。
 
-单机和普通联机世界使用工作台导出的内嵌曲库包即可。使用远程曲库的 BDS 专用包时，请按下方的服主指南配置后端。
+单机与普通联机世界使用 Studio 导出的客户端附加包即可。
 
-### 使用歌曲演出
+### 为已有世界添加歌曲
 
-如果歌曲带有演出编排，从「播放列表 → 添加歌曲」加入时会自动选择第一个可用演出。也可以打开歌曲详情，在「演奏方式」中选择其他演出或普通演奏。
+如果不想重新导出或安装整个附加包，可以使用分段导入码把自定义歌曲写入音乐存储卡：
 
-导出附加包前，请确认已经安装该演出所需的特效扩展。
-
-### 音频转 MIDI
-
-在 Studio 的「音乐工具」中下载转录资源，然后选择音频文件即可开始转录。推理在浏览器本地运行，资源缓存后可以重复使用。
-
-## 给已经安装的世界添加歌曲
-
-不需要重新导出整个附加包，也可以通过分段导入码给已有世界添加曲目：
-
-1. 在 Studio「音乐工具」中打开「MIDI / PBE3 检查与导入码」。
+1. 在 Studio「音乐工具」中打开 MIDI / PBE3 导入码工具。
 2. 导入文件并生成分段导入码。
-3. 在游戏中手持音乐存储卡与钢琴交互，将存储卡插入钢琴。
-4. 打开「MIDI 播放器」→「导入 MIDI」，按顺序粘贴各段导入码。
+3. 将音乐存储卡插入钢琴。
+4. 打开钢琴的「MIDI 播放器」→「导入 MIDI」，按顺序输入各段导入码。
 
-服主可以通过游戏命令 `/pbe:pbe_setting` 为普通玩家开启导入权限。
+普通玩家的导入权限由管理员控制；管理员也可以使用游戏内命令 `/pbe:pbe_library` 管理世界全局曲库。
 
 ## BDS 服务器
 
-PianoBE 提供独立的自托管后端，供服主集中管理远程曲库、插件和服务器附加包：
+如果你希望服务器统一管理曲库、插件和钢琴附加包，可以部署 PianoBE 自托管后端。
 
-- 管理远程音乐库与玩家访问令牌。
-- 管理外置插件、音色和曲目扩展。
-- 在管理页面装配并部署 BDS 专用行为包与资源包。
-- 运行服务端音频转 MIDI 任务。
-- 支持 Docker 部署，也支持 Windows / Linux 单文件服务端程序。
+后端与服务器专用附加包支持：
 
-目前 GitHub Releases 暂无预编译后端。已有后端程序的服主可以直接启动；也可以按后端指南从源码构建 Docker 镜像。
+- 远程音乐曲库和访问令牌管理。
+- 外置插件、歌曲和音色扩展管理。
+- 在管理页面装配并部署 BDS 行为包与资源包。
+- 服务端音频转 MIDI 任务。
+- Docker 部署，或 Windows / Linux 单文件服务端程序。
 
-1. 按照[服主部署指南](packages/server/README.md#服主快速开始)启动后端，并使用管理员令牌登录。
-2. 在管理页「附加包」→「BDS 部署与校验」中填写 BDS 根目录和世界名称，保存配置后部署。后端需要能够写入 BDS 目录；如果后端与 BDS 分开部署，也可以下载配套 `.mcaddon` 后手动安装。
-3. 在 BDS 的 `config/default/variables.json` 中设置 `pianoBackendUrl`，确保该地址可从 BDS 访问；在管理页创建普通令牌，并在 `config/default/secrets.json` 中将 `pianoBackendToken` 设置为 `Bearer <令牌>`。重启 BDS 后，即可从游戏内 MIDI 播放器打开远程曲库。
+**注意：BDS 服务器专用附加包使用远程曲库，不包含客户端版的内嵌曲库，因此需要同时配置 PianoBE 后端。** 还需要按指南配置 BDS 脚本权限及后端地址、令牌。
 
-详细配置见[BDS 配置示例](packages/addon/README.md#bds-配置配置文件示例)。
+- [后端部署与服主快速开始](packages/server/README.md#服主快速开始)
+- [BDS 附加包配置与远程曲库说明](packages/addon/README.md#bds-配置配置文件示例)
 
 ## 文档
 
-- [Addon 使用与 BDS 配置](packages/addon/README.md)
-- [后端部署与配置](packages/server/README.md)
-- [开发、构建与贡献指南](docs/development.md)
-- [VFX 舞台视觉系统](docs/vfx/README.md)
+| 文档 | 内容 |
+|---|---|
+| [Addon 使用说明](packages/addon/README.md) | 游戏内演奏、音乐存储、曲库、BDS 配置 |
+| [Server 后端指南](packages/server/README.md) | 后端启动、Docker、BDS 部署、令牌和 API |
+| [开发与贡献指南](docs/development.md) | 开发环境、测试、构建、仓库架构和曲库维护 |
+| [VFX 文档](docs/vfx/README.md) | 舞台视觉与特效系统 |
+| [PBE3 格式说明](docs/pbe3-format.md) | PianoBE 音乐数据格式 |
 
-## 版本与升级说明
+## 版本兼容性
 
 **PianoBE 2.0 是一次破坏性更新。**
 
@@ -117,12 +139,13 @@ PianoBE 提供独立的自托管后端，供服主集中管理远程曲库、插
 
 ## 反馈与贡献
 
-遇到安装或游玩问题时，请通过 [GitHub Issues](https://github.com/XiaoYangx666/pianoBE/issues) 反馈，并尽量附上游戏版本、设备平台、复现步骤和报错截图。
+遇到安装或游玩问题，请通过 [GitHub Issues](https://github.com/XiaoYangx666/pianoBE/issues) 反馈。建议附上 Minecraft 版本、设备平台、复现步骤和报错信息。
 
-源码构建、测试和曲库贡献方式见[开发与贡献指南](docs/development.md)。
+开发环境、测试、构建及曲库贡献方式见[开发与贡献指南](docs/development.md)。
 
 ## 许可证
 
 - **除 `packages/addon` 外的代码**（Core、Studio、Server、Web、UI 等）：[CC BY-NC 4.0](LICENSE)，允许非商业使用、修改和再分发，需保留署名；禁止商业使用。
-- **`packages/addon`**：专有软件，All Rights Reserved。仅允许最终用户安装和游玩，不得再分发、改包或复用其代码与素材。商业授权及其他授权请联系作者。详见 [Addon LICENSE](packages/addon/LICENSE)。
-- 第三方模型、音色和运行时依赖遵循各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+- **`packages/addon`**：专有软件，All Rights Reserved。仅允许最终用户安装和游玩，不得再分发、改包或复用其代码与素材。商业授权及其他授权请联系作者，详见 [Addon LICENSE](packages/addon/LICENSE)。
+- 第三方模型与运行时依赖遵循各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+- 钢琴采样的来源与授权见 [Addon 音频素材声明](packages/addon/rp/THIRD_PARTY_NOTICES.md)。
