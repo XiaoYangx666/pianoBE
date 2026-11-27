@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -68,13 +69,19 @@ async function main() {
     const started = Date.now();
     console.log(`[check] Mode: ${fastMode ? "fast (typecheck + unit tests)" : "full (parallel build, pack & verify)"}`);
 
-    // Phase 1: Workspace libraries in topological order
+    // 并发上限：留一半核心给系统，核心多的机器不要一次开太多 tsc/bun
+    const parallel = Math.max(2, Math.min(8, Math.floor(cpus().length / 2)));
+
+    // Phase 1: core 先行，其余 workspace 库并行（都只依赖 core 的 dist）
     await runStep("Build @piano/core", tscBin, ["-p", "packages/core/tsconfig.json"]);
-    await runStep("Build @piano/vfx", tscBin, ["-p", "packages/vfx/tsconfig.json"]);
-    await Promise.all([
-        runStep("Build @piano/plugins", tscBin, ["-p", "plugins/tsconfig.json"]),
-        runStep("Build @piano/assembly", tscBin, ["-p", "packages/assembly/tsconfig.json"]),
-    ]);
+    await runPool(
+        [
+            () => runStep("Build @piano/vfx", tscBin, ["-p", "packages/vfx/tsconfig.json"]),
+            () => runStep("Build @piano/plugins", tscBin, ["-p", "plugins/tsconfig.json"]),
+            () => runStep("Build @piano/assembly", tscBin, ["-p", "packages/assembly/tsconfig.json"]),
+        ],
+        3,
+    );
 
     // Phase 2: Typechecks, VFX/plugin packing & addon builds (capped concurrency prevents CPU starvation)
     const phase2 = [
@@ -98,6 +105,10 @@ async function main() {
                     runStep("Pack official timbres", "bun", ["tools/plugins/pack-official-timbres.mjs"]),
                 ]);
                 await runStep("Validate all .pbeplugin archives", "bun", ["tools/plugins/validate-plugin.mjs", "--all"]);
+            },
+            async () => {
+                await runStep("Sync @piano/studio assets", "bun", ["scripts/sync.mjs"], studioDir);
+                await runStep("Build @piano/studio", viteBin, ["build"], studioDir);
             },
             async () => {
                 await Promise.all([
@@ -133,12 +144,12 @@ async function main() {
         );
     }
 
-    await runPool(phase2, 4);
+    await runPool(phase2, parallel);
 
     // Run CPU-intensive VFX simulation suite uncontended so multi-minute songs stay within default 5s timeout
     await runStep("Test @piano/vfx", "bun", ["test"], vfxDir);
 
-    // Phase 3: Unit/integration tests & downstream builds
+    // Phase 3: 单元/集成测试（studio 的构建已挪到 phase2，和 addon 打包并行）
     const phase3 = [
         () => runStep("Test @piano/assembly", "bun", ["test"], assemblyDir),
         () => runStep("Test @piano/server", "bun", ["test"], serverDir),
@@ -152,15 +163,11 @@ async function main() {
             () => runStep("Test @piano/studio", "bun", ["test"], studioDir),
         );
         phase3.push(
-            async () => {
-                await runStep("Sync @piano/studio assets", "bun", ["scripts/sync.mjs"], studioDir);
-                await runStep("Build @piano/studio", viteBin, ["build"], studioDir);
-            },
             () => runStep("Verify exported VFX stage props", "bun", ["tools/verify/verify-stage-props.mjs"]),
         );
     }
 
-    await runPool(phase3, 3);
+    await runPool(phase3, parallel);
     console.log(`\n[check] All checks passed in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 }
 
