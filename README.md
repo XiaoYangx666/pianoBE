@@ -253,7 +253,7 @@ docker compose -f docker-compose.dev.yml up
 | `packages/addon/bp/scripts/packages/addon/src/midis/` | 客户端构建直接从公共曲库生成的运行时模块 | 不入库 |
 | `midis/library/` | PBE3 曲库 `<id>.pbe3` + `index.json` + 人工分类表 `genres.json` | **入库**（生成器数据源） |
 
-原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run midi -- convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。
+原始 MIDI 不在仓库中，因此**新增曲目必须使用增量命令**（全量转换 `npm run midi -- convert` 会以本机 `midis/files` 为准重写曲库，仅适合持有完整源文件的本地维护）。例外是 `tools/verify/fixtures/` 下的两首固定样例，只用于生成器端到端验证。
 
 ### 添加歌曲
 

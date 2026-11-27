@@ -2,6 +2,7 @@
  * 生成器端到端验证（无浏览器）：bun tools/verify-generator.mjs
  * 真实流程：读取 addon 构建产物 template.mcaddon → 解析模板 →
  * 转换真实 .mid → 生成最终 mcaddon → 解包断言（含 PBE3 回读闭环）。
+ * 样例 MIDI 随仓库提交在 tools/verify/fixtures/（midis/files/ 本身不入库）。
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { unzipSync, zipSync } from "fflate";
@@ -35,8 +36,10 @@ import {
 
 const TEMPLATE = "packages/addon/dist/template.mcaddon";
 const BARE_TEMPLATE = TEMPLATE;
-const MIDI_A = "midis/files/Beyond - 海阔天空.mid";
-const MIDI_B = "midis/files/ChiliChill - 让风告诉你.mid";
+// 验证用的固定样例（随仓库提交，见 fixtures/README.md）。
+// 不读 midis/files/：那里是本地原始 MIDI，被 gitignore。
+const MIDI_A = "tools/verify/fixtures/Beyond - 海阔天空.mid";
+const MIDI_B = "tools/verify/fixtures/ChiliChill - 让风告诉你.mid";
 
 let failed = 0;
 async function storedZip(input) {
@@ -53,13 +56,18 @@ function assert(cond, msg) {
     }
 }
 
+/** 验证用固定样例 MIDI 的字节 */
+function readFixture(file) {
+    return new Uint8Array(readFileSync(file));
+}
+
 // 1. 默认模板：模板模式跳过 midi 拷贝，无内嵌曲目
 const templateInfo = await loadAddonTemplate(await storedZip(readFileSync(TEMPLATE)));
 assert(templateInfo.songs.length === 0, "默认模板无内嵌曲目（模板模式跳过 midi 拷贝）");
 assert(templateInfo.bpManifest.header?.name, "bp manifest 解析成功");
 
 // 2. 构造"含内嵌曲目的模板"：注入曲目 A 的 PBE3 模块 + index
-const songA = midiBufferToSong(new Uint8Array(readFileSync(MIDI_A)), "Beyond - 海阔天空");
+const songA = midiBufferToSong(readFixture(MIDI_A), "Beyond - 海阔天空");
 assert(songA.id === "4beea226", `曲目 A 转换 id 正确：${songA.id}`);
 const pbe3A = encodePbe3(songA);
 const moduleA = pbe3ToAddonModule(pbe3A);
@@ -76,7 +84,7 @@ const embEvents = songToNoteEvents(embTemplate.songs[0].data);
 assert(embEvents.length > 0, `内嵌曲目可从 PBE3 转为试听事件：${embEvents.length} 个`);
 
 // 3. 添加新曲目 B，导出
-const songB = midiBufferToSong(new Uint8Array(readFileSync(MIDI_B)), "ChiliChill - 让风告诉你");
+const songB = midiBufferToSong(readFixture(MIDI_B), "ChiliChill - 让风告诉你");
 const pbe3B = encodePbe3(songB);
 const songs = [
     ...embTemplate.songs,

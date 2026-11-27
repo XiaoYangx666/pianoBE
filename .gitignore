@@ -22,6 +22,8 @@ packages/*/data
 packages/studio/public
 .env
 *.mid
+# 生成器端到端验证的固定样例（见 tools/verify/fixtures/README.md）
+!tools/verify/fixtures/*.mid
 *.mcaddon
 # 私有依赖 @begame/tabletop，构建前用 npm run vendor:tabletop 生成（见 vendor/README.md）
 vendor/*.tgz
