@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { compilePerformanceSource, readSongHeader, setDiagnosticSink, toMusicSelection, type MidiSongMeta } from "@piano/core";
 import { MidiManager } from "../src/domain/playback/midiManager";
 import { MidiPlayer } from "../src/domain/playback/player";
-import { PLAYBACK_BUDGET_BYTES, PlaybackStore } from "../src/platform/storage/playbackStore";
+import { PLAYBACK_BUDGET_BYTES } from "../src/domain/playback/playbackBudget";
+import { PlaybackStore } from "../src/platform/storage/playbackStore";
 import { storageRef } from "../src/domain/music/storage";
 
 mock.module("@minecraft/server", () => ({
@@ -197,6 +198,41 @@ describe("PianoDisplay lifecycle", () => {
 
         expect(PianoDisplay.recover(location, point).playback).toBeUndefined();
         expect(entity.getDynamicPropertyIds()).toEqual([ANCHOR, "pbe:playback_v10"]);
+    });
+
+    test("removes malformed playback and recovers the display even if one legacy key cannot be removed", () => {
+        const { entities, location, point } = fixture();
+        const entity = new FakeEntity("invalid");
+        const blocked = "pbe:playback_v1:0:0";
+        const removable = "pbe:playback_v1:0:1";
+        entity.dynamicProperties.set(ANCHOR, location.pos);
+        entity.dynamicProperties.set(SETTINGS, JSON.stringify({ volume: 42 }));
+        entity.dynamicProperties.set(PLAYBACK, "{");
+        entity.dynamicProperties.set(blocked, "legacy");
+        entity.dynamicProperties.set(removable, "legacy");
+        const write = entity.setDynamicProperty.bind(entity);
+        entity.setDynamicProperty = (key, value) => {
+            if (key === blocked) throw new Error("legacy cleanup failed");
+            write(key, value);
+        };
+        entities.push(entity);
+
+        const warn = mock(() => {});
+        setDiagnosticSink(warn);
+        try {
+            const display = PianoDisplay.recover(location, point);
+            expect(display.playback).toBeUndefined();
+            expect(display.settings.volume).toBe(42);
+            expect(entity.getDynamicPropertyIds()).toEqual([ANCHOR, SETTINGS, blocked]);
+            expect(warn).toHaveBeenCalledTimes(2);
+
+            entity.setDynamicProperty = write;
+            expect(PianoDisplay.recover(location, point).playback).toBeUndefined();
+            expect(entity.getDynamicPropertyIds()).toEqual([ANCHOR, SETTINGS]);
+            expect(warn).toHaveBeenCalledTimes(2);
+        } finally {
+            setDiagnosticSink(undefined);
+        }
     });
 
     test("display type follows the instrument definition", () => {

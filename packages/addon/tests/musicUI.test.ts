@@ -436,14 +436,14 @@ describe("播放队列页面", () => {
         expect((host.nav.pushed.at(-1)!.args as any).mode).toBe("add");
     });
 
-    test("歌曲操作页可以跳转到队列中的歌曲并播放", async () => {
-        const { piano, midi } = makePiano();
+    test.each([true, false])("未索引的远程曲目可尝试跳转播放（播放成功 %s）", async (started) => {
+        const { piano, midi } = makePiano({ music: { availability: () => "unknown" } });
         const ref = { id: "q1", name: "队列歌", duration: 800, source: "library" as const, performanceId: "default" };
         midi.queue.enqueue(ref);
         let played: any;
         piano.getMidiPlayer = () => ({
             queue: midi.queue,
-            getInfo: () => ({ state: "playing" }),
+            isPlaying: () => started,
             playNow: (target: any) => { played = target; return Promise.resolve(); },
         });
 
@@ -454,7 +454,8 @@ describe("播放队列页面", () => {
         host.lastForm().click("▶ 跳转播放");
         await settle();
         expect(played?.id).toBe("q1");
-        expect(host.lastForm().labelTexts().some(text => text.includes("已跳转并开始播放"))).toBe(true);
+        const message = started ? "§a已跳转并开始播放" : "§c未能播放这首曲目";
+        expect(host.lastForm().labelTexts()).toContain(message);
     });
 });
 

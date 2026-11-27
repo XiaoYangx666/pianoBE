@@ -78,7 +78,8 @@ export const MusicCardPage = DDUI.page<MusicCardArgs>("音乐存储卡", (ui, ar
         const refs = cardRefs();
         if (!refs) return status.setData("§e存储卡里还没有歌曲");
         const result = piano.getMidiPlayer().addCollectionToQueue(refs);
-        status.setData(`§a已加入 §f${result.added} §a首，队列中已有 §f${result.exists} §a首`);
+        const suffix = result.full ? " §e（队列已满）" : "";
+        status.setData(`§a已加入 §f${result.added} §a首，队列中已有 §f${result.exists} §a首${suffix}`);
     }, { visible: hasSongs });
 
     ui.button("调整歌曲顺序", () => {

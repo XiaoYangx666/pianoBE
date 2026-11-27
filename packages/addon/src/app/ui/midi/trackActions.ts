@@ -128,6 +128,7 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
     ui.button("＋ 加入播放队列", () => {
         if (!alive()) return ui.close();
         const result = piano.getMidiPlayer().addToQueue(chosen());
+        if (result === "full") return status.setData("§e播放队列已满");
         status.setData(result === "added" ? "§a已加入播放队列" : "§e队列中已有这首歌");
     });
 
@@ -152,17 +153,17 @@ export const TrackActionsPage = DDUI.page<TrackActionArgs>("歌曲详情", (ui, 
                 .then(([bytes, cues]) => {
                     if (!bytes) throw new Error("源曲目已不可用");
                     const storage = card.storage();
-                if (opt.id === "default" && storage.has(readSongHeader(bytes).id)) {
-                    status.setData("§e卡里已有这首歌");
-                    return;
-                }
+                    if (opt.id === "default" && storage.has(readSongHeader(bytes).id)) {
+                        status.setData("§e卡里已有这首歌");
+                        return;
+                    }
                     const selected = opt.id === "plain"
                         ? attachSongPerformance(bytes, [])
                         : cues
                           ? attachSongPerformance(bytes, cues)
                           : bytes;
                     const entry = storage.save(selected, ref.name, {
-                    id: opt.id === "default" ? undefined : opt.id,
+                        id: opt.id === "default" ? undefined : opt.id,
                         name: opt.name,
                         author: opt.author,
                     });

@@ -1,6 +1,8 @@
 import { sameMusicSelection, toMusicSelection, type MusicSelection } from "@piano/core";
+import { fitsPlaybackBudget } from "./playbackBudget";
 
 export type PlayMode = "sequence" | "loop" | "single" | "shuffle";
+export type QueueAddResult = "added" | "exists" | "full";
 
 const modeName: Record<PlayMode, string> = {
     sequence: "顺序播放",
@@ -51,41 +53,39 @@ export class PlayQueue {
     /**
      * 插入当前后面并立即跳转
      */
-    insertBack(midi: MusicSelection): MusicSelection {
+    insertBack(midi: MusicSelection): boolean {
         const selection = toMusicSelection(midi, midi.performanceId);
+        if (!fitsPlaybackBudget([...this.list, selection])) return false;
         if (this.index === -1) {
             this.list.push(selection);
             this.index = 0;
-            return selection;
+            return true;
         }
-
         const insertIndex = Math.min(this.list.length, this.index + 1);
         this.list.splice(insertIndex, 0, selection);
         this.index = insertIndex;
-        return selection;
+        return true;
     }
 
     /**
      * 普通加入队列（尾部）
      */
-    enqueue(midi: MusicSelection): MusicSelection | undefined {
-        this.list.push(toMusicSelection(midi, midi.performanceId));
-
-        if (this.index === -1) {
-            this.index = 0;
-            return this.list[0];
-        }
+    enqueue(midi: MusicSelection): boolean {
+        const selection = toMusicSelection(midi, midi.performanceId);
+        if (!fitsPlaybackBudget([...this.list, selection])) return false;
+        this.list.push(selection);
+        if (this.index === -1) this.index = 0;
+        return true;
     }
 
     /** 去重加入尾部；已存在时不产生第二条。 */
-    enqueueUnique(midi: MusicSelection): "added" | "exists" {
+    enqueueUnique(midi: MusicSelection): QueueAddResult {
         if (this.indexOf(midi) >= 0) return "exists";
-        this.enqueue(midi);
-        return "added";
+        return this.enqueue(midi) ? "added" : "full";
     }
 
     /** 在当前曲目之后插入整组歌曲并跳到第一首；其余歌曲保留在后面。 */
-    insertCollectionAfterCurrent(refs: readonly MusicSelection[]): { added: number; exists: number } {
+    insertCollectionAfterCurrent(refs: readonly MusicSelection[]): { added: number; exists: number } | undefined {
         const unique: MusicSelection[] = [];
         for (const ref of refs) {
             if (!unique.some(item => sameMusicSelection(item, ref))) unique.push(toMusicSelection(ref, ref.performanceId));
@@ -107,6 +107,7 @@ export class PlayQueue {
         }
         const insertAt = originalInsertAt - removedBefore;
         kept.splice(insertAt, 0, ...unique);
+        if (!fitsPlaybackBudget(kept)) return;
         this.list = kept;
         this.index = insertAt;
         return { added: unique.length - exists, exists };

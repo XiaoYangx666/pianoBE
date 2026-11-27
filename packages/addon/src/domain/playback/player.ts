@@ -2,7 +2,7 @@ import { processNote } from "@domain/util/note";
 import { Signal } from "@domain/util/signal";
 import { createSongCursor, readLoadedSongNotes, SCHEDULE_LEAD_TICKS, TIME_SCALE, computeNormalizationGainDbFromNotes, isDefaultPerformanceSelection, reportDiagnostic, type MusicSelection, type SongHandle, type PerformanceCue } from "@piano/core";
 import { NoteInfo } from "@domain/types";
-import { PlayQueue } from "./queue";
+import { PlayQueue, type QueueAddResult } from "./queue";
 import type { PlaybackRecord } from "@domain/playback/playbackRecord";
 import type { PianoTransportEvent } from "./visualEvent";
 
@@ -162,20 +162,22 @@ export class MidiPlayer {
         if (this.queue.current()) await this.play();
     }
 
-    /** 加入队列（去重）；返回是否真的新增。 */
-    addToQueue(ref: MusicSelection): "added" | "exists" {
+    /** 加入队列（去重）。 */
+    addToQueue(ref: MusicSelection): QueueAddResult {
         return this.queue.enqueueUnique(ref);
     }
 
-    /** 按给定顺序把一组曲目加入队列；重复项自动跳过。 */
-    addCollectionToQueue(refs: readonly MusicSelection[]): { added: number; exists: number } {
+    /** 按顺序加入、跳过重复项，队满时停止。 */
+    addCollectionToQueue(refs: readonly MusicSelection[]): { added: number; exists: number; full: boolean } {
         let added = 0;
         let exists = 0;
         for (const ref of refs) {
-            if (this.addToQueue(ref) === "added") added++;
+            const result = this.addToQueue(ref);
+            if (result === "full") return { added, exists, full: true };
+            if (result === "added") added++;
             else exists++;
         }
-        return { added, exists };
+        return { added, exists, full: false };
     }
 
     /**
@@ -187,7 +189,7 @@ export class MidiPlayer {
     async playNow(ref: MusicSelection) {
         const existing = this.queue.indexOf(ref);
         if (existing >= 0) this.queue.jump(existing);
-        else this.queue.insertBack(ref);
+        else if (!this.queue.insertBack(ref)) throw new Error("播放队列已满");
         await this.play();
     }
 
@@ -195,6 +197,7 @@ export class MidiPlayer {
     async playCollection(refs: readonly MusicSelection[]): Promise<{ added: number; exists: number } | undefined> {
         if (!refs.length) return undefined;
         const result = this.queue.insertCollectionAfterCurrent(refs);
+        if (!result) throw new Error("播放队列无法容纳整张存储卡");
         await this.play();
         return result;
     }

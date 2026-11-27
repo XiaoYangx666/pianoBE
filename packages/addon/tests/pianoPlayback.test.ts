@@ -11,6 +11,7 @@ import {
     type SongHandle,
     type PerformanceCue,
 } from "@piano/core";
+import { PLAYBACK_BUDGET_BYTES } from "../src/domain/playback/playbackBudget";
 import { readPlaybackRecord, serializePlaybackRecord } from "../src/domain/playback/playbackRecord";
 import type { PianoTransportEvent } from "../src/domain/playback/visualEvent";
 
@@ -153,6 +154,29 @@ test("removing the current track stops playback and leaves the remaining queue r
     midi.addToQueue(next);
     expect(midi.removeFromQueue(song)).toBe(true);
     expect(midi.checkpoint()).toEqual({ songs: [next], index: 0, mode: "sequence", state: "idle", seconds: 0 });
+});
+
+test("a full queue rejects new songs without interrupting playback or changing the saved queue", async () => {
+    const { midi, stopNotes } = fixture();
+    const first = { ...song, name: "火".repeat(4_000) };
+    const second = { ...song, id: "second", name: "花".repeat(4_000) };
+    const extra = { ...song, id: "extra", name: "🎹".repeat(200) };
+    await midi.playNow(first);
+    expect(midi.addCollectionToQueue([second, extra])).toEqual({ added: 1, exists: 0, full: true });
+    const record = midi.checkpoint()!;
+    expect(record.songs).toEqual([first, second]);
+    const raw = serializePlaybackRecord({ ...record, seconds: Number.MAX_VALUE });
+    expect(Buffer.byteLength(raw!)).toBeLessThanOrEqual(PLAYBACK_BUDGET_BYTES);
+
+    expect(midi.addToQueue(first)).toBe("exists");
+    expect(midi.addToQueue(extra)).toBe("full");
+    await expect(midi.playNow(extra)).rejects.toThrow("播放队列已满");
+    await expect(midi.playCollection([second, extra])).rejects.toThrow("播放队列无法容纳整张存储卡");
+    expect(midi.checkpoint()).toEqual(record);
+    expect(stopNotes).toHaveBeenCalledTimes(1);
+
+    expect(midi.removeFromQueue(second)).toBe(true);
+    expect(midi.addToQueue(extra)).toBe("added");
 });
 
 test("playback checkpoints keep performance selection without copying cue data", () => {
@@ -375,7 +399,7 @@ test("整卡加入队列不中断播放，并按去重结果统计", () => {
         { id: "a", name: "A", duration: 40, source: "card" as const, performanceId: "default", cardUid: "c1", checksum: "11" },
     ];
     const result = midi.addCollectionToQueue(refs);
-    expect(result).toEqual({ added: 2, exists: 1 });
+    expect(result).toEqual({ added: 2, exists: 1, full: false });
     expect(midi.queue.getRefs().map(ref => ref.id)).toEqual(["current", "a", "b"]);
     expect(midi.queue.getIndex()).toBe(0);
 });

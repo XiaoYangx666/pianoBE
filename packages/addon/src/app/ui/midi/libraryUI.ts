@@ -240,6 +240,10 @@ export const MusicLibraryPage = DDUI.page<LibraryArgs>("音乐曲库", (ui, args
                 if (!ref || !piano.isAlive()) return;
                 if (mode === "add") {
                     const result = piano.getMidiPlayer().addToQueue(withDefaultQueuePerformance(piano, ref));
+                    if (result === "full") {
+                        notice.setData("§e播放队列已满");
+                        return;
+                    }
                     notice.setData(result === "added" ? `§a已加入队列：§f${ref.name}` : `§e队列中已有：§f${ref.name}`);
                     renderLabels();
                     return;

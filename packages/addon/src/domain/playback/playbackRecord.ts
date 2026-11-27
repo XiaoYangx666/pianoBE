@@ -13,6 +13,7 @@ interface PersistedPlayback extends PlaybackRecord {
     v: 1;
 }
 
+// 这是 v1 的存档契约。更改持久化字段时同时检查写入投影和读取校验。
 const RECORD_FIELDS = new Set(["v", "songs", "index", "mode", "state", "seconds"]);
 const SELECTION_FIELDS = new Set([
     "id", "name", "duration", "source", "performanceId", "noteCount", "bytes", "checksum", "cardUid",
