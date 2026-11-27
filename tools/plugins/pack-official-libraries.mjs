@@ -90,7 +90,7 @@ function buildPackArchive({
         name: pluginName,
         version: "1.0.0",
         apiVersion: VFX_API_VERSION,
-        minPianoBeVersion: "1.3.0",
+        minPianoBeVersion: "2.0.0",
         capabilities,
         author: "PianoBE",
         license: "CC-BY-NC-4.0",

@@ -3,7 +3,8 @@ name: Music storage regression
 on:
   push:
     branches:
-      - feature/addon-overhaul
+      - main
+      - overhaul
     paths:
       - ".github/workflows/music-storage.yml"
       - "packages/addon/src/**"

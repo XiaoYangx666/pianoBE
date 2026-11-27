@@ -3,7 +3,8 @@ name: DDUI regression
 on:
   push:
     branches:
-      - feature/addon-overhaul
+      - main
+      - overhaul
     paths:
       - ".github/workflows/dd-ui.yml"
       - "packages/addon/src/**"

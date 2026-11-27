@@ -3,7 +3,7 @@
     "name": "PianoBE 国风",
     "version": "1.1.3",
     "apiVersion": "1.0.0",
-    "minPianoBeVersion": "1.3.0",
+    "minPianoBeVersion": "2.0.0",
     "capabilities": ["vfx", "vfx.stageProps"],
     "visibility": "internal",
     "author": "PianoBE",

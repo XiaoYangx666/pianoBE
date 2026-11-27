@@ -92,7 +92,7 @@ export function packOfficialTimbres() {
             name: meta.name,
             version: "1.0.0",
             apiVersion: "1.0.0",
-            minPianoBeVersion: "1.3.0",
+            minPianoBeVersion: "2.0.0",
             capabilities: ["audio.timbres"],
             visibility: "public",
             author: meta.author,
