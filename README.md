@@ -172,7 +172,7 @@ npm run start:server                   # http://127.0.0.1:3000，目录为 plugi
 
 ### 音频转 MIDI（AMT）资源
 
-服务端转录依赖 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription) 的运行时，现已发布为 npm 包 [`amt-cli`](https://www.npmjs.com/package/amt-cli)：主包（启动器 + int8 模型）通过 `optionalDependencies` 按平台拉取 `@xiaoyangx666/amt-cli-{linux,win32}-x64`，只下载当前平台的二进制与 ONNX Runtime（解压后约 40 MB）。`@piano/server` 直接声明该依赖，`npm install` 后即可用，不需要再单独同步：
+服务端转录依赖 [Automated-Music-Transcription](https://github.com/gityag/Automated-Music-Transcription) 的运行时，现已发布为 npm 包 [`amt-cli`](https://www.npmjs.com/package/amt-cli)（当前固定 `0.1.1`）：主包（启动器 + int8 模型）通过 `optionalDependencies` 按平台拉取 `@xiaoyangx666/amt-cli-{linux,win32}-x64`，只下载当前平台的二进制与 ONNX Runtime（解压后约 40 MB）。`@piano/server` 直接声明该依赖，`npm install` 后即可用，不需要再单独同步：
 
 ```bash
 npm install            # 安装 workspace 依赖（含 amt-cli）
@@ -182,7 +182,7 @@ npm run start:server
 
 后端按 `process.platform-process.arch` 自动选择包内二进制（`linux-x64` / `win32-x64`）与 `models/run4_int8.onnx`；npm tarball 不保留普通文件的执行位，首次解析时会自动补 `chmod +x`。也可用 `AMT_CLI` / `AMT_MODEL` 覆盖（例如指向本地 cargo 构建的二进制）。Docker 镜像构建时由 `bun install --production` 自动下载，无需预置任何文件。
 
-浏览器端转录使用 `packages/studio/public/amt/` 下的 fp16 模型与 ONNX Runtime WASM，仍由 `packages/studio/scripts/sync.mjs` 从本地 AMT 仓库（`AMT_DIR`）复制；缺失时页面只显示「AMT 不可用」，不影响其他功能。
+浏览器端转录与服务端同源：直接使用 `amt-cli` 包内的 `run4_int8.onnx`，CQT 参数取自仓库内的 `assets/amt/cqt_meta.json`，不再依赖外部 AMT 仓库或 `AMT_DIR`。`npm run build:studio` 会在 `packages/studio/public/amt/` 下准备好模型、`cqt_meta.json` 与 ONNX Runtime WASM；缺少模型时构建直接失败，不会静默产出没有转录能力的页面。
 
 > 模型权重来自 gityag/AMT，为 **CC BY-NC 4.0，仅限非商业使用**。随 release 或镜像
 > 分发模型时，请一并提供 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 中的署名
