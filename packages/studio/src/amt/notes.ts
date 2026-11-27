@@ -7,19 +7,20 @@ export interface AmtNote {
     velocity: number;
 }
 
-/** 与 web_demo/demo.js 完全一致的阈值/峰值提取逻辑 */
+/** 与 AMT 参考实现一致的阈值/峰值提取逻辑 */
 export function decodeNotes(
     frame: Float32Array,
     onset: Float32Array,
     meta: CqtMeta,
     frames: number
 ): AmtNote[] {
-    const { n_bins, fs, pitch_low, frame_thr, onset_thr, min_frames } = meta;
+    const { n_bins, fs, hop, pitch_low, frame_thr, onset_thr, min_frames } = meta;
+    const frameSeconds = hop / fs;
     const active = new Uint8Array(n_bins * frames);
     for (let i = 0; i < active.length; i++) active[i] = frame[i] >= frame_thr ? 1 : 0;
 
     const notes: AmtNote[] = [];
-    const minLength = min_frames / fs;
+    const minLength = min_frames * frameSeconds;
     for (let row = 0; row < n_bins; row++) {
         const pitch = row + pitch_low;
         const offset = row * frames;
@@ -38,8 +39,8 @@ export function decodeNotes(
             const next = i + 1 < onsets.length ? onsets[i + 1] : frames;
             let end = start + 1;
             while (end < next && active[offset + end]) end++;
-            const startSeconds = start / fs;
-            const endSeconds = end / fs;
+            const startSeconds = start * frameSeconds;
+            const endSeconds = end * frameSeconds;
             if (endSeconds - startSeconds >= minLength - 1e-9) {
                 notes.push({ pitch, start: startSeconds, end: endSeconds, velocity: 100 });
             }
@@ -64,7 +65,7 @@ function writeVarLen(target: number[], value: number) {
 
 /**
  * 单轨 SMF：division 480，配合 960 ticks/s 正好是默认 120 BPM。
- * 与 web_demo 的输出保持一致，@piano/core 可直接解析。
+ * 与 AMT 参考实现的输出保持一致，@piano/core 可直接解析。
  */
 export function notesToMidi(notes: AmtNote[]): Uint8Array {
     const TICKS_PER_SECOND = 960;
