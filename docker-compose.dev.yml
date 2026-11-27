@@ -1,9 +1,11 @@
 # 开发配置：直接挂载本地代码与构建产物，改代码即生效（无需重建镜像）。
-# 用法：docker compose -f docker-compose.dev.yml up
-# 前置：本地构建 core/web（npm run build:core && npm run build:web），改 core/web 后需重新 build
+# 先运行 npm run build:release，再运行 docker compose -f docker-compose.dev.yml up --build。
 services:
     server:
         image: pianobe-server:latest
+        build:
+            context: .
+            dockerfile: Dockerfile
         ports:
             - "35050:3000"
         environment:
@@ -20,6 +22,8 @@ services:
         volumes:
             # 本地源码热重载（bun --watch）
             - ./packages/server/src:/app/packages/server/src
+            - ./packages/vfx/src:/app/packages/vfx/src
+            - ./packages/assembly/src:/app/packages/assembly/src
             # 本地构建产物（改 core/vfx/assembly/studio 后 npm run build:* 生效）
             - ./packages/core/dist:/app/packages/core/dist
             - ./packages/vfx/dist:/app/packages/vfx/dist

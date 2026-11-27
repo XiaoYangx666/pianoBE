@@ -1,5 +1,5 @@
-import { RuntimeScope } from "@begame/tabletop";
-import { createMinecraftRuntime, createMinecraftPlatform, createMinecraftTextPort, type MinecraftEventHost } from "@begame/tabletop/minecraft";
+import { RuntimeScope } from "@begame/minecraft/scope";
+import { createMinecraftRuntime, createMinecraftPlatform, createMinecraftTextPort, type MinecraftEventHost } from "@begame/minecraft";
 import { system, world, TextPrimitive } from "@minecraft/server";
 import { reportPianoError } from "@runtime/scope";
 

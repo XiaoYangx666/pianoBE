@@ -1,5 +1,5 @@
 import { reportDiagnostic } from "@piano/core";
-import { reconcileEntityTransform, releaseVisual } from "@begame/tabletop/minecraft";
+import { reconcileEntityTransform, releaseVisual } from "@begame/minecraft";
 import { Entity, EntityComponentTypes, Vector3, system } from "@minecraft/server";
 import type { InstrumentLocation } from "@platform/instrumentLocation";
 import type { Cardinal_Direction } from "@domain/types";

@@ -1,10 +1,20 @@
 # @piano/server — PianoBE 后端曲库管理服务
 
-Hono + bun:sqlite 的单进程服务：托管 API、前端管理页（同源，免 CORS）与 Docker 部署。
+PianoBE 后端提供远程曲库、扩展管理和 BDS 附加包部署。
+
+## 服主快速开始
+
+如果你已有 PianoBE 服务端可执行文件，把它放进一个单独的目录并从该目录启动。Windows 在 PowerShell 执行 `.\pianobe-server-win32-x64.exe`，Linux x64 执行 `./pianobe-server-linux-x64`。也可以按 [Docker 部署](#docker-部署) 构建并启动容器。
+
+1. 打开 `http://localhost:3000`（Docker 源码镜像使用端口 `35050`）。从另一台设备访问时，将 `localhost` 换成后端地址。
+2. 使用管理员令牌登录。首次启动没有预设 `BOOTSTRAP_TOKEN` 时，单文件版令牌写在运行目录下的 `data/bootstrap-token.txt`，Docker 源码镜像的宿主机路径为 `packages/server/data/bootstrap-token.txt`。
+3. 在「音乐库」导入曲目，再到「附加包」→「BDS 部署与校验」安装配套附加包。后端可读写 BDS 目录时，可在页面配置路径并直接部署。跨机器部署时，可下载配套 `.mcaddon` 后手动安装。
+4. 按 [BDS 配置示例](../addon/README.md#bds-配置配置文件示例) 设置后端地址、令牌和脚本权限，再重启 BDS。
 
 ## 快速开始（本地源码运行）
 
 ```bash
+# 从仓库根目录执行。依赖准备见开发指南。
 # 构建共享库与服务器版前端
 npm run build:core
 npm run build:vfx
@@ -13,9 +23,11 @@ npm run build:studio:server
 
 # 本地运行（--dir 可指定运行根目录；不传则以当前目录作为运行根目录）
 cd packages/server
+# 在运行目录 ./run/.env 写入 WEB_ROOT=../studio/dist-server
 bun src/index.ts --dir ./run
-# 或：npm run start:server
 ```
+
+完整安装前请准备 [开发依赖](../../docs/development.md#环境与首次安装)。`WEB_ROOT` 相对于启动命令的工作目录解析，所以从 `packages/server` 启动时使用 `../studio/dist-server`。如果改用 `npm run start:server` 且省略 `--dir`，将同一设置写在 `packages/server/.env`。
 
 > 配置读取运行目录 `.env`（或环境变量，见仓库根 `.env.example`），bun 启动时自动加载。
 > 首次启动未设置 `BOOTSTRAP_TOKEN` 时，会自动生成一个管理员令牌并写入 `data/bootstrap-token.txt`（权限 600）；
@@ -41,17 +53,15 @@ bun src/index.ts --dir ./run
 
 ## Docker 部署
 
+此配置从源码构建镜像。请在仓库根目录执行以下命令。
+
 ```bash
-# 根目录 compose（Dockerfile / docker-compose.yml / .env 均在仓库根）。
-# 镜像构建时在容器内编译 core/web 产物，无需本地预构建；
-# AMT（音频转录）由 npm 依赖 amt-cli 在构建时自动下载，无需预先同步。
-docker compose up -d
+docker compose up -d --build
 # 访问 http://<host>:35050（对外映射 35050 → 容器内 3000）
 # 数据落在 ./packages/server/data/（挂载卷），忘记令牌改 .env 重启即可重置
-
-# Docker 开发模式（热重载，挂载本地源码/产物）
-docker compose -f docker-compose.dev.yml up
 ```
+
+在容器中使用「部署到 BDS」需要将宿主机 BDS 目录以可写方式挂载到容器，并在页面填写容器内路径。也可在页面下载配套包进行手动安装。[Docker 热重载开发说明](../../docs/development.md#docker-开发环境)。
 
 > 运行阶段是 Debian（glibc），`bun install --production` 会安装 `amt-cli`
 > （Linux x64 二进制 + `libonnxruntime.so` + int8 模型）；安装失败时镜像仍可构建，
@@ -189,7 +199,7 @@ docker compose -f docker-compose.single.yml up -d
 ```bash
 npm run deploy:bds                      # 构建 + 本地直接部署
 npm run deploy:bds -- --skip-build      # 复用 packages/addon/dist/server.mcaddon
-npm run deploy:bds -- --file <mcaddon>  # 指定其他产物
+npm run deploy:bds -- --file <mcaddon>  # 直接使用指定的服务器包
 npm run deploy:bds -- --url http://host:35050 --token <admin 令牌>   # 远端后端（走 HTTP）
 ```
 
@@ -309,5 +319,6 @@ docker logs --tail 200 <container>              # 控制台镜像（与文件内
 ## 测试
 
 ```bash
-npm run test:server   # bun test：SQLite 端口契约 + API 全流程
+npm run test:server   # SQLite 端口契约与 API 测试
+npm run verify:release # 使用现有 server.mcaddon 验证 BDS 部署全流程
 ```

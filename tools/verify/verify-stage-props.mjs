@@ -116,7 +116,8 @@ function verifyResources(addon, archive) {
 }
 
 const output = "build/stage-props";
-await mkdir(output, { recursive: true });
+const writeSamples = !process.argv.includes("--no-write");
+if (writeSamples) await mkdir(output, { recursive: true });
 for (const [archive, songId, time] of [[sinner, "28a2cb50", 6], [chinese, "f3b8fb2", 182]]) {
     const template = await readTemplate(bare);
     assert.ok(!template.addon.entries().some(({ path }) => isPropFile(path, template.bpPath, template.rpPath)));
@@ -140,7 +141,9 @@ for (const [archive, songId, time] of [[sinner, "28a2cb50", 6], [chinese, "f3b8f
     const engine = new host.VfxEngine(host.createPerformanceProgram(decoded.performance, decoded.duration / TIME_SCALE), "grand");
     engine.seek(time, true);
     assert.equal(engine.stageProp(time, host.quietFeatures)?.id, registration(archive).id);
-    await writeFile(`${output}/${archive.manifest.id}.mcaddon`, new Uint8Array(await blob.arrayBuffer()));
+    if (writeSamples) {
+        await writeFile(`${output}/${archive.manifest.id}.mcaddon`, new Uint8Array(await blob.arrayBuffer()));
+    }
     console.log(`[stage-props] ${archive.manifest.id} works from the bare template with its own PBE3 song`);
 }
 

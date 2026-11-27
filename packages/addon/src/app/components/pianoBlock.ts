@@ -1,4 +1,4 @@
-import type { createBlockResourceEvents } from "@begame/tabletop/minecraft";
+import type { createBlockResourceEvents } from "@begame/minecraft";
 import { eventHost } from "@platform/host";
 import { PianoScope } from "@runtime/scope";
 import { BlockCustomComponent, EntityComponentTypes, EquipmentSlot, ExplosionBeforeEvent, GameMode, system, world } from "@minecraft/server";

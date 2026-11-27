@@ -1,4 +1,4 @@
-import { NativeTextSurface, textRotationForHeading } from "@begame/tabletop/minecraft";
+import { NativeTextSurface, textRotationForHeading } from "@begame/minecraft";
 import { hostScope, textPort } from "@platform/host";
 import { createLogger } from "@runtime/log";
 import { PianoScope } from "@runtime/scope";

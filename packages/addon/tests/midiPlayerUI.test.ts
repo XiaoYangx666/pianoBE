@@ -65,7 +65,7 @@ mock.module("@minecraft/server-ui", () => ({
 }));
 
 mock.module("sapi-pro", () => createSapiProMock(host));
-mock.module("@begame/tabletop/minecraft", () => ({
+mock.module("@begame/minecraft", () => ({
     reconcileEntityTransform: (entity: any, point: any, yaw: number) => {
         entity?.teleport?.(point);
         entity?.setRotation?.({ x: 0, y: yaw });

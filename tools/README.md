@@ -43,15 +43,9 @@
 
 | 脚本 | 用途 | npm 入口 |
 |---|---|---|
-| `verify-addon-build.mjs` | 校验 client/server 构建产物与 MIDI 路径 | `npm run verify:addon-build` |
+| `verify-addon-build.mjs` | 读取并校验已生成的客户端脚本、客户端模板和服务器底包 | `npm run verify:addon-build` |
 | `verify-timbres.mjs` | 校验音色包结构 | `npm run verify:timbres` |
 | `verify-generator.mjs` | 生成器端到端验证（bun） | — |
-
-## `vendor/` — 私有依赖打包
-
-| 脚本 | 用途 | npm 入口 |
-|---|---|---|
-| `pack-tabletop.mjs` | 打包私有 `@begame/tabletop` | `npm run vendor:tabletop` |
 
 ## `build/` — 构建辅助
 

@@ -1,4 +1,4 @@
-import { clearOwnedAssembly, inspectAssembly, writeAssembly } from "@begame/tabletop/minecraft";
+import { clearOwnedAssembly, inspectAssembly, writeAssembly } from "@begame/minecraft";
 import { P88_BENCH_FORWARD, PIANO_BENCH_SIT_FORWARD } from "@data/pianoBench.generated";
 import { BlockPermutation, ItemStack } from "@minecraft/server";
 import type { Block, Dimension, Vector3 } from "@minecraft/server";

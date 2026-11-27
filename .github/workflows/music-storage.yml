@@ -9,75 +9,37 @@ on:
       - "packages/addon/src/**"
       - "packages/addon/tests/**"
       - "packages/core/src/**"
+      - "packages/addon/package.json"
+      - "package-lock.json"
   pull_request:
     paths:
       - ".github/workflows/music-storage.yml"
       - "packages/addon/src/**"
       - "packages/addon/tests/**"
       - "packages/core/src/**"
+      - "packages/addon/package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 jobs:
-  core:
+  regression:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Run core unit tests in an isolated copy
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core-test"
-          mkdir -p "$core_dir"
-          cp -R packages/core/src packages/core/tests packages/core/package.json packages/core/tsconfig.json "$core_dir/"
-          cd "$core_dir"
-          bun install
-          bun run test
-
-  addon-music:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Build shared core without private vendor archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core"
-          mkdir -p "$core_dir"
-          cp -R packages/core/src packages/core/package.json packages/core/tsconfig.json "$core_dir/"
-          (cd "$core_dir" && bun install && bun add --dev typescript@5.9.3 && bun run build)
-          mkdir -p packages/addon/node_modules/@piano
-          ln -s "$core_dir" packages/addon/node_modules/@piano/core
-      - name: Build shared vfx without private vendor archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core"
-          vfx_dir="$RUNNER_TEMP/pianobe-vfx"
-          deps_dir="$RUNNER_TEMP/pianobe-vfx-deps"
-          mkdir -p "$vfx_dir/node_modules/@piano" "$deps_dir"
-          cp -R packages/vfx/src packages/vfx/package.json packages/vfx/tsconfig.json "$vfx_dir/"
-          printf '{"name":"pianobe-vfx-deps","private":true}\n' > "$deps_dir/package.json"
-          (cd "$deps_dir" && bun add fflate @types/node)
-          ln -s "$core_dir" "$vfx_dir/node_modules/@piano/core"
-          ln -s "$deps_dir/node_modules/fflate" "$vfx_dir/node_modules/fflate"
-          ln -s "$deps_dir/node_modules/@types" "$vfx_dir/node_modules/@types"
-          (cd "$vfx_dir" && "$core_dir/node_modules/.bin/tsc" -p tsconfig.json)
-          mkdir -p packages/addon/node_modules/@piano
-          ln -s "$vfx_dir" packages/addon/node_modules/@piano/vfx
+      - run: npm ci
       - name: Ensure obsolete PianoViewModel is absent
-        shell: bash
         run: |
           if git grep -n -E 'PianoViewModel|pianoViewModel\(' -- packages/addon/src; then
-            echo "Obsolete PianoViewModel reference detected"
             exit 1
           fi
-      - name: Music storage / queue / DDUI regression
-        working-directory: packages/addon
+      - name: Run regressions
         run: |
-          bun test tests/musicStorage.test.ts tests/cardSlot.test.ts tests/musicRefs.test.ts tests/musicUI.test.ts
+          npm run test:core
+          npm run test:addon -- tests/musicStorage.test.ts tests/cardSlot.test.ts tests/musicRefs.test.ts tests/musicUI.test.ts

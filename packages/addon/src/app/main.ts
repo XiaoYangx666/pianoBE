@@ -2,7 +2,7 @@ import { blockPlacerComponent } from "@app/components/blockPlacer";
 import { PianoBlockComponent, registerPianoBlockEvents } from "@app/components/pianoBlock";
 import { MusicCardComponent } from "@app/components/musicCard";
 import { P88BenchRecoveryComponent, PianoBenchComponent, registerPianoBenchEvents } from "@app/components/pianoBench";
-import { createBlockResourceEvents, createNativeDropSuppression } from "@begame/tabletop/minecraft";
+import { createBlockResourceEvents, createNativeDropSuppression } from "@begame/minecraft";
 import { eventHost } from "@platform/host";
 import { invalidateMidiImport } from "@app/ui/midi/importUI";
 import { pianoWorld } from "@app/PianoWorld";

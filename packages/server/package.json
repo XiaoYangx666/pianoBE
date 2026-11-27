@@ -9,7 +9,8 @@
         "start": "bun src/index.ts",
         "dev": "bun --watch src/index.ts",
         "debug": "bun --inspect src/index.ts",
-        "test": "bun test",
+        "test": "bun test --conditions=piano-source --test-name-pattern=\"^(?!.*\\[artifact\\])\"",
+        "test:artifacts": "bun test --conditions=piano-source tests/studioApi.test.ts --test-name-pattern=\"\\[artifact\\]\"",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {

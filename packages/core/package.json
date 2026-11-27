@@ -10,22 +10,27 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
+            "piano-source": "./src/index.ts",
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
         },
         "./convert": {
+            "piano-source": "./src/convert.ts",
             "types": "./dist/convert.d.ts",
             "import": "./dist/convert.js"
         },
         "./player": {
+            "piano-source": "./src/midi/audioPlayer.ts",
             "types": "./dist/midi/audioPlayer.d.ts",
             "import": "./dist/midi/audioPlayer.js"
         },
         "./note": {
+            "piano-source": "./src/midi/note.ts",
             "types": "./dist/midi/note.d.ts",
             "import": "./dist/midi/note.js"
         },
         "./audioLab": {
+            "piano-source": "./src/audioLab/index.ts",
             "types": "./dist/audioLab/index.d.ts",
             "import": "./dist/audioLab/index.js"
         }

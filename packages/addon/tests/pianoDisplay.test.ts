@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { textRotationForHeading } from "@begame/tabletop/minecraft";
+import { textRotationForHeading } from "@begame/minecraft";
 
 // A pitch-90 text primitive lies face-up, so its yaw controls the in-plane
 // heading rather than the facing normal.

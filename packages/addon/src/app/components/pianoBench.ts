@@ -1,4 +1,4 @@
-import { createMinecraftSeats, type createBlockResourceEvents, type MinecraftSeatTarget } from "@begame/tabletop/minecraft";
+import { createMinecraftSeats, type createBlockResourceEvents, type MinecraftSeatTarget } from "@begame/minecraft";
 import { PianoScope, reportPianoError } from "@runtime/scope";
 import { eventHost } from "@platform/host";
 import { PIANO_BENCH_SIT_FORWARD } from "@data/pianoBench.generated";

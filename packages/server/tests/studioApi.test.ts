@@ -498,10 +498,9 @@ describe("PianoBE Server Studio API：PBE3、曲库、插件与 BDS 部署", () 
         expect((await req("/api/addon/scores/test_score", { token: ADMIN, method: "DELETE" })).status).toBe(200);
     });
 
-    test("BDS 部署：重新装配 BP/RP、写入世界配置并维护 pending_deploy -> pending_restart -> active", async () => {
-        const clientTemplate = resolve(import.meta.dir, "../../../packages/addon/dist/template.mcaddon");
+    test("[artifact] BDS 部署：重新装配 BP/RP、写入世界配置并维护 pending_deploy -> pending_restart -> active", async () => {
         const serverTemplate = resolve(import.meta.dir, "../../../packages/addon/dist/server.mcaddon");
-        if (!existsSync(serverTemplate) && !existsSync(clientTemplate)) return;
+        expect(existsSync(serverTemplate)).toBe(true);
 
         // 挂载一个不含脚本冲突的纯数据测试插件验证 BP/RP 部署
         const pluginBytes = writePbePluginArchive({

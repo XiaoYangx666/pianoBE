@@ -9,6 +9,7 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
+            "piano-source": "./index.ts",
             "bun": "./index.ts",
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"

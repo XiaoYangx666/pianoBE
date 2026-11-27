@@ -10,6 +10,7 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
+            "piano-source": "./src/index.ts",
             "bun": "./src/index.ts",
             "types": "./dist/index.d.ts",
             "import": "./src/index.js"
@@ -20,7 +21,8 @@
     ],
     "scripts": {
         "build": "tsc -p tsconfig.json",
-        "test": "bun test"
+        "test": "bun test --conditions=piano-source --test-name-pattern=\"^(?!.*\\[artifact\\])\"",
+        "test:artifacts": "bun test --conditions=piano-source --test-name-pattern=\"\\[artifact\\]\""
     },
     "dependencies": {
         "@bepack/addon": "^0.1.0-beta.9",

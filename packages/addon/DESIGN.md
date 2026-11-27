@@ -18,8 +18,8 @@ app         业务协调与组装：PianoWorld、PianoRuntime、输入路由、U
 
 依赖规则：
 
-- `domain/**` 不得依赖 `@minecraft/server`、`@minecraft/server-ui`、`sapi-pro`、`@begame/tabletop/minecraft`、`runtime`、`platform`、`app`。
-- `runtime/**` 不得依赖 Minecraft，也不得依赖 `app`、`platform`；可以依赖 `@begame/tabletop` 核心。
+- `domain/**` 不得依赖 `@minecraft/server`、`@minecraft/server-ui`、`sapi-pro`、`@begame/minecraft`、`runtime`、`platform`、`app`。
+- `runtime/**` 不得依赖 Minecraft，也不得依赖 `app`、`platform`；可以依赖 `@begame/minecraft/scope` 的平台无关生命周期接口。
 - `platform/**` 集中处理宿主适配，可以依赖 `domain`、`runtime`、`data` 和 Minecraft/Tabletop 平台 API，但不得依赖 `app`。
 - `app/**` 负责组装和业务协调，可以依赖所有层，也可以直接使用必要的 Minecraft 平台 API；UI 与方块/实体事件入口是明确允许的例外，不要求为每个 MC 调用建立 Port/Adapter。
 - `data/**` 只放静态数据/生成数据，不得反向依赖 `domain`、`runtime`、`platform`、`app`。

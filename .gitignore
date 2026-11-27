@@ -25,7 +25,7 @@ packages/studio/public
 # 生成器端到端验证的固定样例（见 tools/verify/fixtures/README.md）
 !tools/verify/fixtures/*.mid
 *.mcaddon
-# 私有依赖 @begame/tabletop，构建前用 npm run vendor:tabletop 生成（见 vendor/README.md）
+# 本地生成的依赖归档
 vendor/*.tgz
 # 本地测试曲谱（正式版由玩家在生成器里导入，不随模板发布）
 assets/scores/

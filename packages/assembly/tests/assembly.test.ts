@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { unzipSync, zipSync } from "fflate";
 import { encodeSong } from "@piano/core";
@@ -169,8 +169,7 @@ describe("@piano/assembly", () => {
         ).toBe("active");
     });
 
-    test("assembleAddonTemplate supports embedSongs=false and pure-song plugin embedding", async () => {
-        if (!existsSync(templatePath)) return;
+    test("[artifact] assembleAddonTemplate supports embedSongs=false and pure-song plugin embedding", async () => {
         const rawTpl = new Uint8Array(readFileSync(templatePath));
         const tplBytes = zipSync(unzipSync(rawTpl), { level: 0 });
         const info = await loadAddonTemplate(tplBytes);
@@ -278,8 +277,7 @@ describe("@piano/assembly", () => {
      * 而编译产物里的 midiManager.js 是 `import { libraries, midis } from ".../index.js"`，
      * 导致游戏内 QuickJS 在模块链接阶段报"未导出"。
      */
-    test("zero-library assembly still exports libraries for the compiled named import", async () => {
-        if (!existsSync(templatePath)) return;
+    test("[artifact] zero-library assembly still exports libraries for the compiled named import", async () => {
         const info = await loadAddonTemplate(new Uint8Array(readFileSync(templatePath)));
         const bytes = await assembleAddonBytes(info, [], {
             name: "零曲库装配",

@@ -11,6 +11,8 @@ on:
       - "packages/addon/tsconfig.json"
       - "packages/addon/bunfig.toml"
       - "packages/core/**"
+      - "packages/addon/package.json"
+      - "package-lock.json"
       - "packages/vfx/**"
   pull_request:
     paths:
@@ -20,81 +22,30 @@ on:
       - "packages/addon/tsconfig.json"
       - "packages/addon/bunfig.toml"
       - "packages/core/**"
+      - "packages/addon/package.json"
+      - "package-lock.json"
       - "packages/vfx/**"
   workflow_dispatch:
 
 jobs:
-  addon-ui:
+  regression:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Build shared core without private vendor archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core"
-          mkdir -p "$core_dir"
-          cp -R packages/core/src packages/core/package.json packages/core/tsconfig.json "$core_dir/"
-          (cd "$core_dir" && bun install && bun add --dev typescript@5.9.3 && bun run build)
-          mkdir -p packages/addon/node_modules/@piano
-          ln -s "$core_dir" packages/addon/node_modules/@piano/core
-          ln -s "$core_dir/node_modules/typescript" packages/addon/node_modules/typescript
-      - name: Build shared vfx without private vendor archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core"
-          vfx_dir="$RUNNER_TEMP/pianobe-vfx"
-          deps_dir="$RUNNER_TEMP/pianobe-vfx-deps"
-          mkdir -p "$vfx_dir/node_modules/@piano" "$deps_dir"
-          cp -R packages/vfx/src packages/vfx/package.json packages/vfx/tsconfig.json "$vfx_dir/"
-          printf '{"name":"pianobe-vfx-deps","private":true}\n' > "$deps_dir/package.json"
-          (cd "$deps_dir" && bun add fflate @types/node)
-          ln -s "$core_dir" "$vfx_dir/node_modules/@piano/core"
-          ln -s "$deps_dir/node_modules/fflate" "$vfx_dir/node_modules/fflate"
-          ln -s "$deps_dir/node_modules/@types" "$vfx_dir/node_modules/@types"
-          (cd "$vfx_dir" && "$core_dir/node_modules/.bin/tsc" -p tsconfig.json)
-          mkdir -p packages/addon/node_modules/@piano
-          ln -s "$vfx_dir" packages/addon/node_modules/@piano/vfx
-      - name: Assemble built-in VFX plugins without private vendor archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core"
-          vfx_dir="$RUNNER_TEMP/pianobe-vfx"
-          plugins_dir="$RUNNER_TEMP/pianobe-plugins"
-          mkdir -p "$plugins_dir/node_modules/@piano"
-          cp -R plugins/index.ts plugins/package.json plugins/tsconfig.json "$plugins_dir/"
-          for name in accents atmosphere chinese curves floral keys stage themes; do
-            cp -R "plugins/$name" "$plugins_dir/"
-          done
-          ln -s "$core_dir" "$plugins_dir/node_modules/@piano/core"
-          ln -s "$vfx_dir" "$plugins_dir/node_modules/@piano/vfx"
-          mkdir -p packages/addon/node_modules/@piano
-          ln -s "$plugins_dir" packages/addon/node_modules/@piano/plugins
-      - name: Run VFX domain tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          core_dir="$RUNNER_TEMP/pianobe-core"
-          deps_dir="$RUNNER_TEMP/pianobe-vfx-deps"
-          mkdir -p packages/vfx/node_modules/@piano plugins/node_modules/@piano
-          ln -s "$core_dir" packages/vfx/node_modules/@piano/core
-          ln -s "$deps_dir/node_modules/fflate" packages/vfx/node_modules/fflate
-          ln -s "$core_dir" plugins/node_modules/@piano/core
-          ln -s "$PWD/packages/vfx" plugins/node_modules/@piano/vfx
-          cd packages/vfx
-          bun test
+      - run: npm ci
       - name: Ensure obsolete PianoViewModel is absent
-        shell: bash
         run: |
           if git grep -n -E 'PianoViewModel|pianoViewModel\(' -- packages/addon/src; then
-            echo "Obsolete PianoViewModel reference detected"
             exit 1
           fi
-      - name: Check architecture and run UI regressions
-        working-directory: packages/addon
-        run: bun test tests/architecture.test.ts tests/pianoPanel.test.ts tests/pianoSettingsUI.test.ts tests/midiPlayerUI.test.ts
+      - name: Run regressions
+        run: |
+          npm run test:vfx
+          npm run test:addon -- tests/architecture.test.ts tests/pianoPanel.test.ts tests/pianoSettingsUI.test.ts tests/midiPlayerUI.test.ts

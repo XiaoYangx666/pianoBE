@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { RuntimeScope } from "@begame/tabletop";
+import { RuntimeScope } from "@begame/minecraft/scope";
 import { PianoScope } from "../src/runtime/scope";
 
 function rootScope() {

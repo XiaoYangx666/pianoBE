@@ -225,14 +225,19 @@ async function validatePlugin(archive, registry, byId) {
 async function main() {
     const args = process.argv.slice(2);
     const validateAll = args.includes("--all");
-    const explicit = args.filter(a => a !== "--all").map(a => resolve(root, a));
+    const sourceOnly = args.includes("--source");
+    const packedOnly = args.includes("--packed");
+    const explicit = args.filter(a => !["--all", "--source", "--packed"].includes(a)).map(a => resolve(root, a));
 
     let targets = explicit;
     if (validateAll) {
         const packedDir = join(root, "build/plugins");
-        const packedFiles = existsSync(packedDir)
+        const packedFiles = !sourceOnly && existsSync(packedDir)
             ? readdirSync(packedDir).filter(name => name.endsWith(".pbeplugin")).map(name => join(packedDir, name))
             : [];
+        if (packedOnly && !packedFiles.length) {
+            throw new Error("未找到已打包的插件：请先运行 npm run pack:plugins");
+        }
         targets = packedFiles.length ? packedFiles : listBuiltinPluginDirs();
     }
 

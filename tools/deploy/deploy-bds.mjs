@@ -10,7 +10,7 @@
  * 用法：
  *   npm run deploy:bds                     # 构建 + 本地直接部署
  *   npm run deploy:bds -- --skip-build     # 用现有 dist/server.mcaddon
- *   npm run deploy:bds -- --file <mcaddon> # 指定其他产物
+ *   npm run deploy:bds -- --file <mcaddon> # 直接使用指定服务器包
  *   npm run deploy:bds -- --url http://host:35050 --token <admin 令牌>   # 远端
  * 远端模式也可用环境变量 PIANOBE_URL / PIANOBE_TOKEN；
  * 令牌缺省时读取 packages/server/.env 的 BOOTSTRAP_TOKEN。
@@ -21,26 +21,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const serverDir = join(root, "packages/server");
 const defaultTemplate = join(root, "packages/addon/dist/server.mcaddon");
 const envFile = join(serverDir, ".env");
-
-/** 极简参数解析：--key value 或 --flag */
-function parseArgs(argv) {
-    const options = { flags: new Set() };
-    for (let i = 0; i < argv.length; i++) {
-        const arg = argv[i];
-        if (!arg.startsWith("--")) continue;
-        const [, key, inline] = arg.match(/^--([^=]+)(?:=(.*))?$/) ?? [];
-        if (!key) continue;
-        if (inline !== undefined) options[key] = inline;
-        else if (argv[i + 1] && !argv[i + 1].startsWith("--")) options[key] = argv[++i];
-        else options.flags.add(key);
-    }
-    return options;
-}
 
 /** 读 .env 里的单行值；找不到返回 undefined */
 function envValue(key) {
@@ -57,16 +43,39 @@ function fail(message) {
     process.exit(1);
 }
 
-const options = parseArgs(process.argv.slice(2));
-if (options.flags.has("help") || options.flags.has("h")) {
+let options;
+try {
+    ({ values: options } = parseArgs({
+        options: {
+            help: { type: "boolean", short: "h" },
+            "skip-build": { type: "boolean" },
+            file: { type: "string" },
+            url: { type: "string" },
+            token: { type: "string" },
+            dir: { type: "string" },
+        },
+    }));
+} catch (error) {
+    fail(`${error.message}。运行 npm run deploy:bds -- --help 查看用法。`);
+}
+if (options.help) {
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0] + "*/");
     process.exit(0);
 }
 
-const templateFile = options.file ? resolve(options.file) : defaultTemplate;
+for (const key of ["file", "url", "token", "dir"]) {
+    if (options[key] !== undefined && !options[key].trim()) fail(`--${key} 的值不能为空`);
+}
+const templateFile = options.file === undefined ? defaultTemplate : resolve(options.file);
 const remoteUrl = options.url ?? process.env.PIANOBE_URL;
+const token = remoteUrl
+    ? options.token ?? process.env.PIANOBE_TOKEN ?? process.env.BOOTSTRAP_TOKEN ?? envValue("BOOTSTRAP_TOKEN")
+    : undefined;
+if (remoteUrl && !token) {
+    fail("远端模式缺少管理员令牌：用 --token、PIANOBE_TOKEN 或 packages/server/.env 的 BOOTSTRAP_TOKEN 提供");
+}
 
-if (options.flags.has("skip-build")) {
+if (options["skip-build"] || options.file !== undefined) {
     console.log("\x1b[90m跳过构建，使用现有产物\x1b[0m");
 } else {
     console.log("\x1b[36m▶ 构建服务器专用包（npm run build:server）\x1b[0m");
@@ -82,10 +91,10 @@ if (options.flags.has("skip-build")) {
     }
 }
 
-if (!existsSync(templateFile)) {
+const meta = statSync(templateFile, { throwIfNoEntry: false });
+if (!meta?.isFile()) {
     fail(`找不到构建产物：${templateFile}`);
 }
-const meta = statSync(templateFile);
 const sizeText = `${(meta.size / 1024 / 1024).toFixed(1)} MB, ${meta.mtime.toLocaleString("zh-CN")}`;
 
 if (!remoteUrl) {
@@ -106,10 +115,6 @@ if (!remoteUrl) {
 
 // 远端模式：走 HTTP 上传模板 + 触发部署
 const baseUrl = remoteUrl.replace(/\/+$/, "");
-const token = options.token ?? process.env.PIANOBE_TOKEN ?? process.env.BOOTSTRAP_TOKEN ?? envValue("BOOTSTRAP_TOKEN");
-if (!token) {
-    fail("远端模式缺少管理员令牌：用 --token、PIANOBE_TOKEN 或 packages/server/.env 的 BOOTSTRAP_TOKEN 提供");
-}
 
 async function request(path, init, label) {
     let response;

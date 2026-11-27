@@ -12,7 +12,7 @@
         "prebuild": "bun scripts/sync.mjs",
         "build": "vite build",
         "preview": "vite preview",
-        "test": "bun test",
+        "test": "bun test --conditions=piano-source",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "build:server": "vite build --mode server",
         "prebuild:server": "bun scripts/sync.mjs --server"

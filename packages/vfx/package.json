@@ -10,11 +10,13 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
+            "piano-source": "./src/index.ts",
             "bun": "./src/index.ts",
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
         },
         "./package": {
+            "piano-source": "./src/plugin/pluginPackage.ts",
             "bun": "./src/plugin/pluginPackage.ts",
             "types": "./dist/plugin/pluginPackage.d.ts",
             "import": "./dist/plugin/pluginPackage.js"
@@ -27,7 +29,7 @@
     ],
     "scripts": {
         "build": "tsc -p tsconfig.json",
-        "test": "bun test"
+        "test": "bun test --conditions=piano-source"
     },
     "dependencies": {
         "@piano/core": "*",

@@ -2,21 +2,21 @@
  * 校验 addon 构建产物（client / server）。
  *
  * 用法：
- *   node tools/verify-addon-build.mjs client
- *   node tools/verify-addon-build.mjs server
- *   node tools/verify-addon-build.mjs            # 根据产物内容推断
+ *   node tools/verify/verify-addon-build.mjs client
+ *   node tools/verify/verify-addon-build.mjs server
+ *   node tools/verify/verify-addon-build.mjs            # 校验 client、server 和 template
  *
- * 必须在对应的 bepack 构建之后运行。重点保护内嵌 MIDI 的 preserve-modules
+ * 读取现有产物。可通过 npm run build:release 生成。重点保护内嵌 MIDI 的 preserve-modules
  * 输出路径，以及 client 产物不泄漏 server-only 模块。
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readAddonFile } from "@bepack/addon/node";
+import { strFromU8, unzipSync } from "fflate";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const addon = path.join(root, "packages/addon");
-const scripts = path.join(addon, "bp/scripts");
+const scripts = "bp/scripts";
 const src = path.join(addon, "src");
 
 let failed = 0;
@@ -45,8 +45,16 @@ function walk(dir) {
     });
 }
 
-const mode = process.argv[2] ?? (fs.existsSync(path.join(scripts, "serverAdmin.js")) ? "server" : "client");
-check(mode === "client" || mode === "server", `mode is client or server (${mode})`);
+const target = process.argv[2];
+if (target !== undefined && target !== "client" && target !== "server") {
+    throw new Error("预期的目标为 client 或 server");
+}
+
+function readArchive(name) {
+    const file = path.join(addon, "dist", name + ".mcaddon");
+    if (!fs.existsSync(file)) throw new Error(`缺少 ${file}，请先运行 npm run build:release`);
+    return unzipSync(fs.readFileSync(file));
+}
 
 // --- 源码与构建钩子必须指向同一个 MIDI 目录 ---
 const managerSource = read(path.join(src, "app/midiManager.ts"));
@@ -78,119 +86,138 @@ check(fs.existsSync(path.join(addon, "timbre-samples")) && fs.readdirSync(path.j
 check(read(path.join(root, "tools/verify/verify-timbres.mjs")).includes(timbresModule),
     "timbres verifier uses the domain timbres path");
 
-const templatePath = path.join(addon, "dist/template.mcaddon");
-const propRoot = "bp/entities/pbe_stage_props";
-const propCatalog = "bp/scripts/vfx/stagePropCatalog.js";
-
-const propFiles = fs.existsSync(path.join(addon, propRoot)) ? walk(path.join(addon, propRoot)) : [];
-check(propFiles.length === 0,
-    "zero-plugin base addon contains no built-in stage props");
-if (fs.existsSync(templatePath)) {
-    const template = await readAddonFile(templatePath);
-    check(template.has(timbresModule), `template includes ${timbresModule}`);
-    check(!template.entries().some(entry => entry.path.startsWith("bp/scripts/plugins/")),
+if (target === undefined) {
+    const template = readArchive("template");
+    check(!Object.keys(template).some((file) => file.includes("@begame/tabletop/")),
+        "template excludes private Tabletop modules");
+    check(Object.hasOwn(template, timbresModule), `template includes ${timbresModule}`);
+    check(!Object.keys(template).some((file) => file.startsWith("bp/scripts/plugins/")),
         "template contains no built-in plugin scripts");
 }
 
-// --- 实际产物 ---
-check(fs.existsSync(scripts), "bp/scripts exists (run a build first)");
-const catalogSource = read(path.join(addon, propCatalog));
-check(catalogSource.includes("STAGE_PROP_REGISTRATIONS"),
-    "stagePropCatalog.js exports STAGE_PROP_REGISTRATIONS");
-const runtimePath = path.join(scripts, "vfx/runtime.js");
-check(read(runtimePath).includes('from "./stagePropCatalog.js"'),
-    "VFX runtime imports the assembled stage prop catalog");
-const vfxPluginsPath = path.join(scripts, "vfx/plugins.js");
-check(fs.existsSync(vfxPluginsPath) && !read(vfxPluginsPath).includes("plugins/dist"),
-    "built vfx/plugins.js is zero-plugin (does not import @piano/plugins)");
-check(!fs.existsSync(path.join(scripts, "plugins")),
-    "built bp/scripts/plugins does not exist in zero-plugin base");
-const vfxIndexPath = path.join(scripts, "vfx/index.js");
-check(fs.existsSync(vfxIndexPath) && read(vfxIndexPath).includes("registerVfxPlugins"),
-    "built vfx/index.js retains registerVfxPlugins call");
+function verifyBuild(mode) {
+    console.log(`\n[verify-addon-build] ${mode}`);
+    const archive = mode === "server" ? readArchive("server") : undefined;
+    if (!archive && !fs.existsSync(path.join(addon, scripts))) {
+        throw new Error("缺少客户端 bp/scripts，请先运行 npm run build:release");
+    }
+    const files = archive
+        ? Object.keys(archive).filter((file) => !file.endsWith("/"))
+        : ["bp", "rp"].flatMap((pack) => walk(path.join(addon, pack)))
+            .map((file) => path.relative(addon, file).split(path.sep).join("/"));
+    const fileSet = new Set(files);
+    check(!files.some((file) => file.includes("@begame/tabletop/")),
+        "output excludes private Tabletop modules");
+    const filesUnder = (directory) => files.filter((file) => file.startsWith(directory + "/"));
+    const has = (file) => fileSet.has(file) || filesUnder(file).length > 0;
+    const readOutput = (file) => archive
+        ? (Object.hasOwn(archive, file) ? strFromU8(archive[file]) : "")
+        : (fileSet.has(file) ? read(path.join(addon, file)) : "");
 
-const seat = JSON.parse(read(path.join(addon, "bp/entities/piano_bench_seat.json")))["minecraft:entity"];
-const rideHeight = seat.components["minecraft:rideable"]?.seats?.[0]?.position?.[1];
-check(seat.description.identifier === "pbe:piano_bench_seat"
-    && seat.components["minecraft:rideable"]?.seat_count === 1
-    && !("minecraft:pushable" in seat.components),
-    "bench seat uses the current entity schema and provides one rider seat");
+    check(filesUnder("bp/entities/pbe_stage_props").length === 0,
+        "zero-plugin base addon contains no built-in stage props");
+    const propCatalog = "bp/scripts/vfx/stagePropCatalog.js";
+    // --- 实际产物 ---
+    const catalogSource = readOutput(propCatalog);
+    check(catalogSource.includes("STAGE_PROP_REGISTRATIONS"),
+        "stagePropCatalog.js exports STAGE_PROP_REGISTRATIONS");
+    const runtimePath = path.posix.join(scripts, "vfx/runtime.js");
+    check(readOutput(runtimePath).includes('from "./stagePropCatalog.js"'),
+        "VFX runtime imports the assembled stage prop catalog");
+    const vfxPluginsPath = path.posix.join(scripts, "vfx/plugins.js");
+    check(has(vfxPluginsPath) && !readOutput(vfxPluginsPath).includes("plugins/dist"),
+        "built vfx/plugins.js is zero-plugin (does not import @piano/plugins)");
+    check(!has(path.posix.join(scripts, "plugins")),
+        "built bp/scripts/plugins does not exist in zero-plugin base");
+    const vfxIndexPath = path.posix.join(scripts, "vfx/index.js");
+    check(has(vfxIndexPath) && readOutput(vfxIndexPath).includes("registerVfxPlugins"),
+        "built vfx/index.js retains registerVfxPlugins call");
 
-for (const [name, recovery] of [["piano_bench", false], ["p88_bench_left", true], ["p88_bench_right", true]]) {
-    const block = JSON.parse(read(path.join(addon, `bp/blocks/${name}.json`)))["minecraft:block"];
-    check(block.description.identifier === `pbe:${name}`
-        && "pbe:piano_bench_seating" in block.components
-        && ("pbe:p88_bench_recovery" in block.components) === recovery
-        && ("minecraft:tick" in block.components) === recovery,
-        `${name} declares seating and the correct tick registration`);
-    const cushion = block.components["minecraft:selection_box"];
-    check(rideHeight >= 0 && rideHeight * 16 < cushion.origin[1] + cushion.size[1],
-        `${name} allows for the visual rider height above the native seat`);
-}
+    const seat = JSON.parse(readOutput("bp/entities/piano_bench_seat.json"))["minecraft:entity"];
+    const rideHeight = seat.components["minecraft:rideable"]?.seats?.[0]?.position?.[1];
+    check(seat.description.identifier === "pbe:piano_bench_seat"
+        && seat.components["minecraft:rideable"]?.seat_count === 1
+        && !("minecraft:pushable" in seat.components),
+        "bench seat uses the current entity schema and provides one rider seat");
 
-const scorePack = path.join(scripts, "packages/addon/src/data/scorePack.js");
-const resourcePackUuid = JSON.parse(read(path.join(addon, "rp/manifest.json"))).header.uuid;
-check(fs.existsSync(scorePack) && read(scorePack).includes(resourcePackUuid),
-    "DDUI score pack ID matches the resource manifest");
-check(fs.existsSync(scorePack) && read(scorePack).includes("PIANO_SCORES"),
-    "score pack exports the published PIANO_SCORES list");
+    for (const [name, recovery] of [["piano_bench", false], ["p88_bench_left", true], ["p88_bench_right", true]]) {
+        const block = JSON.parse(readOutput(`bp/blocks/${name}.json`))["minecraft:block"];
+        check(block.description.identifier === `pbe:${name}`
+            && "pbe:piano_bench_seating" in block.components
+            && ("pbe:p88_bench_recovery" in block.components) === recovery
+            && ("minecraft:tick" in block.components) === recovery,
+            `${name} declares seating and the correct tick registration`);
+        const cushion = block.components["minecraft:selection_box"];
+        check(rideHeight >= 0 && rideHeight * 16 < cushion.origin[1] + cushion.size[1],
+            `${name} allows for the visual rider height above the native seat`);
+    }
 
-const builtManager = path.join(scripts, "midiManager.js");
-check(fs.existsSync(builtManager), "built midiManager.js exists");
+    const scorePack = path.posix.join(scripts, "packages/addon/src/data/scorePack.js");
+    const resourcePackUuid = JSON.parse(readOutput("rp/manifest.json")).header.uuid;
+    check(has(scorePack) && readOutput(scorePack).includes(resourcePackUuid),
+        "DDUI score pack ID matches the resource manifest");
+    check(has(scorePack) && readOutput(scorePack).includes("PIANO_SCORES"),
+        "score pack exports the published PIANO_SCORES list");
 
-if (fs.existsSync(builtManager)) {
-    const builtImport = capture(read(builtManager), /from\s+["']([^"']*midis\/index\.js)["']/, "built MIDI import");
-    const entry = path.resolve(path.dirname(builtManager), builtImport);
-    check(fs.existsSync(entry), `built MIDI entry resolves (${path.relative(root, entry)})`);
-    check(entry === path.join(scripts, destination, "index.js"), "built import matches hook destination");
+    const builtManager = path.posix.join(scripts, "midiManager.js");
+    check(has(builtManager), "built midiManager.js exists");
 
-    if (mode === "client") {
-        const generated = read(entry);
-        check(generated.includes('id:"'), "client embedded library is not empty");
-        check(generated.includes("export const libraries="), "client embedded library exports libraries");
-        check(fs.readdirSync(path.dirname(entry)).length > 1, "client generated MIDI modules exist");
+    if (has(builtManager)) {
+        const builtImport = capture(readOutput(builtManager), /from\s+["']([^"']*midis\/index\.js)["']/, "built MIDI import");
+        const entry = path.posix.join(path.posix.dirname(builtManager), builtImport);
+        check(has(entry), `built MIDI entry resolves (${entry})`);
+        check(entry === path.posix.join(scripts, destination, "index.js"), "built import matches hook destination");
 
-        check(!fs.existsSync(path.join(scripts, "serverAdmin.js")), "client output has no serverAdmin.js");
-        check(!fs.existsSync(path.join(scripts, "packages/addon/src/platform/server")),
-            "client output has no platform/server");
-        const leaked = walk(scripts)
-            .filter((file) => file.endsWith(".js"))
-            .filter((file) => /@minecraft\/server-(?:net|admin)/.test(read(file)));
-        check(leaked.length === 0, "client output has no @minecraft/server-net/admin imports");
+        if (mode === "client") {
+            const generated = readOutput(entry);
+            check(generated.includes('id:"'), "client embedded library is not empty");
+            check(generated.includes("export const libraries="), "client embedded library exports libraries");
+            check(filesUnder(path.posix.dirname(entry)).length > 1, "client generated MIDI modules exist");
 
-        check(!fs.existsSync(path.join(scripts, "server")),
-            "client output has no server feature modules");
-        const transcribeLeaks = walk(scripts)
-            .filter((file) => file.endsWith(".js"))
-            .filter((file) => /TranscriptionManager|online-transcribe|在线转录/.test(read(file)));
-        check(transcribeLeaks.length === 0, "client output has no online transcription code");
-    } else {
-        check(fs.existsSync(path.join(scripts, "serverAdmin.js")), "server output includes serverAdmin.js");
-        check(fs.existsSync(path.join(scripts, "packages/addon/src/platform/server")),
-            "server output includes platform/server");
-        const serverAdmin = path.join(scripts, "serverAdmin.js");
-        if (fs.existsSync(serverAdmin)) {
-            check(/@minecraft\/server-admin/.test(read(serverAdmin)), "serverAdmin imports server-admin");
-        }
+            check(!has(path.posix.join(scripts, "serverAdmin.js")), "client output has no serverAdmin.js");
+            check(!has(path.posix.join(scripts, "packages/addon/src/platform/server")),
+                "client output has no platform/server");
+            const leaked = filesUnder(scripts)
+                .filter((file) => file.endsWith(".js"))
+                .filter((file) => /@minecraft\/server-(?:net|admin)/.test(readOutput(file)));
+            check(leaked.length === 0, "client output has no @minecraft/server-net/admin imports");
 
-        const features = path.join(scripts, "server/features.js");
-        check(fs.existsSync(path.join(scripts, "server/transcription/manager.js")),
-            "server output includes the transcription manager");
-        check(fs.existsSync(features), "server output includes the feature bootstrap");
-        if (fs.existsSync(features)) {
-            check(read(features).includes("online-transcribe"),
-                "server registers the online transcription menu entry");
+            check(!has(path.posix.join(scripts, "server")),
+                "client output has no server feature modules");
+            const transcribeLeaks = filesUnder(scripts)
+                .filter((file) => file.endsWith(".js"))
+                .filter((file) => /TranscriptionManager|online-transcribe|在线转录/.test(readOutput(file)));
+            check(transcribeLeaks.length === 0, "client output has no online transcription code");
+        } else {
+            check(has(path.posix.join(scripts, "serverAdmin.js")), "server output includes serverAdmin.js");
+            check(has(path.posix.join(scripts, "packages/addon/src/platform/server")),
+                "server output includes platform/server");
+            const serverAdmin = path.posix.join(scripts, "serverAdmin.js");
+            if (has(serverAdmin)) {
+                check(/@minecraft\/server-admin/.test(readOutput(serverAdmin)), "serverAdmin imports server-admin");
+            }
+
+            const features = path.posix.join(scripts, "server/features.js");
+            check(has(path.posix.join(scripts, "server/transcription/manager.js")),
+                "server output includes the transcription manager");
+            check(has(features), "server output includes the feature bootstrap");
+            if (has(features)) {
+                check(readOutput(features).includes("online-transcribe"),
+                    "server registers the online transcription menu entry");
+            }
         }
     }
+
+    const vfxHost = path.posix.join(scripts, "vfx/host.js");
+    const vfxHostSource = has(vfxHost) ? readOutput(vfxHost) : "";
+    check(has(vfxHost), "built vfx/host.js exists");
+    check(
+        vfxHostSource.includes("registerVfxPlugin") && vfxHostSource.includes("drawPoints"),
+        "built vfx/host.js exports VFX Host API (registerVfxPlugin, drawPoints)",
+    );
 }
 
-const vfxHost = path.join(scripts, "vfx/host.js");
-const vfxHostSource = fs.existsSync(vfxHost) ? read(vfxHost) : "";
-check(fs.existsSync(vfxHost), "built vfx/host.js exists");
-check(
-    vfxHostSource.includes("registerVfxPlugin") && vfxHostSource.includes("drawPoints"),
-    "built vfx/host.js exports VFX Host API (registerVfxPlugin, drawPoints)",
-);
+for (const mode of target ? [target] : ["client", "server"]) verifyBuild(mode);
 
 if (failed > 0) {
     console.error(`\n${failed} check(s) failed`);

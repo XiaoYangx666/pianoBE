@@ -28,10 +28,10 @@ npm run build:plugins
 npm run pack:plugins
 npm run validate:plugins
 
-# 一键验证 VFX / 插件全链路或完整仓库校验流水线
-npm run check:vfx
+# 日常源码检查和发布验证
+npm run check:vfx    # VFX 测试、类型、素材和内置插件源码
 npm run check        # 类型检查 + 单测（日常）
-npm run check:full   # 额外构建 addon / 打包插件 / 构建 studio（发布前、CI）
+npm run check:full   # 日常检查、发布构建和产物验证
 ```
 
 进一步阅读：

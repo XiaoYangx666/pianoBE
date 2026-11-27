@@ -1,4 +1,4 @@
-import { RuntimeScope, type Disposable, type RuntimeResourceStats } from "@begame/tabletop";
+import { RuntimeScope, type Disposable, type RuntimeResourceStats } from "@begame/minecraft/scope";
 import { createLogger } from "@runtime/log";
 
 export type PianoErrorReporter = (boundary: string, error: unknown) => void;

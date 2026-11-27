@@ -32,6 +32,8 @@
 
 ### BDS 配置（配置文件示例）
 
+先给目标世界开启「测试版 API」。在部署后的行为包 `manifest.json` 中找到 `type` 为 `script` 的模块 UUID，复制 `config/default/permissions.json` 到 `config/<脚本模块 UUID>/permissions.json`，再在该文件的 `allowed_modules` 中补上 `@minecraft/server-net` 和 `@minecraft/server-admin`（已有条目保留）。[Microsoft Learn 的 BDS 脚本权限说明](https://learn.microsoft.com/en-us/minecraft/creator/documents/bedrockserver/scripting)。
+
 ```
 config/default/variables.json    → { "pianoBackendUrl": "http://192.168.1.10:35050" }
 config/default/secrets.json      → { "pianoBackendToken": "Bearer xxxxx" }
@@ -157,10 +159,12 @@ server 构建的启动日志（不打印令牌）：
 
 ```bash
 npm run build:template   # 产出 dist/template.mcaddon（生成器底包）
-npm run build            # 客户端构建（含内嵌曲库）+ 拷贝到测试服
+npm run build            # 生成 dist/dev.mcaddon（含内嵌曲库与本地插件）
+npm run deploy:dev       # 构建并复制开发包到本地 Minecraft
 npm run build:server     # 服务器专用构建（不含内嵌曲库）→ dist/server.mcaddon
-npm run test -w @piano/addon  # bun test（架构边界、MIDI、生命周期、UI 回归等）
-npm run verify:addon-build    # client/server 构建 + MIDI 路径与 server-only 隔离检查
+npm run test:addon           # 源码测试（架构边界、MIDI、生命周期、UI 回归等）
+npm run build:release        # 生成发布产物，最后写入客户端 bp/scripts
+npm run verify:addon-build   # 检查现有客户端脚本、template.mcaddon 和 server.mcaddon
 ```
 
 > 两种构建共用 `packages/addon/bp/` 目录并各自重写 `scripts/` 与 `manifest.json`。
@@ -178,7 +182,7 @@ npm run verify:addon-build    # client/server 构建 + MIDI 路径与 server-onl
 
 ## 音色包与生成器
 
-- `npm run build`：开发构建，包含全部音色，并复制到本地游戏开发包目录。
+- `npm run build` 生成包含全部音色的开发用 `dev.mcaddon`。使用 `npm run deploy:dev` 更新本地游戏开发包目录。
 - [VFX Lab](../../docs/vfx/README.md)：瞄准钢琴后运行 `/scriptevent pbe:vfx demo`，可独立预览三种粒子素材和组合演出。
 - `npm run build:template`：生成供生成器使用的精简基础模板，只保留标准钢琴；
   可选音色由生成器按用户勾选合并，不再把整套音色塞进模板。
